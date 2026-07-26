@@ -1,0 +1,12 @@
+@keyframes dice-tumble {
+    0% { transform: translateY(0) rotate(0deg) scale(1); }
+    20% { transform: translateY(-14px) rotate(120deg) scale(1.05); }
+    40% { transform: translateY(4px) rotate(240deg) scale(0.95); }
+    60% { transform: translateY(-8px) rotate(360deg) scale(1.05); }
+    80% { transform: translateY(2px) rotate(480deg) scale(0.98); }
+    100% { transform: translateY(0) rotate(600deg) scale(1); }
+  }
+  
+  .animate-dice-tumble {
+    animation: dice-tumble 0.6s ease-out;
+  }
