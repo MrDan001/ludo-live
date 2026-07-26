@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import { useMultiplayerGame } from "@/lib/hooks/useMultiplayerGame";
 import Board from "@/components/board/Board";
 import Dice from "@/components/board/Dice";
+import VoiceControls from "@/components/layout/VoiceControls";
 
 export default function RoomPage() {
   const params = useParams();
@@ -52,6 +53,7 @@ export default function RoomPage() {
         selectableTokenIds={selectableTokenIds}
         onTokenClick={(tokenId) => selectMove(room.id, tokenId)}
       />
+      <VoiceControls roomId={room.id} enabled={room.started} />
 
       <Dice
         d1={room.pendingRoll?.d1 ?? null}
