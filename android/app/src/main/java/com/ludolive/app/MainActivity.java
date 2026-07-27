@@ -1,0 +1,5 @@
+package com.ludolive.app;
+
+import com.getcapacitor.BridgeActivity;
+
+public class MainActivity extends BridgeActivity {}

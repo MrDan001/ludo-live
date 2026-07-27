@@ -21,15 +21,15 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
-  socket.on("room:create", ({ name }: { name: string }) => {
-    const room = createRoom(socket.id, name || "Player");
+  socket.on("room:create", ({ name, userId }: { name: string; userId: string }) => {
+    const room = createRoom(socket.id, userId, name || "Player");
     socket.join(room.id);
     socket.emit("room:joined", { roomId: room.id, yourColor: "RED" });
     io.to(room.id).emit("room:update", room);
   });
 
-  socket.on("room:join", ({ roomId, name }: { roomId: string; name: string }) => {
-    const room = joinRoom(roomId, socket.id, name || "Player");
+  socket.on("room:join", ({ roomId, name, userId }: { roomId: string; name: string; userId: string }) => {
+    const room = joinRoom(roomId, socket.id, userId, name || "Player");
     if (!room) {
       socket.emit("room:error", { message: "Could not join room (full, started, or doesn't exist)" });
       return;
@@ -55,8 +55,8 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("room:update", result.room);
   });
 
-  socket.on("game:selectMove", ({ roomId, tokenId }: { roomId: string; tokenId: string }) => {
-    const room = handleSelectMove(roomId, socket.id, tokenId);
+  socket.on("game:selectMove", async ({ roomId, tokenId }: { roomId: string; tokenId: string }) => {
+    const room = await handleSelectMove(roomId, socket.id, tokenId);
     if (!room) return;
     io.to(roomId).emit("room:update", room);
   });

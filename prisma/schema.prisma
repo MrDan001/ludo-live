@@ -5,7 +5,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model User {
@@ -40,4 +39,18 @@ model MatchPlayer {
 
   match    Match   @relation(fields: [matchId], references: [id])
   user     User    @relation(fields: [userId], references: [id])
+}
+
+model DailyReward {
+  id         String   @id @default(cuid())
+  userId     String   @unique
+  lastClaim  DateTime?
+  streak     Int      @default(0)
+}
+
+model LeaderboardEntry {
+  id       String @id @default(cuid())
+  userId   String @unique
+  wins     Int    @default(0)
+  gamesPlayed Int @default(0)
 }
