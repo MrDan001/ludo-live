@@ -2,13 +2,14 @@
   "name": "ludo-live",
   "version": "0.1.0",
   "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "dev:server": "tsx watch server/index.ts"
-  },
+"scripts": {
+  "dev": "next dev",
+  "build": "next build",
+  "start": "next start",
+  "lint": "eslint",
+  "dev:server": "tsx watch server/index.ts",
+  "postinstall": "prisma generate"
+},
   "dependencies": {
     "@capacitor/android": "^8.4.2",
     "@capacitor/core": "^8.4.2",
