@@ -5,17 +5,16 @@ import { usePathname } from "next/navigation";
 
 const NAV_ITEMS = [
   { label: "Home", icon: "🏠", href: "/home" },
-  { label: "Shop", icon: "🛒", href: "/shop" },
-  { label: "Collection", icon: "🎭", href: "/collection" },
-  { label: "Rank", icon: "🏅", href: "/leaderboard" },
-  { label: "Events", icon: "📅", href: "/events" },
+  { label: "Friends", icon: "👥", href: "/friends" },
+  { label: "Chat", icon: "💬", href: "/chat" },
+  { label: "Profile", icon: "👤", href: "/profile" },
 ];
 
 export default function BottomNav() {
   const pathname = usePathname();
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 flex justify-around py-2">
+    <div className="fixed bottom-0 left-0 right-0 bg-slate-800 border-t border-slate-700 flex justify-around py-2 z-10">
       {NAV_ITEMS.map((item) => {
         const active = pathname === item.href;
         return (
