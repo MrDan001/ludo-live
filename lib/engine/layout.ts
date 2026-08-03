@@ -86,22 +86,29 @@ export function getRenderCoord(
 }
 
 export const COLOR_BG: Record<PlayerColor, string> = {
-  RED: "bg-red-500",
-  GREEN: "bg-green-500",
-  YELLOW: "bg-yellow-400",
-  BLUE: "bg-blue-500",
+  RED: "bg-gradient-to-br from-red-400 to-red-600",
+  GREEN: "bg-gradient-to-br from-emerald-400 to-emerald-600",
+  YELLOW: "bg-gradient-to-br from-yellow-300 to-amber-500",
+  BLUE: "bg-gradient-to-br from-blue-400 to-blue-600",
 };
 
 export const COLOR_BG_LIGHT: Record<PlayerColor, string> = {
-  RED: "bg-red-100",
-  GREEN: "bg-green-100",
-  YELLOW: "bg-yellow-100",
-  BLUE: "bg-blue-100",
+  RED: "bg-red-50",
+  GREEN: "bg-emerald-50",
+  YELLOW: "bg-amber-50",
+  BLUE: "bg-blue-50",
+};
+
+export const COLOR_BG_SOLID: Record<PlayerColor, string> = {
+  RED: "bg-red-500",
+  GREEN: "bg-emerald-500",
+  YELLOW: "bg-amber-400",
+  BLUE: "bg-blue-500",
 };
 
 export const COLOR_BORDER: Record<PlayerColor, string> = {
-  RED: "border-red-700",
-  GREEN: "border-green-700",
-  YELLOW: "border-yellow-600",
-  BLUE: "border-blue-700",
+  RED: "border-red-800",
+  GREEN: "border-emerald-800",
+  YELLOW: "border-amber-700",
+  BLUE: "border-blue-800",
 };

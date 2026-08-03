@@ -86,9 +86,9 @@ export default function Board({ players, selectableTokenIds, onTokenClick }: Boa
 
   return (
     <div
-      className="grid w-full max-w-[600px] aspect-square border-2 border-slate-800 bg-white mx-auto"
-      style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
-    >
+  className="grid w-full max-w-[600px] aspect-square border-4 border-slate-900 rounded-xl bg-white mx-auto shadow-2xl overflow-hidden"
+  style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
+>
       {Array.from({ length: 15 }).map((_, r) =>
         Array.from({ length: 15 }).map((__, c) => {
           const key = `${r},${c}`;
@@ -98,17 +98,16 @@ export default function Board({ players, selectableTokenIds, onTokenClick }: Boa
           let bg = "bg-white";
           if (cell.type === "base") bg = COLOR_BG_LIGHT[cell.color!];
           if (cell.type === "home") bg = COLOR_BG_LIGHT[cell.color!];
-          if (cell.type === "center") bg = "bg-amber-300";
-          if (cell.type === "deco") bg = "bg-slate-200";
-
+          if (cell.type === "center") bg = "bg-gradient-to-br from-amber-200 via-amber-300 to-amber-400";
+          if (cell.type === "deco") bg = "bg-slate-100";
           return (
             <div
               key={key}
               className={`relative border border-slate-200 flex items-center justify-center ${bg}`}
             >
               {cell.type === "path" && cell.safe && (
-                <span className="text-[8px] text-slate-400">★</span>
-              )}
+  <span className="text-sm text-amber-500 drop-shadow-sm">★</span>
+)}
               <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-[1px] p-[1px]">
                 {tokensHere.map((t) => (
                   <Token

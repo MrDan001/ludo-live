@@ -42,8 +42,8 @@ export default function PlayPage() {
   const isHumanTurn = gameState.currentTurnColor === HUMAN_COLOR;
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center gap-6 p-6">
-      <h1 className="text-white text-xl font-bold">Ludo Live — Test Play</h1>
+<div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center gap-6 p-6">
+        <h1 className="text-white text-xl font-bold">Ludo Live — Test Play</h1>
 
       <div className="text-white">
         Turn: <span className="font-bold">{gameState.currentTurnColor}</span>

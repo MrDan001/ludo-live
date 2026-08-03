@@ -41,8 +41,8 @@ export default function RoomPage() {
   );
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col items-center gap-6 p-6">
-      <h1 className="text-white text-xl font-bold">Room {room.id}</h1>
+<div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center gap-6 p-6">
+        <h1 className="text-white text-xl font-bold">Room {room.id}</h1>
       <div className="text-white">
         Turn: <span className="font-bold">{gameState.currentTurnColor}</span>
         {gameState.winner && <span className="ml-4 text-amber-400">🏆 {gameState.winner} wins!</span>}
