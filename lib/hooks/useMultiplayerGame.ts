@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { getSocket } from "@/lib/socket/client";
 import { GameState, PlayerColor } from "@/lib/engine/gameState";
+import { ChatMessage } from "@/types/game";
 
 interface RoomPlayer {
   socketId: string;
@@ -19,6 +20,7 @@ interface RoomData {
   started: boolean;
   pendingRoll: { d1: number; d2: number; sum: number; hasSix: boolean } | null;
   pendingMoves: { tokenId: string; toPosition: number }[];
+  messages: ChatMessage[];
 }
 
 interface MultiplayerStore {

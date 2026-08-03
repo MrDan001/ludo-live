@@ -20,7 +20,13 @@ export default function ProfilePage() {
       <div className="w-full flex items-center justify-between">
         <button onClick={() => router.back()} className="text-white text-xl">←</button>
         <h1 className="text-white font-bold text-lg">Profile</h1>
-        <span className="text-white text-xl">⚙️</span>
+        <button
+          onClick={() => router.push("/settings")}
+          aria-label="Settings"
+          className="text-white text-xl active:scale-90 transition-transform"
+        >
+          ⚙️
+        </button>
       </div>
 
       <div className="w-24 h-24 rounded-full bg-slate-700 flex items-center justify-center text-white text-3xl font-bold border-4 border-amber-400 mt-2">

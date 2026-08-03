@@ -7,6 +7,10 @@ import {
 import { rollTwoDice, DiceRoll } from "../lib/engine/dice";
 import { getValidMoves, applyMove, getNextTurnColor, MoveOption } from "../lib/engine/moves";
 import { prisma } from "./db";
+import { ChatMessage, QUICK_CHAT_PRESETS } from "../types/game";
+
+const MAX_STORED_MESSAGES = 200;
+const MAX_MESSAGE_LENGTH = 200;
 
 export interface RoomPlayer {
   socketId: string;
@@ -26,6 +30,7 @@ export interface Room {
   pendingMoves: MoveOption[];
   consecutiveSixes: number;
   resultRecorded: boolean;
+  messages: ChatMessage[];
 }
 
 const rooms = new Map<string, Room>();
@@ -58,6 +63,7 @@ export function createRoom(hostSocketId: string, hostUserId: string, hostName: s
     pendingMoves: [],
     consecutiveSixes: 0,
     resultRecorded: false,
+    messages: [],
   };
   rooms.set(id, room);
   return room;
@@ -201,6 +207,46 @@ async function recordMatchResult(room: Room) {
   } catch (err) {
     console.error("Failed to record match result:", err);
   }
+}
+
+export function addChatMessage(
+  roomId: string,
+  socketId: string,
+  text: string,
+  isQuick: boolean
+): { room: Room; message: ChatMessage } | null {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+
+  const player = room.players.find((p) => p.socketId === socketId);
+  if (!player) return null;
+
+  const trimmed = text.trim();
+  if (!trimmed) return null;
+
+  // Quick chat may only send one of the fixed presets — this keeps it
+  // unmoderated-text-free by construction rather than by filtering.
+  if (isQuick && !QUICK_CHAT_PRESETS.includes(trimmed)) return null;
+  if (!isQuick && trimmed.length > MAX_MESSAGE_LENGTH) return null;
+
+  const message: ChatMessage = {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
+    roomId,
+    senderId: socketId,
+    senderName: player.name,
+    senderColor: player.color,
+    senderAvatarUrl: player.avatarUrl,
+    text: isQuick ? trimmed : trimmed.slice(0, MAX_MESSAGE_LENGTH),
+    isQuick,
+    timestamp: Date.now(),
+  };
+
+  room.messages.push(message);
+  if (room.messages.length > MAX_STORED_MESSAGES) {
+    room.messages.splice(0, room.messages.length - MAX_STORED_MESSAGES);
+  }
+
+  return { room, message };
 }
 
 export function markDisconnected(socketId: string): Room | null {

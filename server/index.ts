@@ -8,6 +8,7 @@ import {
   handleRoll,
   handleSelectMove,
   markDisconnected,
+  addChatMessage,
 } from "./rooms";
 
 type RTCSessionDescriptionInit = { type: string; sdp?: string };
@@ -64,6 +65,26 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("room:update", room);
   });
 
+  // Room chat - free-text messages between players in a room
+  socket.on("chat:message", ({ roomId, text }: { roomId: string; text: string }) => {
+    const result = addChatMessage(roomId, socket.id, text, false);
+    if (!result) {
+      socket.emit("chat:error", { message: "Message could not be sent" });
+      return;
+    }
+    io.to(roomId).emit("chat:new", result.message);
+  });
+
+  // Quick chat - one-tap preset phrases only (validated server-side against QUICK_CHAT_PRESETS)
+  socket.on("chat:quick", ({ roomId, text }: { roomId: string; text: string }) => {
+    const result = addChatMessage(roomId, socket.id, text, true);
+    if (!result) {
+      socket.emit("chat:error", { message: "Quick message could not be sent" });
+      return;
+    }
+    io.to(roomId).emit("chat:new", result.message);
+  });
+
   // WebRTC signaling relay - just passes messages between peers in the room
   socket.on("voice:join", ({ roomId }: { roomId: string }) => {
     socket.to(roomId).emit("voice:peer-joined", { socketId: socket.id });
@@ -83,6 +104,12 @@ io.on("connection", (socket) => {
 
   socket.on("voice:leave", ({ roomId }: { roomId: string }) => {
     socket.to(roomId).emit("voice:peer-left", { socketId: socket.id });
+  });
+
+  // Broadcasts a player's own mute state so peers can show accurate mic
+  // icons for each other in the Voice Chat panel.
+  socket.on("voice:mute-changed", ({ roomId, muted }: { roomId: string; muted: boolean }) => {
+    socket.to(roomId).emit("voice:mute-changed", { socketId: socket.id, muted });
   });
 
   socket.on("disconnect", () => {

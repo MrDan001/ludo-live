@@ -1,24 +1,39 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMultiplayerGame } from "@/lib/hooks/useMultiplayerGame";
 import { useAuth } from "@/lib/hooks/useAuth";
+import { useRoomChat } from "@/lib/hooks/useRoomChat";
+import { getSocket } from "@/lib/socket/client";
 import Board from "@/components/board/Board";
 import Dice from "@/components/board/Dice";
 import PlayerBadge from "@/components/layout/PlayerBadge";
 import VoiceControls from "@/components/layout/VoiceControls";
+import ChatPanel from "@/components/layout/ChatPanel";
+import VoiceChatPanel from "@/components/layout/VoiceChatPanel";
 
 export default function RoomPage() {
   const params = useParams();
   const roomId = params.roomId as string;
   const { room, yourColor, connect, startGame, roll, selectMove, rollSeq } = useMultiplayerGame();
   const { gems, checkSession } = useAuth();
+  const { connect: connectChat, unreadCount, markRead } = useRoomChat();
+
+  const [chatOpen, setChatOpen] = useState(false);
+  const [voiceOpen, setVoiceOpen] = useState(false);
 
   useEffect(() => {
     checkSession();
     connect();
   }, [checkSession, connect]);
+
+  // Seed room chat history once we're in a room. ChatPanel/VoiceChatPanel
+  // are pure overlays from here on - opening or closing them never touches
+  // this connection, the game socket, or the voice socket.
+  useEffect(() => {
+    if (room?.id) connectChat(room.id, room.messages);
+  }, [room?.id, connectChat]);
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
@@ -63,6 +78,7 @@ export default function RoomPage() {
   const selectableTokenIds = new Set(
     isYourTurn ? room.pendingMoves.map((m) => m.tokenId) : []
   );
+  const currentSocketId = getSocket().id ?? null;
 
   // Map top (RED, GREEN) and bottom (BLUE, YELLOW) players
   const redPlayer = room.players.find((p) => p.color === "RED");
@@ -175,8 +191,27 @@ export default function RoomPage() {
         {/* Left Voice & Chat Controls */}
         <div className="flex items-center gap-2">
           <VoiceControls roomId={room.id} enabled={room.started} />
-          <button className="w-9 h-9 rounded-full bg-[#3B2319] border border-amber-900/80 text-amber-200 flex items-center justify-center text-sm shadow-md active:scale-95 transition-transform">
+          <button
+            onClick={() => setVoiceOpen(true)}
+            aria-label="Voice chat participants"
+            className="w-9 h-9 rounded-full bg-[#3B2319] border border-amber-900/80 text-amber-200 flex items-center justify-center text-sm shadow-md active:scale-95 transition-transform"
+          >
+            👥
+          </button>
+          <button
+            onClick={() => {
+              setChatOpen(true);
+              markRead();
+            }}
+            aria-label="Chat"
+            className="relative w-9 h-9 rounded-full bg-[#3B2319] border border-amber-900/80 text-amber-200 flex items-center justify-center text-sm shadow-md active:scale-95 transition-transform"
+          >
             💬
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                {unreadCount > 9 ? "9+" : unreadCount}
+              </span>
+            )}
           </button>
         </div>
 
@@ -191,6 +226,16 @@ export default function RoomPage() {
           />
         </div>
       </div>
+
+      {/* Overlays - render on top of the board without unmounting it or
+          touching the game/voice sockets */}
+      <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} currentSocketId={currentSocketId} />
+      <VoiceChatPanel
+        isOpen={voiceOpen}
+        onClose={() => setVoiceOpen(false)}
+        players={room.players}
+        currentSocketId={currentSocketId}
+      />
     </div>
   );
 }

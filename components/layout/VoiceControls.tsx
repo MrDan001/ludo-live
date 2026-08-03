@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect } from "react";
 import { useVoiceChat } from "@/lib/hooks/useVoiceChat";
 
 interface VoiceControlsProps {
@@ -8,7 +9,21 @@ interface VoiceControlsProps {
 }
 
 export default function VoiceControls({ roomId, enabled }: VoiceControlsProps) {
-  const { muted, toggleMute } = useVoiceChat(roomId, enabled);
+  const { muted, toggleMute, connect } = useVoiceChat();
+
+  // Connect is a no-op if already live for this room, so this is safe to
+  // re-run on every render without re-requesting the mic or re-joining.
+  useEffect(() => {
+    connect(roomId, enabled);
+  }, [roomId, enabled, connect]);
+
+  // Only tear the connection down when this component actually unmounts
+  // (i.e. the room page itself unmounts) - not on every re-render.
+  useEffect(() => {
+    return () => {
+      useVoiceChat.getState().disconnect();
+    };
+  }, []);
 
   return (
     <button
