@@ -10,7 +10,7 @@ import BottomNav from "@/components/layout/BottomNav";
 export default function PrivateRoomPage() {
   const router = useRouter();
   const { connect, createRoom, joinRoom, room, error } = useMultiplayerGame();
-  const { user, dbUserId, checkSession } = useAuth();
+  const { user, dbUserId, avatarUrl, checkSession } = useAuth();
   const [joinCode, setJoinCode] = useState("");
 
   useEffect(() => {
@@ -32,7 +32,7 @@ export default function PrivateRoomPage() {
       {!ready && <p className="text-slate-400 text-sm">Connecting...</p>}
 
       <button
-        onClick={() => dbUserId && createRoom(displayName, dbUserId)}
+        onClick={() => dbUserId && createRoom(displayName, dbUserId, avatarUrl || undefined)}
         disabled={!ready}
         className="px-6 py-3 rounded-lg bg-emerald-600 text-white font-semibold w-64 disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -47,7 +47,7 @@ export default function PrivateRoomPage() {
           className="px-4 py-2 rounded-lg flex-1 bg-white text-slate-900 placeholder-slate-400 border border-slate-300"
         />
         <button
-          onClick={() => dbUserId && joinRoom(joinCode, displayName, dbUserId)}
+          onClick={() => dbUserId && joinRoom(joinCode, displayName, dbUserId, avatarUrl || undefined)}
           disabled={!ready}
           className="px-4 py-2 rounded-lg bg-blue-600 text-white font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
         >

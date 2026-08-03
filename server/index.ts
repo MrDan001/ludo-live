@@ -21,24 +21,27 @@ const io = new Server(httpServer, {
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
 
-  socket.on("room:create", ({ name, userId }: { name: string; userId: string }) => {
-    const room = createRoom(socket.id, userId, name || "Player");
+  socket.on("room:create", ({ name, userId, avatarUrl }: { name: string; userId: string; avatarUrl?: string }) => {
+    const room = createRoom(socket.id, userId, name || "Player", avatarUrl);
     socket.join(room.id);
     socket.emit("room:joined", { roomId: room.id, yourColor: "RED" });
     io.to(room.id).emit("room:update", room);
   });
 
-  socket.on("room:join", ({ roomId, name, userId }: { roomId: string; name: string; userId: string }) => {
-    const room = joinRoom(roomId, socket.id, userId, name || "Player");
-    if (!room) {
-      socket.emit("room:error", { message: "Could not join room (full, started, or doesn't exist)" });
-      return;
+  socket.on(
+    "room:join",
+    ({ roomId, name, userId, avatarUrl }: { roomId: string; name: string; userId: string; avatarUrl?: string }) => {
+      const room = joinRoom(roomId, socket.id, userId, name || "Player", avatarUrl);
+      if (!room) {
+        socket.emit("room:error", { message: "Could not join room (full, started, or doesn't exist)" });
+        return;
+      }
+      socket.join(roomId);
+      const me = room.players.find((p) => p.socketId === socket.id)!;
+      socket.emit("room:joined", { roomId: room.id, yourColor: me.color });
+      io.to(roomId).emit("room:update", room);
     }
-    socket.join(roomId);
-    const me = room.players.find((p) => p.socketId === socket.id)!;
-    socket.emit("room:joined", { roomId: room.id, yourColor: me.color });
-    io.to(roomId).emit("room:update", room);
-  });
+  );
 
   socket.on("room:start", ({ roomId }: { roomId: string }) => {
     const room = startGame(roomId);

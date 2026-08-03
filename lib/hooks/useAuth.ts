@@ -7,6 +7,7 @@ import type { User } from "@supabase/supabase-js";
 interface AuthStore {
   user: User | null;
   dbUserId: string | null;
+  avatarUrl: string | null;
   coins: number;
   gems: number;
   loading: boolean;
@@ -18,7 +19,9 @@ interface AuthStore {
   signOut: () => Promise<void>;
 }
 
-async function syncUser(user: User): Promise<{ id: string; coins: number; gems: number } | null> {
+async function syncUser(
+  user: User
+): Promise<{ id: string; coins: number; gems: number; avatarUrl: string | null } | null> {
   try {
     const res = await fetch("/api/auth/sync-user", {
       method: "POST",
@@ -31,7 +34,9 @@ async function syncUser(user: User): Promise<{ id: string; coins: number; gems: 
       }),
     });
     const data = await res.json();
-    return data.id ? { id: data.id, coins: data.coins ?? 0, gems: data.gems ?? 0 } : null;
+    return data.id
+      ? { id: data.id, coins: data.coins ?? 0, gems: data.gems ?? 0, avatarUrl: data.avatarUrl ?? null }
+      : null;
   } catch {
     return null;
   }
@@ -40,6 +45,7 @@ async function syncUser(user: User): Promise<{ id: string; coins: number; gems: 
 export const useAuth = create<AuthStore>((set, get) => ({
   user: null,
   dbUserId: null,
+  avatarUrl: null,
   coins: 0,
   gems: 0,
   loading: true,
@@ -50,7 +56,7 @@ export const useAuth = create<AuthStore>((set, get) => ({
     set({ user, loading: false });
     if (user) {
       const synced = await syncUser(user);
-      if (synced) set({ dbUserId: synced.id, coins: synced.coins, gems: synced.gems });
+      if (synced) set({ dbUserId: synced.id, coins: synced.coins, gems: synced.gems, avatarUrl: synced.avatarUrl });
     }
   },
 
@@ -58,7 +64,7 @@ export const useAuth = create<AuthStore>((set, get) => ({
     const { user } = get();
     if (!user) return;
     const synced = await syncUser(user);
-    if (synced) set({ coins: synced.coins, gems: synced.gems });
+    if (synced) set({ coins: synced.coins, gems: synced.gems, avatarUrl: synced.avatarUrl });
   },
 
   signInAsGuest: async () => {
@@ -67,7 +73,7 @@ export const useAuth = create<AuthStore>((set, get) => ({
     set({ user: data.user });
     if (data.user) {
       const synced = await syncUser(data.user);
-      if (synced) set({ dbUserId: synced.id, coins: synced.coins, gems: synced.gems });
+      if (synced) set({ dbUserId: synced.id, coins: synced.coins, gems: synced.gems, avatarUrl: synced.avatarUrl });
     }
     return { error: null };
   },
@@ -78,7 +84,7 @@ export const useAuth = create<AuthStore>((set, get) => ({
     set({ user: data.user });
     if (data.user) {
       const synced = await syncUser(data.user);
-      if (synced) set({ dbUserId: synced.id, coins: synced.coins, gems: synced.gems });
+      if (synced) set({ dbUserId: synced.id, coins: synced.coins, gems: synced.gems, avatarUrl: synced.avatarUrl });
     }
     return { error: null };
   },
@@ -89,13 +95,13 @@ export const useAuth = create<AuthStore>((set, get) => ({
     set({ user: data.user });
     if (data.user) {
       const synced = await syncUser(data.user);
-      if (synced) set({ dbUserId: synced.id, coins: synced.coins, gems: synced.gems });
+      if (synced) set({ dbUserId: synced.id, coins: synced.coins, gems: synced.gems, avatarUrl: synced.avatarUrl });
     }
     return { error: null };
   },
 
   signOut: async () => {
     await supabase.auth.signOut();
-    set({ user: null, dbUserId: null, coins: 0, gems: 0 });
+    set({ user: null, dbUserId: null, avatarUrl: null, coins: 0, gems: 0 });
   },
 }));

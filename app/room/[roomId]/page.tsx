@@ -8,13 +8,13 @@ import Board from "@/components/board/Board";
 import Dice from "@/components/board/Dice";
 import PlayerBadge from "@/components/layout/PlayerBadge";
 import VoiceControls from "@/components/layout/VoiceControls";
-import { PlayerColor } from "@/lib/engine";
+import { PlayerColor, ALL_COLORS } from "@/lib/engine";
 
 const CORNER_POSITIONS: Record<PlayerColor, string> = {
-  RED: "-top-3 -left-2",
-  GREEN: "-top-3 -right-2",
-  BLUE: "-bottom-3 -left-2",
-  YELLOW: "-bottom-3 -right-2",
+  RED: "top-0 left-0 -translate-x-1/4 -translate-y-1/3",
+  GREEN: "top-0 right-0 translate-x-1/4 -translate-y-1/3",
+  BLUE: "bottom-0 left-0 -translate-x-1/4 translate-y-1/3",
+  YELLOW: "bottom-0 right-0 translate-x-1/4 translate-y-1/3",
 };
 
 export default function RoomPage() {
@@ -72,16 +72,24 @@ export default function RoomPage() {
 
       {/* Board with corner player badges */}
       <div className="relative w-full max-w-[600px] mx-auto mt-2">
-        {room.players.map((player) => (
-          <div key={player.color} className={`absolute z-10 ${CORNER_POSITIONS[player.color]}`}>
-            <PlayerBadge
-              name={player.name}
-              color={player.color}
-              isCurrentTurn={gameState.currentTurnColor === player.color}
-              connected={player.connected}
-            />
-          </div>
-        ))}
+        {ALL_COLORS.map((color) => {
+          const player = room.players.find((p) => p.color === color);
+          return (
+            <div key={color} className={`absolute z-30 ${CORNER_POSITIONS[color]}`}>
+              {player ? (
+                <PlayerBadge
+                  name={player.name}
+                  color={player.color}
+                  isCurrentTurn={gameState.currentTurnColor === player.color}
+                  connected={player.connected}
+                  avatarUrl={player.avatarUrl}
+                />
+              ) : (
+                <PlayerBadge name="" color={color} isCurrentTurn={false} connected={false} empty />
+              )}
+            </div>
+          );
+        })}
 
         <Board
           players={gameState.players}

@@ -9,6 +9,7 @@ interface RoomPlayer {
   color: PlayerColor;
   name: string;
   connected: boolean;
+  avatarUrl?: string;
 }
 
 interface RoomData {
@@ -27,8 +28,8 @@ interface MultiplayerStore {
   rollSeq: number;
 
   connect: () => void;
-  createRoom: (name: string, userId: string) => void;
-  joinRoom: (roomId: string, name: string, userId: string) => void;
+  createRoom: (name: string, userId: string, avatarUrl?: string) => void;
+  joinRoom: (roomId: string, name: string, userId: string, avatarUrl?: string) => void;
   startGame: (roomId: string) => void;
   roll: (roomId: string) => void;
   selectMove: (roomId: string, tokenId: string) => void;
@@ -60,12 +61,12 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
     });
   },
 
-  createRoom: (name, userId) => {
-    getSocket().emit("room:create", { name, userId });
+  createRoom: (name, userId, avatarUrl) => {
+    getSocket().emit("room:create", { name, userId, avatarUrl });
   },
 
-  joinRoom: (roomId, name, userId) => {
-    getSocket().emit("room:join", { roomId, name, userId });
+  joinRoom: (roomId, name, userId, avatarUrl) => {
+    getSocket().emit("room:join", { roomId, name, userId, avatarUrl });
   },
 
   startGame: (roomId) => {

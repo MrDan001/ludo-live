@@ -14,6 +14,7 @@ export interface RoomPlayer {
   color: PlayerColor;
   name: string;
   connected: boolean;
+  avatarUrl?: string;
 }
 
 export interface Room {
@@ -37,11 +38,20 @@ export function generateRoomId(): string {
   return id;
 }
 
-export function createRoom(hostSocketId: string, hostUserId: string, hostName: string): Room {
+export function createRoom(hostSocketId: string, hostUserId: string, hostName: string, hostAvatarUrl?: string): Room {
   const id = generateRoomId();
   const room: Room = {
     id,
-    players: [{ socketId: hostSocketId, userId: hostUserId, color: "RED", name: hostName, connected: true }],
+    players: [
+      {
+        socketId: hostSocketId,
+        userId: hostUserId,
+        color: "RED",
+        name: hostName,
+        connected: true,
+        avatarUrl: hostAvatarUrl,
+      },
+    ],
     gameState: null,
     started: false,
     pendingRoll: null,
@@ -53,7 +63,13 @@ export function createRoom(hostSocketId: string, hostUserId: string, hostName: s
   return room;
 }
 
-export function joinRoom(roomId: string, socketId: string, userId: string, name: string): Room | null {
+export function joinRoom(
+  roomId: string,
+  socketId: string,
+  userId: string,
+  name: string,
+  avatarUrl?: string
+): Room | null {
   const room = rooms.get(roomId);
   if (!room) return null;
   if (room.started) return null;
@@ -63,7 +79,7 @@ export function joinRoom(roomId: string, socketId: string, userId: string, name:
   const nextColor = ALL_COLORS.find((c) => !usedColors.has(c));
   if (!nextColor) return null;
 
-  room.players.push({ socketId, userId, color: nextColor, name, connected: true });
+  room.players.push({ socketId, userId, color: nextColor, name, connected: true, avatarUrl });
   return room;
 }
 

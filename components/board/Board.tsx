@@ -90,9 +90,27 @@ export default function Board({ players, selectableTokenIds, onTokenClick }: Boa
 
   return (
     <div
-  className="relative grid w-full max-w-[600px] aspect-square border-4 border-slate-900 rounded-xl bg-white mx-auto shadow-2xl overflow-hidden"
+  className="relative isolate grid w-full max-w-[600px] aspect-square border-4 border-slate-900 rounded-xl bg-white mx-auto shadow-2xl overflow-hidden"
   style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
 >
+      {/* One clean border per color box. Positioned absolutely (NOT as grid items) so it
+          can never interfere with the other 225 cells' auto-placement in the grid. */}
+      {ALL_COLORS.map((color) => {
+        const { rowStart, colStart } = BASE_ZONE[color];
+        return (
+          <div
+            key={`zone-border-${color}`}
+            className="absolute z-20 pointer-events-none border-[3px] border-slate-900"
+            style={{
+              top: `${(rowStart / 15) * 100}%`,
+              left: `${(colStart / 15) * 100}%`,
+              width: `${(6 / 15) * 100}%`,
+              height: `${(6 / 15) * 100}%`,
+            }}
+          />
+        );
+      })}
+
       {/* Center arrowhead pinwheel, sized to exactly cover the 3x3 middle block */}
       <div
         className="absolute z-0 pointer-events-none"
@@ -120,10 +138,14 @@ export default function Board({ players, selectableTokenIds, onTokenClick }: Boa
           if (cell.type === "home") bg = COLOR_BG_SOLID[cell.color!];
           if (cell.type === "path" && cell.entryColor) bg = COLOR_BG_SOLID[cell.entryColor];
           if (inArrowZone) bg = "bg-transparent";
+          const showGridLine = cell.type !== "base" && !inArrowZone;
+
           return (
             <div
               key={key}
-              className={`relative z-10 border border-slate-200 flex items-center justify-center ${bg}`}
+              className={`relative z-10 flex items-center justify-center ${bg} ${
+                showGridLine ? "border border-slate-200" : ""
+              }`}
             >
               {cell.type === "path" && cell.safe && (
   <span className={`text-sm drop-shadow-sm ${cell.entryColor ? "text-white" : "text-amber-500"}`}>★</span>
