@@ -1,5 +1,5 @@
 import { PlayerColor, ALL_COLORS } from "./gameState";
-import { GLOBAL_PATH_LENGTH, relativeToGlobal, getSafeGlobalSquares } from "./board";
+import { GLOBAL_PATH_LENGTH, relativeToGlobal, getSafeGlobalSquares, START_OFFSET } from "./board";
 
 export interface Coord {
   row: number;
@@ -27,6 +27,12 @@ export const GLOBAL_PATH_COORDS: Coord[] = [
 if (GLOBAL_PATH_COORDS.length !== GLOBAL_PATH_LENGTH) {
   throw new Error("GLOBAL_PATH_COORDS length mismatch with engine constant");
 }
+
+// Each color's entry ("exit") square onto the shared path, derived from its start offset.
+export const ENTRY_COORDS: Record<PlayerColor, Coord> = ALL_COLORS.reduce((acc, color) => {
+  acc[color] = GLOBAL_PATH_COORDS[START_OFFSET[color]];
+  return acc;
+}, {} as Record<PlayerColor, Coord>);
 
 // Each color's private 6-square home stretch leading to the center.
 export const HOME_STRETCH_COORDS: Record<PlayerColor, Coord[]> = {
@@ -99,11 +105,20 @@ export const COLOR_BG_LIGHT: Record<PlayerColor, string> = {
   BLUE: "bg-blue-50",
 };
 
+// Deep, saturated fills for the board quadrants (yard + home stretch + exit squares).
 export const COLOR_BG_SOLID: Record<PlayerColor, string> = {
-  RED: "bg-red-500",
-  GREEN: "bg-emerald-500",
-  YELLOW: "bg-amber-400",
-  BLUE: "bg-blue-500",
+  RED: "bg-red-600",
+  GREEN: "bg-green-600",
+  YELLOW: "bg-amber-500",
+  BLUE: "bg-blue-600",
+};
+
+// Text-color equivalents of COLOR_BG_SOLID, for use with `fill-current` on SVG shapes.
+export const COLOR_TEXT_SOLID: Record<PlayerColor, string> = {
+  RED: "text-red-600",
+  GREEN: "text-green-600",
+  YELLOW: "text-amber-500",
+  BLUE: "text-blue-600",
 };
 
 export const COLOR_BORDER: Record<PlayerColor, string> = {

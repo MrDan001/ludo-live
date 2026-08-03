@@ -5,12 +5,12 @@ import { useMemo } from "react";
 import { Player, PlayerColor, ALL_COLORS } from "@/lib/engine";
 import {
   BASE_ZONE,
-  DECO_CORNERS,
   GLOBAL_PATH_COORDS,
   HOME_STRETCH_COORDS,
   CENTER_COORD,
-  COLOR_BG,
-  COLOR_BG_LIGHT,
+  ENTRY_COORDS,
+  COLOR_BG_SOLID,
+  COLOR_TEXT_SOLID,
   getSafeCoordSet,
   getRenderCoord,
 } from "@/lib/engine/layout";
@@ -22,6 +22,7 @@ interface CellInfo {
   type: CellType;
   color?: PlayerColor;
   safe?: boolean;
+  entryColor?: PlayerColor;
 }
 
 function buildCellMap(): Record<string, CellInfo> {
@@ -49,15 +50,18 @@ function buildCellMap(): Record<string, CellInfo> {
   });
 
   ALL_COLORS.forEach((color) => {
+    const entry = ENTRY_COORDS[color];
+    const key = `${entry.row},${entry.col}`;
+    map[key] = { ...map[key], entryColor: color };
+  });
+
+  ALL_COLORS.forEach((color) => {
     HOME_STRETCH_COORDS[color].forEach((coord) => {
       map[`${coord.row},${coord.col}`] = { type: "home", color };
     });
   });
 
   map[`${CENTER_COORD.row},${CENTER_COORD.col}`] = { type: "center" };
-  DECO_CORNERS.forEach((coord) => {
-    map[`${coord.row},${coord.col}`] = { type: "deco" };
-  });
 
   return map;
 }
@@ -86,27 +90,43 @@ export default function Board({ players, selectableTokenIds, onTokenClick }: Boa
 
   return (
     <div
-  className="grid w-full max-w-[600px] aspect-square border-4 border-slate-900 rounded-xl bg-white mx-auto shadow-2xl overflow-hidden"
+  className="relative grid w-full max-w-[600px] aspect-square border-4 border-slate-900 rounded-xl bg-white mx-auto shadow-2xl overflow-hidden"
   style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
 >
+      {/* Center arrowhead pinwheel, sized to exactly cover the 3x3 middle block */}
+      <div
+        className="absolute z-0 pointer-events-none"
+        style={{ top: "40%", left: "40%", width: "20%", height: "20%" }}
+      >
+        <svg viewBox="0 0 100 100" className="w-full h-full block">
+          <polygon points="0,0 100,0 50,50" className={`fill-current ${COLOR_TEXT_SOLID.GREEN}`} />
+          <polygon points="100,0 100,100 50,50" className={`fill-current ${COLOR_TEXT_SOLID.YELLOW}`} />
+          <polygon points="100,100 0,100 50,50" className={`fill-current ${COLOR_TEXT_SOLID.BLUE}`} />
+          <polygon points="0,100 0,0 50,50" className={`fill-current ${COLOR_TEXT_SOLID.RED}`} />
+          <line x1="0" y1="0" x2="100" y2="100" stroke="white" strokeWidth="2" />
+          <line x1="100" y1="0" x2="0" y2="100" stroke="white" strokeWidth="2" />
+        </svg>
+      </div>
+
       {Array.from({ length: 15 }).map((_, r) =>
         Array.from({ length: 15 }).map((__, c) => {
           const key = `${r},${c}`;
           const cell = CELL_MAP[key];
           const tokensHere = tokensByCell[key] || [];
+          const inArrowZone = r >= 6 && r <= 8 && c >= 6 && c <= 8;
 
           let bg = "bg-white";
-          if (cell.type === "base") bg = COLOR_BG_LIGHT[cell.color!];
-          if (cell.type === "home") bg = COLOR_BG_LIGHT[cell.color!];
-          if (cell.type === "center") bg = "bg-gradient-to-br from-amber-200 via-amber-300 to-amber-400";
-          if (cell.type === "deco") bg = "bg-slate-100";
+          if (cell.type === "base") bg = COLOR_BG_SOLID[cell.color!];
+          if (cell.type === "home") bg = COLOR_BG_SOLID[cell.color!];
+          if (cell.type === "path" && cell.entryColor) bg = COLOR_BG_SOLID[cell.entryColor];
+          if (inArrowZone) bg = "bg-transparent";
           return (
             <div
               key={key}
-              className={`relative border border-slate-200 flex items-center justify-center ${bg}`}
+              className={`relative z-10 border border-slate-200 flex items-center justify-center ${bg}`}
             >
               {cell.type === "path" && cell.safe && (
-  <span className="text-sm text-amber-500 drop-shadow-sm">★</span>
+  <span className={`text-sm drop-shadow-sm ${cell.entryColor ? "text-white" : "text-amber-500"}`}>★</span>
 )}
               <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-[1px] p-[1px]">
                 {tokensHere.map((t) => (
