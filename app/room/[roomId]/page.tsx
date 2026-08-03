@@ -10,7 +10,6 @@ import PlayerBadge from "@/components/layout/PlayerBadge";
 import VoiceControls from "@/components/layout/VoiceControls";
 import { PlayerColor, ALL_COLORS } from "@/lib/engine";
 
-// Position badges tightly inside the 4 corner bases of the board
 const CORNER_POSITIONS: Record<PlayerColor, string> = {
   RED: "top-1 left-1",
   GREEN: "top-1 right-1",
@@ -41,13 +40,21 @@ export default function RoomPage() {
     };
   }, []);
 
-  if (!room) return <div className="h-[100dvh] w-screen overflow-hidden bg-[#2D3748] p-8 text-white flex items-center justify-center select-none">Joining room {roomId}...</div>;
+  if (!room) {
+    return (
+      <div className="h-[100dvh] w-screen overflow-hidden bg-[#0B132B] p-8 text-white flex items-center justify-center select-none">
+        Joining room {roomId}...
+      </div>
+    );
+  }
 
   if (!room.started) {
     return (
-      <div className="h-[100dvh] w-screen overflow-hidden touch-none select-none bg-[#2D3748] flex flex-col items-center justify-center gap-4 p-6 fixed inset-0">
+      <div className="h-[100dvh] w-screen overflow-hidden touch-none select-none bg-[#0B132B] flex flex-col items-center justify-center gap-4 p-6 fixed inset-0">
         <h1 className="text-white text-2xl font-bold">Room {room.id}</h1>
-        <p className="text-white">Players: {room.players.map((p) => `${p.name} (${p.color})`).join(", ")}</p>
+        <p className="text-white">
+          Players: {room.players.map((p) => `${p.name} (${p.color})`).join(", ")}
+        </p>
         <button
           onClick={() => startGame(room.id)}
           disabled={room.players.length < 2}
@@ -61,12 +68,14 @@ export default function RoomPage() {
 
   const gameState = room.gameState!;
   const isYourTurn = gameState.currentTurnColor === yourColor;
-  const selectableTokenIds = new Set(isYourTurn ? room.pendingMoves.map((m) => m.tokenId) : []);
+  const selectableTokenIds = new Set(
+    isYourTurn ? room.pendingMoves.map((m) => m.tokenId) : []
+  );
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden touch-none select-none bg-[#0B132B] flex flex-col items-center justify-between pt-2 pb-4 px-3 font-sans">
+    <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden touch-none select-none bg-[#0B132B] flex flex-col items-center justify-between p-2 font-sans">
       {/* Top Header */}
-      <div className="w-full max-w-[340px] flex items-center justify-between px-1 shrink-0">
+      <div className="w-full max-w-[500px] flex items-center justify-between px-2 pt-1 shrink-0">
         <button className="text-gray-300 text-xl p-1">☰</button>
 
         <div className="flex items-center gap-1.5 bg-[#1C2541] border border-slate-700/60 px-3 py-1 rounded-full shadow-inner">
@@ -79,15 +88,14 @@ export default function RoomPage() {
       </div>
 
       {gameState.winner && (
-        <div className="text-amber-400 font-bold text-sm shrink-0 my-0.5 animate-bounce">
+        <div className="text-amber-400 font-bold text-sm shrink-0 animate-bounce">
           🏆 {gameState.winner} wins!
         </div>
       )}
 
-      {/* Main Board Container */}
-      <div className="w-full max-w-[320px] my-auto px-1 flex flex-col items-center justify-center shrink">
-        <div className="relative w-full aspect-square bg-[#1C2541] border-[4px] border-[#0B132B] shadow-2xl rounded-2xl flex items-center justify-center p-1 overflow-hidden">
-          
+      {/* Main Board Container - Dynamically scales to fill screen height/width */}
+      <div className="w-full max-w-[calc(100vh-140px)] aspect-square flex items-center justify-center shrink my-auto px-1">
+        <div className="relative w-full h-full bg-[#1C2541] border-[4px] border-[#0B132B] shadow-2xl rounded-2xl flex items-center justify-center overflow-hidden p-0">
           {/* Corner Player Badges */}
           {ALL_COLORS.map((color) => {
             const player = room.players.find((p) => p.color === color);
@@ -119,8 +127,8 @@ export default function RoomPage() {
         </div>
       </div>
 
-      {/* Bottom Controls Bar (Lifted for Mobile Viewports) */}
-      <div className="w-full max-w-[340px] px-1 pb-3 flex items-center justify-between shrink-0 mb-1">
+      {/* Bottom Controls Bar */}
+      <div className="w-full max-w-[500px] px-2 pb-1 flex items-center justify-between shrink-0">
         {/* Left Voice & Chat Controls */}
         <div className="flex items-center gap-2">
           <VoiceControls roomId={room.id} enabled={room.started} />
