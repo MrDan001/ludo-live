@@ -52,7 +52,7 @@ export const BASE_ZONE: Record<PlayerColor, { rowStart: number; colStart: number
   BLUE: { rowStart: 9, colStart: 0 },
 };
 
-// 4 token slots per color, inset within their 6x6 yard zone.
+// 4 token slots per color, aligned directly with the 4 white home circles.
 export const BASE_COORDS: Record<PlayerColor, Coord[]> = ALL_COLORS.reduce((acc, color) => {
   const { rowStart, colStart } = BASE_ZONE[color];
   acc[color] = [
