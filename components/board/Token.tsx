@@ -7,15 +7,30 @@ interface TokenProps {
   color: PlayerColor;
   selectable?: boolean;
   onClick?: () => void;
+  /** How many tokens are sharing this same cell right now - bigger when
+   *  alone, scaled down just enough to still fit when stacked. */
+  stackSize?: number;
 }
 
-export default function Token({ color, selectable, onClick }: TokenProps) {
+// Percent of the cell's own box (not the board cell) each token occupies,
+// keyed by how many tokens currently share that cell.
+const SIZE_BY_STACK: Record<number, string> = {
+  1: "88%",
+  2: "68%",
+  3: "56%",
+  4: "48%",
+};
+
+export default function Token({ color, selectable, onClick, stackSize = 1 }: TokenProps) {
+  const size = SIZE_BY_STACK[Math.min(stackSize, 4)] ?? SIZE_BY_STACK[4];
+
   return (
     <button
       onClick={onClick}
       disabled={!selectable}
+      style={{ width: size, height: size }}
       className={[
-        "relative w-[72%] h-[72%] rounded-full border-2 shadow-md transition-transform",
+        "relative rounded-full border-2 shadow-md transition-transform",
         COLOR_BG[color],
         COLOR_BORDER[color],
         selectable
