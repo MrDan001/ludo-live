@@ -12,11 +12,12 @@ import PlayerBadge from "@/components/layout/PlayerBadge";
 import VoiceControls from "@/components/layout/VoiceControls";
 import ChatPanel from "@/components/layout/ChatPanel";
 import VoiceChatPanel from "@/components/layout/VoiceChatPanel";
+import RoomLobby from "@/components/layout/RoomLobby";
 
 export default function RoomPage() {
   const params = useParams();
   const roomId = params.roomId as string;
-  const { room, yourColor, connect, startGame, roll, selectMove, rollSeq } = useMultiplayerGame();
+  const { room, yourColor, connect, roll, selectMove, rollSeq } = useMultiplayerGame();
   const { gems, checkSession } = useAuth();
   const { connect: connectChat, unreadCount, markRead } = useRoomChat();
 
@@ -57,19 +58,23 @@ export default function RoomPage() {
 
   if (!room.started) {
     return (
-      <div className="h-[100dvh] w-screen overflow-hidden touch-none select-none bg-[#1D110C] flex flex-col items-center justify-center gap-4 p-6 fixed inset-0 font-sans">
-        <h1 className="text-amber-100 text-2xl font-bold">Room {room.id}</h1>
-        <p className="text-amber-200/80">
-          Players: {room.players.map((p) => `${p.name} (${p.color})`).join(", ")}
-        </p>
-        <button
-          onClick={() => startGame(room.id)}
-          disabled={room.players.length < 2}
-          className="px-6 py-3 rounded-lg bg-amber-800 text-amber-100 font-semibold disabled:opacity-40 hover:bg-amber-700 transition-colors shadow-lg"
-        >
-          Start Game ({room.players.length}/4)
-        </button>
-      </div>
+      <>
+        <RoomLobby
+          onOpenChat={() => {
+            setChatOpen(true);
+            markRead();
+          }}
+          onOpenVoice={() => setVoiceOpen(true)}
+          chatUnreadCount={unreadCount}
+        />
+        <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} currentSocketId={getSocket().id ?? null} />
+        <VoiceChatPanel
+          isOpen={voiceOpen}
+          onClose={() => setVoiceOpen(false)}
+          players={room.players}
+          currentSocketId={getSocket().id ?? null}
+        />
+      </>
     );
   }
 

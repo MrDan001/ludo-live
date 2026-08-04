@@ -11,6 +11,9 @@ import { ChatMessage, QUICK_CHAT_PRESETS } from "../types/game";
 
 const MAX_STORED_MESSAGES = 200;
 const MAX_MESSAGE_LENGTH = 200;
+const DEFAULT_BET_AMOUNT = 0;
+const DEFAULT_GAME_MODE = "Classic";
+const MAX_BET_AMOUNT = 1_000_000;
 
 export interface RoomPlayer {
   socketId: string;
@@ -19,10 +22,12 @@ export interface RoomPlayer {
   name: string;
   connected: boolean;
   avatarUrl?: string;
+  ready: boolean;
 }
 
 export interface Room {
   id: string;
+  hostUserId: string;
   players: RoomPlayer[];
   gameState: GameState | null;
   started: boolean;
@@ -31,6 +36,9 @@ export interface Room {
   consecutiveSixes: number;
   resultRecorded: boolean;
   messages: ChatMessage[];
+  betAmount: number;
+  gameMode: string;
+  pot: number;
 }
 
 const rooms = new Map<string, Room>();
@@ -47,6 +55,7 @@ export function createRoom(hostSocketId: string, hostUserId: string, hostName: s
   const id = generateRoomId();
   const room: Room = {
     id,
+    hostUserId,
     players: [
       {
         socketId: hostSocketId,
@@ -55,6 +64,7 @@ export function createRoom(hostSocketId: string, hostUserId: string, hostName: s
         name: hostName,
         connected: true,
         avatarUrl: hostAvatarUrl,
+        ready: true, // host is implicitly ready - they control Start Game
       },
     ],
     gameState: null,
@@ -64,6 +74,9 @@ export function createRoom(hostSocketId: string, hostUserId: string, hostName: s
     consecutiveSixes: 0,
     resultRecorded: false,
     messages: [],
+    betAmount: DEFAULT_BET_AMOUNT,
+    gameMode: DEFAULT_GAME_MODE,
+    pot: 0,
   };
   rooms.set(id, room);
   return room;
@@ -85,7 +98,7 @@ export function joinRoom(
   const nextColor = ALL_COLORS.find((c) => !usedColors.has(c));
   if (!nextColor) return null;
 
-  room.players.push({ socketId, userId, color: nextColor, name, connected: true, avatarUrl });
+  room.players.push({ socketId, userId, color: nextColor, name, connected: true, avatarUrl, ready: false });
   return room;
 }
 
@@ -93,13 +106,54 @@ export function getRoom(roomId: string): Room | undefined {
   return rooms.get(roomId);
 }
 
-export function startGame(roomId: string): Room | null {
+class InsufficientFundsError extends Error {
+  constructor(public playerName: string, public required: number) {
+    super(`${playerName} doesn't have enough coins to cover this bet`);
+  }
+}
+
+export async function startGame(roomId: string, userId: string): Promise<Room | { error: string } | null> {
   const room = rooms.get(roomId);
-  if (!room || room.players.length < 2) return null;
+  if (!room) return null;
+  if (room.started) return { error: "Game already started" };
+  if (userId !== room.hostUserId) return { error: "Only the host can start the game" };
+  if (room.players.length < 2) return { error: "Need at least 2 players to start" };
+
+  const notReady = room.players.find((p) => !p.ready);
+  if (notReady) return { error: `${notReady.name} isn't ready yet` };
+
+  if (room.betAmount > 0) {
+    try {
+      // Interactive transaction: verify every player can cover the bet
+      // *before* deducting from anyone, so a mid-transaction failure never
+      // leaves some players charged and others not.
+      await prisma.$transaction(async (tx) => {
+        for (const p of room.players) {
+          const user = await tx.user.findUnique({ where: { id: p.userId } });
+          if (!user || user.coins < room.betAmount) {
+            throw new InsufficientFundsError(p.name, room.betAmount);
+          }
+        }
+        for (const p of room.players) {
+          await tx.user.update({
+            where: { id: p.userId },
+            data: { coins: { decrement: room.betAmount } },
+          });
+        }
+      });
+    } catch (err) {
+      if (err instanceof InsufficientFundsError) {
+        return { error: err.message };
+      }
+      console.error("Bet escrow transaction failed:", err);
+      return { error: "Could not process the bet - please try again" };
+    }
+  }
 
   const activeColors = room.players.map((p) => p.color);
   room.gameState = createInitialGameState(activeColors, []);
   room.started = true;
+  room.pot = room.betAmount * room.players.length;
   return room;
 }
 
@@ -203,6 +257,17 @@ async function recordMatchResult(room: Room) {
       });
     }
 
+    // Pay out the escrowed bet pot to the winner. The bet was already
+    // deducted from every player up front in startGame, so this is a pure
+    // credit - nothing to deduct here.
+    if (room.pot > 0 && winnerPlayer) {
+      await prisma.user.update({
+        where: { id: winnerPlayer.userId },
+        data: { coins: { increment: room.pot } },
+      });
+      console.log(`Paid out pot of ${room.pot} coins to ${winnerPlayer.name}`);
+    }
+
     console.log(`Match recorded for room ${room.id}, winner: ${winnerColor}`);
   } catch (err) {
     console.error("Failed to record match result:", err);
@@ -247,6 +312,48 @@ export function addChatMessage(
   }
 
   return { room, message };
+}
+
+export function toggleReady(roomId: string, socketId: string): Room | null {
+  const room = rooms.get(roomId);
+  if (!room || room.started) return null;
+
+  const player = room.players.find((p) => p.socketId === socketId);
+  if (!player) return null;
+
+  // The host stays implicitly ready - they don't toggle out, since they're
+  // the one who presses Start Game.
+  if (player.userId === room.hostUserId) return room;
+
+  player.ready = !player.ready;
+  return room;
+}
+
+export function setBetAmount(
+  roomId: string,
+  userId: string,
+  amount: number
+): Room | { error: string } | null {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  if (room.started) return { error: "Game already started" };
+  if (userId !== room.hostUserId) return { error: "Only the host can change the bet amount" };
+  if (!Number.isFinite(amount) || amount < 0 || amount > MAX_BET_AMOUNT) {
+    return { error: "Invalid bet amount" };
+  }
+
+  room.betAmount = Math.floor(amount);
+  return room;
+}
+
+export function setGameMode(roomId: string, userId: string, mode: string): Room | { error: string } | null {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  if (room.started) return { error: "Game already started" };
+  if (userId !== room.hostUserId) return { error: "Only the host can change the game mode" };
+
+  room.gameMode = mode;
+  return room;
 }
 
 export function markDisconnected(socketId: string): Room | null {

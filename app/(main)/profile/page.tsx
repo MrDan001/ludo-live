@@ -1,19 +1,46 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import BottomNav from "@/components/layout/BottomNav";
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { user, coins, gems, checkSession } = useAuth();
+  const { user, name, coins, gems, checkSession, updateName } = useAuth();
+
+  const [editing, setEditing] = useState(false);
+  const [nameInput, setNameInput] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [nameError, setNameError] = useState<string | null>(null);
 
   useEffect(() => {
     checkSession();
   }, [checkSession]);
 
-  const displayName = user?.email?.split("@")[0] || "PlayerOne";
+  const displayName = name || user?.email?.split("@")[0] || "Player";
+
+  const startEditing = () => {
+    setNameInput(displayName);
+    setNameError(null);
+    setEditing(true);
+  };
+
+  const handleSave = async () => {
+    if (!nameInput.trim() || nameInput.trim() === displayName) {
+      setEditing(false);
+      return;
+    }
+    setSaving(true);
+    setNameError(null);
+    const { error } = await updateName(nameInput.trim());
+    setSaving(false);
+    if (error) {
+      setNameError(error);
+      return;
+    }
+    setEditing(false);
+  };
 
   return (
     <div className="min-h-screen bg-slate-900 pb-24 flex flex-col items-center gap-4 p-4">
@@ -33,10 +60,42 @@ export default function ProfilePage() {
         {displayName.charAt(0).toUpperCase()}
       </div>
 
-      <div className="flex items-center gap-2">
-        <span className="text-white font-bold text-lg">{displayName}</span>
-        <span className="text-slate-400">✏️</span>
-      </div>
+      {editing ? (
+        <div className="flex flex-col items-center gap-1.5 w-full max-w-xs">
+          <div className="flex items-center gap-2 w-full">
+            <input
+              value={nameInput}
+              onChange={(e) => setNameInput(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && handleSave()}
+              maxLength={20}
+              autoFocus
+              className="flex-1 bg-slate-800 text-white text-center font-bold text-lg rounded-lg px-3 py-1.5 border border-slate-700 outline-none focus:border-amber-400"
+            />
+          </div>
+          <div className="flex items-center gap-3 mt-1">
+            <button
+              onClick={() => setEditing(false)}
+              disabled={saving}
+              className="text-slate-400 text-xs font-semibold px-3 py-1"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              className="text-emerald-400 text-xs font-semibold px-3 py-1 disabled:opacity-50"
+            >
+              {saving ? "Saving..." : "Save"}
+            </button>
+          </div>
+          {nameError && <p className="text-red-400 text-xs text-center">{nameError}</p>}
+        </div>
+      ) : (
+        <button onClick={startEditing} className="flex items-center gap-2 active:scale-95 transition-transform">
+          <span className="text-white font-bold text-lg">{displayName}</span>
+          <span className="text-slate-400">✏️</span>
+        </button>
+      )}
 
       <div className="w-full max-w-xs">
         <div className="flex justify-between text-xs text-slate-400 mb-1">

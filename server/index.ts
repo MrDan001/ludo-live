@@ -9,6 +9,9 @@ import {
   handleSelectMove,
   markDisconnected,
   addChatMessage,
+  toggleReady,
+  setBetAmount,
+  setGameMode,
 } from "./rooms";
 
 type RTCSessionDescriptionInit = { type: string; sdp?: string };
@@ -44,13 +47,43 @@ io.on("connection", (socket) => {
     }
   );
 
-  socket.on("room:start", ({ roomId }: { roomId: string }) => {
-    const room = startGame(roomId);
-    if (!room) {
-      socket.emit("room:error", { message: "Need at least 2 players to start" });
+  socket.on("room:start", async ({ roomId, userId }: { roomId: string; userId: string }) => {
+    const result = await startGame(roomId, userId);
+    if (!result) {
+      socket.emit("room:error", { message: "Room not found" });
       return;
     }
+    if ("error" in result) {
+      socket.emit("room:error", { message: result.error });
+      return;
+    }
+    io.to(roomId).emit("room:update", result);
+  });
+
+  socket.on("room:toggleReady", ({ roomId }: { roomId: string }) => {
+    const room = toggleReady(roomId, socket.id);
+    if (!room) return;
     io.to(roomId).emit("room:update", room);
+  });
+
+  socket.on("room:setBet", ({ roomId, userId, amount }: { roomId: string; userId: string; amount: number }) => {
+    const result = setBetAmount(roomId, userId, amount);
+    if (!result) return;
+    if ("error" in result) {
+      socket.emit("room:error", { message: result.error });
+      return;
+    }
+    io.to(roomId).emit("room:update", result);
+  });
+
+  socket.on("room:setMode", ({ roomId, userId, mode }: { roomId: string; userId: string; mode: string }) => {
+    const result = setGameMode(roomId, userId, mode);
+    if (!result) return;
+    if ("error" in result) {
+      socket.emit("room:error", { message: result.error });
+      return;
+    }
+    io.to(roomId).emit("room:update", result);
   });
 
   socket.on("game:roll", ({ roomId }: { roomId: string }) => {

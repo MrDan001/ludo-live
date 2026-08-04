@@ -20,7 +20,10 @@ export async function POST(req: NextRequest) {
 
   const user = await prisma.user.upsert({
     where: { supabaseId },
-    update: { name: name || "Player" },
+    // Deliberately not touching `name` here - it's a real, user-owned
+    // username now (see /api/auth/update-name). Overwriting it on every
+    // session sync would silently wipe out anything the player set.
+    update: {},
     create: {
       supabaseId,
       name: name || "Player",
@@ -32,5 +35,5 @@ export async function POST(req: NextRequest) {
 
   const avatarUrl = user.avatarUrl || defaultAvatarUrl(user.id);
 
-  return NextResponse.json({ id: user.id, coins: user.coins, gems: user.gems, avatarUrl });
+  return NextResponse.json({ id: user.id, name: user.name, coins: user.coins, gems: user.gems, avatarUrl });
 }

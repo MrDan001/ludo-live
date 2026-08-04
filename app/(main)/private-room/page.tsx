@@ -10,7 +10,7 @@ import BottomNav from "@/components/layout/BottomNav";
 export default function PrivateRoomPage() {
   const router = useRouter();
   const { connect, createRoom, joinRoom, room, error } = useMultiplayerGame();
-  const { user, dbUserId, avatarUrl, checkSession } = useAuth();
+  const { user, dbUserId, name, avatarUrl, checkSession } = useAuth();
   const [joinCode, setJoinCode] = useState("");
 
   useEffect(() => {
@@ -22,7 +22,7 @@ export default function PrivateRoomPage() {
     if (room) router.push(`/room/${room.id}`);
   }, [room, router]);
 
-  const displayName = user?.email?.split("@")[0] || "PlayerOne";
+  const displayName = name || user?.email?.split("@")[0] || "Player";
   const ready = !!dbUserId;
 
   return (

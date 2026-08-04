@@ -12,7 +12,7 @@ import QuickActionsRow from "@/components/layout/QuickActionsRow";
 export default function HomePage() {
   const router = useRouter();
   const { connect, createRoom, room } = useMultiplayerGame();
-  const { user, dbUserId, coins, gems, checkSession } = useAuth();
+  const { user, dbUserId, name, coins, gems, checkSession } = useAuth();
 
   useEffect(() => {
     checkSession();
@@ -27,7 +27,7 @@ export default function HomePage() {
     if (room) router.push(`/room/${room.id}`);
   }, [room, router]);
 
-  const displayName = user?.email?.split("@")[0] || "PlayerOne";
+  const displayName = name || user?.email?.split("@")[0] || "Player";
 
   return (
     <div className="min-h-screen bg-slate-900 pb-24">
