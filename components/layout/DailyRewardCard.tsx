@@ -8,14 +8,22 @@ interface DailyRewardCardProps {
 }
 
 export default function DailyRewardCard({ userId }: DailyRewardCardProps) {
-  const { claiming, claimResult, claimDailyReward } = useEconomy();
+  const { claiming, claimDailyReward } = useEconomy();
   const [message, setMessage] = useState<string | null>(null);
 
   async function handleClaim() {
     await claimDailyReward(userId);
     const result = useEconomy.getState().claimResult;
+
     if (result?.claimed) {
-      setMessage(`+${result.amount} coins! (${result.streak}-day streak)`);
+      // Check which currency was awarded today
+      const rewardText = result.coins
+        ? `+${result.coins} coins!`
+        : result.gems
+        ? `+${result.gems} gems!`
+        : "Daily reward claimed!";
+
+      setMessage(`${rewardText} (${result.streak ?? 1}-day streak)`);
     } else {
       setMessage("Already claimed today — come back later!");
     }
