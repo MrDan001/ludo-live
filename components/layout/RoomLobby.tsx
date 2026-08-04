@@ -1,8 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Settings, Copy, Check, Plus, CheckCircle2, XCircle, Crown, HelpCircle, MessageCircle } from "lucide-react";
+import { ArrowLeft, Settings, Copy, Check, Plus, CheckCircle2, XCircle, Crown, HelpCircle, MessageCircle, X } from "lucide-react";
 import { useMultiplayerGame } from "@/lib/hooks/useMultiplayerGame";
 import VoiceControls from "./VoiceControls";
 
@@ -23,10 +23,17 @@ interface RoomLobbyProps {
 
 export default function RoomLobby({ onOpenChat, onOpenVoice, chatUnreadCount }: RoomLobbyProps) {
   const router = useRouter();
-  const { room, yourUserId, starting, error, clearError, toggleReady, setBetAmount, startGame } =
+  const { room, yourUserId, starting, error, clearError, toggleReady, setBetAmount, startGame, removePlayer, kickedMessage, clearKicked } =
     useMultiplayerGame();
   const [copied, setCopied] = useState(false);
   const [showModeInfo, setShowModeInfo] = useState(false);
+
+  useEffect(() => {
+    if (!kickedMessage) return;
+    alert(kickedMessage);
+    clearKicked();
+    router.push("/home");
+  }, [kickedMessage, clearKicked, router]);
 
   if (!room) return null;
 
@@ -102,7 +109,20 @@ export default function RoomLobby({ onOpenChat, onOpenVoice, chatUnreadCount }: 
           const isYou = player.userId === yourUserId;
 
           return (
-            <div key={player.socketId} className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-2xl p-3">
+            <div key={player.socketId} className="relative flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-2xl p-3">
+              {isHost && !isPlayerHost && (
+                <button
+                  onClick={() => {
+                    if (confirm(`Remove ${player.name} from the room?`)) {
+                      removePlayer(room.id, player.userId);
+                    }
+                  }}
+                  aria-label={`Remove ${player.name}`}
+                  className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-slate-700 border border-slate-600 text-slate-300 flex items-center justify-center active:scale-90 transition-transform"
+                >
+                  <X size={11} />
+                </button>
+              )}
               <div className="relative shrink-0">
                 <div
                   className="w-11 h-11 rounded-full overflow-hidden flex items-center justify-center text-white text-sm font-bold"

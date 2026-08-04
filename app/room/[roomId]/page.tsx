@@ -17,8 +17,8 @@ import RoomLobby from "@/components/layout/RoomLobby";
 export default function RoomPage() {
   const params = useParams();
   const roomId = params.roomId as string;
-  const { room, yourColor, connect, roll, selectMove, rollSeq } = useMultiplayerGame();
-  const { gems, checkSession } = useAuth();
+  const { room, yourColor, connect, joinRoom, roll, selectMove, rollSeq } = useMultiplayerGame();
+  const { gems, name, avatarUrl, dbUserId, checkSession } = useAuth();
   const { connect: connectChat, unreadCount, markRead } = useRoomChat();
 
   const [chatOpen, setChatOpen] = useState(false);
@@ -28,6 +28,16 @@ export default function RoomPage() {
     checkSession();
     connect();
   }, [checkSession, connect]);
+
+  // If we land directly on this URL with no room state in memory yet - a
+  // page refresh, or opening the link fresh after a disconnect - rejoin
+  // using our real user ID. The server matches us back to our existing
+  // seat/color instead of treating us as a brand new player.
+  useEffect(() => {
+    if (!room && dbUserId && roomId) {
+      joinRoom(roomId, name || "Player", dbUserId, avatarUrl ?? undefined);
+    }
+  }, [room, dbUserId, roomId, name, avatarUrl, joinRoom]);
 
   // Seed room chat history once we're in a room. ChatPanel/VoiceChatPanel
   // are pure overlays from here on - opening or closing them never touches

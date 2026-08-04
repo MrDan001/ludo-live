@@ -88,15 +88,32 @@ export function joinRoom(
   userId: string,
   name: string,
   avatarUrl?: string
-): Room | null {
+): Room | { error: string } | null {
   const room = rooms.get(roomId);
   if (!room) return null;
-  if (room.started) return null;
-  if (room.players.length >= 4) return null;
+
+  // Reconnection: this user already has a seat in this room - whether
+  // they just dropped mid-game or their tab reloaded in the lobby. Resume
+  // their existing seat/color instead of treating them as a new player.
+  // Works whether the game has started or not, and even after a match has
+  // been decided (they'll just see the final result - nothing about a
+  // finished, paid-out match gets undone by reconnecting).
+  const existing = room.players.find((p) => p.userId === userId);
+  if (existing) {
+    existing.socketId = socketId;
+    existing.connected = true;
+    if (name) existing.name = name;
+    if (avatarUrl) existing.avatarUrl = avatarUrl;
+    return room;
+  }
+
+  // Brand new player - only allowed pre-game, with a free seat.
+  if (room.started) return { error: "Game already in progress" };
+  if (room.players.length >= 4) return { error: "Room is full" };
 
   const usedColors = new Set(room.players.map((p) => p.color));
   const nextColor = ALL_COLORS.find((c) => !usedColors.has(c));
-  if (!nextColor) return null;
+  if (!nextColor) return { error: "Room is full" };
 
   room.players.push({ socketId, userId, color: nextColor, name, connected: true, avatarUrl, ready: false });
   return room;
@@ -354,6 +371,76 @@ export function setGameMode(roomId: string, userId: string, mode: string): Room 
 
   room.gameMode = mode;
   return room;
+}
+
+// Auto-plays a disconnected player's turn so the match doesn't freeze on
+// them. Deliberately backs off when fewer than 2 players are connected -
+// that's a "can this match even continue" situation, handled separately
+// (last-player-standing), not a simple stall to play through.
+export async function autoPlayDisconnectedTurn(roomId: string): Promise<Room | null> {
+  const room = rooms.get(roomId);
+  if (!room || !room.started || !room.gameState || room.gameState.winner) return null;
+
+  const currentPlayer = room.players.find((p) => p.color === room.gameState!.currentTurnColor);
+  if (!currentPlayer || currentPlayer.connected) return null;
+
+  const connectedCount = room.players.filter((p) => p.connected).length;
+  if (connectedCount < 2) return null;
+
+  if (!room.pendingRoll) {
+    const result = handleRoll(roomId, currentPlayer.socketId);
+    return result ? result.room : null;
+  }
+
+  if (room.pendingMoves.length > 0) {
+    // Auto-play the first available move on their behalf.
+    const move = room.pendingMoves[0];
+    return await handleSelectMove(roomId, currentPlayer.socketId, move.tokenId);
+  }
+
+  return null;
+}
+
+// If a live bet match drops to exactly one connected player, the match is
+// over right there - that one player is the winner and takes the entire
+// pot (their own bet plus everyone else's). Anyone who disconnected has
+// forfeited their stake - there is no refund path, by design.
+export async function checkLastPlayerStanding(roomId: string): Promise<Room | null> {
+  const room = rooms.get(roomId);
+  if (!room || !room.started || !room.gameState || room.gameState.winner) return null;
+
+  const connectedPlayers = room.players.filter((p) => p.connected);
+  if (connectedPlayers.length !== 1) return null;
+
+  const survivor = connectedPlayers[0];
+  room.gameState = { ...room.gameState, winner: survivor.color };
+  room.pendingRoll = null;
+  room.pendingMoves = [];
+
+  if (!room.resultRecorded) {
+    room.resultRecorded = true;
+    await recordMatchResult(room);
+  }
+
+  return room;
+}
+
+export function removePlayer(
+  roomId: string,
+  hostUserId: string,
+  targetUserId: string
+): { room: Room; removedSocketId: string } | { error: string } | null {
+  const room = rooms.get(roomId);
+  if (!room) return null;
+  if (room.started) return { error: "Cannot remove players after the game has started" };
+  if (hostUserId !== room.hostUserId) return { error: "Only the host can remove players" };
+  if (targetUserId === room.hostUserId) return { error: "The host can't remove themselves" };
+
+  const index = room.players.findIndex((p) => p.userId === targetUserId);
+  if (index === -1) return { error: "Player not found" };
+
+  const [removed] = room.players.splice(index, 1);
+  return { room, removedSocketId: removed.socketId };
 }
 
 export function markDisconnected(socketId: string): Room | null {

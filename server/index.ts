@@ -12,6 +12,9 @@ import {
   toggleReady,
   setBetAmount,
   setGameMode,
+  autoPlayDisconnectedTurn,
+  checkLastPlayerStanding,
+  removePlayer,
 } from "./rooms";
 
 type RTCSessionDescriptionInit = { type: string; sdp?: string };
@@ -21,6 +24,46 @@ const httpServer = createServer();
 const io = new Server(httpServer, {
   cors: { origin: "*" },
 });
+
+// Grace period before a disconnected player's turn gets auto-played for
+// them, so one dropped connection doesn't freeze the match for everyone
+// else. Re-armed after every roll/move/disconnect - anything that could
+// change whose turn it is.
+const TURN_TIMEOUT_MS = 10_000;
+const turnTimers = new Map<string, NodeJS.Timeout>();
+
+function clearTurnTimer(roomId: string) {
+  const t = turnTimers.get(roomId);
+  if (t) {
+    clearTimeout(t);
+    turnTimers.delete(roomId);
+  }
+}
+
+function scheduleAutoPlayCheck(roomId: string) {
+  clearTurnTimer(roomId);
+
+  const room = getRoom(roomId);
+  if (!room || !room.started || !room.gameState || room.gameState.winner) return;
+
+  const currentPlayer = room.players.find((p) => p.color === room.gameState!.currentTurnColor);
+  if (!currentPlayer || currentPlayer.connected) return; // connected player's turn - nothing to schedule
+
+  const connectedCount = room.players.filter((p) => p.connected).length;
+  if (connectedCount < 2) return; // last-player-standing territory, not this mechanism
+
+  const timer = setTimeout(async () => {
+    const updated = await autoPlayDisconnectedTurn(roomId);
+    if (updated) {
+      io.to(roomId).emit("room:update", updated);
+    }
+    // Re-check in case the same (or a newly-current) disconnected player
+    // needs another auto-play chained right after this one.
+    scheduleAutoPlayCheck(roomId);
+  }, TURN_TIMEOUT_MS);
+
+  turnTimers.set(roomId, timer);
+}
 
 io.on("connection", (socket) => {
   console.log("Client connected:", socket.id);
@@ -35,15 +78,23 @@ io.on("connection", (socket) => {
   socket.on(
     "room:join",
     ({ roomId, name, userId, avatarUrl }: { roomId: string; name: string; userId: string; avatarUrl?: string }) => {
-      const room = joinRoom(roomId, socket.id, userId, name || "Player", avatarUrl);
-      if (!room) {
-        socket.emit("room:error", { message: "Could not join room (full, started, or doesn't exist)" });
+      const result = joinRoom(roomId, socket.id, userId, name || "Player", avatarUrl);
+      if (!result) {
+        socket.emit("room:error", { message: "Room not found" });
+        return;
+      }
+      if ("error" in result) {
+        socket.emit("room:error", { message: result.error });
         return;
       }
       socket.join(roomId);
-      const me = room.players.find((p) => p.socketId === socket.id)!;
-      socket.emit("room:joined", { roomId: room.id, yourColor: me.color });
-      io.to(roomId).emit("room:update", room);
+      const me = result.players.find((p) => p.socketId === socket.id)!;
+      socket.emit("room:joined", { roomId: result.id, yourColor: me.color });
+      io.to(roomId).emit("room:update", result);
+
+      // A reconnect may have just brought the current turn-holder back -
+      // re-check whether the auto-skip timer still needs to be armed.
+      scheduleAutoPlayCheck(result.id);
     }
   );
 
@@ -58,6 +109,7 @@ io.on("connection", (socket) => {
       return;
     }
     io.to(roomId).emit("room:update", result);
+    scheduleAutoPlayCheck(roomId);
   });
 
   socket.on("room:toggleReady", ({ roomId }: { roomId: string }) => {
@@ -86,16 +138,38 @@ io.on("connection", (socket) => {
     io.to(roomId).emit("room:update", result);
   });
 
+  socket.on(
+    "room:removePlayer",
+    ({ roomId, hostUserId, targetUserId }: { roomId: string; hostUserId: string; targetUserId: string }) => {
+      const result = removePlayer(roomId, hostUserId, targetUserId);
+      if (!result) return;
+      if ("error" in result) {
+        socket.emit("room:error", { message: result.error });
+        return;
+      }
+
+      io.to(roomId).emit("room:update", result.room);
+
+      const removedSocket = io.sockets.sockets.get(result.removedSocketId);
+      if (removedSocket) {
+        removedSocket.emit("room:kicked", { message: "The host removed you from the room" });
+        removedSocket.leave(roomId);
+      }
+    }
+  );
+
   socket.on("game:roll", ({ roomId }: { roomId: string }) => {
     const result = handleRoll(roomId, socket.id);
     if (!result) return;
     io.to(roomId).emit("room:update", result.room);
+    scheduleAutoPlayCheck(roomId);
   });
 
   socket.on("game:selectMove", async ({ roomId, tokenId }: { roomId: string; tokenId: string }) => {
     const room = await handleSelectMove(roomId, socket.id, tokenId);
     if (!room) return;
     io.to(roomId).emit("room:update", room);
+    scheduleAutoPlayCheck(roomId);
   });
 
   // Room chat - free-text messages between players in a room
@@ -145,9 +219,22 @@ io.on("connection", (socket) => {
     socket.to(roomId).emit("voice:mute-changed", { socketId: socket.id, muted });
   });
 
-  socket.on("disconnect", () => {
+  socket.on("disconnect", async () => {
     const room = markDisconnected(socket.id);
-    if (room) io.to(room.id).emit("room:update", room);
+    if (room) {
+      io.to(room.id).emit("room:update", room);
+
+      // Did that disconnect just drop us to exactly one connected player?
+      // If so, the match is over now - no need to arm the turn-skip timer
+      // for a match that's already been decided.
+      const resolved = await checkLastPlayerStanding(room.id);
+      if (resolved) {
+        clearTurnTimer(resolved.id);
+        io.to(resolved.id).emit("room:update", resolved);
+      } else {
+        scheduleAutoPlayCheck(room.id);
+      }
+    }
     console.log("Client disconnected:", socket.id);
   });
 });

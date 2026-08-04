@@ -34,6 +34,7 @@ interface MultiplayerStore {
   yourColor: PlayerColor | null;
   yourUserId: string | null;
   error: string | null;
+  kickedMessage: string | null;
   rollSeq: number;
   starting: boolean;
 
@@ -46,7 +47,9 @@ interface MultiplayerStore {
   toggleReady: (roomId: string) => void;
   setBetAmount: (roomId: string, userId: string, amount: number) => void;
   setGameMode: (roomId: string, userId: string, mode: string) => void;
+  removePlayer: (roomId: string, targetUserId: string) => void;
   clearError: () => void;
+  clearKicked: () => void;
 }
 
 export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
@@ -54,6 +57,7 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
   yourColor: null,
   yourUserId: null,
   error: null,
+  kickedMessage: null,
   rollSeq: 0,
   starting: false,
 
@@ -63,6 +67,7 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
     socket.off("room:joined");
     socket.off("room:update");
     socket.off("room:error");
+    socket.off("room:kicked");
 
     socket.on("room:joined", ({ yourColor }: { roomId: string; yourColor: PlayerColor }) => {
       set({ yourColor, error: null });
@@ -78,6 +83,10 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
 
     socket.on("room:error", ({ message }: { message: string }) => {
       set({ error: message, starting: false });
+    });
+
+    socket.on("room:kicked", ({ message }: { message: string }) => {
+      set({ kickedMessage: message, room: null });
     });
   },
 
@@ -116,5 +125,10 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
     getSocket().emit("room:setMode", { roomId, userId, mode });
   },
 
+  removePlayer: (roomId, targetUserId) => {
+    getSocket().emit("room:removePlayer", { roomId, hostUserId: get().yourUserId, targetUserId });
+  },
+
   clearError: () => set({ error: null }),
+  clearKicked: () => set({ kickedMessage: null }),
 }));
