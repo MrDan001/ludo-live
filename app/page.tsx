@@ -3,7 +3,7 @@
 
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 
@@ -14,9 +14,31 @@ const PAWN_COLORS = [
   { color: "#eab308", left: "78%" },
 ];
 
+interface Star {
+  top: number;
+  left: number;
+  opacity: number;
+}
+
+const STAR_COUNT = 24;
+
 export default function SplashPage() {
   const router = useRouter();
   const { checkSession, user, loading } = useAuth();
+  const [stars, setStars] = useState<Star[]>([]);
+
+  useEffect(() => {
+    // Generate random star positions only on the client, after mount.
+    // Doing this during render (or with SSR) causes a hydration mismatch
+    // because Math.random() produces different values on server vs client.
+    setStars(
+      Array.from({ length: STAR_COUNT }, () => ({
+        top: Math.random() * 100,
+        left: Math.random() * 100,
+        opacity: Math.random() * 0.8 + 0.2,
+      }))
+    );
+  }, []);
 
   useEffect(() => {
     checkSession();
@@ -34,14 +56,14 @@ export default function SplashPage() {
     <div className="min-h-screen bg-gradient-to-b from-slate-950 via-indigo-950 to-slate-950 flex flex-col items-center justify-center gap-6 relative overflow-hidden">
       {/* scattered star sparkles */}
       <div className="absolute inset-0 opacity-40 pointer-events-none">
-        {Array.from({ length: 24 }).map((_, i) => (
+        {stars.map((star, i) => (
           <div
             key={i}
             className="absolute w-1 h-1 bg-white rounded-full"
             style={{
-              top: `${Math.random() * 100}%`,
-              left: `${Math.random() * 100}%`,
-              opacity: Math.random() * 0.8 + 0.2,
+              top: `${star.top}%`,
+              left: `${star.left}%`,
+              opacity: star.opacity,
             }}
           />
         ))}
