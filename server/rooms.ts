@@ -5,7 +5,7 @@ import {
   createInitialGameState,
 } from "../lib/engine/gameState";
 import { rollTwoDice, DiceRoll } from "../lib/engine/dice";
-import { getValidMoves, applyMove, getNextTurnColor, MoveOption } from "../lib/engine/moves";
+import { getValidMoves, applyMove, getNextTurnColor, MoveOption, TEAM_PARTNER } from "../lib/engine/moves";
 import { prisma } from "./db";
 import { ChatMessage, QUICK_CHAT_PRESETS } from "../types/game";
 
@@ -23,6 +23,9 @@ export interface RoomPlayer {
   connected: boolean;
   avatarUrl?: string;
   ready: boolean;
+  // Set only in 2-player team mode: the second color this human also
+  // controls (Yellow if their primary color is Red, Blue if Green).
+  teammateColor?: PlayerColor;
 }
 
 export interface Room {
@@ -167,8 +170,26 @@ export async function startGame(roomId: string, userId: string): Promise<Room | 
     }
   }
 
-  const activeColors = room.players.map((p) => p.color);
-  room.gameState = createInitialGameState(activeColors, []);
+  const isTeamMode = room.players.length === 2;
+  let activeColors: PlayerColor[];
+
+  if (isTeamMode) {
+    // Deterministic team assignment regardless of whatever colors they
+    // happened to hold during lobby churn: first joiner (by array order)
+    // is Red+Yellow, second is Green+Blue.
+    room.players[0].color = "RED";
+    room.players[0].teammateColor = "YELLOW";
+    room.players[1].color = "GREEN";
+    room.players[1].teammateColor = "BLUE";
+    activeColors = ["RED", "GREEN", "YELLOW", "BLUE"];
+  } else {
+    room.players.forEach((p) => {
+      p.teammateColor = undefined;
+    });
+    activeColors = room.players.map((p) => p.color);
+  }
+
+  room.gameState = createInitialGameState(activeColors, [], isTeamMode);
   room.started = true;
   room.pot = room.betAmount * room.players.length;
   return room;
@@ -202,14 +223,22 @@ export function handleRoll(roomId: string, socketId: string): {
   return { room, roll, moves };
 }
 
-export async function handleSelectMove(roomId: string, socketId: string, tokenId: string): Promise<Room | null> {
+export async function handleSelectMove(
+  roomId: string,
+  socketId: string,
+  tokenId: string,
+  toPosition: number
+): Promise<Room | null> {
   const room = rooms.get(roomId);
   if (!room || !room.gameState || !room.pendingRoll) return null;
 
   const player = room.players.find((p) => p.socketId === socketId);
   if (!player || player.color !== room.gameState.currentTurnColor) return null;
 
-  const move = room.pendingMoves.find((m) => m.tokenId === tokenId);
+  // Matched on tokenId AND toPosition, not tokenId alone - a token can now
+  // have two valid destinations at once (one per die value), so tokenId by
+  // itself would be ambiguous about which one was actually chosen.
+  const move = room.pendingMoves.find((m) => m.tokenId === tokenId && m.toPosition === toPosition);
   if (!move) return null;
 
   const applied = applyMove(room.gameState, move);
@@ -373,11 +402,10 @@ export function setGameMode(roomId: string, userId: string, mode: string): Room 
   return room;
 }
 
-// Auto-plays a disconnected player's turn so the match doesn't freeze on
-// them. Deliberately backs off when fewer than 2 players are connected -
-// that's a "can this match even continue" situation, handled separately
-// (last-player-standing), not a simple stall to play through.
-export async function autoPlayDisconnectedTurn(roomId: string): Promise<Room | null> {
+// If it's a disconnected player's turn and 2+ others are still connected,
+// their turn just gets passed along after the grace period - nothing is
+// rolled or moved on their behalf, they're simply skipped.
+export function skipDisconnectedTurn(roomId: string): Room | null {
   const room = rooms.get(roomId);
   if (!room || !room.started || !room.gameState || room.gameState.winner) return null;
 
@@ -385,20 +413,18 @@ export async function autoPlayDisconnectedTurn(roomId: string): Promise<Room | n
   if (!currentPlayer || currentPlayer.connected) return null;
 
   const connectedCount = room.players.filter((p) => p.connected).length;
-  if (connectedCount < 2) return null;
+  if (connectedCount < 2) return null; // last-player-standing handles this instead
 
-  if (!room.pendingRoll) {
-    const result = handleRoll(roomId, currentPlayer.socketId);
-    return result ? result.room : null;
-  }
+  const activeColors = room.gameState.players.filter((p) => p.isActive).map((p) => p.color);
+  const currentIndex = activeColors.indexOf(room.gameState.currentTurnColor);
+  const nextColor = activeColors[(currentIndex + 1) % activeColors.length];
 
-  if (room.pendingMoves.length > 0) {
-    // Auto-play the first available move on their behalf.
-    const move = room.pendingMoves[0];
-    return await handleSelectMove(roomId, currentPlayer.socketId, move.tokenId);
-  }
+  room.pendingRoll = null;
+  room.pendingMoves = [];
+  room.consecutiveSixes = 0;
+  room.gameState = { ...room.gameState, currentTurnColor: nextColor };
 
-  return null;
+  return room;
 }
 
 // If a live bet match drops to exactly one connected player, the match is

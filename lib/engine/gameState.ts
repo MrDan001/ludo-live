@@ -39,6 +39,10 @@ export interface GameState {
   phase: GamePhase;
   consecutiveSixes: number; // rolling three 6's in a row forfeits the turn
   winner: PlayerColor | null;
+  // 2-player games: Red+Yellow play as one team, Green+Blue as the other.
+  // See lib/engine/moves.ts for how this changes move selection, capture
+  // immunity, turn order, and the win condition.
+  teamMode: boolean;
 }
 
 export function createToken(color: PlayerColor, index: number): Token {
@@ -54,10 +58,14 @@ export function createPlayer(color: PlayerColor, isAI = false): Player {
   };
 }
 
-// activeColors: which of the 4 colors are actually playing (2-4 of them)
+// activeColors: which of the 4 colors are actually playing (2-4 of them).
+// In team mode, all 4 are passed as active even though only 2 humans are
+// present - Yellow and Blue are real, playable colors owned by their
+// teammate, not placeholders.
 export function createInitialGameState(
   activeColors: PlayerColor[],
-  aiColors: PlayerColor[] = []
+  aiColors: PlayerColor[] = [],
+  teamMode = false
 ): GameState {
   const players = ALL_COLORS.map((color) => {
     const player = createPlayer(color, aiColors.includes(color));
@@ -72,5 +80,6 @@ export function createInitialGameState(
     phase: "WAITING",
     consecutiveSixes: 0,
     winner: null,
+    teamMode,
   };
 }

@@ -13,6 +13,9 @@ interface RoomPlayer {
   connected: boolean;
   avatarUrl?: string;
   ready: boolean;
+  // Set only in 2-player team mode - the second color this human also
+  // controls (Yellow if their primary is Red, Blue if Green).
+  teammateColor?: PlayerColor;
 }
 
 interface RoomData {
@@ -22,7 +25,7 @@ interface RoomData {
   gameState: GameState | null;
   started: boolean;
   pendingRoll: { d1: number; d2: number; sum: number; hasSix: boolean } | null;
-  pendingMoves: { tokenId: string; toPosition: number }[];
+  pendingMoves: { tokenId: string; toPosition: number; dieValue: number }[];
   messages: ChatMessage[];
   betAmount: number;
   gameMode: string;
@@ -37,19 +40,29 @@ interface MultiplayerStore {
   kickedMessage: string | null;
   rollSeq: number;
   starting: boolean;
+  // The dice display's source of truth - set the instant a roll happens
+  // (whether or not it produced a valid move) and only cleared once the
+  // board's step-by-step move animation finishes (or, if there was nothing
+  // to animate, after a short grace period). This is what makes the dice
+  // hold their value and stay visible through the whole hop sequence
+  // instead of resetting the moment a move is selected.
+  lastRoll: { d1: number; d2: number } | null;
 
   connect: () => void;
   createRoom: (name: string, userId: string, avatarUrl?: string) => void;
   joinRoom: (roomId: string, name: string, userId: string, avatarUrl?: string) => void;
   startGame: (roomId: string) => void;
   roll: (roomId: string) => void;
-  selectMove: (roomId: string, tokenId: string) => void;
+  selectMove: (roomId: string, tokenId: string, toPosition: number) => void;
   toggleReady: (roomId: string) => void;
   setBetAmount: (roomId: string, userId: string, amount: number) => void;
   setGameMode: (roomId: string, userId: string, mode: string) => void;
   removePlayer: (roomId: string, targetUserId: string) => void;
   clearError: () => void;
   clearKicked: () => void;
+  /** Called by the board once a move's hop animation is fully done -
+   *  releases the dice hold, allowing the next roll. */
+  finishMoveAnimation: () => void;
 }
 
 export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
@@ -60,6 +73,7 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
   kickedMessage: null,
   rollSeq: 0,
   starting: false,
+  lastRoll: null,
 
   connect: () => {
     const socket = getSocket();
@@ -68,17 +82,14 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
     socket.off("room:update");
     socket.off("room:error");
     socket.off("room:kicked");
+    socket.off("game:rolled");
 
     socket.on("room:joined", ({ yourColor }: { roomId: string; yourColor: PlayerColor }) => {
       set({ yourColor, error: null });
     });
 
     socket.on("room:update", (room: RoomData) => {
-      set((s) => ({
-        room,
-        rollSeq: room.pendingRoll ? s.rollSeq + 1 : s.rollSeq,
-        starting: false,
-      }));
+      set({ room, starting: false });
     });
 
     socket.on("room:error", ({ message }: { message: string }) => {
@@ -87,6 +98,17 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
 
     socket.on("room:kicked", ({ message }: { message: string }) => {
       set({ kickedMessage: message, room: null });
+    });
+
+    socket.on("game:rolled", ({ d1, d2, hasValidMoves }: { d1: number; d2: number; hasValidMoves: boolean }) => {
+      set((s) => ({ lastRoll: { d1, d2 }, rollSeq: s.rollSeq + 1 }));
+      if (!hasValidMoves) {
+        // Nothing will animate - hold the numbers just long enough to be
+        // seen, then release the dice so the next player isn't stuck.
+        setTimeout(() => {
+          set((s) => (s.lastRoll?.d1 === d1 && s.lastRoll?.d2 === d2 ? { lastRoll: null } : {}));
+        }, 1200);
+      }
     });
   },
 
@@ -109,8 +131,8 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
     getSocket().emit("game:roll", { roomId });
   },
 
-  selectMove: (roomId, tokenId) => {
-    getSocket().emit("game:selectMove", { roomId, tokenId });
+  selectMove: (roomId, tokenId, toPosition) => {
+    getSocket().emit("game:selectMove", { roomId, tokenId, toPosition });
   },
 
   toggleReady: (roomId) => {
@@ -131,4 +153,5 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
 
   clearError: () => set({ error: null }),
   clearKicked: () => set({ kickedMessage: null }),
+  finishMoveAnimation: () => set({ lastRoll: null }),
 }));

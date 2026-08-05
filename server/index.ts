@@ -12,7 +12,7 @@ import {
   toggleReady,
   setBetAmount,
   setGameMode,
-  autoPlayDisconnectedTurn,
+  skipDisconnectedTurn,
   checkLastPlayerStanding,
   removePlayer,
 } from "./rooms";
@@ -52,13 +52,13 @@ function scheduleAutoPlayCheck(roomId: string) {
   const connectedCount = room.players.filter((p) => p.connected).length;
   if (connectedCount < 2) return; // last-player-standing territory, not this mechanism
 
-  const timer = setTimeout(async () => {
-    const updated = await autoPlayDisconnectedTurn(roomId);
+  const timer = setTimeout(() => {
+    const updated = skipDisconnectedTurn(roomId);
     if (updated) {
       io.to(roomId).emit("room:update", updated);
     }
-    // Re-check in case the same (or a newly-current) disconnected player
-    // needs another auto-play chained right after this one.
+    // Re-check in case the newly-current player is also disconnected -
+    // chains straight through multiple dropped players in a row.
     scheduleAutoPlayCheck(roomId);
   }, TURN_TIMEOUT_MS);
 
@@ -161,16 +161,28 @@ io.on("connection", (socket) => {
   socket.on("game:roll", ({ roomId }: { roomId: string }) => {
     const result = handleRoll(roomId, socket.id);
     if (!result) return;
+    // Emitted separately from room:update, and always carries the real
+    // rolled numbers - even when there were no valid moves and the room
+    // state's pendingRoll gets cleared again in this same tick. The client
+    // uses this as the single source of truth for what the dice display.
+    io.to(roomId).emit("game:rolled", {
+      d1: result.roll.d1,
+      d2: result.roll.d2,
+      hasValidMoves: result.moves.length > 0,
+    });
     io.to(roomId).emit("room:update", result.room);
     scheduleAutoPlayCheck(roomId);
   });
 
-  socket.on("game:selectMove", async ({ roomId, tokenId }: { roomId: string; tokenId: string }) => {
-    const room = await handleSelectMove(roomId, socket.id, tokenId);
-    if (!room) return;
-    io.to(roomId).emit("room:update", room);
-    scheduleAutoPlayCheck(roomId);
-  });
+  socket.on(
+    "game:selectMove",
+    async ({ roomId, tokenId, toPosition }: { roomId: string; tokenId: string; toPosition: number }) => {
+      const room = await handleSelectMove(roomId, socket.id, tokenId, toPosition);
+      if (!room) return;
+      io.to(roomId).emit("room:update", room);
+      scheduleAutoPlayCheck(roomId);
+    }
+  );
 
   // Room chat - free-text messages between players in a room
   socket.on("chat:message", ({ roomId, text }: { roomId: string; text: string }) => {

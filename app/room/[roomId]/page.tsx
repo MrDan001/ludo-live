@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMultiplayerGame } from "@/lib/hooks/useMultiplayerGame";
+import type { PlayerColor } from "@/lib/engine/gameState";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useRoomChat } from "@/lib/hooks/useRoomChat";
 import { getSocket } from "@/lib/socket/client";
 import Board from "@/components/board/Board";
 import Dice from "@/components/board/Dice";
+import DiceOverlay from "@/components/board/DiceOverlay";
 import PlayerBadge from "@/components/layout/PlayerBadge";
 import VoiceControls from "@/components/layout/VoiceControls";
 import ChatPanel from "@/components/layout/ChatPanel";
@@ -17,12 +19,21 @@ import RoomLobby from "@/components/layout/RoomLobby";
 export default function RoomPage() {
   const params = useParams();
   const roomId = params.roomId as string;
-  const { room, yourColor, connect, joinRoom, roll, selectMove, rollSeq } = useMultiplayerGame();
+  const { room, yourColor, connect, joinRoom, roll, selectMove, rollSeq, lastRoll, finishMoveAnimation } =
+    useMultiplayerGame();
   const { gems, name, avatarUrl, dbUserId, checkSession } = useAuth();
   const { connect: connectChat, unreadCount, markRead } = useRoomChat();
 
   const [chatOpen, setChatOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
+  // Which die value the player picked to play this turn, when there were
+  // two distinct usable values to choose between. Reset the instant a new
+  // roll happens (see rollSeq) so it never carries over into the next turn.
+  const [manualDieChoice, setManualDieChoice] = useState<number | null>(null);
+
+  useEffect(() => {
+    setManualDieChoice(null);
+  }, [rollSeq]);
 
   useEffect(() => {
     checkSession();
@@ -90,16 +101,38 @@ export default function RoomPage() {
 
   const gameState = room.gameState!;
   const isYourTurn = gameState.currentTurnColor === yourColor;
+
+  // d1 and d2 are never summed for movement - the player picks one value
+  // to play. If both dice offer a real (different) choice, wait for a tap;
+  // if only one value has any valid moves (or it's doubles), resolve it
+  // automatically since there's nothing to actually choose between.
+  const distinctDieValues = Array.from(new Set(room.pendingMoves.map((m) => m.dieValue)));
+  const needsDieChoice = isYourTurn && distinctDieValues.length > 1;
+  const activeDieValue = distinctDieValues.length <= 1 ? distinctDieValues[0] ?? null : manualDieChoice;
+
   const selectableTokenIds = new Set(
-    isYourTurn ? room.pendingMoves.map((m) => m.tokenId) : []
+    isYourTurn && activeDieValue !== null
+      ? room.pendingMoves.filter((m) => m.dieValue === activeDieValue).map((m) => m.tokenId)
+      : []
   );
   const currentSocketId = getSocket().id ?? null;
 
-  // Map top (RED, GREEN) and bottom (BLUE, YELLOW) players
+  // Map top (RED, GREEN) and bottom (BLUE, YELLOW) players. In 2-player
+  // team mode there's no RoomPlayer whose primary color is literally
+  // Yellow/Blue - that human's primary is Red/Green and Yellow/Blue is
+  // their teammateColor, so those badges fall back to matching on that.
   const redPlayer = room.players.find((p) => p.color === "RED");
   const greenPlayer = room.players.find((p) => p.color === "GREEN");
-  const bluePlayer = room.players.find((p) => p.color === "BLUE");
-  const yellowPlayer = room.players.find((p) => p.color === "YELLOW");
+  const bluePlayer = room.players.find((p) => p.color === "BLUE" || p.teammateColor === "BLUE");
+  const yellowPlayer = room.players.find((p) => p.color === "YELLOW" || p.teammateColor === "YELLOW");
+
+  // In team mode, a whole team's badges highlight together on their turn
+  // slot (currentTurnColor is only ever Red or Green there) - outside
+  // team mode this is just a literal color match, same as always.
+  const isColorCurrentTurn = (color: PlayerColor) =>
+    gameState.teamMode
+      ? (color === "RED" || color === "YELLOW" ? "RED" : "GREEN") === gameState.currentTurnColor
+      : gameState.currentTurnColor === color;
 
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden touch-none select-none bg-[#1D110C] flex flex-col items-center justify-between p-2 font-sans">
@@ -156,7 +189,7 @@ export default function RoomPage() {
           <PlayerBadge
             name={redPlayer?.name ?? ""}
             color="RED"
-            isCurrentTurn={gameState.currentTurnColor === "RED"}
+            isCurrentTurn={isColorCurrentTurn("RED")}
             connected={redPlayer?.connected ?? false}
             avatarUrl={redPlayer?.avatarUrl}
             empty={!redPlayer}
@@ -164,7 +197,7 @@ export default function RoomPage() {
           <PlayerBadge
             name={greenPlayer?.name ?? ""}
             color="GREEN"
-            isCurrentTurn={gameState.currentTurnColor === "GREEN"}
+            isCurrentTurn={isColorCurrentTurn("GREEN")}
             connected={greenPlayer?.connected ?? false}
             avatarUrl={greenPlayer?.avatarUrl}
             empty={!greenPlayer}
@@ -176,7 +209,22 @@ export default function RoomPage() {
           <Board
             players={gameState.players}
             selectableTokenIds={selectableTokenIds}
-            onTokenClick={(tokenId) => selectMove(room.id, tokenId)}
+            onTokenClick={(tokenId) => {
+              const move = room.pendingMoves.find(
+                (m) => m.tokenId === tokenId && m.dieValue === activeDieValue
+              );
+              if (move) selectMove(room.id, tokenId, move.toPosition);
+            }}
+            onMoveAnimationComplete={finishMoveAnimation}
+          />
+          <DiceOverlay
+            active={!!lastRoll}
+            d1={lastRoll?.d1 ?? null}
+            d2={lastRoll?.d2 ?? null}
+            rollSeq={rollSeq}
+            needsChoice={needsDieChoice}
+            chosenValue={activeDieValue}
+            onChooseValue={setManualDieChoice}
           />
         </div>
 
@@ -185,7 +233,7 @@ export default function RoomPage() {
           <PlayerBadge
             name={bluePlayer?.name ?? ""}
             color="BLUE"
-            isCurrentTurn={gameState.currentTurnColor === "BLUE"}
+            isCurrentTurn={isColorCurrentTurn("BLUE")}
             connected={bluePlayer?.connected ?? false}
             avatarUrl={bluePlayer?.avatarUrl}
             empty={!bluePlayer}
@@ -193,7 +241,7 @@ export default function RoomPage() {
           <PlayerBadge
             name={yellowPlayer?.name ?? ""}
             color="YELLOW"
-            isCurrentTurn={gameState.currentTurnColor === "YELLOW"}
+            isCurrentTurn={isColorCurrentTurn("YELLOW")}
             connected={yellowPlayer?.connected ?? false}
             avatarUrl={yellowPlayer?.avatarUrl}
             empty={!yellowPlayer}
@@ -233,11 +281,9 @@ export default function RoomPage() {
         {/* Dice Holder */}
         <div className="bg-[#3B2319] border border-amber-900/80 p-1.5 rounded-xl shadow-xl flex items-center justify-center">
           <Dice
-            d1={room.pendingRoll?.d1 ?? null}
-            d2={room.pendingRoll?.d2 ?? null}
-            rollSeq={rollSeq}
             onRoll={() => roll(room.id)}
-            canRoll={isYourTurn && !room.pendingRoll && !gameState.winner}
+            canRoll={isYourTurn && !room.pendingRoll && !gameState.winner && !lastRoll}
+            active={!!lastRoll}
           />
         </div>
       </div>

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Settings, Copy, Check, Plus, CheckCircle2, XCircle, Crown, HelpCircle, MessageCircle, X } from "lucide-react";
+import { ArrowLeft, Settings, Copy, Check, Plus, CheckCircle2, XCircle, Crown, HelpCircle, MessageCircle, X, Users } from "lucide-react";
 import { useMultiplayerGame } from "@/lib/hooks/useMultiplayerGame";
 import VoiceControls from "./VoiceControls";
 
@@ -76,6 +76,17 @@ export default function RoomLobby({ onOpenChat, onOpenVoice, chatUnreadCount }: 
           <Settings size={20} />
         </button>
       </div>
+
+      {/* Team mode notice - only ever kicks in with exactly 2 players */}
+      {room.players.length === 2 && (
+        <div className="w-full max-w-sm flex items-center gap-2 bg-indigo-950/50 border border-indigo-800/60 text-indigo-300 text-xs rounded-lg px-3 py-2 mb-3 shrink-0">
+          <Users size={14} className="shrink-0" />
+          <span>
+            <span className="font-semibold text-indigo-200">Team Mode:</span> 2 players means teams -
+            Red + Yellow vs Green + Blue. Each of you controls both colors on your side.
+          </span>
+        </div>
+      )}
 
       {/* Error banner */}
       {error && (

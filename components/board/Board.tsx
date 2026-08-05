@@ -68,6 +68,17 @@ function buildCellMap(): Record<string, CellInfo> {
 
 const CELL_MAP = buildCellMap();
 
+// When 2+ tokens share a cell, they fan out with a slight offset instead
+// of shrinking - each keeps its full size, later ones layer on top so all
+// are still visible and tappable. Percentages are relative to the token
+// wrapper's own box (i.e. the cell), so these stay small and subtle.
+const STACK_OFFSETS: Record<number, { x: number; y: number }[]> = {
+  1: [{ x: 0, y: 0 }],
+  2: [{ x: -13, y: -13 }, { x: 13, y: 13 }],
+  3: [{ x: -15, y: -15 }, { x: 15, y: -15 }, { x: 0, y: 15 }],
+  4: [{ x: -15, y: -15 }, { x: 15, y: -15 }, { x: -15, y: 15 }, { x: 15, y: 15 }],
+};
+
 // How long each single-cell hop takes. Tuned to feel like a token actually
 // counting its way across the board rather than sliding smoothly or
 // snapping instantly.
@@ -230,16 +241,24 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
               {cell.type === "path" && cell.safe && (
   <span className={`text-sm drop-shadow-sm ${cell.entryColor ? "text-white" : "text-amber-500"}`}>★</span>
 )}
-              <div className="absolute inset-0 flex flex-wrap items-center justify-center gap-[1px] p-0">
-                {tokensHere.map((t) => (
-                  <Token
-                    key={t.id}
-                    color={t.color}
-                    selectable={selectableTokenIds.has(t.id)}
-                    onClick={() => onTokenClick(t.id)}
-                    stackSize={tokensHere.length}
-                  />
-                ))}
+              <div className="absolute inset-0">
+                {tokensHere.map((t, i) => {
+                  const stackSize = Math.min(tokensHere.length, 4);
+                  const offset = STACK_OFFSETS[stackSize]?.[i] ?? { x: 0, y: 0 };
+                  return (
+                    <div
+                      key={t.id}
+                      className="absolute inset-0 flex items-center justify-center"
+                      style={{ transform: `translate(${offset.x}%, ${offset.y}%)`, zIndex: i + 1 }}
+                    >
+                      <Token
+                        color={t.color}
+                        selectable={selectableTokenIds.has(t.id)}
+                        onClick={() => onTokenClick(t.id)}
+                      />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
