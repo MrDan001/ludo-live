@@ -13,7 +13,6 @@ export default function PlayPage() {
   const {
     gameState,
     diceRoll,
-    rollSeq,
     validMoves,
     initGame,
     rollForHuman,
@@ -52,12 +51,16 @@ export default function PlayPage() {
 
       <Board players={gameState.players} selectableTokenIds={selectableTokenIds} onTokenClick={selectMove} />
 
+      {diceRoll && (
+        <div className="text-white text-sm">
+          Rolled: {diceRoll.d1} + {diceRoll.d2}
+        </div>
+      )}
+
       <Dice
-        d1={diceRoll?.d1 ?? null}
-        d2={diceRoll?.d2 ?? null}
-        rollSeq={rollSeq}
         onRoll={rollForHuman}
         canRoll={isHumanTurn && !diceRoll && !isBusy && !isWaitingOnSelection && !gameState.winner}
+        active={!!diceRoll}
       />
     </div>
   );
