@@ -222,14 +222,9 @@ export default function RoomPage() {
             onMoveAnimationComplete={finishMoveAnimation}
           />
           <DiceOverlay
-            active={!!lastRoll}
+            rollSeq={rollSeq}
             d1={lastRoll?.d1 ?? null}
             d2={lastRoll?.d2 ?? null}
-            rollSeq={rollSeq}
-            needsChoice={needsDieChoice}
-            chosenValue={activeDieValue}
-            onChooseValue={setManualDieChoice}
-            hasValidMoves={room.pendingMoves.length > 0}
           />
         </div>
 
@@ -289,6 +284,13 @@ export default function RoomPage() {
             onRoll={() => roll(room.id)}
             canRoll={isYourTurn && !room.pendingRoll && !gameState.winner && !lastRoll}
             active={!!lastRoll}
+            rollSeq={rollSeq}
+            d1={lastRoll?.d1 ?? null}
+            d2={lastRoll?.d2 ?? null}
+            needsChoice={needsDieChoice}
+            chosenValue={activeDieValue}
+            onChooseValue={setManualDieChoice}
+            hasValidMoves={room.pendingMoves.length > 0}
           />
         </div>
       </div>
