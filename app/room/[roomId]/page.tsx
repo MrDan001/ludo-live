@@ -225,6 +225,7 @@ export default function RoomPage() {
             needsChoice={needsDieChoice}
             chosenValue={activeDieValue}
             onChooseValue={setManualDieChoice}
+            hasValidMoves={room.pendingMoves.length > 0}
           />
         </div>
 

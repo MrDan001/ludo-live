@@ -1,35 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-
-const PIP_LAYOUTS: Record<number, [number, number][]> = {
-  1: [[1, 1]],
-  2: [[0, 0], [2, 2]],
-  3: [[0, 0], [1, 1], [2, 2]],
-  4: [[0, 0], [0, 2], [2, 0], [2, 2]],
-  5: [[0, 0], [0, 2], [1, 1], [2, 0], [2, 2]],
-  6: [[0, 0], [0, 2], [1, 0], [1, 2], [2, 0], [2, 2]],
-};
-
-function DiceFace({ face }: { face: number }) {
-  const pips = PIP_LAYOUTS[face] || [];
-  const pipSet = new Set(pips.map(([r, c]) => `${r},${c}`));
-
-  return (
-    <div className="grid grid-cols-3 grid-rows-3 gap-1 w-full h-full p-2">
-      {Array.from({ length: 9 }).map((_, i) => {
-        const r = Math.floor(i / 3);
-        const c = i % 3;
-        const active = pipSet.has(`${r},${c}`);
-        return (
-          <div key={i} className="flex items-center justify-center">
-            {active && <div className="w-2 h-2 rounded-full bg-slate-900" />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
+import Die3D from "./Die3D";
 
 function SingleDie({
   finalFace,
@@ -44,26 +16,14 @@ function SingleDie({
   chosen?: boolean;
   onChoose?: () => void;
 }) {
-  const [face, setFace] = useState(finalFace);
   const [spinning, setSpinning] = useState(false);
 
   useEffect(() => {
     if (rollSeq === 0) return;
     setSpinning(true);
-    let ticks = 0;
-    const maxTicks = 9;
-    const interval = setInterval(() => {
-      ticks++;
-      if (ticks >= maxTicks) {
-        clearInterval(interval);
-        setFace(finalFace);
-        setSpinning(false);
-      } else {
-        setFace(Math.floor(Math.random() * 6) + 1);
-      }
-    }, 55);
-    return () => clearInterval(interval);
-  }, [rollSeq, finalFace]);
+    const t = setTimeout(() => setSpinning(false), 550);
+    return () => clearTimeout(t);
+  }, [rollSeq]);
 
   return (
     <button
@@ -71,13 +31,19 @@ function SingleDie({
       onClick={onChoose}
       disabled={!selectable}
       className={[
-        "w-14 h-14 rounded-lg bg-white border-2 shadow-xl transition-transform",
-        spinning ? "animate-dice-tumble" : "",
-        selectable ? "border-emerald-400 ring-4 ring-emerald-400/50 cursor-pointer active:scale-95 animate-pulse" : "border-slate-800",
-        chosen ? "ring-4 ring-white scale-110 border-emerald-500" : "",
+        "rounded-xl transition-transform",
+        selectable ? "cursor-pointer active:scale-95" : "cursor-default",
       ].join(" ")}
     >
-      <DiceFace face={face} />
+      <div
+        className={[
+          "rounded-xl transition-all",
+          selectable ? "ring-4 ring-emerald-400/60 animate-pulse" : "",
+          chosen ? "ring-4 ring-white scale-110" : "",
+        ].join(" ")}
+      >
+        <Die3D face={finalFace} spinning={spinning} size={56} />
+      </div>
     </button>
   );
 }
@@ -97,6 +63,12 @@ interface DiceOverlayProps {
   needsChoice?: boolean;
   chosenValue?: number | null;
   onChooseValue?: (value: number) => void;
+  /** Whether ANY valid move exists this roll, for anyone - independent of
+   *  whether it's been resolved on THIS particular screen yet. Without
+   *  this, a spectating player (not the one rolling) would wrongly see
+   *  "No valid moves" the whole time the actual roller is still deciding,
+   *  since chosenValue only ever resolves on the acting player's screen. */
+  hasValidMoves?: boolean;
 }
 
 export default function DiceOverlay({
@@ -107,6 +79,7 @@ export default function DiceOverlay({
   needsChoice,
   chosenValue,
   onChooseValue,
+  hasValidMoves,
 }: DiceOverlayProps) {
   // Keep rendering briefly after `active` goes false so the retract
   // animation actually gets to play, instead of vanishing instantly.
@@ -154,6 +127,10 @@ export default function DiceOverlay({
         ) : chosenValue !== null && chosenValue !== undefined ? (
           <div className="text-white text-sm font-bold bg-black/50 px-2.5 py-0.5 rounded-full">
             Move: {chosenValue}
+          </div>
+        ) : hasValidMoves ? (
+          <div className="text-white text-xs bg-black/50 px-2.5 py-0.5 rounded-full text-slate-300">
+            Waiting for their move...
           </div>
         ) : (
           d1 !== null &&

@@ -1,12 +1,21 @@
 @keyframes dice-tumble {
-    0% { transform: translateY(0) rotate(0deg) scale(1); }
-    20% { transform: translateY(-14px) rotate(120deg) scale(1.05); }
-    40% { transform: translateY(4px) rotate(240deg) scale(0.95); }
-    60% { transform: translateY(-8px) rotate(360deg) scale(1.05); }
-    80% { transform: translateY(2px) rotate(480deg) scale(0.98); }
-    100% { transform: translateY(0) rotate(600deg) scale(1); }
-  }
-  
-  .animate-dice-tumble {
-    animation: dice-tumble 0.6s ease-out;
-  }
+  0% { transform: translateY(0) rotate(0deg) scale(1); }
+  20% { transform: translateY(-14px) rotate(120deg) scale(1.05); }
+  40% { transform: translateY(4px) rotate(240deg) scale(0.95); }
+  60% { transform: translateY(-8px) rotate(360deg) scale(1.05); }
+  80% { transform: translateY(2px) rotate(480deg) scale(0.98); }
+  100% { transform: translateY(0) rotate(600deg) scale(1); }
+}
+
+.animate-dice-tumble {
+  animation: dice-tumble 0.6s ease-out;
+}
+
+@keyframes die3d-spin {
+  0%   { transform: rotateX(0deg) rotateY(0deg) rotateZ(0deg); }
+  100% { transform: rotateX(360deg) rotateY(720deg) rotateZ(180deg); }
+}
+
+.die3d-spin {
+  animation: die3d-spin 0.5s linear infinite;
+}

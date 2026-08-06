@@ -14,11 +14,12 @@ export default function Dice({ onRoll, canRoll, active }: DiceProps) {
     <div className="flex flex-col items-center gap-1.5">
       <div
         className={[
-          "w-10 h-10 rounded-lg border-2 flex items-center justify-center text-lg transition-opacity",
+          "flex items-center gap-0.5 px-1.5 h-10 rounded-lg border-2 transition-opacity",
           active ? "border-slate-600 opacity-30" : "border-amber-700 opacity-90",
         ].join(" ")}
       >
-        🎲
+        <span className="text-base leading-none">🎲</span>
+        <span className="text-base leading-none">🎲</span>
       </div>
       <button
         onClick={onRoll}
