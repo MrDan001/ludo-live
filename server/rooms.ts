@@ -204,7 +204,13 @@ export function handleRoll(roomId: string, socketId: string): {
   if (!room || !room.gameState) return null;
 
   const player = room.players.find((p) => p.socketId === socketId);
-  if (!player || player.color !== room.gameState.currentTurnColor) return null;
+  // In 2-player team mode, a player also controls their teammateColor
+  // (Yellow if primary is Red, Blue if primary is Green) - so either match
+  // counts as "it's their turn," not just an exact primary-color match.
+  const controlsCurrentColor =
+    !!player &&
+    (player.color === room.gameState.currentTurnColor || player.teammateColor === room.gameState.currentTurnColor);
+  if (!controlsCurrentColor) return null;
 
   const roll = rollTwoDice();
   const moves = getValidMoves(room.gameState, roll);
@@ -233,7 +239,11 @@ export async function handleSelectMove(
   if (!room || !room.gameState || !room.pendingRoll) return null;
 
   const player = room.players.find((p) => p.socketId === socketId);
-  if (!player || player.color !== room.gameState.currentTurnColor) return null;
+  // Same teammateColor allowance as handleRoll - see comment there.
+  const controlsCurrentColor =
+    !!player &&
+    (player.color === room.gameState.currentTurnColor || player.teammateColor === room.gameState.currentTurnColor);
+  if (!controlsCurrentColor) return null;
 
   // Matched on tokenId AND toPosition, not tokenId alone - a token can now
   // have two valid destinations at once (one per die value), so tokenId by
@@ -409,14 +419,28 @@ export function skipDisconnectedTurn(roomId: string): Room | null {
   const room = rooms.get(roomId);
   if (!room || !room.started || !room.gameState || room.gameState.winner) return null;
 
-  const currentPlayer = room.players.find((p) => p.color === room.gameState!.currentTurnColor);
-  if (!currentPlayer || currentPlayer.connected) return null;
+  const currentColor = room.gameState.currentTurnColor;
+  // Match on primary color OR teammate color - in 2-player team mode the
+  // player controlling Yellow/Blue is found via teammateColor, not color.
+  const currentPlayer = room.players.find((p) => p.color === currentColor || p.teammateColor === currentColor);
 
-  const connectedCount = room.players.filter((p) => p.connected).length;
-  if (connectedCount < 2) return null; // last-player-standing handles this instead
+  // A connected player controls this color - nothing to skip.
+  if (currentPlayer && currentPlayer.connected) return null;
+
+  // Someone controls this color but they're disconnected - only auto-skip
+  // if there's still a real match going (2+ connected players); a lone
+  // straggler is "last player standing" territory instead.
+  if (currentPlayer) {
+    const connectedCount = room.players.filter((p) => p.connected).length;
+    if (connectedCount < 2) return null;
+  }
+
+  // (If currentPlayer is undefined, this color has no controller at all -
+  // a genuinely empty/uncontrolled seat - so we fall through and skip it
+  // unconditionally below.)
 
   const activeColors = room.gameState.players.filter((p) => p.isActive).map((p) => p.color);
-  const currentIndex = activeColors.indexOf(room.gameState.currentTurnColor);
+  const currentIndex = activeColors.indexOf(currentColor);
   const nextColor = activeColors[(currentIndex + 1) % activeColors.length];
 
   room.pendingRoll = null;

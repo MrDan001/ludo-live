@@ -119,6 +119,11 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
     const prev = truePositionsRef.current;
     const timers: ReturnType<typeof setTimeout>[] = [];
     let pendingHops = 0;
+    // Whether ANY token actually changed position this update - as opposed
+    // to a re-render with the same positions (e.g. a room:update that
+    // didn't touch tokens). Only changes need to eventually fire the
+    // completion callback.
+    let anyChange = false;
 
     const startHop = (tokenId: string, from: number, to: number) => {
       pendingHops++;
@@ -140,6 +145,7 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
       const oldPos = prev[tokenId];
       const newPos = truePositions[tokenId];
       if (oldPos === newPos) return;
+      anyChange = true;
 
       if (oldPos === "YARD" && typeof newPos === "number") {
         // Pop onto the board at the entry square, then hop any remaining
@@ -160,6 +166,15 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
     });
 
     truePositionsRef.current = truePositions;
+
+    // Something moved (e.g. a token exited straight onto its entry square,
+    // or got captured back to the yard) but none of it needed a multi-step
+    // hop, so `startHop` never ran and never fired the completion callback.
+    // The dice overlay is still waiting on it - fire it now, next tick, so
+    // "Counting..." doesn't get stuck forever.
+    if (anyChange && pendingHops === 0) {
+      timers.push(setTimeout(() => onCompleteRef.current?.(), 0));
+    }
 
     return () => timers.forEach(clearTimeout);
     // eslint-disable-next-line react-hooks/exhaustive-deps

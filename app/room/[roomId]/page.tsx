@@ -100,7 +100,13 @@ export default function RoomPage() {
   }
 
   const gameState = room.gameState!;
-  const isYourTurn = gameState.currentTurnColor === yourColor;
+  const currentSocketId = getSocket().id ?? null;
+  const me = room.players.find((p) => p.socketId === currentSocketId);
+  // In 2-player team mode you also control your teammateColor (Yellow if
+  // your primary is Red, Blue if Green) - so either match counts as your
+  // turn, not just an exact primary-color match against yourColor.
+  const isYourTurn =
+    !!me && (gameState.currentTurnColor === me.color || gameState.currentTurnColor === me.teammateColor);
 
   // d1 and d2 are never summed for movement - the player picks one value
   // to play. If both dice offer a real (different) choice, wait for a tap;
@@ -115,8 +121,6 @@ export default function RoomPage() {
       ? room.pendingMoves.filter((m) => m.dieValue === activeDieValue).map((m) => m.tokenId)
       : []
   );
-  const currentSocketId = getSocket().id ?? null;
-
   // Map top (RED, GREEN) and bottom (BLUE, YELLOW) players. In 2-player
   // team mode there's no RoomPlayer whose primary color is literally
   // Yellow/Blue - that human's primary is Red/Green and Yellow/Blue is

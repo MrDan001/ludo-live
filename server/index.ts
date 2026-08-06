@@ -46,8 +46,22 @@ function scheduleAutoPlayCheck(roomId: string) {
   const room = getRoom(roomId);
   if (!room || !room.started || !room.gameState || room.gameState.winner) return;
 
-  const currentPlayer = room.players.find((p) => p.color === room.gameState!.currentTurnColor);
-  if (!currentPlayer || currentPlayer.connected) return; // connected player's turn - nothing to schedule
+  const currentColor = room.gameState.currentTurnColor;
+  // Match on primary color OR teammate color - in 2-player team mode the
+  // player controlling Yellow/Blue is found via teammateColor, not color.
+  const currentPlayer = room.players.find((p) => p.color === currentColor || p.teammateColor === currentColor);
+
+  // Nobody at all is attached to this color (a genuinely empty/uncontrolled
+  // seat) - skip it right away instead of waiting on a player who can never
+  // show up.
+  if (!currentPlayer) {
+    const updated = skipDisconnectedTurn(roomId);
+    if (updated) io.to(roomId).emit("room:update", updated);
+    scheduleAutoPlayCheck(roomId);
+    return;
+  }
+
+  if (currentPlayer.connected) return; // connected player's turn - nothing to schedule
 
   const connectedCount = room.players.filter((p) => p.connected).length;
   if (connectedCount < 2) return; // last-player-standing territory, not this mechanism
