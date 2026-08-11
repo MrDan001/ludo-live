@@ -15,12 +15,28 @@ import VoiceControls from "@/components/layout/VoiceControls";
 import ChatPanel from "@/components/layout/ChatPanel";
 import VoiceChatPanel from "@/components/layout/VoiceChatPanel";
 import RoomLobby from "@/components/layout/RoomLobby";
+import TournamentWaitingRoom from "@/components/layout/TournamentWaitingRoom";
 
 export default function RoomPage() {
   const params = useParams();
   const roomId = params.roomId as string;
-  const { room, yourColor, connect, joinRoom, roll, selectMove, rollSeq, lastRoll, finishMoveAnimation } =
-    useMultiplayerGame();
+  // Tournament match rooms always use the deterministic `t_<tournamentId>`
+  // id (see server/rooms.ts createOrJoinTournamentRoom) - recognizing that
+  // shape here is enough to route this join through the tournament path
+  // instead of the plain create-a-room-and-invite-friends path.
+  const tournamentId = roomId?.startsWith("t_") ? roomId.slice(2) : null;
+  const {
+    room,
+    yourColor,
+    connect,
+    joinRoom,
+    joinTournamentMatch,
+    roll,
+    selectMove,
+    rollSeq,
+    lastRoll,
+    finishMoveAnimation,
+  } = useMultiplayerGame();
   const { gems, name, avatarUrl, dbUserId, checkSession } = useAuth();
   const { connect: connectChat, unreadCount, markRead } = useRoomChat();
 
@@ -46,9 +62,13 @@ export default function RoomPage() {
   // seat/color instead of treating us as a brand new player.
   useEffect(() => {
     if (!room && dbUserId && roomId) {
-      joinRoom(roomId, name || "Player", dbUserId, avatarUrl ?? undefined);
+      if (tournamentId) {
+        joinTournamentMatch(tournamentId, name || "Player", dbUserId, avatarUrl ?? undefined);
+      } else {
+        joinRoom(roomId, name || "Player", dbUserId, avatarUrl ?? undefined);
+      }
     }
-  }, [room, dbUserId, roomId, name, avatarUrl, joinRoom]);
+  }, [room, dbUserId, roomId, tournamentId, name, avatarUrl, joinRoom, joinTournamentMatch]);
 
   // Seed room chat history once we're in a room. ChatPanel/VoiceChatPanel
   // are pure overlays from here on - opening or closing them never touches
@@ -78,6 +98,13 @@ export default function RoomPage() {
   }
 
   if (!room.started) {
+    // Tournament match rooms get a minimal waiting screen instead of the
+    // full lobby - there's no bet/mode to configure and no one to invite,
+    // so none of RoomLobby's controls apply.
+    if (room.tournamentId) {
+      return <TournamentWaitingRoom />;
+    }
+
     return (
       <>
         <RoomLobby
@@ -143,6 +170,12 @@ export default function RoomPage() {
       {/* Top Header */}
       <div className="w-full max-w-[min(94vw,440px)] flex items-center justify-between px-1 pt-1 shrink-0">
         <button className="text-amber-200 text-xl p-1">☰</button>
+
+        {room.tournamentId && (
+          <div className="flex items-center gap-1 bg-[#3B2319] border border-amber-900/60 px-2 py-1 rounded-full shadow-inner text-amber-300 text-xs font-bold">
+            🏆 Tournament
+          </div>
+        )}
 
         <div className="flex items-center gap-1.5 bg-[#3B2319] border border-amber-900/60 px-3 py-1 rounded-full shadow-inner">
           <span className="text-blue-400 text-xs">💎</span>

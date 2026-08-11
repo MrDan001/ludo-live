@@ -30,6 +30,12 @@ interface RoomData {
   betAmount: number;
   gameMode: string;
   pot: number;
+  // Present only for a room created from a filled tournament - id of that
+  // Tournament. Drives the tournament-specific waiting/lobby UI and lets
+  // the room screen skip bet/mode controls that don't apply there.
+  tournamentId?: string;
+  // Total entrants expected for that tournament - see server/rooms.ts.
+  tournamentMaxPlayers?: number;
 }
 
 interface MultiplayerStore {
@@ -51,6 +57,7 @@ interface MultiplayerStore {
   connect: () => void;
   createRoom: (name: string, userId: string, avatarUrl?: string) => void;
   joinRoom: (roomId: string, name: string, userId: string, avatarUrl?: string) => void;
+  joinTournamentMatch: (tournamentId: string, name: string, userId: string, avatarUrl?: string) => void;
   startGame: (roomId: string) => void;
   roll: (roomId: string) => void;
   selectMove: (roomId: string, tokenId: string, toPosition: number) => void;
@@ -120,6 +127,11 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
   joinRoom: (roomId, name, userId, avatarUrl) => {
     set({ yourUserId: userId });
     getSocket().emit("room:join", { roomId, name, userId, avatarUrl });
+  },
+
+  joinTournamentMatch: (tournamentId, name, userId, avatarUrl) => {
+    set({ yourUserId: userId });
+    getSocket().emit("tournament:joinMatch", { tournamentId, name, userId, avatarUrl });
   },
 
   startGame: (roomId) => {

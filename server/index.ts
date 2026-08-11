@@ -15,6 +15,7 @@ import {
   skipDisconnectedTurn,
   checkLastPlayerStanding,
   removePlayer,
+  createOrJoinTournamentRoom,
 } from "./rooms";
 
 type RTCSessionDescriptionInit = { type: string; sdp?: string };
@@ -109,6 +110,45 @@ io.on("connection", (socket) => {
       // A reconnect may have just brought the current turn-holder back -
       // re-check whether the auto-skip timer still needs to be armed.
       scheduleAutoPlayCheck(result.id);
+    }
+  );
+
+  // Join (or, for the first entrant to arrive, create) a filled
+  // tournament's match room. Unlike room:join this never fails with "room
+  // not found" - the room is derived from the tournament and stood up on
+  // demand - it only fails if the tournament itself isn't playable by this
+  // user right now (see createOrJoinTournamentRoom).
+  socket.on(
+    "tournament:joinMatch",
+    async ({
+      tournamentId,
+      name,
+      userId,
+      avatarUrl,
+    }: {
+      tournamentId: string;
+      name: string;
+      userId: string;
+      avatarUrl?: string;
+    }) => {
+      const result = await createOrJoinTournamentRoom(tournamentId, socket.id, userId, name || "Player", avatarUrl);
+      if (!result) {
+        socket.emit("room:error", { message: "Tournament not found" });
+        return;
+      }
+      if ("error" in result) {
+        socket.emit("room:error", { message: result.error });
+        return;
+      }
+      socket.join(result.id);
+      const me = result.players.find((p) => p.socketId === socket.id)!;
+      socket.emit("room:joined", { roomId: result.id, yourColor: me.color });
+      io.to(result.id).emit("room:update", result);
+
+      // If this join was the one that completed the room (last entrant to
+      // connect), the game just started above - arm the disconnect/skip
+      // timer the same way room:start does.
+      if (result.started) scheduleAutoPlayCheck(result.id);
     }
   );
 

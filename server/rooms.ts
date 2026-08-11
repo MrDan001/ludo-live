@@ -15,6 +15,12 @@ const DEFAULT_BET_AMOUNT = 0;
 const DEFAULT_GAME_MODE = "Classic";
 const MAX_BET_AMOUNT = 1_000_000;
 
+// Where the Next.js app (which owns /api/tournaments/*) is reachable from
+// this process. Defaults to the local dev server; set to the deployed
+// app's URL in production, since the socket server and the Next app are
+// separate processes/services.
+const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
+
 export interface RoomPlayer {
   socketId: string;
   userId: string;
@@ -42,6 +48,19 @@ export interface Room {
   betAmount: number;
   gameMode: string;
   pot: number;
+  // Set only for a room created from a filled Tournament (see
+  // createOrJoinTournamentRoom) - id of that Tournament. Presence of this
+  // field is what tells the rest of the room lifecycle "this match's
+  // result needs to settle a tournament prize pool, not a bet pot."
+  tournamentId?: string;
+  // How many entrants this tournament has in total - carried onto the
+  // room purely so the waiting-room UI can show "2/4 joined" without a
+  // separate fetch back to the tournament API.
+  tournamentMaxPlayers?: number;
+  // Guards the settle call the same way resultRecorded guards match
+  // recording - so a reconnect/replay near the winning move can never
+  // trigger a second payout.
+  tournamentSettled?: boolean;
 }
 
 const rooms = new Map<string, Room>();
@@ -124,6 +143,105 @@ export function joinRoom(
 
 export function getRoom(roomId: string): Room | undefined {
   return rooms.get(roomId);
+}
+
+// Join (creating on first arrival) the match room for a filled tournament.
+// Unlike joinRoom, there's no separate "create" step and no host picking
+// who's allowed in - the room's roster is exactly the tournament's paid
+// entrants, known from the database, and any of them connecting is enough
+// to stand the room up. Colors are assigned deterministically from entry
+// order so every entrant lands on the same color regardless of connection
+// order or reconnects.
+export async function createOrJoinTournamentRoom(
+  tournamentId: string,
+  socketId: string,
+  userId: string,
+  name: string,
+  avatarUrl?: string
+): Promise<Room | { error: string } | null> {
+  const tournament = await prisma.tournament.findUnique({
+    where: { id: tournamentId },
+    include: { entries: { orderBy: { joinedAt: "asc" } } },
+  });
+  if (!tournament) return null;
+
+  // The tournament only moves to in_progress once it's full (see the join
+  // route) - anything else means there's no match to connect to yet, or
+  // it's already been played out.
+  if (tournament.status !== "in_progress") {
+    return { error: "This tournament isn't ready to play yet" };
+  }
+
+  const entry = tournament.entries.find((e) => e.userId === userId);
+  if (!entry) return { error: "You didn't enter this tournament" };
+
+  const roomId = `t_${tournamentId}`;
+  let room = rooms.get(roomId);
+
+  if (!room) {
+    room = {
+      id: roomId,
+      hostUserId: tournament.entries[0].userId,
+      players: [],
+      gameState: null,
+      started: false,
+      pendingRoll: null,
+      pendingMoves: [],
+      consecutiveSixes: 0,
+      resultRecorded: false,
+      messages: [],
+      // No bet escrow here - the entry fee was already deducted (and
+      // pooled into tournament.prizePool) when each player joined, so
+      // there's nothing for startGame's bet logic to do and no room.pot
+      // for recordMatchResult to separately pay out. The prize pays out
+      // through settleTournamentMatch instead, once, from prizePool.
+      betAmount: 0,
+      gameMode: DEFAULT_GAME_MODE,
+      pot: 0,
+      tournamentId,
+      tournamentMaxPlayers: tournament.entries.length,
+      tournamentSettled: false,
+    };
+    rooms.set(roomId, room);
+  }
+
+  const existing = room.players.find((p) => p.userId === userId);
+  if (existing) {
+    // Reconnect - same as joinRoom's reconnect path.
+    existing.socketId = socketId;
+    existing.connected = true;
+    if (name) existing.name = name;
+    if (avatarUrl) existing.avatarUrl = avatarUrl;
+  } else {
+    if (room.players.length >= tournament.entries.length) return { error: "Tournament room is full" };
+    // Color = this entrant's fixed position in join order, so it never
+    // depends on who happens to connect (or reconnect) first.
+    const color = ALL_COLORS[tournament.entries.findIndex((e) => e.userId === userId) % ALL_COLORS.length];
+    room.players.push({ socketId, userId, color, name, connected: true, avatarUrl, ready: true });
+  }
+
+  // Every paid entrant is present - kick the match off immediately, no
+  // lobby/ready-up step, since entering the tournament already was the
+  // commitment to play.
+  if (!room.started && room.players.length === tournament.entries.length) {
+    const isTeamMode = room.players.length === 2;
+    let activeColors: PlayerColor[];
+
+    if (isTeamMode) {
+      room.players[0].color = "RED";
+      room.players[0].teammateColor = "YELLOW";
+      room.players[1].color = "GREEN";
+      room.players[1].teammateColor = "BLUE";
+      activeColors = ["RED", "GREEN", "YELLOW", "BLUE"];
+    } else {
+      activeColors = room.players.map((p) => p.color);
+    }
+
+    room.gameState = createInitialGameState(activeColors, [], isTeamMode);
+    room.started = true;
+  }
+
+  return room;
 }
 
 class InsufficientFundsError extends Error {
@@ -260,7 +378,8 @@ export async function handleSelectMove(
 
     if (!room.resultRecorded) {
       room.resultRecorded = true;
-      await recordMatchResult(room);
+      const matchId = await recordMatchResult(room);
+      if (room.tournamentId) await settleTournamentMatch(room, matchId);
     }
 
     return room;
@@ -275,8 +394,8 @@ export async function handleSelectMove(
   return room;
 }
 
-async function recordMatchResult(room: Room) {
-  if (!room.gameState?.winner) return;
+async function recordMatchResult(room: Room): Promise<string | undefined> {
+  if (!room.gameState?.winner) return undefined;
 
   try {
     const winnerColor = room.gameState.winner;
@@ -325,8 +444,62 @@ async function recordMatchResult(room: Room) {
     }
 
     console.log(`Match recorded for room ${room.id}, winner: ${winnerColor}`);
+    return match.id;
   } catch (err) {
     console.error("Failed to record match result:", err);
+    return undefined;
+  }
+}
+
+// Called once a tournament room's match has a recorded winner. Pays the
+// tournament's coin prize pool out to the winner by calling the settle
+// route - the same trusted internal endpoint Stage 3 built and locked
+// behind INTERNAL_API_SECRET specifically for this handler to call, now
+// that there's a real match result to hand it. This is a pure credit:
+// entry fees were already deducted (and pooled) when each player joined,
+// so nothing here deducts anything.
+async function settleTournamentMatch(room: Room, matchId: string | undefined) {
+  if (!room.tournamentId || room.tournamentSettled) return;
+  if (!room.gameState?.winner) return;
+
+  const winnerColor = room.gameState.winner;
+  // In team mode the winning "color" can be a teammateColor holder too.
+  const winnerPlayer = room.players.find((p) => p.color === winnerColor || p.teammateColor === winnerColor);
+  if (!winnerPlayer) {
+    console.error(`Tournament ${room.tournamentId}: no player controls winning color ${winnerColor}`);
+    return;
+  }
+
+  if (!process.env.INTERNAL_API_SECRET) {
+    console.error(`Tournament ${room.tournamentId}: INTERNAL_API_SECRET not set, cannot settle`);
+    return;
+  }
+
+  room.tournamentSettled = true;
+
+  try {
+    const res = await fetch(`${APP_BASE_URL}/api/tournaments/${room.tournamentId}/settle`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-internal-secret": process.env.INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify({ winnerId: winnerPlayer.userId, matchId }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      console.error(`Failed to settle tournament ${room.tournamentId}:`, body.error ?? res.status);
+      // Allow a retry on a later event (e.g. checkLastPlayerStanding after
+      // a disconnect) rather than leaving the pot permanently unpaid.
+      room.tournamentSettled = false;
+      return;
+    }
+
+    console.log(`Tournament ${room.tournamentId} settled, winner: ${winnerPlayer.name}`);
+  } catch (err) {
+    console.error(`Failed to settle tournament ${room.tournamentId}:`, err);
+    room.tournamentSettled = false;
   }
 }
 
@@ -469,7 +642,8 @@ export async function checkLastPlayerStanding(roomId: string): Promise<Room | nu
 
   if (!room.resultRecorded) {
     room.resultRecorded = true;
-    await recordMatchResult(room);
+    const matchId = await recordMatchResult(room);
+    if (room.tournamentId) await settleTournamentMatch(room, matchId);
   }
 
   return room;

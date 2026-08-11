@@ -25,9 +25,17 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overflow-hidden overscroll-none`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased overscroll-none`}
     >
-      <body className="h-full w-full overflow-hidden overscroll-none flex flex-col select-none" suppressHydrationWarning>
+      {/* No height/overflow lock here anymore - most pages (Home, Events,
+          Shop, Leaderboard, etc.) are meant to scroll under the fixed
+          BottomNav when their content runs taller than the viewport, and
+          a body-level `overflow-hidden` was blocking that globally. Pages
+          that must stay pinned - the game board (room page) and its
+          lobby/waiting-room screens - already opt into their own
+          `fixed inset-0 h-[100dvh] overflow-hidden` wrapper, so they stay
+          non-scrollable regardless of what the body allows. */}
+      <body className="min-h-full w-full overscroll-none flex flex-col select-none" suppressHydrationWarning>
         {children}
       </body>
     </html>

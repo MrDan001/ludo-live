@@ -58,15 +58,22 @@ export async function POST(
         include: { _count: { select: { entries: true } } },
       });
 
-      // Auto-start once the tournament fills up.
+      // Auto-start once the tournament fills up. roomId is deterministic
+      // (`t_<tournamentId>`) - the socket server derives the same value
+      // independently, this column just makes it queryable/explicit. The
+      // actual Room object is created lazily by the socket server the
+      // moment the first entrant connects to it (see server/rooms.ts
+      // createOrJoinTournamentRoom) - nothing to do here but flip status.
+      let finalTournament = updated;
       if (updated._count.entries >= updated.maxPlayers) {
-        await tx.tournament.update({
+        finalTournament = await tx.tournament.update({
           where: { id: tournamentId },
-          data: { status: "in_progress", startedAt: new Date() },
+          data: { status: "in_progress", startedAt: new Date(), roomId: `t_${tournamentId}` },
+          include: { _count: { select: { entries: true } } },
         });
       }
 
-      return { entry, tournament: updated };
+      return { entry, tournament: finalTournament };
     });
 
     return NextResponse.json({ joined: true, ...result });

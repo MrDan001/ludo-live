@@ -9,11 +9,25 @@ const adapter = new PrismaPg({
 const prisma = new PrismaClient({ adapter });
 
 // GET /api/tournaments - list open tournaments (default) or filter by status
+// GET /api/tournaments?userId=... - "my tournaments" mode: instead of every
+// open tournament, return only the ones this user has personally entered
+// (open or in_progress by default, so a client can poll this to notice the
+// moment their tournament fills up and get its roomId to join the match).
+// Pass an explicit ?status= alongside userId to narrow further (e.g.
+// status=completed to look up a past result).
 export async function GET(req: NextRequest) {
-  const status = req.nextUrl.searchParams.get("status") ?? "open";
+  const userId = req.nextUrl.searchParams.get("userId");
+  const statusParam = req.nextUrl.searchParams.get("status");
+
+  const where = userId
+    ? {
+        entries: { some: { userId } },
+        ...(statusParam ? { status: statusParam } : { status: { in: ["open", "in_progress"] } }),
+      }
+    : { status: statusParam ?? "open" };
 
   const tournaments = await prisma.tournament.findMany({
-    where: { status },
+    where,
     orderBy: { createdAt: "desc" },
     include: { _count: { select: { entries: true } } },
   });
@@ -27,6 +41,9 @@ export async function GET(req: NextRequest) {
       maxPlayers: t.maxPlayers,
       playerCount: t._count.entries,
       status: t.status,
+      roomId: t.roomId,
+      winnerId: t.winnerId,
+      matchId: t.matchId,
       createdAt: t.createdAt,
     })),
   });

@@ -73,6 +73,16 @@ model Tournament {
   maxPlayers  Int       @default(4)
   status      String    @default("open") // open | in_progress | completed | cancelled
   winnerId    String?
+  // Deterministic socket room code for this tournament's match, always
+  // `t_<tournament id>`. Stored (rather than only derived client-side) so
+  // it's queryable and so the shape matches roomId elsewhere. Set once the
+  // tournament fills and moves to in_progress.
+  roomId      String?
+  // The real Ludo Match this tournament's game produced, once played -
+  // this is what "a tournament match is a real Ludo game" cashes out to.
+  // Set by the settle route when the match-completion handler reports a
+  // result, never by the client.
+  matchId     String?
   createdAt   DateTime  @default(now())
   startedAt   DateTime?
   completedAt DateTime?

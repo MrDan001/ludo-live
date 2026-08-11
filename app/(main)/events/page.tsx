@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/hooks/useAuth";
 import BottomNav from "@/components/layout/BottomNav";
 
@@ -12,14 +13,24 @@ interface Tournament {
   maxPlayers: number;
   playerCount: number;
   status: string;
+  roomId?: string | null;
 }
 
+// How often to poll for tournaments this user has already entered, purely
+// so a slot getting filled by someone *else* still gets you moved into the
+// match room without needing to refresh - the join response itself
+// already handles the case where your own join was the one that filled it.
+const MY_TOURNAMENTS_POLL_MS = 4000;
+
 export default function EventsPage() {
+  const router = useRouter();
   const { dbUserId, coins, refreshWallet } = useAuth();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
+  const [myTournaments, setMyTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const redirectedRef = useRef(false);
 
   const loadTournaments = useCallback(() => {
     fetch("/api/tournaments?status=open")
@@ -31,6 +42,38 @@ export default function EventsPage() {
   useEffect(() => {
     loadTournaments();
   }, [loadTournaments]);
+
+  // Poll the tournaments this user is personally entered in, so a match
+  // filling up while they're sitting on this page still routes them in.
+  useEffect(() => {
+    if (!dbUserId) return;
+
+    let cancelled = false;
+
+    const poll = () => {
+      fetch(`/api/tournaments?userId=${dbUserId}`)
+        .then((res) => res.json())
+        .then((data: { tournaments?: Tournament[] }) => {
+          if (cancelled) return;
+          const mine = data.tournaments ?? [];
+          setMyTournaments(mine);
+
+          const readyMatch = mine.find((t) => t.status === "in_progress" && t.roomId);
+          if (readyMatch && !redirectedRef.current) {
+            redirectedRef.current = true;
+            router.push(`/room/${readyMatch.roomId}`);
+          }
+        })
+        .catch(() => {});
+    };
+
+    poll();
+    const interval = setInterval(poll, MY_TOURNAMENTS_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [dbUserId, router]);
 
   async function handleJoin(tournament: Tournament) {
     if (!dbUserId) {
@@ -59,6 +102,15 @@ export default function EventsPage() {
       }
 
       await refreshWallet();
+
+      // Our join was the one that filled it - go straight to the match
+      // instead of waiting for the next poll tick.
+      if (data.tournament.status === "in_progress" && data.tournament.roomId) {
+        redirectedRef.current = true;
+        router.push(`/room/${data.tournament.roomId}`);
+        return;
+      }
+
       loadTournaments();
       setMessage(`You're in! Prize pool is now ${data.tournament.prizePool.toLocaleString()} coins.`);
     } catch {
@@ -86,6 +138,37 @@ export default function EventsPage() {
       {message && (
         <div className="w-full max-w-md bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200">
           {message}
+        </div>
+      )}
+
+      {myTournaments.length > 0 && (
+        <div className="w-full max-w-md flex flex-col gap-2">
+          <h2 className="text-slate-400 text-xs font-semibold uppercase tracking-wide">Your Tournaments</h2>
+          {myTournaments.map((t) => (
+            <div
+              key={t.id}
+              className="bg-slate-800/80 border border-slate-700 rounded-xl p-3 flex items-center justify-between gap-3"
+            >
+              <div className="min-w-0">
+                <div className="text-white text-sm font-semibold truncate">{t.name}</div>
+                <div className="text-slate-400 text-xs">
+                  {t.status === "in_progress"
+                    ? "Match ready"
+                    : `Waiting for players (${t.playerCount}/${t.maxPlayers})`}
+                </div>
+              </div>
+              {t.status === "in_progress" && t.roomId ? (
+                <button
+                  onClick={() => router.push(`/room/${t.roomId}`)}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-semibold bg-emerald-600 hover:bg-emerald-500 text-white"
+                >
+                  Enter Match
+                </button>
+              ) : (
+                <span className="shrink-0 text-amber-400 text-xs font-semibold">Waiting...</span>
+              )}
+            </div>
+          ))}
         </div>
       )}
 
