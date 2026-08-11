@@ -14,11 +14,17 @@ model User {
   email       String?  @unique
   isGuest     Boolean  @default(false)
   avatarUrl   String?
+  // Coins/gems are in-app currency only. There is intentionally no
+  // withdrawal or cash-conversion path anywhere in the schema or API -
+  // coins can be earned or purchased, but only ever spent in-app
+  // (tournament entries, shop items). Do not add a redemption/withdraw
+  // field without a legal review - see /areas/ludo-live.md.
   coins       Int      @default(500)
   gems        Int      @default(0)
   createdAt   DateTime @default(now())
 
-  matchPlayers MatchPlayer[]
+  matchPlayers      MatchPlayer[]
+  tournamentEntries TournamentEntry[]
 }
 
 model Match {
@@ -53,4 +59,35 @@ model LeaderboardEntry {
   userId   String @unique
   wins     Int    @default(0)
   gamesPlayed Int @default(0)
+}
+
+// Coin-based tournament. Entry fee and prize pool are both in coins -
+// there is no real-money field on this model. If real-money entry fees
+// are ever added, that requires a gambling license (see chat notes) and
+// should be a completely separate model, not a field bolted onto this one.
+model Tournament {
+  id          String    @id @default(cuid())
+  name        String
+  entryFee    Int // coins
+  prizePool   Int       @default(0) // coins, accumulates as players join
+  maxPlayers  Int       @default(4)
+  status      String    @default("open") // open | in_progress | completed | cancelled
+  winnerId    String?
+  createdAt   DateTime  @default(now())
+  startedAt   DateTime?
+  completedAt DateTime?
+
+  entries TournamentEntry[]
+}
+
+model TournamentEntry {
+  id           String   @id @default(cuid())
+  tournamentId String
+  userId       String
+  joinedAt     DateTime @default(now())
+
+  tournament Tournament @relation(fields: [tournamentId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+
+  @@unique([tournamentId, userId])
 }
