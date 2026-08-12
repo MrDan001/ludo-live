@@ -78,12 +78,12 @@ export default function PlayPage() {
   };
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden touch-none select-none bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center gap-4 p-4">
+    <div className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden touch-pan-y select-none bg-gradient-to-b from-slate-900 to-slate-950 flex flex-col items-center gap-4 p-4">
       <h1 className="text-white text-lg font-bold shrink-0">Ludo Live — Test Play</h1>
 
       <ScoreBar entries={scoreEntries} />
 
-      <div className="relative w-full max-w-[600px] aspect-square shrink">
+      <div className="relative w-full max-w-[min(600px,94vw,calc(100dvh_-_280px))] aspect-square shrink">
         <Board
           players={gameState.players}
           selectableTokenIds={selectableTokenIds}
