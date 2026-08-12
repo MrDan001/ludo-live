@@ -71,14 +71,11 @@ export default function DiceOverlay({ onRoll, canRoll, rollSeq, d1, d2 }: DiceOv
     return () => clearTimeout(t);
   }, [rollSeq]);
 
-  const showFaces = hasRolledOnce && d1 !== null && d2 !== null;
   const faceOrPlaceholder = (face: number | null) => face ?? 1;
-  // Fall back to the old fixed sizes for the first paint before the
-  // ResizeObserver has measured anything (trayPx starts at 0) - avoids a
-  // flash of zero-size dice, and matches server-rendered markup exactly
-  // since trayPx is always 0 on both sides until this mounts client-side.
-  const pairedSize = trayPx > 0 ? Math.round(trayPx * 0.42) : 18;
-  const placeholderSize = trayPx > 0 ? Math.round(trayPx * 0.55) : 24;
+  // Two dice always sit in the tray, before the first roll included -
+  // matching the reference, which never shows just one. Size is measured
+  // from the tray's own rendered width so it scales with the board.
+  const dieSize = trayPx > 0 ? Math.round(trayPx * 0.42) : 20;
 
   return (
     // pointer-events-none on the wrapper - inset-0 makes this div's hit
@@ -94,9 +91,9 @@ export default function DiceOverlay({ onRoll, canRoll, rollSeq, d1, d2 }: DiceOv
         disabled={!canRoll}
         aria-label="Roll dice"
         className={[
-          "pointer-events-auto relative flex items-center justify-center gap-[6%] rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.4),0_4px_10px_rgba(0,0,0,0.5)] border-2 transition-transform active:scale-95",
+          "pointer-events-auto relative flex items-center justify-center gap-[8%] rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.4),0_4px_10px_rgba(0,0,0,0.5)] border-2 transition-transform active:scale-95",
           canRoll ? "border-amber-400/70 cursor-pointer" : "border-amber-900/60 cursor-default",
-          !showFaces && canRoll ? "animate-pulse" : "",
+          !hasRolledOnce && canRoll ? "animate-pulse" : "",
         ].join(" ")}
         style={{
           width: "19%",
@@ -104,14 +101,8 @@ export default function DiceOverlay({ onRoll, canRoll, rollSeq, d1, d2 }: DiceOv
           background: "radial-gradient(circle at 35% 30%, #2f7db0, #1a4c6e 70%)",
         }}
       >
-        {showFaces ? (
-          <>
-            <Die3D face={faceOrPlaceholder(d1)} spinning={spinning} size={pairedSize} />
-            <Die3D face={faceOrPlaceholder(d2)} spinning={spinning} size={pairedSize} />
-          </>
-        ) : (
-          <Die3D face={1} spinning={spinning} size={placeholderSize} />
-        )}
+        <Die3D face={faceOrPlaceholder(d1)} spinning={spinning} size={dieSize} />
+        <Die3D face={faceOrPlaceholder(d2)} spinning={spinning} size={dieSize} />
       </button>
     </div>
   );
