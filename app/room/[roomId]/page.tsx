@@ -215,9 +215,9 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden touch-none select-none bg-[#1D110C] flex flex-col items-center justify-between p-2 font-sans">
+    <div className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden touch-pan-y select-none bg-[#1D110C] flex flex-col items-center justify-between p-2 font-sans">
       {/* Top Header */}
-      <div className="w-full max-w-[min(96vw,560px)] flex items-center justify-between px-1 pt-1 shrink-0">
+      <div className="w-full max-w-[min(94vw,560px,calc(100dvh_-_460px))] flex items-center justify-between px-1 pt-1 shrink-0">
         <button className="text-amber-200 text-xl p-1">☰</button>
 
         {room.tournamentId && (
@@ -240,7 +240,7 @@ export default function RoomPage() {
 
       {/* Main Board Unit with Striped Wood Plank Gradient */}
       <div 
-        className="w-full max-w-[min(96vw,560px)] border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center shrink my-auto relative"
+        className="w-full max-w-[min(94vw,560px,calc(100dvh_-_460px))] border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center shrink my-auto relative"
         style={{
           backgroundColor: "#4E2E1E",
           backgroundImage: `
@@ -351,7 +351,7 @@ export default function RoomPage() {
       </div>
 
       {/* Bottom Controls Bar */}
-      <div className="w-full max-w-[min(96vw,560px)] px-1 pb-1 flex items-center justify-between shrink-0">
+      <div className="w-full max-w-[min(94vw,560px,calc(100dvh_-_460px))] px-1 pb-1 flex items-center justify-between shrink-0">
         {/* Left Voice & Chat Controls */}
         <div className="flex items-center gap-2">
           <VoiceControls roomId={room.id} enabled={room.started} />
@@ -391,4 +391,4 @@ export default function RoomPage() {
       />
     </div>
   );
-}
+        }
