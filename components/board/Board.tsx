@@ -114,6 +114,16 @@ interface BoardProps {
    *  local player, an opponent's real name otherwise). Falls back to the
    *  plain color name for any color left unset. */
   playerNames?: Partial<Record<PlayerColor, string>>;
+  /** Photo URL shown on each color's yard badge, in place of the letter
+   *  avatar, when the seat has one. */
+  playerAvatars?: Partial<Record<PlayerColor, string | undefined>>;
+  /** Colors whose seat is currently unfilled - shown as a dashed empty
+   *  slot instead of a name/avatar badge. */
+  emptyColors?: Set<PlayerColor>;
+  /** Colors that are disconnected (but still seated) - dims the badge. */
+  disconnectedColors?: Set<PlayerColor>;
+  /** Colors whose turn it is right now - gets the glowing highlight ring. */
+  currentTurnColors?: Set<PlayerColor>;
   /** Fires once per token sent back to its yard by an opponent landing on
    *  it (not for a token simply starting the game in the yard). Lets the
    *  parent page show a toast, play a sound, etc. */
@@ -136,6 +146,10 @@ export default function Board({
   onTokenClick,
   onMoveAnimationComplete,
   playerNames,
+  playerAvatars,
+  emptyColors,
+  disconnectedColors,
+  currentTurnColors,
   onCapture,
 }: BoardProps) {
   const [displayPositions, setDisplayPositions] = useState<Record<string, Pos>>(() => {
@@ -281,6 +295,10 @@ export default function Board({
       {ALL_COLORS.map((color) => {
         const { rowStart, colStart } = BASE_ZONE[color];
         const name = playerNames?.[color] ?? color.charAt(0) + color.slice(1).toLowerCase();
+        const avatarUrl = playerAvatars?.[color];
+        const isEmpty = emptyColors?.has(color) ?? false;
+        const isDisconnected = disconnectedColors?.has(color) ?? false;
+        const isCurrentTurn = currentTurnColors?.has(color) ?? false;
         return (
           <div key={`zone-${color}`}>
             <div
@@ -292,38 +310,59 @@ export default function Board({
                 height: `${(6 / 15) * 100}%`,
               }}
             />
+            {/* Big photo badge - deliberately oversized to overlap the 4
+                pip dots around it, so identity reads instantly at a
+                glance instead of needing a separate header row. */}
             <div
               className="absolute z-20 pointer-events-none flex items-center justify-center"
               style={{
-                top: `${((rowStart + 2) / 15) * 100}%`,
-                left: `${((colStart + 2) / 15) * 100}%`,
-                width: `${(2 / 15) * 100}%`,
-                height: `${(1 / 15) * 100}%`,
-              }}
-            >
-              <div
-                className={`h-full aspect-square rounded-full ${COLOR_BG_SOLID[color]} border-2 border-white/90 shadow-md flex items-center justify-center text-white font-extrabold`}
-                style={{ fontSize: "min(3.2vw, 15px)" }}
-              >
-                {name.charAt(0).toUpperCase()}
-              </div>
-            </div>
-            <div
-              className="absolute z-20 pointer-events-none flex items-center justify-center"
-              style={{
-                top: `${((rowStart + 3) / 15) * 100}%`,
+                top: `${((rowStart + 1) / 15) * 100}%`,
                 left: `${((colStart + 1) / 15) * 100}%`,
-                width: `${(4 / 15) * 100}%`,
-                height: `${(1 / 15) * 100}%`,
+                width: `${(3 / 15) * 100}%`,
+                height: `${(3 / 15) * 100}%`,
               }}
             >
-              <span
-                className="px-1.5 rounded-full bg-slate-900/80 text-white font-bold leading-tight whitespace-nowrap"
-                style={{ fontSize: "min(2.2vw, 10px)" }}
-              >
-                {name}
-              </span>
+              {isEmpty ? (
+                <div className="w-[80%] h-[80%] rounded-full border-[3px] border-dashed border-white/60 bg-black/20 flex items-center justify-center">
+                  <span className="text-white/70 font-black" style={{ fontSize: "min(6vw, 24px)" }}>+</span>
+                </div>
+              ) : (
+                <div
+                  className={[
+                    "relative w-[82%] h-[82%] rounded-full overflow-hidden flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.5)] border-[3px] border-white/95 transition-all",
+                    isCurrentTurn ? "ring-4 ring-amber-300 shadow-[0_0_16px_4px_rgba(251,191,36,0.65)]" : "",
+                    isDisconnected ? "opacity-40 grayscale" : "",
+                  ].join(" ")}
+                >
+                  {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className={`w-full h-full ${COLOR_BG_SOLID[color]} flex items-center justify-center text-white font-black`} style={{ fontSize: "min(6vw, 26px)" }}>
+                      {name.charAt(0).toUpperCase()}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
+            {!isEmpty && (
+              <div
+                className="absolute z-20 pointer-events-none flex items-center justify-center"
+                style={{
+                  top: `${((rowStart + 4.05) / 15) * 100}%`,
+                  left: `${((colStart + 0.5) / 15) * 100}%`,
+                  width: `${(5 / 15) * 100}%`,
+                  height: `${(1 / 15) * 100}%`,
+                }}
+              >
+                <span
+                  className="px-2 py-0.5 rounded-full bg-slate-900/85 text-white font-extrabold leading-tight whitespace-nowrap border border-white/20"
+                  style={{ fontSize: "min(2.6vw, 12px)" }}
+                >
+                  {name}
+                </span>
+              </div>
+            )}
           </div>
         );
       })}
