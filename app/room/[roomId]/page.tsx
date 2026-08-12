@@ -215,9 +215,9 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden touch-pan-y select-none bg-[#1D110C] flex flex-col items-center justify-between p-2 font-sans">
+    <div className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden touch-pan-y select-none bg-[#1D110C] flex flex-col items-center p-2 font-sans">
       {/* Top Header */}
-      <div className="w-full max-w-[min(94vw,560px,calc(100dvh_-_460px))] flex items-center justify-between px-1 pt-1 shrink-0">
+      <div className="w-full max-w-[min(94vw,560px)] flex items-center justify-between px-1 pt-1 shrink-0">
         <button className="text-amber-200 text-xl p-1">☰</button>
 
         {room.tournamentId && (
@@ -238,9 +238,14 @@ export default function RoomPage() {
       {/* Score readout - one pill per human seat, tokens-home count */}
       <ScoreBar entries={scoreEntries} />
 
-      {/* Main Board Unit with Striped Wood Plank Gradient */}
+      {/* Main Board Unit with Striped Wood Plank Gradient.
+          flex-1 + min-h-0 here (instead of a guessed pixel budget) is what
+          actually makes this fill the real leftover vertical space after
+          the header/score/bottom rows above and below take theirs - the
+          browser computes that, so it can't be "too small" the way a
+          hardcoded calc(100dvh - Npx) reservation was. */}
       <div 
-        className="w-full max-w-[min(94vw,560px,calc(100dvh_-_460px))] border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center shrink my-auto relative"
+        className="w-full max-w-[min(94vw,560px)] flex-1 min-h-0 border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center relative"
         style={{
           backgroundColor: "#4E2E1E",
           backgroundImage: `
@@ -287,8 +292,15 @@ export default function RoomPage() {
           />
         </div>
 
-        {/* Playable Ludo Board Grid */}
-        <div className="relative w-full aspect-square rounded-xl overflow-hidden border-2 border-[#2C1810] shrink shadow-2xl">
+        {/* Playable Ludo Board Grid - flex-1/min-h-0 lets it claim
+            whatever vertical room is left inside the frame after the
+            badge/dice/turn rows around it take theirs; self-center (not
+            the default stretch) is what lets aspect-square then derive
+            the matching WIDTH from that height instead of always
+            stretching to the frame's full width first. max-w-full is the
+            other half of the pair - it re-clamps by width on a
+            short-but-wide screen where height alone would overshoot. */}
+        <div className="relative self-center max-w-full flex-1 min-h-0 aspect-square rounded-xl overflow-hidden border-2 border-[#2C1810] shadow-2xl">
           <Board
             players={gameState.players}
             selectableTokenIds={selectableTokenIds}
@@ -351,7 +363,7 @@ export default function RoomPage() {
       </div>
 
       {/* Bottom Controls Bar */}
-      <div className="w-full max-w-[min(94vw,560px,calc(100dvh_-_460px))] px-1 pb-1 flex items-center justify-between shrink-0">
+      <div className="w-full max-w-[min(94vw,560px)] px-1 pb-1 flex items-center justify-between shrink-0">
         {/* Left Voice & Chat Controls */}
         <div className="flex items-center gap-2">
           <VoiceControls roomId={room.id} enabled={room.started} />
@@ -391,4 +403,4 @@ export default function RoomPage() {
       />
     </div>
   );
-        }
+}
