@@ -287,11 +287,12 @@ export default function Board({
       className="relative isolate grid w-full aspect-square border-[5px] border-slate-900 rounded-2xl bg-white mx-auto shadow-2xl overflow-hidden"
       style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
     >
-      {/* One clean border per color box, plus a name/avatar badge sitting
-          in the yard's free center 2x2 gap (the 4 BASE_COORDS slots sit
-          around it, one per corner of that gap). Positioned absolutely
-          (NOT as grid items) so neither ever interferes with the other
-          225 cells' auto-placement in the grid. */}
+      {/* One clean border per color box, plus an avatar badge sitting in
+          the yard's free center gap. Positioned absolutely (NOT as grid
+          items) so neither ever interferes with the other 225 cells'
+          auto-placement in the grid. Deliberately drawn at a LOWER
+          z-index than the token cells below, so tokens always render on
+          top of the photo instead of the photo covering them. */}
       {ALL_COLORS.map((color) => {
         const { rowStart, colStart } = BASE_ZONE[color];
         const name = playerNames?.[color] ?? color.charAt(0) + color.slice(1).toLowerCase();
@@ -310,26 +311,26 @@ export default function Board({
                 height: `${(6 / 15) * 100}%`,
               }}
             />
-            {/* Big photo badge - deliberately oversized to overlap the 4
-                pip dots around it, so identity reads instantly at a
-                glance instead of needing a separate header row. */}
+            {/* Photo badge - sits BEHIND the token cells (z-[5] vs the
+                cells' z-10) so the 4 tokens always sit visibly on top of
+                it instead of the photo covering them. */}
             <div
-              className="absolute z-20 pointer-events-none flex items-center justify-center"
+              className="absolute z-[5] pointer-events-none flex items-center justify-center"
               style={{
                 top: `${((rowStart + 1) / 15) * 100}%`,
                 left: `${((colStart + 1) / 15) * 100}%`,
-                width: `${(3 / 15) * 100}%`,
-                height: `${(3 / 15) * 100}%`,
+                width: `${(4 / 15) * 100}%`,
+                height: `${(4 / 15) * 100}%`,
               }}
             >
               {isEmpty ? (
-                <div className="w-[80%] h-[80%] rounded-full border-[3px] border-dashed border-white/60 bg-black/20 flex items-center justify-center">
+                <div className="w-[75%] h-[75%] rounded-full border-[3px] border-dashed border-white/60 bg-black/20 flex items-center justify-center">
                   <span className="text-white/70 font-black" style={{ fontSize: "min(6vw, 24px)" }}>+</span>
                 </div>
               ) : (
                 <div
                   className={[
-                    "relative w-[82%] h-[82%] rounded-full overflow-hidden flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.5)] border-[3px] border-white/95 transition-all",
+                    "relative w-[75%] h-[75%] rounded-full overflow-hidden flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.5)] border-[3px] border-white/95 transition-all",
                     isCurrentTurn ? "ring-4 ring-amber-300 shadow-[0_0_16px_4px_rgba(251,191,36,0.65)]" : "",
                     isDisconnected ? "opacity-40 grayscale" : "",
                   ].join(" ")}
@@ -345,24 +346,6 @@ export default function Board({
                 </div>
               )}
             </div>
-            {!isEmpty && (
-              <div
-                className="absolute z-20 pointer-events-none flex items-center justify-center"
-                style={{
-                  top: `${((rowStart + 4.05) / 15) * 100}%`,
-                  left: `${((colStart + 0.5) / 15) * 100}%`,
-                  width: `${(5 / 15) * 100}%`,
-                  height: `${(1 / 15) * 100}%`,
-                }}
-              >
-                <span
-                  className="px-2 py-0.5 rounded-full bg-slate-900/85 text-white font-extrabold leading-tight whitespace-nowrap border border-white/20"
-                  style={{ fontSize: "min(2.6vw, 12px)" }}
-                >
-                  {name}
-                </span>
-              </div>
-            )}
           </div>
         );
       })}
