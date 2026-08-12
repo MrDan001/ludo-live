@@ -8,6 +8,7 @@ import DiceOverlay from "@/components/board/DiceOverlay";
 import ScoreBar from "@/components/board/ScoreBar";
 import TurnBanner from "@/components/board/TurnBanner";
 import CaptureToast from "@/components/board/CaptureToast";
+import FitSquare from "@/components/board/FitSquare";
 import type { PlayerColor } from "@/lib/engine/gameState";
 
 const HUMAN_COLOR = "RED" as const;
@@ -83,7 +84,7 @@ export default function PlayPage() {
 
       <ScoreBar entries={scoreEntries} />
 
-      <div className="relative self-center max-w-[600px] w-full flex-1 min-h-0 aspect-square">
+      <FitSquare className="relative" maxSize={600}>
         <Board
           players={gameState.players}
           selectableTokenIds={selectableTokenIds}
@@ -99,7 +100,7 @@ export default function PlayPage() {
           d2={diceRoll?.d2 ?? null}
         />
         <CaptureToast text={captureText} />
-      </div>
+      </FitSquare>
 
       <div className="shrink-0">
         <Dice
