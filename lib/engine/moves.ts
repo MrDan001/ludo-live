@@ -8,13 +8,20 @@ import {
 import { relativeToGlobal, isGlobalSquareSafe } from "./board";
 import { DiceRoll } from "./dice";
 
+// Which of the three tabs this move belongs to: "d1" (Blue), "d2" (Green),
+// or "sum" (Red - the combined d1+d2 value, played as a single jump straight
+// to the landing square; only that final square matters for safety/capture,
+// same as any other move).
+export type MoveSource = "d1" | "d2" | "sum";
+
 export interface MoveOption {
   tokenId: string;
   fromPosition: Token["position"];
   toPosition: number;
-  // Which individual die value this move uses - d1 and d2 are never
-  // combined into a sum for movement, the player picks one or the other.
+  // The number of squares this move actually advances the token - d1, d2,
+  // or d1+d2 depending on source.
   dieValue: number;
+  source: MoveSource;
 }
 
 // In 2-player team mode, Red+Yellow play as one team and Green+Blue as the
@@ -45,30 +52,39 @@ function areTeammates(a: PlayerColor, b: PlayerColor): boolean {
 // both of the acting team's colors (e.g. on Red's turn slot, Yellow's
 // token moves are offered too) - outside team mode it's just the current
 // color, same as always.
-// Each die is used independently - d1 and d2 are never summed for
-// movement. A 6 on a given die is required to bring a token out of the
-// yard using THAT die specifically (landing exactly on the entry square,
-// not carried further by the other die's value).
+//
+// Three move sources are offered per roll, matching the three UI tabs:
+//   - "d1"  (Blue)  - move using die 1's value alone
+//   - "d2"  (Green) - move using die 2's value alone
+//   - "sum" (Red)   - move using d1+d2 as a single jump straight to the
+//                      landing square. Only the landing square is checked
+//                      for safety/capture - squares passed over don't matter.
+// A 6 on d1 or d2 individually is required to bring a token out of the
+// yard using that die. The combined "sum" value can NEVER exit a token
+// from the yard, even if d1+d2 happens to equal 6 (e.g. 1+5) - that
+// matches standard Ludo rules, where only an actual rolled 6 opens the yard.
 export function getValidMoves(state: GameState, roll: DiceRoll): MoveOption[] {
   const actingColors = state.teamMode
     ? [state.currentTurnColor, TEAM_PARTNER[state.currentTurnColor]]
     : [state.currentTurnColor];
 
-  // Doubles (d1 === d2) collapse to one usable value - there's no real
-  // choice to offer when both dice show the same number.
-  const dieValues = Array.from(new Set([roll.d1, roll.d2]));
+  const sources: { source: MoveSource; dieValue: number; canExitYard: boolean }[] = [
+    { source: "d1", dieValue: roll.d1, canExitYard: roll.d1 === 6 },
+    { source: "d2", dieValue: roll.d2, canExitYard: roll.d2 === 6 },
+    { source: "sum", dieValue: roll.sum, canExitYard: false },
+  ];
 
   const moves: MoveOption[] = [];
 
-  for (const dieValue of dieValues) {
+  for (const { source, dieValue, canExitYard } of sources) {
     for (const color of actingColors) {
       const player = state.players.find((p) => p.color === color);
       if (!player) continue;
 
       for (const token of player.tokens) {
         if (token.position === "YARD") {
-          if (dieValue === 6) {
-            moves.push({ tokenId: token.id, fromPosition: "YARD", toPosition: 0, dieValue });
+          if (canExitYard) {
+            moves.push({ tokenId: token.id, fromPosition: "YARD", toPosition: 0, dieValue, source });
           }
           continue;
         }
@@ -76,7 +92,7 @@ export function getValidMoves(state: GameState, roll: DiceRoll): MoveOption[] {
         const newPos = token.position + dieValue;
         if (newPos > FINISH_POSITION) continue;
 
-        moves.push({ tokenId: token.id, fromPosition: token.position, toPosition: newPos, dieValue });
+        moves.push({ tokenId: token.id, fromPosition: token.position, toPosition: newPos, dieValue, source });
       }
     }
   }

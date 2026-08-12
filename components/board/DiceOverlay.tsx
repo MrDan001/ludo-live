@@ -1,49 +1,113 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import Die3D from "./Die3D";
 
-// How long the centered "landing" flourish stays visible after a roll,
-// before it fades out and the real interactive dice take over down in the
-// holder (see Dice.tsx). Purely decorative - pointer-events-none for its
-// entire life - so it can never block a tap on the board underneath it,
-// unlike the old version of this component which doubled as the tap-to-
-// choose UI and sat on top of the board the whole time a choice was
-// pending.
+// Cosmetic-only spin time before the settled faces are revealed. By the
+// time "game:rolled" (or the local store's roll) reaches this component,
+// the real d1/d2 values are already known - this delay exists purely so
+// the roll *feels* like it's being counted instead of snapping instantly,
+// same idea the old transient overlay used.
 const SPIN_MS = 550;
-const FLOURISH_MS = 850;
 
 interface DiceOverlayProps {
-  /** Bumped on every new roll - restarts the flourish from scratch. */
+  /** Tapping the tray rolls the dice - this replaces the old separate
+   *  "Roll Dice" button entirely. The whole tray is the roll button. */
+  onRoll: () => void;
+  canRoll: boolean;
+  /** Bumped on every new roll - restarts the spin from scratch. */
   rollSeq: number;
   d1: number | null;
   d2: number | null;
 }
 
-export default function DiceOverlay({ rollSeq, d1, d2 }: DiceOverlayProps) {
-  const [visible, setVisible] = useState(false);
-  const [spinning, setSpinning] = useState(false);
+/** Permanent center-board dice tray. Unlike the old DiceOverlay, this
+ *  never unmounts or fades away - it's a fixed fixture sitting in the
+ *  board's middle hole the whole game, matching the reference UI where
+ *  the dice visibly live there between rolls. Tap it to roll; it spins
+ *  briefly then settles on the two results and stays showing them until
+ *  the next roll. */
+export default function DiceOverlay({ onRoll, canRoll, rollSeq, d1, d2 }: DiceOverlayProps) {
+  // Die3D's cube faces are positioned with real 3D CSS transforms
+  // (translateZ, perspective) - those need actual pixels, percentages
+  // don't work for them. So instead of a fixed pixel size, measure the
+  // tray's own rendered width (which DOES scale fluidly with the board
+  // via the "19%" style below) and derive the die size from that -
+  // keeping the dice visually in proportion no matter how big or small
+  // the board ends up being on a given screen.
+  const trayRef = useRef<HTMLButtonElement>(null);
+  const [trayPx, setTrayPx] = useState(0);
 
+  useLayoutEffect(() => {
+    const el = trayRef.current;
+    if (!el) return;
+    const measure = () => setTrayPx(el.clientWidth);
+    measure();
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
+
+  // Render-time "reset on prop change" pattern (see React docs) instead of
+  // an effect that calls setState synchronously the moment rollSeq
+  // changes - a new rollSeq means a new roll just happened, so flip into
+  // the spinning state immediately, during this same render.
+  const [seenRollSeq, setSeenRollSeq] = useState(rollSeq);
+  const [spinning, setSpinning] = useState(false);
+  const [hasRolledOnce, setHasRolledOnce] = useState(false);
+
+  if (rollSeq !== seenRollSeq) {
+    setSeenRollSeq(rollSeq);
+    setSpinning(true);
+    setHasRolledOnce(true);
+  }
+
+  // The actual side effect - scheduling the spin to stop - stays in an
+  // effect, but only ever calls setState inside the deferred timeout
+  // callback, never synchronously in the effect body itself.
   useEffect(() => {
     if (rollSeq === 0) return;
-    setVisible(true);
-    setSpinning(true);
-    const spinTimer = setTimeout(() => setSpinning(false), SPIN_MS);
-    const hideTimer = setTimeout(() => setVisible(false), FLOURISH_MS);
-    return () => {
-      clearTimeout(spinTimer);
-      clearTimeout(hideTimer);
-    };
+    const t = setTimeout(() => setSpinning(false), SPIN_MS);
+    return () => clearTimeout(t);
   }, [rollSeq]);
 
-  if (!visible) return null;
+  const showFaces = hasRolledOnce && d1 !== null && d2 !== null;
+  const faceOrPlaceholder = (face: number | null) => face ?? 1;
+  // Fall back to the old fixed sizes for the first paint before the
+  // ResizeObserver has measured anything (trayPx starts at 0) - avoids a
+  // flash of zero-size dice, and matches server-rendered markup exactly
+  // since trayPx is always 0 on both sides until this mounts client-side.
+  const pairedSize = trayPx > 0 ? Math.round(trayPx * 0.42) : 18;
+  const placeholderSize = trayPx > 0 ? Math.round(trayPx * 0.55) : 24;
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
-      <div className="flex gap-3 bg-black/30 backdrop-blur-[2px] rounded-2xl p-3 shadow-2xl">
-        <Die3D face={d1 ?? 1} spinning={spinning} size={56} />
-        <Die3D face={d2 ?? 1} spinning={spinning} size={56} />
-      </div>
+    <div className="absolute inset-0 z-30 flex items-center justify-center">
+      <button
+        ref={trayRef}
+        type="button"
+        onClick={() => canRoll && onRoll()}
+        disabled={!canRoll}
+        aria-label="Roll dice"
+        className={[
+          "relative flex items-center justify-center gap-[6%] rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.4),0_4px_10px_rgba(0,0,0,0.5)] border-2 transition-transform active:scale-95",
+          canRoll ? "border-amber-400/70 cursor-pointer" : "border-amber-900/60 cursor-default",
+          !showFaces && canRoll ? "animate-pulse" : "",
+        ].join(" ")}
+        style={{
+          width: "19%",
+          aspectRatio: "1 / 1",
+          background: "radial-gradient(circle at 35% 30%, #2f7db0, #1a4c6e 70%)",
+        }}
+      >
+        {showFaces ? (
+          <>
+            <Die3D face={faceOrPlaceholder(d1)} spinning={spinning} size={pairedSize} />
+            <Die3D face={faceOrPlaceholder(d2)} spinning={spinning} size={pairedSize} />
+          </>
+        ) : (
+          <Die3D face={1} spinning={spinning} size={placeholderSize} />
+        )}
+      </button>
     </div>
   );
 }

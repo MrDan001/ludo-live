@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Player, PlayerColor, ALL_COLORS } from "@/lib/engine";
 import {
   BASE_ZONE,
+  BASE_COORDS,
   GLOBAL_PATH_COORDS,
   HOME_STRETCH_COORDS,
   CENTER_COORD,
@@ -23,7 +24,20 @@ interface CellInfo {
   color?: PlayerColor;
   safe?: boolean;
   entryColor?: PlayerColor;
+  /** True for the 4 marked token-holder squares inside a yard (as
+   *  opposed to the plain filler squares around them). Drives whether we
+   *  draw a decorative empty-slot ring there when no token occupies it. */
+  pipSlot?: boolean;
 }
+
+// Which lane direction each color's home stretch runs, so the inward
+// arrow hints point the right way (toward the center).
+const HOME_STRETCH_ARROW: Record<PlayerColor, string> = {
+  RED: "→",
+  GREEN: "↓",
+  YELLOW: "←",
+  BLUE: "↑",
+};
 
 function buildCellMap(): Record<string, CellInfo> {
   const map: Record<string, CellInfo> = {};
@@ -41,6 +55,9 @@ function buildCellMap(): Record<string, CellInfo> {
         map[`${r},${c}`] = { type: "base", color };
       }
     }
+    BASE_COORDS[color].forEach((coord) => {
+      map[`${coord.row},${coord.col}`] = { type: "base", color, pipSlot: true };
+    });
   });
 
   const safeSet = getSafeCoordSet();
@@ -93,28 +110,64 @@ interface BoardProps {
   /** Fires once every token that moved this turn has finished hopping
    *  through its full path and landed on its true final square. */
   onMoveAnimationComplete?: () => void;
+  /** Display name shown on each color's yard badge (e.g. "Me" for the
+   *  local player, an opponent's real name otherwise). Falls back to the
+   *  plain color name for any color left unset. */
+  playerNames?: Partial<Record<PlayerColor, string>>;
+  /** Fires once per token sent back to its yard by an opponent landing on
+   *  it (not for a token simply starting the game in the yard). Lets the
+   *  parent page show a toast, play a sound, etc. */
+  onCapture?: (info: { tokenId: string; color: PlayerColor }) => void;
 }
 
-export default function Board({ players, selectableTokenIds, onTokenClick, onMoveAnimationComplete }: BoardProps) {
+interface CaptureFlash {
+  key: string;
+  color: PlayerColor;
+  row: number;
+  col: number;
+}
+
+// How long the capture "burst" ring stays on screen before it's removed.
+const CAPTURE_FLASH_MS = 700;
+
+export default function Board({
+  players,
+  selectableTokenIds,
+  onTokenClick,
+  onMoveAnimationComplete,
+  playerNames,
+  onCapture,
+}: BoardProps) {
   const [displayPositions, setDisplayPositions] = useState<Record<string, Pos>>(() => {
     const initial: Record<string, Pos> = {};
     players.forEach((p) => p.tokens.forEach((t) => { initial[t.id] = t.position; }));
     return initial;
   });
+  const [captureFlashes, setCaptureFlashes] = useState<CaptureFlash[]>([]);
 
   // Tracks the last *true* (server) position we diffed against - kept
   // separate from displayPositions so an in-flight hop animation doesn't
   // get confused with the authoritative game state driving it.
   const truePositionsRef = useRef<Record<string, Pos>>(displayPositions);
   const onCompleteRef = useRef(onMoveAnimationComplete);
+  const onCaptureRef = useRef(onCapture);
+  const flashSeqRef = useRef(0);
 
   useEffect(() => {
     onCompleteRef.current = onMoveAnimationComplete;
   }, [onMoveAnimationComplete]);
 
   useEffect(() => {
+    onCaptureRef.current = onCapture;
+  }, [onCapture]);
+
+  useEffect(() => {
     const truePositions: Record<string, Pos> = {};
-    players.forEach((p) => p.tokens.forEach((t) => { truePositions[t.id] = t.position; }));
+    const colorByToken: Record<string, PlayerColor> = {};
+    players.forEach((p) => p.tokens.forEach((t) => {
+      truePositions[t.id] = t.position;
+      colorByToken[t.id] = t.color;
+    }));
 
     const prev = truePositionsRef.current;
     const timers: ReturnType<typeof setTimeout>[] = [];
@@ -124,6 +177,7 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
     // didn't touch tokens). Only changes need to eventually fire the
     // completion callback.
     let anyChange = false;
+    const newFlashes: CaptureFlash[] = [];
 
     const startHop = (tokenId: string, from: number, to: number) => {
       pendingHops++;
@@ -160,10 +214,30 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
         return;
       }
 
-      // Captured back to the yard (or any other non-forward transition) -
-      // there's no path to walk backward along, so place it directly.
+      // Sent back to the yard by an opponent landing on this square - the
+      // only other way a token's position can change. Flash a brief burst
+      // at the square it was captured on before it disappears, and let the
+      // parent page know (toast/sound) via onCapture.
+      if (typeof oldPos === "number" && newPos === "YARD") {
+        const color = colorByToken[tokenId];
+        const coord = getRenderCoord(color, oldPos, 0);
+        flashSeqRef.current += 1;
+        newFlashes.push({ key: `${tokenId}-${flashSeqRef.current}`, color, row: coord.row, col: coord.col });
+        onCaptureRef.current?.({ tokenId, color });
+      }
+
       setDisplayPositions((cur) => ({ ...cur, [tokenId]: newPos }));
     });
+
+    if (newFlashes.length > 0) {
+      setCaptureFlashes((cur) => [...cur, ...newFlashes]);
+      const flashKeys = newFlashes.map((f) => f.key);
+      timers.push(
+        setTimeout(() => {
+          setCaptureFlashes((cur) => cur.filter((f) => !flashKeys.includes(f.key)));
+        }, CAPTURE_FLASH_MS)
+      );
+    }
 
     truePositionsRef.current = truePositions;
 
@@ -177,7 +251,6 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
     }
 
     return () => timers.forEach(clearTimeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [players]);
 
   const tokensByCell = useMemo(() => {
@@ -196,24 +269,61 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
 
   return (
     <div
-  className="relative isolate grid w-full max-w-[600px] aspect-square border-4 border-slate-900 rounded-xl bg-white mx-auto shadow-2xl overflow-hidden"
-  style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
->
-      {/* One clean border per color box. Positioned absolutely (NOT as grid items) so it
-          can never interfere with the other 225 cells' auto-placement in the grid. */}
+      className="relative isolate grid w-full aspect-square border-[5px] border-slate-900 rounded-2xl bg-white mx-auto shadow-2xl overflow-hidden"
+      style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
+    >
+      {/* One clean border per color box, plus a name/avatar badge sitting
+          in the yard's free center 2x2 gap (the 4 BASE_COORDS slots sit
+          around it, one per corner of that gap). Positioned absolutely
+          (NOT as grid items) so neither ever interferes with the other
+          225 cells' auto-placement in the grid. */}
       {ALL_COLORS.map((color) => {
         const { rowStart, colStart } = BASE_ZONE[color];
+        const name = playerNames?.[color] ?? color.charAt(0) + color.slice(1).toLowerCase();
         return (
-          <div
-            key={`zone-border-${color}`}
-            className="absolute z-20 pointer-events-none border-[3px] border-slate-900"
-            style={{
-              top: `${(rowStart / 15) * 100}%`,
-              left: `${(colStart / 15) * 100}%`,
-              width: `${(6 / 15) * 100}%`,
-              height: `${(6 / 15) * 100}%`,
-            }}
-          />
+          <div key={`zone-${color}`}>
+            <div
+              className="absolute z-20 pointer-events-none border-[3px] border-slate-900"
+              style={{
+                top: `${(rowStart / 15) * 100}%`,
+                left: `${(colStart / 15) * 100}%`,
+                width: `${(6 / 15) * 100}%`,
+                height: `${(6 / 15) * 100}%`,
+              }}
+            />
+            <div
+              className="absolute z-20 pointer-events-none flex items-center justify-center"
+              style={{
+                top: `${((rowStart + 2) / 15) * 100}%`,
+                left: `${((colStart + 2) / 15) * 100}%`,
+                width: `${(2 / 15) * 100}%`,
+                height: `${(1 / 15) * 100}%`,
+              }}
+            >
+              <div
+                className={`h-full aspect-square rounded-full ${COLOR_BG_SOLID[color]} border-2 border-white/90 shadow-md flex items-center justify-center text-white font-extrabold`}
+                style={{ fontSize: "min(3.2vw, 15px)" }}
+              >
+                {name.charAt(0).toUpperCase()}
+              </div>
+            </div>
+            <div
+              className="absolute z-20 pointer-events-none flex items-center justify-center"
+              style={{
+                top: `${((rowStart + 3) / 15) * 100}%`,
+                left: `${((colStart + 1) / 15) * 100}%`,
+                width: `${(4 / 15) * 100}%`,
+                height: `${(1 / 15) * 100}%`,
+              }}
+            >
+              <span
+                className="px-1.5 rounded-full bg-slate-900/80 text-white font-bold leading-tight whitespace-nowrap"
+                style={{ fontSize: "min(2.2vw, 10px)" }}
+              >
+                {name}
+              </span>
+            </div>
+          </div>
         );
       })}
 
@@ -246,16 +356,45 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
           if (inArrowZone) bg = "bg-transparent";
           const showGridLine = cell.type !== "base" && !inArrowZone;
 
+          // Which home-stretch cell (of the 6) gets the inward direction
+          // arrow hint - the 3rd cell, roughly the middle of the lane.
+          const homeStretchIdx = cell.type === "home" ? HOME_STRETCH_COORDS[cell.color!].findIndex(
+            (coord) => coord.row === r && coord.col === c
+          ) : -1;
+
           return (
             <div
               key={key}
               className={`relative z-10 flex items-center justify-center ${bg} ${
-                showGridLine ? "border border-slate-200" : ""
+                showGridLine ? "border border-slate-300" : ""
               }`}
             >
               {cell.type === "path" && cell.safe && (
-  <span className={`text-sm drop-shadow-sm ${cell.entryColor ? "text-white" : "text-amber-500"}`}>★</span>
-)}
+                <span
+                  className={`absolute drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] ${
+                    cell.entryColor ? "text-white" : "text-amber-500"
+                  }`}
+                  style={{ fontSize: "min(3.4vw, 16px)" }}
+                >
+                  ★
+                </span>
+              )}
+
+              {homeStretchIdx === 2 && (
+                <span className="text-white/80 font-black pointer-events-none" style={{ fontSize: "min(2.6vw, 13px)" }}>
+                  {HOME_STRETCH_ARROW[cell.color!]}
+                </span>
+              )}
+
+              {/* Decorative empty holder ring - only drawn on a marked
+                  pip slot with nothing currently sitting on it, so a
+                  yard never looks like a flat block of color even before
+                  any tokens are visually distinguishable from the
+                  background. */}
+              {cell.pipSlot && tokensHere.length === 0 && (
+                <div className="absolute w-[70%] h-[70%] rounded-full border-[3px] border-white/70 bg-black/10 pointer-events-none" />
+              )}
+
               <div className="absolute inset-0">
                 {tokensHere.map((t, i) => {
                   const stackSize = Math.min(tokensHere.length, 4);
@@ -279,6 +418,44 @@ export default function Board({ players, selectableTokenIds, onTokenClick, onMov
           );
         })
       )}
+
+      {/* Capture bursts - a brief ring pulse at the square a token was
+          just sent home from, on top of everything else. */}
+      {captureFlashes.map((flash) => (
+        <div
+          key={flash.key}
+          className="absolute z-40 pointer-events-none flex items-center justify-center"
+          style={{
+            top: `${(flash.row / 15) * 100}%`,
+            left: `${(flash.col / 15) * 100}%`,
+            width: `${(1 / 15) * 100}%`,
+            height: `${(1 / 15) * 100}%`,
+          }}
+        >
+          <div className="capture-burst absolute inset-[-60%] rounded-full border-4 border-red-500" />
+          <span className="capture-burst-mark text-red-600 font-black" style={{ fontSize: "min(4vw, 20px)" }}>
+            ✕
+          </span>
+        </div>
+      ))}
+
+      <style jsx>{`
+        .capture-burst {
+          animation: capture-burst-ring ${CAPTURE_FLASH_MS}ms ease-out forwards;
+        }
+        .capture-burst-mark {
+          animation: capture-burst-mark ${CAPTURE_FLASH_MS}ms ease-out forwards;
+        }
+        @keyframes capture-burst-ring {
+          0% { transform: scale(0.3); opacity: 1; }
+          100% { transform: scale(1.6); opacity: 0; }
+        }
+        @keyframes capture-burst-mark {
+          0% { transform: scale(0.5); opacity: 0; }
+          30% { transform: scale(1.2); opacity: 1; }
+          100% { transform: scale(1); opacity: 0; }
+        }
+      `}</style>
     </div>
   );
 }

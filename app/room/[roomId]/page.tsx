@@ -4,12 +4,16 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { useMultiplayerGame } from "@/lib/hooks/useMultiplayerGame";
 import type { PlayerColor } from "@/lib/engine/gameState";
+import type { MoveSource } from "@/lib/engine/moves";
 import { useAuth } from "@/lib/hooks/useAuth";
 import { useRoomChat } from "@/lib/hooks/useRoomChat";
 import { getSocket } from "@/lib/socket/client";
 import Board from "@/components/board/Board";
 import Dice from "@/components/board/Dice";
 import DiceOverlay from "@/components/board/DiceOverlay";
+import ScoreBar from "@/components/board/ScoreBar";
+import TurnBanner from "@/components/board/TurnBanner";
+import CaptureToast from "@/components/board/CaptureToast";
 import PlayerBadge from "@/components/layout/PlayerBadge";
 import VoiceControls from "@/components/layout/VoiceControls";
 import ChatPanel from "@/components/layout/ChatPanel";
@@ -42,14 +46,19 @@ export default function RoomPage() {
 
   const [chatOpen, setChatOpen] = useState(false);
   const [voiceOpen, setVoiceOpen] = useState(false);
-  // Which die value the player picked to play this turn, when there were
-  // two distinct usable values to choose between. Reset the instant a new
-  // roll happens (see rollSeq) so it never carries over into the next turn.
-  const [manualDieChoice, setManualDieChoice] = useState<number | null>(null);
-
-  useEffect(() => {
-    setManualDieChoice(null);
-  }, [rollSeq]);
+  // Which of the three tabs (Blue/d1, Red/sum, Green/d2) the player tapped
+  // to play this turn, when more than one had a legal move. Reset the
+  // instant a new roll happens (see rollSeq) so it never carries over into
+  // the next turn.
+  const [manualSource, setManualSource] = useState<MoveSource | null>(null);
+  const [captureText, setCaptureText] = useState<string | null>(null);
+  // Render-time reset instead of an effect that calls setState the moment
+  // rollSeq changes - see the same pattern in DiceOverlay.tsx.
+  const [seenRollSeq, setSeenRollSeq] = useState(rollSeq);
+  if (rollSeq !== seenRollSeq) {
+    setSeenRollSeq(rollSeq);
+    setManualSource(null);
+  }
 
   useEffect(() => {
     checkSession();
@@ -135,17 +144,22 @@ export default function RoomPage() {
   const isYourTurn =
     !!me && (gameState.currentTurnColor === me.color || gameState.currentTurnColor === me.teammateColor);
 
-  // d1 and d2 are never summed for movement - the player picks one value
-  // to play. If both dice offer a real (different) choice, wait for a tap;
-  // if only one value has any valid moves (or it's doubles), resolve it
-  // automatically since there's nothing to actually choose between.
-  const distinctDieValues = Array.from(new Set(room.pendingMoves.map((m) => m.dieValue)));
-  const needsDieChoice = isYourTurn && distinctDieValues.length > 1;
-  const activeDieValue = distinctDieValues.length <= 1 ? distinctDieValues[0] ?? null : manualDieChoice;
+  // Three tabs per roll - Blue (d1), Red (d1+d2 combined), Green (d2).
+  // Each is only enabled if at least one token has a legal move under it.
+  // If exactly one tab is enabled there's nothing to genuinely choose
+  // between, so it's picked automatically instead of making the player
+  // tap a tab with no real alternative.
+  const sourceEnabled: Record<MoveSource, boolean> = {
+    d1: room.pendingMoves.some((m) => m.source === "d1"),
+    d2: room.pendingMoves.some((m) => m.source === "d2"),
+    sum: room.pendingMoves.some((m) => m.source === "sum"),
+  };
+  const enabledSources = (Object.keys(sourceEnabled) as MoveSource[]).filter((s) => sourceEnabled[s]);
+  const activeSource = enabledSources.length <= 1 ? enabledSources[0] ?? null : manualSource;
 
   const selectableTokenIds = new Set(
-    isYourTurn && activeDieValue !== null
-      ? room.pendingMoves.filter((m) => m.dieValue === activeDieValue).map((m) => m.tokenId)
+    isYourTurn && activeSource !== null
+      ? room.pendingMoves.filter((m) => m.source === activeSource).map((m) => m.tokenId)
       : []
   );
   // Map top (RED, GREEN) and bottom (BLUE, YELLOW) players. In 2-player
@@ -165,10 +179,45 @@ export default function RoomPage() {
       ? (color === "RED" || color === "YELLOW" ? "RED" : "GREEN") === gameState.currentTurnColor
       : gameState.currentTurnColor === color;
 
+  // "Me" for whichever color(s) the local player controls (both colors
+  // in team mode), everyone else's real room name otherwise.
+  const playerNames: Partial<Record<PlayerColor, string>> = {};
+  room.players.forEach((p) => {
+    const isMe = p.socketId === currentSocketId;
+    playerNames[p.color] = isMe ? "Me" : p.name;
+    if (p.teammateColor) playerNames[p.teammateColor] = isMe ? "Me" : p.name;
+  });
+
+  // Score = tokens that have reached home. Grouped onto one row per human
+  // seat (team mode combines a team's two colors into their single row).
+  const scoreEntries = room.players.map((p) => {
+    const colors = p.teammateColor ? [p.color, p.teammateColor] : [p.color];
+    const value = gameState.players
+      .filter((gp) => colors.includes(gp.color))
+      .reduce((sum, gp) => sum + gp.tokens.filter((t) => t.position === 57).length, 0);
+    return {
+      label: p.socketId === currentSocketId ? "Me" : p.name,
+      value,
+      active: colors.includes(gameState.currentTurnColor),
+    };
+  });
+
+  const turnText = gameState.winner
+    ? `${playerNames[gameState.winner] ?? gameState.winner} wins!`
+    : isYourTurn
+    ? "Your Turn"
+    : `${playerNames[gameState.currentTurnColor] ?? gameState.currentTurnColor}'s Turn`;
+
+  const handleCapture = (info: { tokenId: string; color: PlayerColor }) => {
+    const name = playerNames[info.color] ?? info.color;
+    setCaptureText(`${name}'s token was sent home!`);
+    setTimeout(() => setCaptureText(null), 1800);
+  };
+
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden touch-none select-none bg-[#1D110C] flex flex-col items-center justify-between p-2 font-sans">
       {/* Top Header */}
-      <div className="w-full max-w-[min(94vw,440px)] flex items-center justify-between px-1 pt-1 shrink-0">
+      <div className="w-full max-w-[min(96vw,560px)] flex items-center justify-between px-1 pt-1 shrink-0">
         <button className="text-amber-200 text-xl p-1">☰</button>
 
         {room.tournamentId && (
@@ -186,15 +235,12 @@ export default function RoomPage() {
         </div>
       </div>
 
-      {gameState.winner && (
-        <div className="text-amber-400 font-bold text-sm shrink-0 my-0.5 animate-bounce">
-          🏆 {gameState.winner} wins!
-        </div>
-      )}
+      {/* Score readout - one pill per human seat, tokens-home count */}
+      <ScoreBar entries={scoreEntries} />
 
       {/* Main Board Unit with Striped Wood Plank Gradient */}
       <div 
-        className="w-full max-w-[min(94vw,440px)] border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center shrink my-auto relative"
+        className="w-full max-w-[min(96vw,560px)] border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center shrink my-auto relative"
         style={{
           backgroundColor: "#4E2E1E",
           backgroundImage: `
@@ -246,19 +292,41 @@ export default function RoomPage() {
           <Board
             players={gameState.players}
             selectableTokenIds={selectableTokenIds}
+            playerNames={playerNames}
             onTokenClick={(tokenId) => {
               const move = room.pendingMoves.find(
-                (m) => m.tokenId === tokenId && m.dieValue === activeDieValue
+                (m) => m.tokenId === tokenId && m.source === activeSource
               );
               if (move) selectMove(room.id, tokenId, move.toPosition);
             }}
             onMoveAnimationComplete={finishMoveAnimation}
+            onCapture={handleCapture}
           />
           <DiceOverlay
+            onRoll={() => roll(room.id)}
+            canRoll={isYourTurn && !room.pendingRoll && !gameState.winner && !lastRoll}
             rollSeq={rollSeq}
             d1={lastRoll?.d1 ?? null}
             d2={lastRoll?.d2 ?? null}
           />
+          <CaptureToast text={captureText} />
+        </div>
+
+        {/* Three move tabs - Blue plays d1, Red plays d1+d2 combined,
+            Green plays d2. Tap one to choose which move set is active. */}
+        <div className="w-full flex justify-center mt-3 shrink-0">
+          <Dice
+            roll={lastRoll ? { d1: lastRoll.d1, d2: lastRoll.d2, sum: lastRoll.d1 + lastRoll.d2 } : null}
+            activeSource={isYourTurn ? activeSource : null}
+            sourceEnabled={sourceEnabled}
+            onSelect={setManualSource}
+            disabled={!isYourTurn || !lastRoll}
+          />
+        </div>
+
+        {/* Big turn banner */}
+        <div className="w-full flex justify-center mt-3 shrink-0">
+          <TurnBanner text={turnText} isYou={isYourTurn && !gameState.winner} />
         </div>
 
         {/* Bottom Player Badges */}
@@ -283,7 +351,7 @@ export default function RoomPage() {
       </div>
 
       {/* Bottom Controls Bar */}
-      <div className="w-full max-w-[min(94vw,440px)] px-1 pb-1 flex items-center justify-between shrink-0">
+      <div className="w-full max-w-[min(96vw,560px)] px-1 pb-1 flex items-center justify-between shrink-0">
         {/* Left Voice & Chat Controls */}
         <div className="flex items-center gap-2">
           <VoiceControls roomId={room.id} enabled={room.started} />
@@ -309,22 +377,6 @@ export default function RoomPage() {
               </span>
             )}
           </button>
-        </div>
-
-        {/* Dice Holder */}
-        <div className="bg-[#3B2319] border border-amber-900/80 p-1.5 rounded-xl shadow-xl flex items-center justify-center">
-          <Dice
-            onRoll={() => roll(room.id)}
-            canRoll={isYourTurn && !room.pendingRoll && !gameState.winner && !lastRoll}
-            active={!!lastRoll}
-            rollSeq={rollSeq}
-            d1={lastRoll?.d1 ?? null}
-            d2={lastRoll?.d2 ?? null}
-            needsChoice={needsDieChoice}
-            chosenValue={activeDieValue}
-            onChooseValue={setManualDieChoice}
-            hasValidMoves={room.pendingMoves.length > 0}
-          />
         </div>
       </div>
 

@@ -7,8 +7,26 @@ import {
   createInitialGameState,
 } from "@/lib/engine/gameState";
 import { rollTwoDice, DiceRoll } from "@/lib/engine/dice";
-import { getValidMoves, applyMove, getNextTurnColor, MoveOption } from "@/lib/engine/moves";
+import { getValidMoves, applyMove, getNextTurnColor, MoveOption, MoveSource } from "@/lib/engine/moves";
 import { chooseAIMove } from "@/lib/engine/ai";
+
+const ALL_SOURCES: MoveSource[] = ["d1", "d2", "sum"];
+
+export function sourceEnabledMap(moves: MoveOption[]): Record<MoveSource, boolean> {
+  return {
+    d1: moves.some((m) => m.source === "d1"),
+    d2: moves.some((m) => m.source === "d2"),
+    sum: moves.some((m) => m.source === "sum"),
+  };
+}
+
+// If only one of the three tabs actually has a legal move this roll,
+// there's nothing to genuinely choose between - auto-pick it instead of
+// making the player tap a tab with no real alternative.
+function autoSource(moves: MoveOption[]): MoveSource | null {
+  const enabled = ALL_SOURCES.filter((s) => moves.some((m) => m.source === s));
+  return enabled.length === 1 ? enabled[0] : null;
+}
 
 interface GameStore {
   gameState: GameState | null;
@@ -16,11 +34,17 @@ interface GameStore {
   diceRoll: DiceRoll | null;
   rollSeq: number;
   validMoves: MoveOption[];
+  /** Which tab (Blue/Red/Green) is active - the player tapped it, or it
+   *  was auto-picked because it was the only one with a legal move. Null
+   *  means the player still needs to tap a tab before any token is
+   *  selectable. */
+  activeSource: MoveSource | null;
   isBusy: boolean;
   isWaitingOnSelection: boolean;
 
   initGame: (activeColors: PlayerColor[], aiColors: PlayerColor[], humanColor: PlayerColor) => void;
   rollForHuman: () => void;
+  chooseSource: (source: MoveSource) => void;
   selectMove: (tokenId: string) => void;
   aiTakeTurn: () => void;
 }
@@ -42,6 +66,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
   diceRoll: null,
   rollSeq: 0,
   validMoves: [],
+  activeSource: null,
   isBusy: false,
   isWaitingOnSelection: false,
 
@@ -52,6 +77,7 @@ export const useGameStore = create<GameStore>((set, get) => ({
       diceRoll: null,
       rollSeq: 0,
       validMoves: [],
+      activeSource: null,
       isBusy: false,
       isWaitingOnSelection: false,
     });
@@ -64,38 +90,58 @@ export const useGameStore = create<GameStore>((set, get) => ({
     const roll = rollTwoDice();
     const moves = getValidMoves(gameState, roll);
 
-    set((s) => ({ diceRoll: roll, rollSeq: s.rollSeq + 1, isBusy: true }));
+    set((s) => ({ diceRoll: roll, rollSeq: s.rollSeq + 1, isBusy: true, activeSource: null }));
 
     if (moves.length === 0) {
       setTimeout(() => {
         const current = get().gameState!;
         const advanced = advanceTurn(current, roll);
-        set({ gameState: advanced, diceRoll: null, validMoves: [], isBusy: false, isWaitingOnSelection: false });
+        set({
+          gameState: advanced,
+          diceRoll: null,
+          validMoves: [],
+          activeSource: null,
+          isBusy: false,
+          isWaitingOnSelection: false,
+        });
       }, 900);
       return;
     }
 
     setTimeout(() => {
-      set({ validMoves: moves, isBusy: false, isWaitingOnSelection: true });
+      set({ validMoves: moves, isBusy: false, isWaitingOnSelection: true, activeSource: autoSource(moves) });
     }, 700);
   },
 
-  selectMove: (tokenId) => {
-    const { gameState, diceRoll, validMoves, isWaitingOnSelection } = get();
-    if (!gameState || !diceRoll || !isWaitingOnSelection) return;
+  chooseSource: (source) => {
+    const { validMoves, isWaitingOnSelection } = get();
+    if (!isWaitingOnSelection) return;
+    if (!validMoves.some((m) => m.source === source)) return;
+    set({ activeSource: source });
+  },
 
-    const move = validMoves.find((m) => m.tokenId === tokenId);
+  // Fixed: previously matched on tokenId alone, so a token with more than
+  // one legal move (now common with three tabs instead of two) would
+  // always resolve to whichever move happened to come first in the array -
+  // not necessarily the tab the player actually tapped. Now matched on
+  // tokenId AND the active tab's source, same fix already in place
+  // server-side for multiplayer (see server/rooms.ts handleSelectMove).
+  selectMove: (tokenId) => {
+    const { gameState, diceRoll, validMoves, isWaitingOnSelection, activeSource } = get();
+    if (!gameState || !diceRoll || !isWaitingOnSelection || !activeSource) return;
+
+    const move = validMoves.find((m) => m.tokenId === tokenId && m.source === activeSource);
     if (!move) return;
 
     const applied = applyMove(gameState, move);
 
     if (applied.winner) {
-      set({ gameState: applied, diceRoll: null, validMoves: [], isWaitingOnSelection: false });
+      set({ gameState: applied, diceRoll: null, validMoves: [], activeSource: null, isWaitingOnSelection: false });
       return;
     }
 
     const advanced = advanceTurn(applied, diceRoll);
-    set({ gameState: advanced, diceRoll: null, validMoves: [], isWaitingOnSelection: false });
+    set({ gameState: advanced, diceRoll: null, validMoves: [], activeSource: null, isWaitingOnSelection: false });
   },
 
   aiTakeTurn: () => {

@@ -1,113 +1,66 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import Die3D from "./Die3D";
+import { MoveSource } from "@/lib/engine/moves";
 
-// Matches DiceOverlay's own spin+flourish timing - by the time the center
-// flourish is fading out, this holder is ready to take over and show the
-// real, tappable dice in their permanent spot.
-const LANDED_DELAY_MS = 700;
+const TABS: { source: MoveSource; label: string; bg: string; ring: string }[] = [
+  { source: "d1", label: "Blue", bg: "bg-sky-500", ring: "ring-sky-300" },
+  { source: "sum", label: "Red", bg: "bg-red-600", ring: "ring-red-300" },
+  { source: "d2", label: "Green", bg: "bg-emerald-500", ring: "ring-emerald-300" },
+];
 
 interface DiceProps {
-  onRoll: () => void;
-  canRoll: boolean;
-  /** True while the rolled dice are still "out" - either mid-flourish on
-   *  the board or landed here waiting on a choice/resolution. Holder shows
-   *  a disabled "Counting..." state (then the real dice) the whole time,
-   *  only re-enabling once this goes false. */
-  active: boolean;
-  /** Bumped on every new roll - restarts the handoff timer below. Optional
-   *  since the single-player /play page doesn't have a die-choice step and
-   *  can leave this (and d1/d2/etc below) unset. */
-  rollSeq?: number;
-  d1?: number | null;
-  d2?: number | null;
-  /** True once rolled with two different usable values - the player must
-   *  tap a die (shown here, once landed) to choose which to play. */
-  needsChoice?: boolean;
-  chosenValue?: number | null;
-  onChooseValue?: (value: number) => void;
-  /** Whether ANY valid move exists this roll, once landed. */
-  hasValidMoves?: boolean;
+  /** Null until a roll has landed this turn. */
+  roll: { d1: number; d2: number; sum: number } | null;
+  /** Which tab is currently chosen (or auto-chosen when only one has
+   *  moves). Null while the player still needs to tap one. */
+  activeSource: MoveSource | null;
+  /** Whether each source has at least one legal move this roll - a tab
+   *  with none is shown but disabled, same as real Ludo (e.g. you rolled
+   *  a 3 on Blue but every token would overshoot home on that value). */
+  sourceEnabled: Record<MoveSource, boolean>;
+  onSelect: (source: MoveSource) => void;
+  /** True once the tabs shouldn't be tappable at all - not your turn, or
+   *  no roll landed yet. */
+  disabled?: boolean;
 }
 
-export default function Dice({
-  onRoll,
-  canRoll,
-  active,
-  rollSeq = 0,
-  d1 = null,
-  d2 = null,
-  needsChoice,
-  chosenValue,
-  onChooseValue,
-  hasValidMoves,
-}: DiceProps) {
-  const [landed, setLanded] = useState(false);
-
-  useEffect(() => {
-    if (!active) {
-      setLanded(false);
-      return;
-    }
-    const t = setTimeout(() => setLanded(true), LANDED_DELAY_MS);
-    return () => clearTimeout(t);
-  }, [active, rollSeq]);
-
-  const showResult = active && landed && d1 !== null && d2 !== null;
-
-  const statusText = needsChoice
-    ? "Tap a die to play"
-    : chosenValue !== null && chosenValue !== undefined
-    ? `Move: ${chosenValue}`
-    : hasValidMoves
-    ? "Waiting..."
-    : "No valid moves";
+/** The three permanent Blue / Red / Green tabs below the board. Blue plays
+ *  die 1's value, Green plays die 2's value, Red plays the combined
+ *  d1+d2 value as a single jump. Tapping a tab commits to that move set -
+ *  only tokens with a legal move under the chosen tab become selectable
+ *  on the board. */
+export default function Dice({ roll, activeSource, sourceEnabled, onSelect, disabled }: DiceProps) {
+  const valueFor = (source: MoveSource): number => {
+    if (!roll) return 0;
+    if (source === "d1") return roll.d1;
+    if (source === "d2") return roll.d2;
+    return roll.sum;
+  };
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      {showResult ? (
-        <div className="flex items-center gap-1.5">
-          {[d1, d2].map((face, i) => (
-            <button
-              key={i}
-              onClick={() => needsChoice && face !== null && onChooseValue?.(face)}
-              disabled={!needsChoice}
-              className={[
-                "rounded-lg transition-transform",
-                needsChoice ? "cursor-pointer active:scale-95 ring-2 ring-emerald-400/70 animate-pulse" : "cursor-default",
-                chosenValue === face ? "ring-2 ring-white scale-105" : "",
-              ].join(" ")}
-            >
-              <Die3D face={face ?? 1} size={32} />
-            </button>
-          ))}
-        </div>
-      ) : (
-        <div
-          className={[
-            "flex items-center gap-0.5 px-1.5 h-10 rounded-lg border-2 transition-opacity",
-            active ? "border-slate-600 opacity-30" : "border-amber-700 opacity-90",
-          ].join(" ")}
-        >
-          <span className="text-base leading-none">🎲</span>
-          <span className="text-base leading-none">🎲</span>
-        </div>
-      )}
-
-      {showResult ? (
-        <div className="text-white text-[10px] font-semibold bg-black/40 px-2 py-0.5 rounded-full text-center leading-tight whitespace-nowrap">
-          {statusText}
-        </div>
-      ) : (
-        <button
-          onClick={onRoll}
-          disabled={!canRoll}
-          className="px-4 py-1.5 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-transform whitespace-nowrap"
-        >
-          {active ? "Counting..." : "Roll Dice"}
-        </button>
-      )}
+    <div className="flex items-center justify-center gap-3">
+      {TABS.map(({ source, label, bg, ring }) => {
+        const enabled = !disabled && !!roll && sourceEnabled[source];
+        const isActive = activeSource === source;
+        return (
+          <button
+            key={source}
+            type="button"
+            onClick={() => enabled && onSelect(source)}
+            disabled={!enabled}
+            aria-label={`${label} move`}
+            style={{ width: "min(15vw, 62px)", height: "min(15vw, 62px)", fontSize: "min(5.5vw, 21px)" }}
+            className={[
+              "relative rounded-full flex items-center justify-center text-white font-extrabold shadow-[inset_0_2px_3px_rgba(255,255,255,0.5),0_3px_6px_rgba(0,0,0,0.5)] border-2 border-black/20 transition-all",
+              bg,
+              enabled ? "opacity-100 active:scale-95" : "opacity-35 grayscale cursor-not-allowed",
+              isActive ? `ring-4 ${ring} scale-110` : "",
+            ].join(" ")}
+          >
+            {valueFor(source)}
+          </button>
+        );
+      })}
     </div>
   );
 }

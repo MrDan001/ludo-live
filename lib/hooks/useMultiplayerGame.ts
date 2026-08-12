@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { getSocket } from "@/lib/socket/client";
 import { GameState, PlayerColor } from "@/lib/engine/gameState";
+import { MoveSource } from "@/lib/engine/moves";
 import { ChatMessage } from "@/types/game";
 
 interface RoomPlayer {
@@ -25,7 +26,9 @@ interface RoomData {
   gameState: GameState | null;
   started: boolean;
   pendingRoll: { d1: number; d2: number; sum: number; hasSix: boolean } | null;
-  pendingMoves: { tokenId: string; toPosition: number; dieValue: number }[];
+  // source tags which of the three tabs (Blue/d1, Green/d2, Red/sum) this
+  // move belongs to - see lib/engine/moves.ts.
+  pendingMoves: { tokenId: string; toPosition: number; dieValue: number; source: MoveSource }[];
   messages: ChatMessage[];
   betAmount: number;
   gameMode: string;
