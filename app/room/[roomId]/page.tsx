@@ -15,7 +15,6 @@ import ScoreBar from "@/components/board/ScoreBar";
 import TurnBanner from "@/components/board/TurnBanner";
 import CaptureToast from "@/components/board/CaptureToast";
 import FitSquare from "@/components/board/FitSquare";
-import PlayerBadge from "@/components/layout/PlayerBadge";
 import VoiceControls from "@/components/layout/VoiceControls";
 import ChatPanel from "@/components/layout/ChatPanel";
 import VoiceChatPanel from "@/components/layout/VoiceChatPanel";
@@ -163,15 +162,6 @@ export default function RoomPage() {
       ? room.pendingMoves.filter((m) => m.source === activeSource).map((m) => m.tokenId)
       : []
   );
-  // Map top (RED, GREEN) and bottom (BLUE, YELLOW) players. In 2-player
-  // team mode there's no RoomPlayer whose primary color is literally
-  // Yellow/Blue - that human's primary is Red/Green and Yellow/Blue is
-  // their teammateColor, so those badges fall back to matching on that.
-  const redPlayer = room.players.find((p) => p.color === "RED");
-  const greenPlayer = room.players.find((p) => p.color === "GREEN");
-  const bluePlayer = room.players.find((p) => p.color === "BLUE" || p.teammateColor === "BLUE");
-  const yellowPlayer = room.players.find((p) => p.color === "YELLOW" || p.teammateColor === "YELLOW");
-
   // In team mode, a whole team's badges highlight together on their turn
   // slot (currentTurnColor is only ever Red or Green there) - outside
   // team mode this is just a literal color match, same as always.
@@ -188,6 +178,28 @@ export default function RoomPage() {
     playerNames[p.color] = isMe ? "Me" : p.name;
     if (p.teammateColor) playerNames[p.teammateColor] = isMe ? "Me" : p.name;
   });
+
+  // Identity now renders directly inside each color's yard on the board
+  // itself (big photo badge) instead of a separate row of badges above
+  // and below - these feed that in-board badge per color.
+  const playerAvatars: Partial<Record<PlayerColor, string | undefined>> = {};
+  const emptyColors = new Set<PlayerColor>(["RED", "GREEN", "BLUE", "YELLOW"]);
+  const disconnectedColors = new Set<PlayerColor>();
+  room.players.forEach((p) => {
+    playerAvatars[p.color] = p.avatarUrl;
+    emptyColors.delete(p.color);
+    if (p.teammateColor) {
+      playerAvatars[p.teammateColor] = p.avatarUrl;
+      emptyColors.delete(p.teammateColor);
+    }
+    if (!p.connected) {
+      disconnectedColors.add(p.color);
+      if (p.teammateColor) disconnectedColors.add(p.teammateColor);
+    }
+  });
+  const currentTurnColors = new Set<PlayerColor>(
+    (["RED", "GREEN", "BLUE", "YELLOW"] as PlayerColor[]).filter((c) => isColorCurrentTurn(c))
+  );
 
   // Score = tokens that have reached home. Grouped onto one row per human
   // seat (team mode combines a team's two colors into their single row).
@@ -218,7 +230,7 @@ export default function RoomPage() {
   return (
     <div className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden touch-pan-y select-none bg-[#1D110C] flex flex-col items-center p-2 font-sans">
       {/* Top Header */}
-      <div className="w-full max-w-[min(94vw,560px)] flex items-center justify-between px-1 pt-1 shrink-0">
+      <div className="w-full max-w-[min(98vw,640px)] flex items-center justify-between px-1 pt-1 shrink-0">
         <button className="text-amber-200 text-xl p-1">☰</button>
 
         {room.tournamentId && (
@@ -246,7 +258,7 @@ export default function RoomPage() {
           browser computes that, so it can't be "too small" the way a
           hardcoded calc(100dvh - Npx) reservation was. */}
       <div 
-        className="w-full max-w-[min(94vw,560px)] flex-1 min-h-0 border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center relative"
+        className="w-full max-w-[min(98vw,640px)] flex-1 min-h-0 border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center relative"
         style={{
           backgroundColor: "#4E2E1E",
           backgroundImage: `
@@ -273,26 +285,6 @@ export default function RoomPage() {
           `
         }}
       >
-        {/* Top Player Badges */}
-        <div className="w-full flex items-center justify-between px-1 mb-2 shrink-0">
-          <PlayerBadge
-            name={redPlayer?.name ?? ""}
-            color="RED"
-            isCurrentTurn={isColorCurrentTurn("RED")}
-            connected={redPlayer?.connected ?? false}
-            avatarUrl={redPlayer?.avatarUrl}
-            empty={!redPlayer}
-          />
-          <PlayerBadge
-            name={greenPlayer?.name ?? ""}
-            color="GREEN"
-            isCurrentTurn={isColorCurrentTurn("GREEN")}
-            connected={greenPlayer?.connected ?? false}
-            avatarUrl={greenPlayer?.avatarUrl}
-            empty={!greenPlayer}
-          />
-        </div>
-
         {/* Playable Ludo Board Grid - FitSquare measures the real
             leftover space in this frame (after the badge/dice/turn rows
             around it) and renders the board at exactly that size, in
@@ -303,6 +295,10 @@ export default function RoomPage() {
             players={gameState.players}
             selectableTokenIds={selectableTokenIds}
             playerNames={playerNames}
+            playerAvatars={playerAvatars}
+            emptyColors={emptyColors}
+            disconnectedColors={disconnectedColors}
+            currentTurnColors={currentTurnColors}
             onTokenClick={(tokenId) => {
               const move = room.pendingMoves.find(
                 (m) => m.tokenId === tokenId && m.source === activeSource
@@ -339,29 +335,10 @@ export default function RoomPage() {
           <TurnBanner text={turnText} isYou={isYourTurn && !gameState.winner} />
         </div>
 
-        {/* Bottom Player Badges */}
-        <div className="w-full flex items-center justify-between px-1 mt-2 shrink-0">
-          <PlayerBadge
-            name={bluePlayer?.name ?? ""}
-            color="BLUE"
-            isCurrentTurn={isColorCurrentTurn("BLUE")}
-            connected={bluePlayer?.connected ?? false}
-            avatarUrl={bluePlayer?.avatarUrl}
-            empty={!bluePlayer}
-          />
-          <PlayerBadge
-            name={yellowPlayer?.name ?? ""}
-            color="YELLOW"
-            isCurrentTurn={isColorCurrentTurn("YELLOW")}
-            connected={yellowPlayer?.connected ?? false}
-            avatarUrl={yellowPlayer?.avatarUrl}
-            empty={!yellowPlayer}
-          />
-        </div>
       </div>
 
       {/* Bottom Controls Bar */}
-      <div className="w-full max-w-[min(94vw,560px)] px-1 pb-1 flex items-center justify-between shrink-0">
+      <div className="w-full max-w-[min(98vw,640px)] px-1 pb-1 flex items-center justify-between shrink-0">
         {/* Left Voice & Chat Controls */}
         <div className="flex items-center gap-2">
           <VoiceControls roomId={room.id} enabled={room.started} />
