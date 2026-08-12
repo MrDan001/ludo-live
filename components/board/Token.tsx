@@ -18,7 +18,7 @@ export default function Token({ color, selectable, onClick }: TokenProps) {
       onClick={onClick}
       disabled={!selectable}
       className={[
-        "relative w-[80%] h-[80%] rounded-full border-2 shadow-md transition-transform",
+        "relative w-[94%] h-[94%] rounded-full border-[3px] shadow-lg transition-transform",
         COLOR_BG[color],
         COLOR_BORDER[color],
         selectable
