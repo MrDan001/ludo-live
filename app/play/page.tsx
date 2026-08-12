@@ -83,7 +83,7 @@ export default function PlayPage() {
 
       <ScoreBar entries={scoreEntries} />
 
-      <div className="relative w-full max-w-[min(600px,94vw,calc(100dvh_-_280px))] aspect-square shrink">
+      <div className="relative self-center max-w-[600px] w-full flex-1 min-h-0 aspect-square">
         <Board
           players={gameState.players}
           selectableTokenIds={selectableTokenIds}
@@ -101,13 +101,15 @@ export default function PlayPage() {
         <CaptureToast text={captureText} />
       </div>
 
-      <Dice
-        roll={diceRoll ? { d1: diceRoll.d1, d2: diceRoll.d2, sum: diceRoll.sum } : null}
-        activeSource={isHumanTurn ? activeSource : null}
-        sourceEnabled={sourceEnabledMap(validMoves)}
-        onSelect={chooseSource}
-        disabled={!isHumanTurn || !isWaitingOnSelection}
-      />
+      <div className="shrink-0">
+        <Dice
+          roll={diceRoll ? { d1: diceRoll.d1, d2: diceRoll.d2, sum: diceRoll.sum } : null}
+          activeSource={isHumanTurn ? activeSource : null}
+          sourceEnabled={sourceEnabledMap(validMoves)}
+          onSelect={chooseSource}
+          disabled={!isHumanTurn || !isWaitingOnSelection}
+        />
+      </div>
 
       <TurnBanner text={turnText} isYou={isHumanTurn && !gameState.winner} />
     </div>
