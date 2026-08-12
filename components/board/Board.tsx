@@ -269,6 +269,7 @@ export default function Board({
 
   return (
     <div
+      dir="ltr"
       className="relative isolate grid w-full aspect-square border-[5px] border-slate-900 rounded-2xl bg-white mx-auto shadow-2xl overflow-hidden"
       style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
     >
@@ -365,6 +366,12 @@ export default function Board({
           return (
             <div
               key={key}
+              // Explicit placement instead of relying on DOM-order
+              // auto-flow - auto-placement direction can silently mirror
+              // (e.g. under an inherited RTL context), which would offset
+              // every cell from the absolutely-positioned badges above
+              // without either one "looking broken" on its own.
+              style={{ gridColumn: c + 1, gridRow: r + 1 }}
               className={`relative z-10 flex items-center justify-center ${bg} ${
                 showGridLine ? "border border-slate-300" : ""
               }`}
