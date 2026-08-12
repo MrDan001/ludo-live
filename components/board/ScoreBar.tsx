@@ -20,9 +20,9 @@ export default function ScoreBar({ entries }: ScoreBarProps) {
       {entries.map((entry) => (
         <div
           key={entry.label}
-          style={{ fontSize: "min(3.8vw, 15px)" }}
+          style={{ fontSize: "min(4.4vw, 17px)" }}
           className={[
-            "px-4 py-1 rounded-full font-bold whitespace-nowrap border",
+            "px-4 py-1.5 rounded-full font-black whitespace-nowrap border-2",
             entry.active
               ? "bg-emerald-800/90 border-emerald-400 text-emerald-50"
               : "bg-slate-800/90 border-slate-600 text-slate-100",
