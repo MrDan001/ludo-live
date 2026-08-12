@@ -81,7 +81,12 @@ export default function DiceOverlay({ onRoll, canRoll, rollSeq, d1, d2 }: DiceOv
   const placeholderSize = trayPx > 0 ? Math.round(trayPx * 0.55) : 24;
 
   return (
-    <div className="absolute inset-0 z-30 flex items-center justify-center">
+    // pointer-events-none on the wrapper - inset-0 makes this div's hit
+    // box cover the WHOLE board, not just the visible tray in the middle,
+    // and without this it was silently swallowing every tap anywhere on
+    // the board (tokens included) except the one spot the button actually
+    // sits. pointer-events-auto on the button opts it back in.
+    <div className="absolute inset-0 z-30 flex items-center justify-center pointer-events-none">
       <button
         ref={trayRef}
         type="button"
@@ -89,7 +94,7 @@ export default function DiceOverlay({ onRoll, canRoll, rollSeq, d1, d2 }: DiceOv
         disabled={!canRoll}
         aria-label="Roll dice"
         className={[
-          "relative flex items-center justify-center gap-[6%] rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.4),0_4px_10px_rgba(0,0,0,0.5)] border-2 transition-transform active:scale-95",
+          "pointer-events-auto relative flex items-center justify-center gap-[6%] rounded-2xl shadow-[inset_0_2px_4px_rgba(0,0,0,0.4),0_4px_10px_rgba(0,0,0,0.5)] border-2 transition-transform active:scale-95",
           canRoll ? "border-amber-400/70 cursor-pointer" : "border-amber-900/60 cursor-default",
           !showFaces && canRoll ? "animate-pulse" : "",
         ].join(" ")}
