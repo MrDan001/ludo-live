@@ -14,6 +14,7 @@ import DiceOverlay from "@/components/board/DiceOverlay";
 import ScoreBar from "@/components/board/ScoreBar";
 import TurnBanner from "@/components/board/TurnBanner";
 import CaptureToast from "@/components/board/CaptureToast";
+import FitSquare from "@/components/board/FitSquare";
 import PlayerBadge from "@/components/layout/PlayerBadge";
 import VoiceControls from "@/components/layout/VoiceControls";
 import ChatPanel from "@/components/layout/ChatPanel";
@@ -292,15 +293,12 @@ export default function RoomPage() {
           />
         </div>
 
-        {/* Playable Ludo Board Grid - flex-1/min-h-0 lets it claim
-            whatever vertical room is left inside the frame after the
-            badge/dice/turn rows around it take theirs; self-center (not
-            the default stretch) is what lets aspect-square then derive
-            the matching WIDTH from that height instead of always
-            stretching to the frame's full width first. max-w-full is the
-            other half of the pair - it re-clamps by width on a
-            short-but-wide screen where height alone would overshoot. */}
-        <div className="relative self-center max-w-full flex-1 min-h-0 aspect-square rounded-xl overflow-hidden border-2 border-[#2C1810] shadow-2xl">
+        {/* Playable Ludo Board Grid - FitSquare measures the real
+            leftover space in this frame (after the badge/dice/turn rows
+            around it) and renders the board at exactly that size, in
+            actual pixels - see FitSquare.tsx for why this replaced a
+            CSS-only aspect-ratio approach. */}
+        <FitSquare className="relative rounded-xl overflow-hidden border-2 border-[#2C1810] shadow-2xl">
           <Board
             players={gameState.players}
             selectableTokenIds={selectableTokenIds}
@@ -322,7 +320,7 @@ export default function RoomPage() {
             d2={lastRoll?.d2 ?? null}
           />
           <CaptureToast text={captureText} />
-        </div>
+        </FitSquare>
 
         {/* Three move tabs - Blue plays d1, Red plays d1+d2 combined,
             Green plays d2. Tap one to choose which move set is active. */}
