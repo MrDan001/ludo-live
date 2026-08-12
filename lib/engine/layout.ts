@@ -54,14 +54,16 @@ export const BASE_ZONE: Record<PlayerColor, { rowStart: number; colStart: number
 
 // 4 token slots per color, clustered close together directly above/below
 // the yard's center avatar badge (rows 2-3 stay clear for that) instead of
-// spread out to the yard's 4 far corners - keeps the tokens visually
-// tight instead of "far apart" across the whole 6x6 yard.
+// spread out to the yard's 4 far corners. Left one full empty column
+// between the pair (col+1 / col+3, not col+2 / col+3) so the bigger
+// tokens sit with a clean visible gap instead of overlapping into a
+// fused blob at the tighter spacing.
 export const BASE_COORDS: Record<PlayerColor, Coord[]> = ALL_COLORS.reduce((acc, color) => {
   const { rowStart, colStart } = BASE_ZONE[color];
   acc[color] = [
-    { row: rowStart + 1, col: colStart + 2 },
+    { row: rowStart + 1, col: colStart + 1 },
     { row: rowStart + 1, col: colStart + 3 },
-    { row: rowStart + 4, col: colStart + 2 },
+    { row: rowStart + 4, col: colStart + 1 },
     { row: rowStart + 4, col: colStart + 3 },
   ];
   return acc;
