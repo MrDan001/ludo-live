@@ -228,9 +228,9 @@ export default function RoomPage() {
   };
 
   return (
-    <div className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden touch-pan-y select-none bg-[#1D110C] flex flex-col items-center p-2 font-sans">
+    <div className="fixed inset-0 h-[100dvh] w-screen overflow-y-auto overflow-x-hidden touch-pan-y select-none bg-[#1D110C] flex flex-col items-center p-1 font-sans">
       {/* Top Header */}
-      <div className="w-full max-w-[min(98vw,640px)] flex items-center justify-between px-1 pt-1 shrink-0">
+      <div className="w-full max-w-[min(99vw,720px)] flex items-center justify-between px-1 pt-1 shrink-0">
         <button className="text-amber-200 text-xl p-1">☰</button>
 
         {room.tournamentId && (
@@ -251,46 +251,22 @@ export default function RoomPage() {
       {/* Score readout - one pill per human seat, tokens-home count */}
       <ScoreBar entries={scoreEntries} />
 
-      {/* Main Board Unit with Striped Wood Plank Gradient.
+      {/* Main Board Unit - a thin dark surround only, no decorative wood
+          frame, so almost all of the space goes to the actual grid.
           flex-1 + min-h-0 here (instead of a guessed pixel budget) is what
           actually makes this fill the real leftover vertical space after
           the header/score/bottom rows above and below take theirs - the
           browser computes that, so it can't be "too small" the way a
           hardcoded calc(100dvh - Npx) reservation was. */}
-      <div 
-        className="w-full max-w-[min(98vw,640px)] flex-1 min-h-0 border-[6px] border-[#2C1810] shadow-[0_10px_25px_rgba(0,0,0,0.7)] rounded-3xl p-2.5 flex flex-col items-center relative"
-        style={{
-          backgroundColor: "#4E2E1E",
-          backgroundImage: `
-            linear-gradient(90deg, 
-              rgba(0, 0, 0, 0.15) 0%, 
-              transparent 2%, 
-              transparent 48%, 
-              rgba(0, 0, 0, 0.15) 50%, 
-              transparent 52%, 
-              transparent 98%, 
-              rgba(0, 0, 0, 0.15) 100%
-            ),
-            repeating-linear-gradient(
-              0deg,
-              #4E2E1E,
-              #4E2E1E 24px,
-              #3D2316 24px,
-              #3D2316 26px,
-              #5C3724 26px,
-              #5C3724 50px,
-              #3D2316 50px,
-              #3D2316 52px
-            )
-          `
-        }}
+      <div
+        className="w-full max-w-[min(99vw,720px)] flex-1 min-h-0 bg-[#1D110C] rounded-2xl p-1 flex flex-col items-center relative"
       >
         {/* Playable Ludo Board Grid - FitSquare measures the real
             leftover space in this frame (after the badge/dice/turn rows
             around it) and renders the board at exactly that size, in
             actual pixels - see FitSquare.tsx for why this replaced a
             CSS-only aspect-ratio approach. */}
-        <FitSquare className="relative rounded-xl overflow-hidden border-2 border-[#2C1810] shadow-2xl">
+        <FitSquare className="relative rounded-xl overflow-hidden shadow-2xl">
           <Board
             players={gameState.players}
             selectableTokenIds={selectableTokenIds}
@@ -338,7 +314,7 @@ export default function RoomPage() {
       </div>
 
       {/* Bottom Controls Bar */}
-      <div className="w-full max-w-[min(98vw,640px)] px-1 pb-1 flex items-center justify-between shrink-0">
+      <div className="w-full max-w-[min(99vw,720px)] px-1 pb-1 flex items-center justify-between shrink-0">
         {/* Left Voice & Chat Controls */}
         <div className="flex items-center gap-2">
           <VoiceControls roomId={room.id} enabled={room.started} />
