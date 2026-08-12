@@ -38,7 +38,7 @@ export default function Dice({ roll, activeSource, sourceEnabled, onSelect, disa
   };
 
   return (
-    <div className="flex items-center justify-center gap-3">
+    <div className="flex items-center justify-center gap-4">
       {TABS.map(({ source, label, bg, ring }) => {
         const enabled = !disabled && !!roll && sourceEnabled[source];
         const isActive = activeSource === source;
@@ -49,9 +49,9 @@ export default function Dice({ roll, activeSource, sourceEnabled, onSelect, disa
             onClick={() => enabled && onSelect(source)}
             disabled={!enabled}
             aria-label={`${label} move`}
-            style={{ width: "min(15vw, 62px)", height: "min(15vw, 62px)", fontSize: "min(5.5vw, 21px)" }}
+            style={{ width: "min(19vw, 80px)", height: "min(19vw, 80px)", fontSize: "min(7.5vw, 32px)" }}
             className={[
-              "relative rounded-full flex items-center justify-center text-white font-extrabold shadow-[inset_0_2px_3px_rgba(255,255,255,0.5),0_3px_6px_rgba(0,0,0,0.5)] border-2 border-black/20 transition-all",
+              "relative rounded-full flex items-center justify-center text-white font-extrabold shadow-[inset_0_3px_4px_rgba(255,255,255,0.55),0_4px_8px_rgba(0,0,0,0.55)] border-[3px] border-black/25 transition-all",
               bg,
               enabled ? "opacity-100 active:scale-95" : "opacity-35 grayscale cursor-not-allowed",
               isActive ? `ring-4 ${ring} scale-110` : "",
