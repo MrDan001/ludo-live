@@ -7,18 +7,18 @@ interface TokenProps {
   color: PlayerColor;
   selectable?: boolean;
   onClick?: () => void;
+  /** Tokens in the yard are at rest and should read larger than moving tokens. */
+  resting?: boolean;
 }
 
-// Tokens always render at full size now - when multiple share a cell,
-// Board fans them out with a slight offset instead of shrinking them to
-// fit, so nothing ever looks smaller just because it's stacked.
-export default function Token({ color, selectable, onClick }: TokenProps) {
+export default function Token({ color, selectable, onClick, resting = false }: TokenProps) {
   return (
     <button
       onClick={onClick}
       disabled={!selectable}
       className={[
-        "relative w-[94%] h-[94%] rounded-full border-[3px] shadow-lg transition-transform",
+        "relative rounded-full border-[3px] shadow-lg transition-transform duration-200",
+        resting ? "w-[112%] h-[112%]" : "w-[100%] h-[100%]",
         COLOR_BG[color],
         COLOR_BORDER[color],
         selectable
@@ -27,8 +27,7 @@ export default function Token({ color, selectable, onClick }: TokenProps) {
       ].join(" ")}
       aria-label={`${color} token`}
     >
-      {/* shine highlight */}
-      <span className="absolute top-[15%] left-[20%] w-[35%] h-[35%] rounded-full bg-white/40 blur-[1px]" />
+      <span className="absolute top-[12%] left-[18%] w-[34%] h-[34%] rounded-full bg-white/45 blur-[1px]" />
     </button>
   );
 }
