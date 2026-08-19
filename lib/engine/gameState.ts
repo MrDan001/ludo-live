@@ -9,11 +9,11 @@ export const ALL_COLORS: PlayerColor[] = ["RED", "GREEN", "YELLOW", "BLUE"];
 // A token's position:
 // "YARD"   -> not yet on the board
 // 0-51     -> relative steps along this color's own path on the shared 52-square loop
-// 52-56    -> steps into this color's private 5-square home stretch
-// 57       -> finished (reached home)
+// 52-57    -> steps into this color's private 6-square home stretch
+// 58       -> finished (reached home)
 export type TokenPosition = "YARD" | number;
 
-export const FINISH_POSITION = 57;
+export const FINISH_POSITION = 58;
 export const HOME_ENTRY_POSITION = 52; // first home-stretch step
 export const SHARED_PATH_LENGTH = 52; // steps 0-51 are shared-path steps
 
