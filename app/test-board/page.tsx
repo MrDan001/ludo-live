@@ -9,7 +9,6 @@ import { createInitialGameState, GameState } from "@/lib/engine/gameState";
 import { rollTwoDice, DiceRoll } from "@/lib/engine/dice";
 import { applyMove, getValidMoves, MoveOption, MoveSource } from "@/lib/engine/moves";
 
-const HUMAN_COLOR: PlayerColor = "RED";
 const ACTIVE_COLORS: PlayerColor[] = ["RED", "GREEN", "YELLOW", "BLUE"];
 const PLAYER_NAMES: Partial<Record<PlayerColor, string>> = { RED: "You", GREEN: "Green", YELLOW: "Yellow", BLUE: "Blue" };
 type UsedDice = { d1: boolean; d2: boolean };
@@ -24,7 +23,6 @@ export default function TestBoardPage() {
   const [validMoves, setValidMoves] = useState<MoveOption[]>([]);
   const [activeSource, setActiveSource] = useState<MoveSource | null>(null);
   const [captureText, setCaptureText] = useState<string | null>(null);
-  const [message, setMessage] = useState("");
   const sourceMoves = (source: MoveSource) => source === "sum" ? [] : validMoves.filter(m => m.source === source && !usedDice[source]);
   const enabled = useMemo(() => ({ d1: !!diceRoll && !usedDice.d1 && sourceMoves("d1").length > 0, d2: !!diceRoll && !usedDice.d2 && sourceMoves("d2").length > 0 }), [diceRoll, usedDice, validMoves]);
   const selectableTokenIds = useMemo(() => new Set(activeSource ? sourceMoves(activeSource).map(m => m.tokenId) : []), [activeSource, validMoves, usedDice]);
@@ -34,20 +32,18 @@ export default function TestBoardPage() {
     const remaining = getValidMoves(nextState, roll).filter(m => (m.source === "d1" && !nextUsed.d1) || (m.source === "d2" && !nextUsed.d2));
     setGameState(nextState); setUsedDice(nextUsed); setValidMoves(remaining); setActiveSource(null);
     if (remaining.length) return;
-    setDiceRoll(null); setUsedDice({ d1: false, d2: false }); setMessage("");
+    setDiceRoll(null); setUsedDice({ d1: false, d2: false }); setValidMoves([]);
   };
   const startRoll = () => {
     if (diceRoll) return;
-    const first = rollTwoDice(); const second = rollTwoDice();
-    const d1 = first.d1, d2 = second.d1;
-    const roll: DiceRoll = { d1, d2, sum: d1 + d2, hasSix: d1 === 6 || d2 === 6 };
-    const moves = getValidMoves(gameState, roll).filter(m => m.source === "d1' || m.source === "d2");
+    const roll = rollTwoDice();
+    const moves = getValidMoves(gameState, roll).filter(m => m.source === "d1" || m.source === "d2");
     setDiceRoll(roll); setUsedDice({ d1: false, d2: false }); setValidMoves(moves); setActiveSource(null);
-    if (!moves.length) { setDiceRoll(null); setMessage(""); }
+    if (!moves.length) { setDiceRoll(null); setValidMoves([]); }
   };
   const chooseSource = (source: MoveSource) => { if (!diceRoll || source === "sum" || (source === "d1" && usedDice.d1) || (source === "d2" && usedDice.d2) || !sourceMoves(source).length) return; setActiveSource(source); };
   const selectMove = (tokenId: string) => { if (!diceRoll || !activeSource) return; const move = sourceMoves(activeSource).find(m => m.tokenId === tokenId); if (!move) return; const nextState = applyMove(gameState, move); const nextUsed = { ...usedDice, [activeSource]: true } as UsedDice; setCaptureText("Move complete"); setTimeout(() => setCaptureText(null), 700); finishOrContinue(nextState, nextUsed, diceRoll); };
-  const reset = () => { setGameState(freshGame()); setDiceRoll(null); setUsedDice({ d1: false, d2: false }); setValidMoves([]); setActiveSource(null); setMessage(""); };
+  const reset = () => { setGameState(freshGame()); setDiceRoll(null); setUsedDice({ d1: false, d2: false }); setValidMoves([]); setActiveSource(null); };
   return <div className="fixed inset-0 h-[100dvh] w-screen overflow-hidden touch-none select-none bg-slate-950 flex flex-col items-center justify-center text-white p-1">
     <FitSquare className="relative w-full max-w-[100dvh] max-h-[calc(100dvh-3.5rem)]" maxSize={900}>
       <Board players={gameState.players} selectableTokenIds={selectableTokenIds} playerNames={PLAYER_NAMES} onTokenClick={selectMove} onCapture={() => setCaptureText("Capture!")} />
