@@ -1,4 +1,3 @@
-// Board UI component
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -17,75 +16,41 @@ import {
 } from "@/lib/engine/layout";
 import Token from "./Token";
 
-type CellType = "base" | "path" | "home" | "center" | "deco" | "empty";
+/**
+ * Unified Ludo board.
+ *
+ * The entire board is one 15x15 coordinate system. Home yards, the 52-square
+ * shared path, each 6-square home lane, the center and tokens all resolve
+ * through the same row/column geometry. There are no independently positioned
+ * board quadrants or hand-tuned token coordinates.
+ */
+const BOARD_SIZE = 15;
+const STEP_DURATION_MS = 180;
+const STACK_OFFSETS: Record<number, { x: number; y: number }[]> = {
+  1: [{ x: 0, y: 0 }],
+  2: [{ x: -14, y: -14 }, { x: 14, y: 14 }],
+  3: [{ x: -14, y: -14 }, { x: 14, y: -14 }, { x: 0, y: 14 }],
+  4: [{ x: -14, y: -14 }, { x: 14, y: -14 }, { x: -14, y: 14 }, { x: 14, y: 14 }],
+};
 
-interface CellInfo {
-  type: CellType;
-  color?: PlayerColor;
-  safe?: boolean;
-  entryColor?: PlayerColor;
-  pipSlot?: boolean;
-}
-
-const HOME_STRETCH_ARROW: Record<PlayerColor, string> = {
+const HOME_ARROW: Record<PlayerColor, string> = {
   RED: "→",
   GREEN: "↓",
   YELLOW: "←",
   BLUE: "↑",
 };
 
-function buildCellMap(): Record<string, CellInfo> {
-  const map: Record<string, CellInfo> = {};
-
-  for (let r = 0; r < 15; r++) {
-    for (let c = 0; c < 15; c++) map[`${r},${c}`] = { type: "empty" };
-  }
-
-  ALL_COLORS.forEach((color) => {
-    const { rowStart, colStart } = BASE_ZONE[color];
-    for (let r = rowStart; r < rowStart + 6; r++) {
-      for (let c = colStart; c < colStart + 6; c++) {
-        map[`${r},${c}`] = { type: "base", color };
-      }
-    }
-    BASE_COORDS[color].forEach((coord) => {
-      map[`${coord.row},${coord.col}`] = { type: "base", color, pipSlot: true };
-    });
-  });
-
-  const safeSet = getSafeCoordSet();
-  GLOBAL_PATH_COORDS.forEach((coord) => {
-    const key = `${coord.row},${coord.col}`;
-    map[key] = { type: "path", safe: safeSet.has(key) };
-  });
-
-  ALL_COLORS.forEach((color) => {
-    const entry = ENTRY_COORDS[color];
-    const key = `${entry.row},${entry.col}`;
-    map[key] = { ...map[key], entryColor: color };
-  });
-
-  ALL_COLORS.forEach((color) => {
-    HOME_STRETCH_COORDS[color].forEach((coord) => {
-      map[`${coord.row},${coord.col}`] = { type: "home", color };
-    });
-  });
-
-  map[`${CENTER_COORD.row},${CENTER_COORD.col}`] = { type: "center" };
-  return map;
-}
-
-const CELL_MAP = buildCellMap();
-
-const STACK_OFFSETS: Record<number, { x: number; y: number }[]> = {
-  1: [{ x: 0, y: 0 }],
-  2: [{ x: -13, y: -13 }, { x: 13, y: 13 }],
-  3: [{ x: -15, y: -15 }, { x: 15, y: -15 }, { x: 0, y: 15 }],
-  4: [{ x: -15, y: -15 }, { x: 15, y: -15 }, { x: -15, y: 15 }, { x: 15, y: 15 }],
-};
-
-const STEP_DURATION_MS = 220;
 type Pos = number | "YARD";
+type CellType = "yard" | "path" | "home" | "center" | "empty";
+
+interface Cell {
+  type: CellType;
+  color?: PlayerColor;
+  safe?: boolean;
+  entryColor?: PlayerColor;
+  yardSlot?: boolean;
+  homeIndex?: number;
+}
 
 interface BoardProps {
   players: Player[];
@@ -100,14 +65,92 @@ interface BoardProps {
   onCapture?: (info: { tokenId: string; color: PlayerColor }) => void;
 }
 
-interface CaptureFlash {
-  key: string;
+interface Flash {
+  id: string;
   color: PlayerColor;
   row: number;
   col: number;
 }
 
-const CAPTURE_FLASH_MS = 700;
+function key(row: number, col: number) {
+  return `${row},${col}`;
+}
+
+function buildUnifiedBoard(): Record<string, Cell> {
+  const cells: Record<string, Cell> = {};
+  for (let row = 0; row < BOARD_SIZE; row++) {
+    for (let col = 0; col < BOARD_SIZE; col++) cells[key(row, col)] = { type: "empty" };
+  }
+
+  // Four yards are regions of the same board, not separate components.
+  for (const color of ALL_COLORS) {
+    const zone = BASE_ZONE[color];
+    for (let row = zone.rowStart; row < zone.rowStart + 6; row++) {
+      for (let col = zone.colStart; col < zone.colStart + 6; col++) {
+        cells[key(row, col)] = { type: "yard", color };
+      }
+    }
+    BASE_COORDS[color].forEach((coord) => {
+      cells[key(coord.row, coord.col)] = { type: "yard", color, yardSlot: true };
+    });
+  }
+
+  const safe = getSafeCoordSet();
+  GLOBAL_PATH_COORDS.forEach((coord) => {
+    cells[key(coord.row, coord.col)] = {
+      type: "path",
+      safe: safe.has(key(coord.row, coord.col)),
+    };
+  });
+
+  for (const color of ALL_COLORS) {
+    const entry = ENTRY_COORDS[color];
+    cells[key(entry.row, entry.col)] = {
+      ...cells[key(entry.row, entry.col)],
+      entryColor: color,
+    };
+    HOME_STRETCH_COORDS[color].forEach((coord, index) => {
+      cells[key(coord.row, coord.col)] = { type: "home", color, homeIndex: index };
+    });
+  }
+
+  cells[key(CENTER_COORD.row, CENTER_COORD.col)] = { type: "center" };
+  return cells;
+}
+
+const BOARD_CELLS = buildUnifiedBoard();
+
+function BoardToken({
+  id,
+  color,
+  position,
+  selectable,
+  offset,
+  onClick,
+}: {
+  id: string;
+  color: PlayerColor;
+  position: Pos;
+  selectable: boolean;
+  offset: { x: number; y: number };
+  onClick: () => void;
+}) {
+  return (
+    <div
+      className="absolute inset-0 flex items-center justify-center pointer-events-none"
+      style={{ transform: `translate(${offset.x}%, ${offset.y}%)`, zIndex: 20 }}
+    >
+      <div className="pointer-events-auto w-[72%] h-[72%] flex items-center justify-center">
+        <Token
+          color={color}
+          resting={position === "YARD"}
+          selectable={selectable}
+          onClick={onClick}
+        />
+      </div>
+    </div>
+  );
+}
 
 export default function Board({
   players,
@@ -123,226 +166,228 @@ export default function Board({
 }: BoardProps) {
   const [displayPositions, setDisplayPositions] = useState<Record<string, Pos>>(() => {
     const initial: Record<string, Pos> = {};
-    players.forEach((p) => p.tokens.forEach((t) => { initial[t.id] = t.position; }));
+    players.forEach((player) => player.tokens.forEach((token) => {
+      initial[token.id] = token.position;
+    }));
     return initial;
   });
-  const [captureFlashes, setCaptureFlashes] = useState<CaptureFlash[]>([]);
+  const previousPositions = useRef<Record<string, Pos>>(displayPositions);
+  const completeRef = useRef(onMoveAnimationComplete);
+  const captureRef = useRef(onCapture);
+  const [flashes, setFlashes] = useState<Flash[]>([]);
+  const flashId = useRef(0);
 
-  const truePositionsRef = useRef<Record<string, Pos>>(displayPositions);
-  const onCompleteRef = useRef(onMoveAnimationComplete);
-  const onCaptureRef = useRef(onCapture);
-  const flashSeqRef = useRef(0);
-
-  useEffect(() => { onCompleteRef.current = onMoveAnimationComplete; }, [onMoveAnimationComplete]);
-  useEffect(() => { onCaptureRef.current = onCapture; }, [onCapture]);
+  useEffect(() => { completeRef.current = onMoveAnimationComplete; }, [onMoveAnimationComplete]);
+  useEffect(() => { captureRef.current = onCapture; }, [onCapture]);
 
   useEffect(() => {
-    const truePositions: Record<string, Pos> = {};
-    const colorByToken: Record<string, PlayerColor> = {};
-    players.forEach((p) => p.tokens.forEach((t) => {
-      truePositions[t.id] = t.position;
-      colorByToken[t.id] = t.color;
+    const next: Record<string, Pos> = {};
+    const colors: Record<string, PlayerColor> = {};
+    players.forEach((player) => player.tokens.forEach((token) => {
+      next[token.id] = token.position;
+      colors[token.id] = token.color;
     }));
 
-    const prev = truePositionsRef.current;
+    const prev = previousPositions.current;
     const timers: ReturnType<typeof setTimeout>[] = [];
-    let pendingHops = 0;
-    let anyChange = false;
-    const newFlashes: CaptureFlash[] = [];
+    let animations = 0;
+    let changed = false;
+    const newFlashes: Flash[] = [];
 
-    const startHop = (tokenId: string, from: number, to: number) => {
-      pendingHops++;
-      let step = from;
-      const advance = () => {
-        step++;
-        setDisplayPositions((cur) => ({ ...cur, [tokenId]: step }));
-        if (step < to) timers.push(setTimeout(advance, STEP_DURATION_MS));
-        else {
-          pendingHops--;
-          if (pendingHops === 0) onCompleteRef.current?.();
-        }
-      };
-      timers.push(setTimeout(advance, STEP_DURATION_MS));
+    const finish = () => {
+      animations -= 1;
+      if (animations === 0) completeRef.current?.();
     };
 
-    Object.keys(truePositions).forEach((tokenId) => {
-      const oldPos = prev[tokenId];
-      const newPos = truePositions[tokenId];
+    const animateForward = (id: string, from: number, to: number) => {
+      animations += 1;
+      let step = from;
+      const tick = () => {
+        step += 1;
+        setDisplayPositions((current) => ({ ...current, [id]: step }));
+        if (step < to) timers.push(setTimeout(tick, STEP_DURATION_MS));
+        else finish();
+      };
+      timers.push(setTimeout(tick, STEP_DURATION_MS));
+    };
+
+    Object.entries(next).forEach(([id, newPos]) => {
+      const oldPos = prev[id];
       if (oldPos === newPos) return;
-      anyChange = true;
+      changed = true;
 
       if (oldPos === "YARD" && typeof newPos === "number") {
-        setDisplayPositions((cur) => ({ ...cur, [tokenId]: 0 }));
-        if (newPos > 0) startHop(tokenId, 0, newPos);
+        setDisplayPositions((current) => ({ ...current, [id]: 0 }));
+        if (newPos === 0) return;
+        animateForward(id, 0, newPos);
         return;
       }
 
       if (typeof oldPos === "number" && typeof newPos === "number" && newPos > oldPos) {
-        startHop(tokenId, oldPos, newPos);
+        animateForward(id, oldPos, newPos);
         return;
       }
 
       if (typeof oldPos === "number" && newPos === "YARD") {
-        const color = colorByToken[tokenId];
+        const color = colors[id];
         const coord = getRenderCoord(color, oldPos, 0);
-        flashSeqRef.current += 1;
-        newFlashes.push({ key: `${tokenId}-${flashSeqRef.current}`, color, row: coord.row, col: coord.col });
-        onCaptureRef.current?.({ tokenId, color });
+        flashId.current += 1;
+        newFlashes.push({ id: `${id}-${flashId.current}`, color, row: coord.row, col: coord.col });
+        captureRef.current?.({ tokenId: id, color });
       }
-
-      setDisplayPositions((cur) => ({ ...cur, [tokenId]: newPos }));
+      setDisplayPositions((current) => ({ ...current, [id]: newPos }));
     });
 
-    if (newFlashes.length > 0) {
-      setCaptureFlashes((cur) => [...cur, ...newFlashes]);
-      const flashKeys = newFlashes.map((f) => f.key);
+    previousPositions.current = next;
+
+    if (newFlashes.length) {
+      setFlashes((current) => [...current, ...newFlashes]);
+      const ids = new Set(newFlashes.map((flash) => flash.id));
       timers.push(setTimeout(() => {
-        setCaptureFlashes((cur) => cur.filter((f) => !flashKeys.includes(f.key)));
-      }, CAPTURE_FLASH_MS));
+        setFlashes((current) => current.filter((flash) => !ids.has(flash.id)));
+      }, 650));
     }
 
-    truePositionsRef.current = truePositions;
-    if (anyChange && pendingHops === 0) timers.push(setTimeout(() => onCompleteRef.current?.(), 0));
+    if (changed && animations === 0) {
+      timers.push(setTimeout(() => completeRef.current?.(), 0));
+    }
+
     return () => timers.forEach(clearTimeout);
   }, [players]);
 
   const tokensByCell = useMemo(() => {
-    const grouped: Record<string, { id: string; color: PlayerColor; position: Pos; tokenIndex: number }[]> = {};
-    players.forEach((player) => {
-      player.tokens.forEach((token, index) => {
-        const pos = displayPositions[token.id] ?? token.position;
-        const coord = getRenderCoord(token.color, pos, index);
-        const key = `${coord.row},${coord.col}`;
-        if (!grouped[key]) grouped[key] = [];
-        grouped[key].push({ id: token.id, color: token.color, position: pos, tokenIndex: index });
-      });
-    });
+    const grouped: Record<string, { id: string; color: PlayerColor; position: Pos; index: number }[]> = {};
+    players.forEach((player) => player.tokens.forEach((token, index) => {
+      const position = displayPositions[token.id] ?? token.position;
+      const coord = getRenderCoord(token.color, position, index);
+      const cellKey = key(coord.row, coord.col);
+      (grouped[cellKey] ||= []).push({ id: token.id, color: token.color, position, index });
+    }));
     return grouped;
   }, [players, displayPositions]);
 
   return (
     <div
       dir="ltr"
-      className="relative isolate grid w-full aspect-square border-[5px] border-slate-900 rounded-2xl bg-white mx-auto shadow-2xl overflow-hidden"
-      style={{ gridTemplateColumns: "repeat(15, 1fr)", gridTemplateRows: "repeat(15, 1fr)" }}
+      className="relative isolate grid w-full max-w-[720px] aspect-square mx-auto overflow-hidden rounded-[22px] border-[5px] border-slate-950 bg-white shadow-2xl"
+      style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, minmax(0, 1fr))`, gridTemplateRows: `repeat(${BOARD_SIZE}, minmax(0, 1fr))` }}
+      aria-label="Ludo board"
     >
-      {ALL_COLORS.map((color) => {
-        const { rowStart, colStart } = BASE_ZONE[color];
-        const name = playerNames?.[color] ?? color.charAt(0) + color.slice(1).toLowerCase();
-        const avatarUrl = playerAvatars?.[color];
-        const isEmpty = emptyColors?.has(color) ?? false;
-        const isDisconnected = disconnectedColors?.has(color) ?? false;
-        const isCurrentTurn = currentTurnColors?.has(color) ?? false;
+      {Array.from({ length: BOARD_SIZE * BOARD_SIZE }).map((_, index) => {
+        const row = Math.floor(index / BOARD_SIZE);
+        const col = index % BOARD_SIZE;
+        const cell = BOARD_CELLS[key(row, col)];
+        const tokens = tokensByCell[key(row, col)] || [];
+        const centerRegion = row >= 6 && row <= 8 && col >= 6 && col <= 8;
+        const isCenter = row === CENTER_COORD.row && col === CENTER_COORD.col;
+        const isHome = cell.type === "home";
+        const homeIndex = cell.homeIndex ?? -1;
+        const bg = cell.type === "yard" || isHome
+          ? COLOR_BG_SOLID[cell.color!]
+          : cell.type === "path" && cell.entryColor
+            ? COLOR_BG_SOLID[cell.entryColor]
+            : "bg-white";
+
         return (
-          <div key={`zone-${color}`}>
-            <div
-              className="absolute z-20 pointer-events-none border-[3px] border-slate-900"
-              style={{ top: `${(rowStart / 15) * 100}%`, left: `${(colStart / 15) * 100}%`, width: `${(6 / 15) * 100}%`, height: `${(6 / 15) * 100}%` }}
-            />
-            <div
-              className="absolute z-[5] pointer-events-none flex items-center justify-center"
-              style={{ top: `${((rowStart + 1) / 15) * 100}%`, left: `${((colStart + 1) / 15) * 100}%`, width: `${(4 / 15) * 100}%`, height: `${(4 / 15) * 100}%` }}
-            >
-              {isEmpty ? (
-                <div className="w-[75%] h-[75%] rounded-full border-[3px] border-dashed border-white/60 bg-black/20 flex items-center justify-center">
-                  <span className="text-white/70 font-black" style={{ fontSize: "min(6vw, 24px)" }}>+</span>
+          <div
+            key={key(row, col)}
+            style={{ gridRow: row + 1, gridColumn: col + 1 }}
+            className={`relative flex items-center justify-center ${centerRegion ? "bg-transparent" : bg} ${cell.type !== "yard" && !centerRegion ? "border border-slate-300" : ""}`}
+          >
+            {cell.yardSlot && tokens.length === 0 && (
+              <div className="absolute w-[72%] h-[72%] rounded-full border-[3px] border-white/75 bg-black/10" />
+            )}
+            {cell.type === "path" && cell.safe && (
+              <span className={`absolute font-black drop-shadow-sm ${cell.entryColor ? "text-white" : "text-amber-500"}`} style={{ fontSize: "min(3.5vw, 17px)" }}>★</span>
+            )}
+            {isHome && homeIndex === 2 && (
+              <span className="absolute z-[2] text-white/80 font-black pointer-events-none" style={{ fontSize: "min(2.8vw, 13px)" }}>
+                {HOME_ARROW[cell.color!]}
+              </span>
+            )}
+
+            {tokens.map((token, stackIndex) => {
+              const stackSize = Math.min(tokens.length, 4);
+              const offset = STACK_OFFSETS[stackSize]?.[stackIndex] ?? { x: 0, y: 0 };
+              return (
+                <BoardToken
+                  key={token.id}
+                  id={token.id}
+                  color={token.color}
+                  position={token.position}
+                  selectable={selectableTokenIds.has(token.id)}
+                  offset={offset}
+                  onClick={() => onTokenClick(token.id)}
+                />
+              );
+            })}
+
+            {isCenter && (
+              <div className="absolute inset-0 z-[3] overflow-hidden">
+                <div className={`absolute inset-0 ${COLOR_BG_SOLID.RED}`} style={{ clipPath: "polygon(0 0, 100% 0, 50% 50%)" }} />
+                <div className={`absolute inset-0 ${COLOR_BG_SOLID.GREEN}`} style={{ clipPath: "polygon(100% 0, 100% 100%, 50% 50%)" }} />
+                <div className={`absolute inset-0 ${COLOR_BG_SOLID.YELLOW}`} style={{ clipPath: "polygon(100% 100%, 0 100%, 50% 50%)" }} />
+                <div className={`absolute inset-0 ${COLOR_BG_SOLID.BLUE}`} style={{ clipPath: "polygon(0 100%, 0 0, 50% 50%)" }} />
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="w-[24%] h-[24%] rounded-full bg-white/90 shadow-lg" />
                 </div>
-              ) : (
-                <div className={[
-                  "relative w-[75%] h-[75%] rounded-full overflow-hidden flex items-center justify-center shadow-[0_2px_8px_rgba(0,0,0,0.5)] border-[3px] border-white/95 transition-all",
-                  isCurrentTurn ? "ring-4 ring-amber-300 shadow-[0_0_16px_4px_rgba(251,191,36,0.65)]" : "",
-                  isDisconnected ? "opacity-40 grayscale" : "",
-                ].join(" ")}>
-                  {avatarUrl ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
-                  ) : (
-                    <div className={`w-full h-full ${COLOR_BG_SOLID[color]} flex items-center justify-center text-white font-black`} style={{ fontSize: "min(6vw, 26px)" }}>
-                      {name.charAt(0).toUpperCase()}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         );
       })}
 
-      <div className="absolute z-0 pointer-events-none" style={{ top: "40%", left: "40%", width: "20%", height: "20%" }}>
-        <svg viewBox="0 0 100 100" className="w-full h-full block">
-          <polygon points="0,0 100,0 50,50" className={`fill-current ${COLOR_TEXT_SOLID.GREEN}`} />
-          <polygon points="100,0 100,100 50,50" className={`fill-current ${COLOR_TEXT_SOLID.YELLOW}`} />
-          <polygon points="100,100 0,100 50,50" className={`fill-current ${COLOR_TEXT_SOLID.BLUE}`} />
-          <polygon points="0,100 0,0 50,50" className={`fill-current ${COLOR_TEXT_SOLID.RED}`} />
-          <line x1="0" y1="0" x2="100" y2="100" stroke="white" strokeWidth="2" />
-          <line x1="100" y1="0" x2="0" y2="100" stroke="white" strokeWidth="2" />
-        </svg>
-      </div>
-
-      {Array.from({ length: 15 }).map((_, r) =>
-        Array.from({ length: 15 }).map((__, c) => {
-          const key = `${r},${c}`;
-          const cell = CELL_MAP[key];
-          const tokensHere = tokensByCell[key] || [];
-          const inArrowZone = r >= 6 && r <= 8 && c >= 6 && c <= 8;
-
-          let bg = "bg-white";
-          if (cell.type === "base") bg = COLOR_BG_SOLID[cell.color!];
-          if (cell.type === "home") bg = COLOR_BG_SOLID[cell.color!];
-          if (cell.type === "path" && cell.entryColor) bg = COLOR_BG_SOLID[cell.entryColor];
-          if (inArrowZone) bg = "bg-transparent";
-          const showGridLine = cell.type !== "base" && !inArrowZone;
-          const homeStretchIdx = cell.type === "home" ? HOME_STRETCH_COORDS[cell.color!].findIndex((coord) => coord.row === r && coord.col === c) : -1;
-
-          return (
-            <div key={key} style={{ gridColumn: c + 1, gridRow: r + 1 }} className={`relative z-10 flex items-center justify-center ${bg} ${showGridLine ? "border border-slate-300" : ""}`}>
-              {cell.type === "path" && cell.safe && (
-                <span className={`absolute drop-shadow-[0_1px_1px_rgba(0,0,0,0.6)] ${cell.entryColor ? "text-white" : "text-amber-500"}`} style={{ fontSize: "min(3.4vw, 16px)" }}>★</span>
-              )}
-              {homeStretchIdx === 2 && <span className="text-white/80 font-black pointer-events-none" style={{ fontSize: "min(2.6vw, 13px)" }}>{HOME_STRETCH_ARROW[cell.color!]}</span>}
-              {cell.pipSlot && tokensHere.length === 0 && <div className="absolute w-[70%] h-[70%] rounded-full border-[3px] border-white/70 bg-black/10 pointer-events-none" />}
-
-              <div className="absolute inset-0">
-                {tokensHere.map((t, i) => {
-                  const stackSize = Math.min(tokensHere.length, 4);
-                  const offset = STACK_OFFSETS[stackSize]?.[i] ?? { x: 0, y: 0 };
-                  return (
-                    <div key={t.id} className="absolute inset-0 flex items-center justify-center" style={{ transform: `translate(${offset.x}%, ${offset.y}%)`, zIndex: i + 1 }}>
-                      <Token
-                        color={t.color}
-                        resting={t.position === "YARD"}
-                        selectable={selectableTokenIds.has(t.id)}
-                        onClick={() => onTokenClick(t.id)}
-                      />
-                    </div>
-                  );
-                })}
+      {/* Unified yard overlays: avatar/player identity lives on the same 15x15 board. */}
+      {ALL_COLORS.map((color) => {
+        const zone = BASE_ZONE[color];
+        const name = playerNames?.[color] ?? color.charAt(0) + color.slice(1).toLowerCase();
+        const avatarUrl = playerAvatars?.[color];
+        const empty = emptyColors?.has(color) ?? false;
+        const disconnected = disconnectedColors?.has(color) ?? false;
+        const turn = currentTurnColors?.has(color) ?? false;
+        return (
+          <div
+            key={`player-${color}`}
+            className="absolute z-[8] pointer-events-none flex items-center justify-center"
+            style={{
+              top: `${((zone.rowStart + 2) / BOARD_SIZE) * 100}%`,
+              left: `${((zone.colStart + 2) / BOARD_SIZE) * 100}%`,
+              width: `${(2 / BOARD_SIZE) * 100}%`,
+              height: `${(2 / BOARD_SIZE) * 100}%`,
+            }}
+          >
+            {empty ? (
+              <div className="w-full h-full rounded-full border-[2px] border-dashed border-white/70 bg-black/20 flex items-center justify-center text-white font-black text-lg">+</div>
+            ) : (
+              <div className={`relative w-full h-full rounded-full overflow-hidden border-[3px] border-white shadow-lg ${turn ? "ring-4 ring-amber-300" : ""} ${disconnected ? "opacity-40 grayscale" : ""}`} title={name}>
+                {avatarUrl ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+                ) : (
+                  <div className={`w-full h-full ${COLOR_BG_SOLID[color]} flex items-center justify-center text-white font-black`} style={{ fontSize: "min(5vw, 24px)" }}>
+                    {name.charAt(0).toUpperCase()}
+                  </div>
+                )}
               </div>
-            </div>
-          );
-        })
-      )}
+            )}
+          </div>
+        );
+      })}
 
-      {captureFlashes.map((flash) => (
-        <div key={flash.key} className="absolute z-40 pointer-events-none flex items-center justify-center" style={{ top: `${(flash.row / 15) * 100}%`, left: `${(flash.col / 15) * 100}%`, width: `${(1 / 15) * 100}%`, height: `${(1 / 15) * 100}%` }}>
-          <div className="capture-burst absolute inset-[-60%] rounded-full border-4 border-red-500" />
-          <span className="capture-burst-mark text-red-600 font-black" style={{ fontSize: "min(4vw, 20px)" }}>✕</span>
-        </div>
+      {flashes.map((flash) => (
+        <div
+          key={flash.id}
+          className="absolute z-40 pointer-events-none rounded-full border-[4px] border-white/90 animate-ping"
+          style={{
+            left: `${((flash.col + 0.5) / BOARD_SIZE) * 100}%`,
+            top: `${((flash.row + 0.5) / BOARD_SIZE) * 100}%`,
+            width: `${(1.2 / BOARD_SIZE) * 100}%`,
+            height: `${(1.2 / BOARD_SIZE) * 100}%`,
+            transform: "translate(-50%, -50%)",
+            background: flash.color === "RED" ? "#dc2626" : flash.color === "GREEN" ? "#16a34a" : flash.color === "YELLOW" ? "#f59e0b" : "#2563eb",
+          }}
+        />
       ))}
-
-      <style jsx>{`
-        .capture-burst { animation: capture-burst-ring ${CAPTURE_FLASH_MS}ms ease-out forwards; }
-        .capture-burst-mark { animation: capture-burst-mark ${CAPTURE_FLASH_MS}ms ease-out forwards; }
-        @keyframes capture-burst-ring {
-          0% { transform: scale(0.3); opacity: 1; }
-          100% { transform: scale(1.6); opacity: 0; }
-        }
-        @keyframes capture-burst-mark {
-          0% { transform: scale(0.5); opacity: 0; }
-          30% { transform: scale(1.2); opacity: 1; }
-          100% { transform: scale(1); opacity: 0; }
-        }
-      `}</style>
     </div>
   );
 }
