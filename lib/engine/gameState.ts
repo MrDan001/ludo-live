@@ -8,14 +8,14 @@ export const ALL_COLORS: PlayerColor[] = ["RED", "GREEN", "YELLOW", "BLUE"];
 
 // A token's position:
 // "YARD"   -> not yet on the board
-// 0-50     -> relative steps along this color's own path on the shared 52-square loop
-// 51-56    -> steps into this color's private 6-square home stretch
+// 0-51     -> relative steps along this color's own path on the shared 52-square loop
+// 52-56    -> steps into this color's private 5-square home stretch
 // 57       -> finished (reached home)
 export type TokenPosition = "YARD" | number;
 
 export const FINISH_POSITION = 57;
-export const HOME_ENTRY_POSITION = 51; // first home-stretch step
-export const SHARED_PATH_LENGTH = 51; // steps 0-50 are shared-path steps
+export const HOME_ENTRY_POSITION = 52; // first home-stretch step
+export const SHARED_PATH_LENGTH = 52; // steps 0-51 are shared-path steps
 
 export interface Token {
   id: string; // e.g. "RED-0"
@@ -39,7 +39,7 @@ export interface GameState {
   phase: GamePhase;
   consecutiveSixes: number; // rolling three 6's in a row forfeits the turn
   winner: PlayerColor | null;
-  // 2-player games: Red+Yellow play as one team, Green+Blue as the other.
+  // 2-player games: Red+Yellow play as one team and Green+Blue as the other.
   // See lib/engine/moves.ts for how this changes move selection, capture
   // immunity, turn order, and the win condition.
   teamMode: boolean;
