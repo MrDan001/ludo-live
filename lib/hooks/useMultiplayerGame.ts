@@ -14,8 +14,6 @@ interface RoomPlayer {
   connected: boolean;
   avatarUrl?: string;
   ready: boolean;
-  // Set only in 2-player team mode - the second color this human also
-  // controls (Yellow if their primary is Red, Blue if Green).
   teammateColor?: PlayerColor;
 }
 
@@ -26,18 +24,12 @@ interface RoomData {
   gameState: GameState | null;
   started: boolean;
   pendingRoll: { d1: number; d2: number; sum: number; hasSix: boolean } | null;
-  // source tags which of the three tabs (Blue/d1, Green/d2, Red/sum) this
-  // move belongs to - see lib/engine/moves.ts.
   pendingMoves: { tokenId: string; toPosition: number; dieValue: number; source: MoveSource }[];
   messages: ChatMessage[];
   betAmount: number;
   gameMode: string;
   pot: number;
-  // Present only for a room created from a filled tournament - id of that
-  // Tournament. Drives the tournament-specific waiting/lobby UI and lets
-  // the room screen skip bet/mode controls that don't apply there.
   tournamentId?: string;
-  // Total entrants expected for that tournament - see server/rooms.ts.
   tournamentMaxPlayers?: number;
 }
 
@@ -49,12 +41,6 @@ interface MultiplayerStore {
   kickedMessage: string | null;
   rollSeq: number;
   starting: boolean;
-  // The dice display's source of truth - set the instant a roll happens
-  // (whether or not it produced a valid move) and only cleared once the
-  // board's step-by-step move animation finishes (or, if there was nothing
-  // to animate, after a short grace period). This is what makes the dice
-  // hold their value and stay visible through the whole hop sequence
-  // instead of resetting the moment a move is selected.
   lastRoll: { d1: number; d2: number } | null;
 
   connect: () => void;
@@ -70,8 +56,6 @@ interface MultiplayerStore {
   removePlayer: (roomId: string, targetUserId: string) => void;
   clearError: () => void;
   clearKicked: () => void;
-  /** Called by the board once a move's hop animation is fully done -
-   *  releases the dice hold, allowing the next roll. */
   finishMoveAnimation: () => void;
 }
 
@@ -93,6 +77,37 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
     socket.off("room:error");
     socket.off("room:kicked");
     socket.off("game:rolled");
+    socket.off("connect", handleSocketReconnect);
+
+    function handleSocketReconnect() {
+      const { room, yourUserId } = get();
+      if (!room || !yourUserId) return;
+
+      // Socket.IO creates a new socket id after a dropped connection. The
+      // server keeps the seat by userId, so rejoin the same room automatically
+      // instead of leaving the player stuck as "disconnected" after a Wi-Fi
+      // hiccup, mobile backgrounding, or temporary network loss.
+      if (room.tournamentId) {
+        socket.emit("tournament:joinMatch", {
+          tournamentId: room.tournamentId,
+          name: room.players.find((p) => p.userId === yourUserId)?.name || "Player",
+          userId: yourUserId,
+          avatarUrl: room.players.find((p) => p.userId === yourUserId)?.avatarUrl,
+        });
+      } else {
+        const me = room.players.find((p) => p.userId === yourUserId);
+        if (me) {
+          socket.emit("room:join", {
+            roomId: room.id,
+            name: me.name || "Player",
+            userId: yourUserId,
+            avatarUrl: me.avatarUrl,
+          });
+        }
+      }
+    }
+
+    socket.on("connect", handleSocketReconnect);
 
     socket.on("room:joined", ({ yourColor }: { roomId: string; yourColor: PlayerColor }) => {
       set({ yourColor, error: null });
@@ -113,8 +128,6 @@ export const useMultiplayerGame = create<MultiplayerStore>((set, get) => ({
     socket.on("game:rolled", ({ d1, d2, hasValidMoves }: { d1: number; d2: number; hasValidMoves: boolean }) => {
       set((s) => ({ lastRoll: { d1, d2 }, rollSeq: s.rollSeq + 1 }));
       if (!hasValidMoves) {
-        // Nothing will animate - hold the numbers just long enough to be
-        // seen, then release the dice so the next player isn't stuck.
         setTimeout(() => {
           set((s) => (s.lastRoll?.d1 === d1 && s.lastRoll?.d2 === d2 ? { lastRoll: null } : {}));
         }, 1200);

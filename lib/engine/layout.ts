@@ -91,8 +91,8 @@ export function getRenderCoord(
   tokenIndex: number
 ): Coord {
   if (position === "YARD") return BASE_COORDS[color][tokenIndex];
-  if (position === 57) return CENTER_COORD;
-  if (position >= 51) return HOME_STRETCH_COORDS[color][position - 51];
+  if (position === 58) return CENTER_COORD;
+  if (position >= 52) return HOME_STRETCH_COORDS[color][position - 52];
   return GLOBAL_PATH_COORDS[relativeToGlobal(color, position)];
 }
 

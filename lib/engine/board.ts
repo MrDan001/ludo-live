@@ -13,7 +13,7 @@ export const START_OFFSET: Record<PlayerColor, number> = {
   BLUE: 39,
 };
 
-// Converts a token's relative position (0-50) into its actual square
+// Converts a token's relative position (0-51) into its actual square
 // on the shared 52-square loop, based on its color's start offset.
 export function relativeToGlobal(color: PlayerColor, relativePos: number): number {
   return (START_OFFSET[color] + relativePos) % GLOBAL_PATH_LENGTH;
