@@ -19,21 +19,31 @@ type Choice = "blue" | "green" | "red" | null;
 type DieValue = number | null;
 type DiceState = [DieValue, DieValue];
 
-const BOARD_ROUTE: [number, number][] = [[13,6],[12,6],[11,6],[10,6],[9,6],[8,6],[8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],[6,6],[5,6],[4,6],[3,6],[2,6],[1,6],[1,7],[1,8],[2,8],[3,8],[4,8],[5,8],[6,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,13],[8,13],[8,12],[8,11],[8,10],[8,9],[8,8],[9,8],[10,8],[11,8],[12,8],[13,8],[13,7]];
+// Only visible playable squares are counted. The four corner cells hidden by
+// the centre box are intentionally skipped, so a token never cuts underneath it.
+const TRACK_LENGTH = 48;
+const BOARD_ROUTE: [number, number][] = [
+  [13,6],[12,6],[11,6],[10,6],[9,6],
+  [8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],
+  [5,6],[4,6],[3,6],[2,6],[1,6],[1,7],[1,8],
+  [2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,13],
+  [8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[13,7],
+];
 const HOME_LANES: Record<PlayerColor, [number, number][]> = {
-  red:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]],
-  blue:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]],
-  green:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]],
-  yellow:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]],
+  // Five visible home-lane cells. The sixth apparent cell is hidden by the centre box.
+  red:[[13,7],[12,7],[11,7],[10,7],[9,7]],
+  blue:[[7,1],[7,2],[7,3],[7,4],[7,5]],
+  green:[[1,7],[2,7],[3,7],[4,7],[5,7]],
+  yellow:[[7,13],[7,12],[7,11],[7,10],[7,9]],
 };
-const START_INDEX: Record<PlayerColor, number> = { red:0, blue:11, green:24, yellow:35 };
+const START_INDEX: Record<PlayerColor, number> = { red:0, blue:10, green:22, yellow:32 };
 const BOT_ORDER: Record<PlayerColor, PlayerColor> = { red:"green", green:"yellow", yellow:"blue", blue:"red" };
 
 function gridPosition(row:number,col:number){ return { left:`${col/15*100}%`, top:`${row/15*100}%` }; }
 function tokenPosition(color:PlayerColor,progress:number){
   if(progress<0 || progress>FINISH_PROGRESS) return null;
-  if(progress<52){ const [row,col]=BOARD_ROUTE[(START_INDEX[color]+progress)%52]; return gridPosition(row,col); }
-  const lane=HOME_LANES[color][progress-52];
+  if(progress<TRACK_LENGTH){ const [row,col]=BOARD_ROUTE[(START_INDEX[color]+progress)%TRACK_LENGTH]; return gridPosition(row,col); }
+  const lane=HOME_LANES[color][progress-TRACK_LENGTH];
   return lane ? gridPosition(lane[0],lane[1]) : null;
 }
 
@@ -105,11 +115,19 @@ export default function HomePage(){
     },420);
   }
 
+  function canPlayRoll(token:PlayerState["tokens"][number], roll:number, merged:boolean=false){
+    // A merged 6 is a movement of six spaces, but it is NOT a valid home exit.
+    if(merged && token.status==="home") return false;
+    return isMovable(token,roll);
+  }
+
   function choose(v:Choice){
     if(turn!=="red"||v===null||moving||forfeits)return;
     if(v==="blue"&&!available[0])return;
     if(v==="green"&&!available[1])return;
     if(v==="red"&&!(available[0]&&available[1]))return;
+    const roll=v==="blue"?dice[0]:v==="green"?dice[1]:total;
+    if(roll===null||!me.tokens.some(t=>canPlayRoll(t,roll,v==="red")))return;
     setChoice(v);
   }
 
@@ -139,7 +157,8 @@ export default function HomePage(){
     if(!choice||forfeits||turn!=="red"||moving)return;
     const roll=choice==="blue"?dice[0]:choice==="green"?dice[1]:total;
     if(roll===null)return;
-    const token=me.tokens.find(t=>t.id===id); if(!token||!isMovable(token,roll))return;
+    const merged=choice==="red";
+    const token=me.tokens.find(t=>t.id===id); if(!token||!canPlayRoll(token,roll,merged))return;
     const ok=await animateMove("red",id,roll); if(!ok)return;
     const current=playersRef.current.find(p=>p.color==="red")?.tokens.find(t=>t.id===id);
     if(current){
@@ -221,8 +240,8 @@ export default function HomePage(){
   },[turn,botCycle]);
 
   const chosenRoll=choice==="blue"?dice[0]:choice==="green"?dice[1]:total;
-  const canMoveAny=chosenRoll!==null&&me.tokens.some(t=>isMovable(t,chosenRoll));
-  const homeSixMovable=turn==="red"&&choice!==null&&chosenRoll===6&&!forfeits&&!moving;
+  const canMoveAny=chosenRoll!==null&&me.tokens.some(t=>canPlayRoll(t,chosenRoll,choice==="red"));
+  const homeSixMovable=turn==="red"&&(choice==="blue"||choice==="green")&&chosenRoll===6&&!forfeits&&!moving;
 
   return <main className="game-page"><div className="game-stage"><div className="board-wrap"><div className="ludo-board" aria-label="Ludo board">
     <div className="track" aria-hidden="true">{Array.from({length:15},(_,row)=>Array.from({length:15},(_,col)=>{const cross=(row>=6&&row<=8)||(col>=6&&col<=8);return cross?<TrackCell key={`${row}-${col}`} row={row} col={col}/>:<div key={`${row}-${col}`} className="empty-cell"/>;}))}</div>
@@ -230,9 +249,9 @@ export default function HomePage(){
     <Home color="yellow" name="Player2" className="home-yellow" tokens={players.find(p=>p.color==="yellow")?.tokens}/>
     <Home color="red" name="Me" className="home-red"><div className="tokens">{me.tokens.filter(t=>t.status==="home").map(t=><button key={t.id} type="button" className={`token-slot token-home-button ${homeSixMovable&&isMovable(t,6)?"token-movable-home":""}`} onClick={()=>moveToken(t.id)} disabled={!homeSixMovable||!isMovable(t,6)} aria-label={`Red token ${t.id+1}`}><div className="token" style={{background:COLORS.red}}/></button>)}</div></Home>
     <Home color="blue" name="Player4" className="home-blue" tokens={players.find(p=>p.color==="blue")?.tokens}/>
-    <div className="board-token-layer" aria-label="Tokens">{players.flatMap(p=>p.tokens.map(t=><MovableToken key={`${p.color}-${t.id}`} token={t} color={p.color} movable={p.color==="red"&&canMoveAny&&chosenRoll!==null&&isMovable(t,chosenRoll)} onClick={()=>moveToken(t.id)}/>))}</div>
+    <div className="board-token-layer" aria-label="Tokens">{players.flatMap(p=>p.tokens.map(t=><MovableToken key={`${p.color}-${t.id}`} token={t} color={p.color} movable={p.color==="red"&&canMoveAny&&chosenRoll!==null&&canPlayRoll(t,chosenRoll,choice==="red")} onClick={()=>moveToken(t.id)}/>))}</div>
     <div className="center-home" aria-label="Dice area"><div className="center-backdrop" aria-hidden="true">LUDO</div><div className="center-controls"><div className="dice-pair"><Die value={dice[0]} rolling={rolling||botBusy} onClick={rollDice} label="Roll first die"/><Die value={dice[1]} rolling={rolling||botBusy} onClick={rollDice} label="Roll second die"/></div></div></div>
   </div></div>
-  <div className="move-controls" aria-label="Choose a move value"><ChoiceToken color="blue" value={dice[0]} selected={choice==="blue"} disabled={turn!=="red"||!available[0]||forfeits||botBusy||moving||!me.tokens.some(t=>dice[0]!==null&&isMovable(t,dice[0]))} label="Play first die" onClick={()=>choose("blue")}/><ChoiceToken color="green" value={dice[1]} selected={choice==="green"} disabled={turn!=="red"||!available[1]||forfeits||botBusy||moving||!me.tokens.some(t=>dice[1]!==null&&isMovable(t,dice[1]))} label="Play second die" onClick={()=>choose("green")}/><ChoiceToken color="red" value={total} selected={choice==="red"} disabled={turn!=="red"||!(available[0]&&available[1])||forfeits||botBusy||moving||!me.tokens.some(t=>total!==null&&isMovable(t,total))} label="Merge both dice" onClick={()=>choose("red")}/></div>
+  <div className="move-controls" aria-label="Choose a move value"><ChoiceToken color="blue" value={dice[0]} selected={choice==="blue"} disabled={turn!=="red"||!available[0]||forfeits||botBusy||moving||!me.tokens.some(t=>dice[0]!==null&&isMovable(t,dice[0]))} label="Play first die" onClick={()=>choose("blue")}/><ChoiceToken color="green" value={dice[1]} selected={choice==="green"} disabled={turn!=="red"||!available[1]||forfeits||botBusy||moving||!me.tokens.some(t=>dice[1]!==null&&isMovable(t,dice[1]))} label="Play second die" onClick={()=>choose("green")}/><ChoiceToken color="red" value={total} selected={choice==="red"} disabled={turn!=="red"||!(available[0]&&available[1])||forfeits||botBusy||moving||!me.tokens.some(t=>total!==null&&canPlayRoll(t,total,true))} label="Merge both dice" onClick={()=>choose("red")}/></div>
   </div></main>;
 }
