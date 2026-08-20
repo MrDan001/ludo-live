@@ -9,7 +9,7 @@ type DieValue = number | null;
 type DiceState = [DieValue, DieValue];
 const BOARD_ROUTE: [number, number][] = [[13,6],[12,6],[11,6],[10,6],[9,6],[8,6],[8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],[6,6],[5,6],[4,6],[3,6],[2,6],[1,6],[1,7],[1,8],[2,8],[3,8],[4,8],[5,8],[6,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,13],[8,13],[8,12],[8,11],[8,10],[8,9],[8,8],[9,8],[10,8],[11,8],[12,8],[13,8],[13,7]];
 const HOME_LANES: Record<PlayerColor, [number, number][]> = { red:[[13,7],[12,7],[11,7],[10,7],[9,7],[8,7]], blue:[[7,1],[7,2],[7,3],[7,4],[7,5],[7,6]], green:[[1,7],[2,7],[3,7],[4,7],[5,7],[6,7]], yellow:[[7,13],[7,12],[7,11],[7,10],[7,9],[7,8]] };
-const START_INDEX: Record<PlayerColor, number> = { red:39, blue:13, green:0, yellow:26 };
+const START_INDEX: Record<PlayerColor, number> = { red:0, blue:11, green:24, yellow:35 };
 function gridPosition(row:number,col:number){return{left:`${col/15*100}%`,top:`${row/15*100}%`};}
 function tokenPosition(color:PlayerColor,progress:number){if(progress<0)return null;if(progress<52){const [row,col]=BOARD_ROUTE[(START_INDEX[color]+progress)%52];return gridPosition(row,col);}if(progress<=FINISH_PROGRESS){const lane=HOME_LANES[color][progress-52];return gridPosition(lane[0],lane[1]);}return null;}
 function Token({color,name}:{color:keyof typeof COLORS;name:string}){return <div className="token-slot" aria-label={`${name} token`}><div className="token" style={{background:COLORS[color]}}/></div>;}
