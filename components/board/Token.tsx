@@ -11,10 +11,13 @@ interface TokenProps {
 }
 
 export default function Token({ color, selectable, onClick, resting = false }: TokenProps) {
+  // Keep tokens large enough to read on small screens while remaining centred
+  // inside their square. The transform below centres the token itself, so the
+  // larger resting token cannot become visually biased to one side.
   const sizeClass = selectable
-    ? "h-[68%] w-[68%]"
+    ? "h-[78%] w-[78%] sm:h-[72%] sm:w-[72%]"
     : resting
-      ? "h-[118%] w-[118%]"
+      ? "h-[108%] w-[108%] sm:h-[118%] sm:w-[118%]"
       : "h-[94%] w-[94%]";
 
   return (
