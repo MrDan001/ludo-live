@@ -30,7 +30,6 @@ function Die({ value, active, used, onClick, disabled }: { value: number; active
 
 export default function TestBoardPage() {
   const [gameState, setGameState] = useState<GameState>(() => freshGame());
-  // The reference starts with visible dice; rolling replaces them with a fresh 1-6 pair.
   const [diceRoll, setDiceRoll] = useState<DiceRoll | null>({ d1: 4, d2: 5 });
   const [usedDice, setUsedDice] = useState<UsedDice>({ d1: false, d2: false });
   const [validMoves, setValidMoves] = useState<MoveOption[]>([]);
@@ -38,7 +37,11 @@ export default function TestBoardPage() {
   const [captureText, setCaptureText] = useState<string | null>(null);
   const [history, setHistory] = useState<number[]>([4, 2, 0]);
 
-  const sourceMoves = (source: MoveSource) => source === "sum" ? [] : validMoves.filter((m) => m.source === source && !usedDice[source]);
+  const sourceMoves = (source: MoveSource) => {
+    if (source === "sum") return [];
+    const used = source === "d1" ? usedDice.d1 : usedDice.d2;
+    return validMoves.filter((m) => m.source === source && !used);
+  };
   const enabled = useMemo(() => ({ d1: !!diceRoll && !usedDice.d1 && sourceMoves("d1").length > 0, d2: !!diceRoll && !usedDice.d2 && sourceMoves("d2").length > 0 }), [diceRoll, usedDice, validMoves]);
   const selectableTokenIds = useMemo(() => new Set(activeSource ? sourceMoves(activeSource).map((m) => m.tokenId) : []), [activeSource, validMoves, usedDice]);
 
