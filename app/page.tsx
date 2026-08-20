@@ -107,7 +107,28 @@ export default function HomePage() {
     const chosen = home ?? candidates[0];
     setTimeout(() => resolveMove(chosen.color, chosen.i, dice), 600);
   }
-  useEffect(() => { if (mode === "bot" && teamTurn === "bot" && !winner) { if (dice === null) setTimeout(() => { const next = Math.floor(Math.random() * 6) + 1; setDice(next); setSixStreak(next === 6 ? sixStreak + 1 : 0); setMessage(`BOT TEAM rolled ${next}.`); }, 600); else botMove(); } }, [teamTurn, dice, mode, winner]);
+  useEffect(() => {
+    if (mode !== "bot" || teamTurn !== "bot" || winner) return;
+    if (dice === null) {
+      const timer = setTimeout(() => {
+        const next = Math.floor(Math.random() * 6) + 1;
+        const streak = next === 6 ? sixStreak + 1 : 0;
+        if (streak >= 4) {
+          setDice(null);
+          setSixStreak(0);
+          setMessage("BOT TEAM rolled four 6s. Turn forfeited.");
+          nextTeam();
+          return;
+        }
+        setDice(next);
+        setSixStreak(streak);
+        setMessage(`BOT TEAM rolled ${next}.`);
+      }, 600);
+      return () => clearTimeout(timer);
+    }
+    const timer = setTimeout(() => botMove(), 100);
+    return () => clearTimeout(timer);
+  }, [teamTurn, dice, mode, winner, sixStreak]);
 
   function reset() { if (animating) return; setTokens({ green:[HOME,HOME,HOME,HOME], yellow:[HOME,HOME,HOME,HOME], red:[HOME,HOME,HOME,HOME], blue:[HOME,HOME,HOME,HOME] }); setTeamTurn(mode === "bot" ? "human" : "green"); setDice(null); setSixStreak(0); setWinner(null); setMessage(mode === "bot" ? "You are Red + Yellow. Roll once, then choose either color." : mode === "two" ? "2-player mode: Player 1 Green + Blue, Player 2 Red + Yellow." : "4-player mode: one color per player."); }
   function changeMode(next: Mode) { if (animating) return; setMode(next); setTeamTurn(next === "bot" ? "human" : "green"); setDice(null); setSixStreak(0); setWinner(null); setTokens({ green:[HOME,HOME,HOME,HOME], yellow:[HOME,HOME,HOME,HOME], red:[HOME,HOME,HOME,HOME], blue:[HOME,HOME,HOME,HOME] }); setMessage(next === "bot" ? "Bot mode: you are Red + Yellow. Roll once, then choose either color." : next === "two" ? "2-player mode: Player 1 Green + Blue, Player 2 Red + Yellow." : "4-player mode: one player per color."); }
