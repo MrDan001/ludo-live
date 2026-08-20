@@ -70,7 +70,8 @@ export function chooseBotToken(players: PlayerState[], color: PlayerColor, roll:
   if (enter) return enter.id;
   return pool.reduce((best, t) => t.progress > best.progress ? t : best).id;
 }
-export function applyMove(players: PlayerState[], color: PlayerColor, tokenId: number, roll: number): PlayerState[] {
+export function applyMove(players: PlayerState[], color: PlayerColor, tokenId: number | null, roll: number): PlayerState[] {
+  if (tokenId === null) return players;
   const next = players.map(p => ({ ...p, tokens: p.tokens.map(t => ({ ...t })) }));
   const p = next.find(x => x.color === color); if (!p) return next;
   const token = p.tokens.find(t => t.id === tokenId); if (!token) return next;
