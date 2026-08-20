@@ -20,7 +20,7 @@ type DieValue = number | null;
 type DiceState = [DieValue, DieValue];
 
 // Only visible playable squares are counted. The four corner cells hidden by
-the centre box are intentionally skipped, so a token never cuts underneath it.
+// the centre box are intentionally skipped, so a token never cuts underneath it.
 const TRACK_LENGTH = 44;
 const BOARD_ROUTE: [number, number][] = [
   [13,6],[12,6],[11,6],[10,6],[9,6],
