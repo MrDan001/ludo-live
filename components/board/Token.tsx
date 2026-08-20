@@ -11,13 +11,11 @@ interface TokenProps {
 }
 
 export default function Token({ color, selectable, onClick, resting = false }: TokenProps) {
-  // Keep resting tokens 150% larger than the previous mobile resting size,
-  // while preserving true centre alignment inside the board cell.
   const sizeClass = selectable
-    ? "h-[90%] w-[90%] sm:h-[84%] sm:w-[84%]"
+    ? "h-[82%] w-[82%] sm:h-[78%] sm:w-[78%]"
     : resting
-      ? "h-[168%] w-[168%] sm:h-[118%] sm:w-[118%]"
-      : "h-[100%] w-[100%]";
+      ? "h-[76%] w-[76%] sm:h-[72%] sm:w-[72%]"
+      : "h-[92%] w-[92%]";
 
   return (
     <button
@@ -25,11 +23,9 @@ export default function Token({ color, selectable, onClick, resting = false }: T
       disabled={!selectable}
       aria-label={`${color} token`}
       className={[
-        "absolute left-1/2 top-1/2 z-10 block aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-[4px] shadow-xl transition-all duration-250 ease-out",
+        "absolute left-1/2 top-1/2 z-10 block aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] sm:border-[4px] shadow-xl transition-all duration-200 ease-out",
         sizeClass,
-        selectable
-          ? "ring-4 ring-white/80 cursor-pointer"
-          : "cursor-default",
+        selectable ? "ring-4 ring-white/80 cursor-pointer" : "cursor-default",
         COLOR_BG[color],
         COLOR_BORDER[color],
       ].join(" ")}
