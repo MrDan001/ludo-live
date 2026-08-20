@@ -6,14 +6,15 @@ import { advanceToken, allFinished, createGame, FINISH_PROGRESS, isMovable, kill
 const COLORS = { green: "#08a63b", yellow: "#ffad08", red: "#f21b2d", blue: "#1769e8" } as const;
 type Choice = "blue" | "green" | "red" | null; type DieValue = number | null; type DiceState = [DieValue, DieValue];
 
-// Shared track: only the visible white squares are included. The centre-covered
-// squares are deliberately excluded. The route is clockwise from Red's start.
+// Exactly the visible shared-track squares. The centre artwork and covered
+// home-path cells are not movement squares. Red starts at [13,6] and moves
+// clockwise through every visible square before turning.
 const BOARD_ROUTE: [number, number][] = [
-  [13,6],[13,5],[13,4],[13,3],[13,2],[13,1],[12,6],[11,6],[10,6],[9,6],
+  [13,6],[12,6],[11,6],[10,6],[9,6],
   [8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],
-  [5,6],[4,6],[3,6],[2,6],[1,6],[1,7],[1,8],[2,8],[3,8],[4,8],[5,8],
-  [6,9],[6,10],[6,11],[6,12],[6,13],[7,13],[8,13],[8,12],[8,11],[8,10],[8,9],
-  [9,8],[10,8],[11,8],[12,8],[13,8],[13,7]
+  [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],
+  [1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],
+  [7,13],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6]
 ];
 const TRACK_LENGTH = BOARD_ROUTE.length;
 const HOME_LANES: Record<PlayerColor,[number,number][]> = {
@@ -22,13 +23,13 @@ const HOME_LANES: Record<PlayerColor,[number,number][]> = {
   green:[[2,7],[3,7],[4,7],[5,7],[6,7]],
   yellow:[[7,12],[7,11],[7,10],[7,9],[7,8]],
 };
-const START_INDEX: Record<PlayerColor,number> = { red:0, blue:12, green:24, yellow:36 };
+const START_INDEX: Record<PlayerColor,number> = { red:0, blue:9, green:24, yellow:33 };
 const BOT_ORDER: Record<PlayerColor,PlayerColor> = { red:"green", green:"yellow", yellow:"blue", blue:"red" };
-function gridPosition(row:number,col:number){return{left:`${col/15*100}%`,top:`${row/15*100}%`};}
+function gridPosition(row:number,col:number){return{left:`${(col+.5)/15*100}%`,top:`${(row+.5)/15*100}%`};}
 function tokenPosition(color:PlayerColor,progress:number){if(progress<0||progress>FINISH_PROGRESS)return null;if(progress<TRACK_LENGTH){const [row,col]=BOARD_ROUTE[(START_INDEX[color]+progress)%TRACK_LENGTH];return gridPosition(row,col);}const lane=HOME_LANES[color][progress-TRACK_LENGTH];return lane?gridPosition(lane[0],lane[1]):null;}
 function Token({color,name}:{color:keyof typeof COLORS;name:string}){return <div className="token-slot"><div className="token" style={{background:COLORS[color]}} aria-label={`${name} token`}/></div>}
 function Home({color,name,className,children,tokens}:{color:keyof typeof COLORS;name:string;className:string;children?:ReactNode;tokens?:PlayerState["tokens"]}){return <section className={`home ${className}`} style={{backgroundColor:COLORS[color]}}><h2>{name}</h2>{children??<div className="tokens">{(tokens??[]).filter(t=>t.status==="home").map(t=><Token key={t.id} color={color} name={name}/>)}</div>}</section>}
-function TrackCell({row,col}:{row:number;col:number}){const green=col===7&&row>=1&&row<=5,yellow=row===7&&col>=9&&col<=13,red=col===7&&row>=9&&row<=13,blue=row===7&&col>=1&&col<=5;const start=(row===6&&col===1)||(row===1&&col===8)||(row===8&&col===13)||(row===13&&col===6),safe=new Set(["6-2","2-8","8-12","12-6"]).has(`${row}-${col}`);let c="track-cell";if(green)c+=" green-path";else if(yellow)c+=" yellow-path";else if(red)c+=" red-path";else if(blue)c+=" blue-path";else if(safe)c+=" safe-cell";else if(start)c+=" start-cell";const mark=safe?"★":row===7&&col===1?"→":row===1&&col===7?"↓":row===13&&col===7?"↑":row===7&&col===13?"←":"";return <div className={c}>{mark}</div>}
+function TrackCell({row,col}:{row:number;col:number}){const green=col===7&&row>=1&&row<=5,yellow=row===7&&col>=9&&col<=13,red=col===7&&row>=9&&row<=13,blue=row===7&&col>=1&&col<=5;const start=(row===6&&col===1)||(row===1&&col===8)||(row===8&&col===13)||(row===13&&col===6);const safe=new Set(["6-2","2-8","8-12","12-6"]).has(`${row}-${col}`);let c="track-cell";if(green)c+=" green-path";else if(yellow)c+=" yellow-path";else if(red)c+=" red-path";else if(blue)c+=" blue-path";else if(safe)c+=" safe-cell";else if(start)c+=" start-cell";const mark=safe?"★":row===7&&col===1?"→":row===1&&col===7?"↓":row===13&&col===7?"↑":row===7&&col===13?"←":"";return <div className={c}>{mark}</div>}
 function Die({value,rolling,onClick,label}:{value:DieValue;rolling:boolean;onClick:()=>void;label:string}){return <button className={`die ${rolling?"die-rolling":""}`} onClick={onClick} disabled={rolling} aria-label={label}>{value===null?<span className="die-question">?</span>:<span className={`pip-grid pips-${value}`}>{Array.from({length:value},(_,i)=><i key={i}/>)}</span>}</button>}
 function ChoiceToken({color,value,selected,disabled,label,onClick}:{color:"blue"|"green"|"red";value:number|null;selected:boolean;disabled:boolean;label:string;onClick:()=>void}){return <button className={`choice-token choice-${color} ${selected?"chosen":""}`} onClick={onClick} disabled={disabled} aria-label={label}>{value??"?"}</button>}
 function MovableToken({token,color,movable,onClick}:{token:PlayerState["tokens"][number];color:PlayerColor;movable:boolean;onClick:()=>void}){const pos=tokenPosition(color,token.progress);if(!pos)return null;return <button className={`board-token board-token-${color} ${movable?"token-movable":""}`} style={{...pos,background:COLORS[color]}} onClick={onClick} disabled={!movable} aria-label={`${color} token ${token.id+1}`}/>}
