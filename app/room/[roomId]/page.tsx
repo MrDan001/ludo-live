@@ -32,16 +32,13 @@ export default function RoomPage() {
   const [seenRollSeq, setSeenRollSeq] = useState(rollSeq);
 
   useEffect(() => { checkSession(); connect(); }, [checkSession, connect]);
-
   useEffect(() => {
     if (!room && dbUserId && roomId) {
       if (tournamentId) joinTournamentMatch(tournamentId, name || "Player", dbUserId, avatarUrl ?? undefined);
       else joinRoom(roomId, name || "Player", dbUserId, avatarUrl ?? undefined);
     }
   }, [room, dbUserId, roomId, tournamentId, name, avatarUrl, joinRoom, joinTournamentMatch]);
-
   useEffect(() => { if (room?.id) connectChat(room.id, room.messages); }, [room?.id, connectChat]);
-
   useEffect(() => {
     if (rollSeq === 0 || rollSeq === seenRollSeq || !lastRoll) return;
     setSeenRollSeq(rollSeq);
@@ -49,7 +46,6 @@ export default function RoomPage() {
   }, [rollSeq, lastRoll, seenRollSeq]);
 
   if (!room) return <div className="h-[100dvh] w-screen bg-[#704326] text-white flex items-center justify-center font-black">Joining room {roomId}...</div>;
-
   if (!room.started) {
     if (room.tournamentId) return <TournamentWaitingRoom />;
     return <>
@@ -63,7 +59,6 @@ export default function RoomPage() {
   const currentSocketId = getSocket().id ?? null;
   const me = room.players.find((p) => p.socketId === currentSocketId);
   const isYourTurn = !!me && (gameState.currentTurnColor === me.color || gameState.currentTurnColor === me.teammateColor);
-
   const sourceEnabled: Record<MoveSource, boolean> = {
     d1: room.pendingMoves.some((m) => m.source === "d1"),
     d2: room.pendingMoves.some((m) => m.source === "d2"),
@@ -72,10 +67,7 @@ export default function RoomPage() {
   const enabledSources = (Object.keys(sourceEnabled) as MoveSource[]).filter((s) => sourceEnabled[s]);
   const activeSource = enabledSources.length <= 1 ? (enabledSources[0] ?? null) : (manualSource ?? enabledSources[0] ?? null);
   const selectableTokenIds = new Set(isYourTurn && activeSource ? room.pendingMoves.filter((m) => m.source === activeSource).map((m) => m.tokenId) : []);
-
-  const isColorCurrentTurn = (color: PlayerColor) => gameState.teamMode
-    ? (color === "RED" || color === "YELLOW" ? "RED" : "GREEN") === gameState.currentTurnColor
-    : gameState.currentTurnColor === color;
+  const isColorCurrentTurn = (color: PlayerColor) => gameState.teamMode ? (color === "RED" || color === "YELLOW" ? "RED" : "GREEN") === gameState.currentTurnColor : gameState.currentTurnColor === color;
 
   const playerNames: Partial<Record<PlayerColor, string>> = {};
   const playerAvatars: Partial<Record<PlayerColor, string | undefined>> = {};
@@ -97,7 +89,6 @@ export default function RoomPage() {
     }
   });
   const currentTurnColors = new Set<PlayerColor>((["RED", "GREEN", "YELLOW", "BLUE"] as PlayerColor[]).filter(isColorCurrentTurn));
-
   const localPlayer = room.players.find((p) => p.socketId === currentSocketId);
   const opponent = room.players.find((p) => p.socketId !== currentSocketId);
   const scoreFor = (colors: PlayerColor[]) => gameState.players.filter((p) => colors.includes(p.color)).reduce((n, p) => n + p.tokens.filter((t) => t.position === 57).length, 0);
@@ -126,14 +117,14 @@ export default function RoomPage() {
             <button aria-label="Close" className="grid h-11 w-11 place-items-center rounded-full border-2 border-white/40 bg-gradient-to-br from-orange-400 to-red-600 text-3xl font-black shadow-[0_4px_8px_rgba(0,0,0,.45)]">×</button>
           </div>
           <div className="mt-1.5 flex justify-center gap-2">
-            <div className="rounded-full border border-white/10 bg-[#063f48] px-5 py-1.5 text-sm font-black shadow-lg"><span className="text-white">Me</span>: {meScore}</div>
-            <div className="rounded-full border border-white/10 bg-[#063f48] px-5 py-1.5 text-sm font-black shadow-lg"><span className="text-white">Player1</span>: {opponentScore}</div>
+            <div className="rounded-full border border-white/10 bg-[#063f48] px-5 py-1.5 text-sm font-black shadow-lg">Me: {meScore}</div>
+            <div className="rounded-full border border-white/10 bg-[#063f48] px-5 py-1.5 text-sm font-black shadow-lg">Player1: {opponentScore}</div>
           </div>
         </header>
 
         <main className="relative min-h-0 flex-1 flex items-center justify-center py-1">
           <div className="relative h-full w-full max-w-[720px] flex items-center justify-center">
-            <div className="absolute left-1/2 top-0 z-[60] -translate-x-1/2 -translate-y-1/3">
+            <div className="absolute left-1/2 top-0 z-[60] h-20 w-44 -translate-x-1/2 -translate-y-1/4">
               <DiceOverlay onRoll={() => roll(room.id)} canRoll={isYourTurn && !room.pendingRoll && !gameState.winner && !lastRoll} rollSeq={rollSeq} d1={lastRoll?.d1 ?? null} d2={lastRoll?.d2 ?? null} />
             </div>
             <FitSquare className="relative rounded-[18px] overflow-hidden shadow-[0_10px_24px_rgba(0,0,0,.5)]" maxSize={720}>
@@ -150,7 +141,6 @@ export default function RoomPage() {
           <button type="button" disabled={!isYourTurn || !!gameState.winner} onClick={() => { if (isYourTurn && !lastRoll) roll(room.id); }} className={`rounded-full border-2 px-8 py-3 text-base font-black shadow-[0_5px_10px_rgba(0,0,0,.5)] transition active:scale-95 ${isYourTurn ? "border-emerald-300 bg-[#063f48]" : "border-white/20 bg-[#3a332e] opacity-70"}`}>{turnText}</button>
         </footer>
       </div>
-
       <ChatPanel isOpen={chatOpen} onClose={() => setChatOpen(false)} currentSocketId={currentSocketId} />
       <VoiceChatPanel isOpen={voiceOpen} onClose={() => setVoiceOpen(false)} players={room.players} currentSocketId={currentSocketId} />
     </div>
