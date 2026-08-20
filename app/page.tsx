@@ -19,15 +19,18 @@ type Choice = "blue" | "green" | "red" | null;
 type DieValue = number | null;
 type DiceState = [DieValue, DieValue];
 
-// Only visible playable squares are counted. The four corner cells hidden by
-// the centre box are intentionally skipped, so a token never cuts underneath it.
+// The route contains only the 44 visible shared-track squares.
+// IMPORTANT: the route is ordered continuously around the board. The three
+// visible squares on the starting player's bottom row are counted first,
+// before the token diverts upward. The centre artwork is never counted.
 const TRACK_LENGTH = 44;
 const BOARD_ROUTE: [number, number][] = [
-  [13,6],[12,6],[11,6],[10,6],[9,6],
-  [8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],
-  [5,6],[4,6],[3,6],[2,6],[1,6],[1,7],[1,8],
-  [2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,13],
-  [8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[13,7],
+  [13,6],[13,7],[13,8],[12,8],[11,8],[10,8],[9,8],
+  [8,9],[8,10],[8,11],[8,12],[8,13],[7,13],[6,13],
+  [6,12],[6,11],[6,10],[6,9],[5,8],[4,8],[3,8],[2,8],[1,8],
+  [1,7],[1,6],[2,6],[3,6],[4,6],[5,6],
+  [6,5],[6,4],[6,3],[6,2],[6,1],[7,1],[8,1],[8,2],[8,3],[8,4],[8,5],
+  [9,6],[10,6],[11,6],[12,6],
 ];
 const HOME_LANES: Record<PlayerColor, [number, number][]> = {
   // Five visible home-lane cells. The sixth apparent cell is hidden by the centre box.
@@ -36,7 +39,7 @@ const HOME_LANES: Record<PlayerColor, [number, number][]> = {
   green:[[1,7],[2,7],[3,7],[4,7],[5,7]],
   yellow:[[7,13],[7,12],[7,11],[7,10],[7,9]],
 };
-const START_INDEX: Record<PlayerColor, number> = { red:0, blue:10, green:22, yellow:32 };
+const START_INDEX: Record<PlayerColor, number> = { red:0, blue:33, green:22, yellow:11 };
 const BOT_ORDER: Record<PlayerColor, PlayerColor> = { red:"green", green:"yellow", yellow:"blue", blue:"red" };
 
 function gridPosition(row:number,col:number){ return { left:`${col/15*100}%`, top:`${row/15*100}%` }; }
@@ -131,7 +134,7 @@ export default function HomePage(){
     setChoice(v);
   }
 
-  function updateToken(color:PlayerColor,id:number,tokenUpdater:(token:PlayerState["tokens"][number])=>PlayerState["tokens"][number]){
+  function updateToken(color:PlayerColor,id:number,tokenUpdater:(token:PlayerState["tokens"][number])=>PlayerState[PlayerColor extends never ? never : "tokens"][number]){
     setPlayers(current=>current.map(p=>p.color===color?{...p,tokens:p.tokens.map(t=>t.id===id?tokenUpdater(t):t)}:p));
   }
 
