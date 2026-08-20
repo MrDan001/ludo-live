@@ -21,7 +21,6 @@ const BOARD_ROUTE: [number, number][] = [
 const route = new Set(BOARD_ROUTE.map(([r, c]) => `${r}-${c}`));
 const safe = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 
-// Exact colored entry/exit squares marked in the user's reference image.
 const COLORED_EXITS: Record<string, keyof typeof COLORS> = {
   "6-1": "green",
   "1-8": "yellow",
@@ -42,59 +41,21 @@ const laneMap = new Map<string, keyof typeof COLORS>();
 });
 
 function Home({ color, className }: { color: keyof typeof COLORS; className: string }) {
-  return (
-    <div className={`home ${className}`} style={{ background: COLORS[color] }}>
-      <div className="home-yard">
-        {[0, 1, 2, 3].map((slot) => <span key={slot} />)}
-      </div>
-    </div>
-  );
+  return <div className={`home ${className}`} style={{ background: COLORS[color] }}><div className="home-yard">{[0,1,2,3].map((slot) => <span key={slot} />)}</div></div>;
 }
 
 function Center() {
-  return (
-    <div className="center">
-      <div className="center-triangle center-green" />
-      <div className="center-triangle center-yellow" />
-      <div className="center-triangle center-red" />
-      <div className="center-triangle center-blue" />
-    </div>
-  );
+  return <div className="center"><div className="center-triangle center-green"/><div className="center-triangle center-yellow"/><div className="center-triangle center-red"/><div className="center-triangle center-blue"/></div>;
 }
 
 export default function HomePage() {
-  return (
-    <main className="board-page">
-      <div className="ludo-board" aria-label="Ludo board">
-        <div className="grid">
-          {Array.from({ length: 225 }, (_, index) => {
-            const row = Math.floor(index / 15);
-            const col = index % 15;
-            const key = `${row}-${col}`;
-            const laneColor = laneMap.get(key);
-            const routeIndex = BOARD_ROUTE.findIndex(([r, c]) => r === row && c === col);
-            const exitColor = COLORED_EXITS[key];
-
-            if (route.has(key)) {
-              return (
-                <div
-                  key={key}
-                  className={`cell path ${safe.has(routeIndex) ? "safe" : ""} ${exitColor ? `exit-${exitColor}` : ""}`}
-                >
-                  {safe.has(routeIndex) && <span className="safe-star">★</span>}
-                </div>
-              );
-            }
-            if (laneColor) return <div key={key} className={`cell home-lane lane-${laneColor}`} />;
-            return <div key={key} className="cell empty" />;
-          })}
-        </div>
-        <Home color="green" className="home-green" />
-        <Home color="yellow" className="home-yellow" />
-        <Home color="red" className="home-red" />
-        <Home color="blue" className="home-blue" />
-        <Center />
-      </div>
-    </main>
-  );
+  return <main className="board-page"><div className="ludo-board" aria-label="Ludo board"><div className="grid">{Array.from({ length: 225 }, (_, index) => {
+    const row = Math.floor(index / 15), col = index % 15, key = `${row}-${col}`;
+    const laneColor = laneMap.get(key);
+    const routeIndex = BOARD_ROUTE.findIndex(([r,c]) => r === row && c === col);
+    const exitColor = COLORED_EXITS[key];
+    if (route.has(key)) return <div key={key} className={`cell path ${safe.has(routeIndex) ? "safe" : ""} ${exitColor ? `exit-${exitColor}` : ""}`}>{safe.has(routeIndex) && <span className="safe-star">★</span>}</div>;
+    if (laneColor) return <div key={key} className={`cell home-lane lane-${laneColor}`}/>;
+    return <div key={key} className="cell empty"/>;
+  })}</div><Home color="green" className="home-green"/><Home color="yellow" className="home-yellow"/><Home color="red" className="home-red"/><Home color="blue" className="home-blue"/><Center/></div></main>;
 }
