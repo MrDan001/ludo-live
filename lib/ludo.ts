@@ -3,10 +3,10 @@ export type TokenStatus = "home" | "track" | "finished";
 export type TokenState = { id: number; progress: number; status: TokenStatus };
 export type PlayerState = { color: PlayerColor; tokens: TokenState[] };
 
-// The playable perimeter follows only the 44 visible shared-track squares.
-// The centre box is not counted. Route ordering is defined in app/page.tsx.
-export const TRACK_LENGTH = 44;
-export const FINISH_PROGRESS = 49;
+// The centre box is not counted. app/page.tsx defines the 48 visible shared-track squares.
+export const TRACK_LENGTH = 48;
+// 48 shared-track squares + 5 inner home-lane squares = 53 visible positions.
+export const FINISH_PROGRESS = 53;
 export const HOME_ENTRY_ROLL = 6;
 export const START_INDEX: Record<PlayerColor, number> = { red: 0, blue: 33, green: 22, yellow: 11 };
 export const COLORS: PlayerColor[] = ["red", "blue", "green", "yellow"];
