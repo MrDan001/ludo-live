@@ -25,7 +25,7 @@ const LANES: Record<keyof typeof COLORS, [number, number][]> = {
   red: [[13,7],[12,7],[11,7],[10,7],[9,7]],
   green: [[7,1],[7,2],[7,3],[7,4],[7,5]],
   yellow: [[1,7],[2,7],[3,7],[4,7],[5,7]],
-  blue: [[9,7],[10,7],[11,7],[12,7],[13,7]],
+  blue: [[7,9],[7,10],[7,11],[7,12],[7,13]],
 };
 
 const laneMap = new Map<string, keyof typeof COLORS>();
