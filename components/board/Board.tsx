@@ -9,9 +9,9 @@ const BOARD_SIZE = 15;
 const STEP_DURATION_MS = 180;
 const STACK_OFFSETS: Record<number, { x: number; y: number }[]> = {
   1: [{ x: 0, y: 0 }],
-  2: [{ x: -14, y: -14 }, { x: 14, y: 14 }],
-  3: [{ x: -14, y: -14 }, { x: 14, y: -14 }, { x: 0, y: 14 }],
-  4: [{ x: -14, y: -14 }, { x: 14, y: -14 }, { x: -14, y: 14 }, { x: 14, y: 14 }],
+  2: [{ x: -14, y: -22 }, { x: 14, y: 22 }],
+  3: [{ x: -14, y: -22 }, { x: 14, y: -22 }, { x: 0, y: 22 }],
+  4: [{ x: -14, y: -22 }, { x: 14, y: -22 }, { x: -14, y: 22 }, { x: 14, y: 22 }],
 };
 const HOME_ARROW: Record<PlayerColor, string> = { RED: "→", GREEN: "↓", YELLOW: "←", BLUE: "↑" };
 type Pos = number | "YARD";
