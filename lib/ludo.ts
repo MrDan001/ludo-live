@@ -21,6 +21,9 @@ export const START_INDEX: Record<PlayerColor, number> = {
 export const COLORS: PlayerColor[] = ["red", "green", "yellow", "blue"];
 export const SAFE_TRACK_INDICES = new Set([0, 11, 17, 35]);
 
+// Board/engine alignment marker: keep this route mapping authoritative.
+export const BOARD_ROUTE_CLOCKWISE = true;
+
 export function createToken(id: number): TokenState { return { id, progress: -1, status: "home" }; }
 export function createPlayer(color: PlayerColor): PlayerState { return { color, tokens: [0, 1, 2, 3].map(createToken) }; }
 export function createGame(): PlayerState[] { return COLORS.map(createPlayer); }
