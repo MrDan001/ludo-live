@@ -7,8 +7,8 @@ const COLORS = { green: "#08a63b", yellow: "#ffad08", red: "#f21b2d", blue: "#17
 type Choice = "blue" | "green" | "red" | null;
 type Dice = [number | null, number | null];
 
-// 48 visible shared-track squares. Hidden centre artwork and coloured home lanes
-// are never counted. Red starts at the bottom-left entry and moves clockwise.
+// 48 visible shared-track squares. Each player's entry is aligned with the
+// correct home lane so the token makes the intended L-shaped turn into it.
 const BOARD_ROUTE: [number, number][] = [
   [13,6],[12,6],[11,6],[10,6],[9,6],
   [8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],
@@ -17,12 +17,18 @@ const BOARD_ROUTE: [number, number][] = [
   [7,13],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6]
 ];
 const TRACK_LENGTH = BOARD_ROUTE.length;
-const START_INDEX: Record<PlayerColor, number> = { red: 0, blue: 9, green: 24, yellow: 33 };
+
+// Correct entry points: red bottom-left, green top-left, yellow top-right,
+// blue bottom-right. The previous blue/green indices were on the wrong sides.
+const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 16, yellow: 33, blue: 40 };
+
+// Five coloured home-lane squares. Blue uses the right-hand bottom column,
+// mirroring red's left-hand bottom lane and creating the requested L turn.
 const HOME_LANES: Record<PlayerColor, [number, number][]> = {
   red: [[12,7],[11,7],[10,7],[9,7],[8,7]],
-  blue: [[7,2],[7,3],[7,4],[7,5],[7,6]],
   green: [[2,7],[3,7],[4,7],[5,7],[6,7]],
   yellow: [[7,12],[7,11],[7,10],[7,9],[7,8]],
+  blue: [[12,8],[11,8],[10,8],[9,8],[8,8]],
 };
 const NEXT: Record<PlayerColor, PlayerColor> = { red: "green", green: "yellow", yellow: "blue", blue: "red" };
 
@@ -202,7 +208,7 @@ function TrackCell({ row, col }: { row: number; col: number }) {
   const green = col === 7 && row >= 1 && row <= 5;
   const yellow = row === 7 && col >= 9 && col <= 13;
   const red = col === 7 && row >= 9 && row <= 13;
-  const blue = row === 7 && col >= 1 && col <= 5;
+  const blue = col === 8 && row >= 9 && row <= 13;
   let cls = "track-cell";
   if (green) cls += " green-path"; else if (yellow) cls += " yellow-path"; else if (red) cls += " red-path"; else if (blue) cls += " blue-path";
   return <div className={cls} />;
