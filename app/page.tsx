@@ -20,7 +20,12 @@ const BOARD_ROUTE: [number, number][] = [
 
 const route = new Set(BOARD_ROUTE.map(([r, c]) => `${r}-${c}`));
 const safe = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
-const BLUE_EXIT = "8-13";
+const COLORED_EXITS: Record<string, keyof typeof COLORS> = {
+  "6-7": "yellow",
+  "8-5": "green",
+  "8-13": "blue",
+  "14-7": "red",
+};
 
 const LANES: Record<keyof typeof COLORS, [number, number][]> = {
   red: [[13,7],[12,7],[11,7],[10,7],[9,7]],
@@ -66,11 +71,14 @@ export default function HomePage() {
             const key = `${row}-${col}`;
             const laneColor = laneMap.get(key);
             const routeIndex = BOARD_ROUTE.findIndex(([r, c]) => r === row && c === col);
+            const exitColor = COLORED_EXITS[key];
 
             if (route.has(key)) {
-              const isBlueExit = key === BLUE_EXIT;
               return (
-                <div key={key} className={`cell path ${safe.has(routeIndex) ? "safe" : ""} ${isBlueExit ? "blue-exit" : ""}`}>
+                <div
+                  key={key}
+                  className={`cell path ${safe.has(routeIndex) ? "safe" : ""} ${exitColor ? `exit-${exitColor}` : ""}`}
+                >
                   {safe.has(routeIndex) && <span className="safe-star">★</span>}
                 </div>
               );
