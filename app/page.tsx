@@ -29,7 +29,7 @@ export default function HomePage() {
   const [teamTurn, setTeamTurn] = useState<"human" | "bot" | Color>("human");
   const [dice, setDice] = useState<number | null>(null);
   const [sixStreak, setSixStreak] = useState(0);
-  const [winner, setWinner] = useState<Color | null>(null);
+  const [winner, setWinner] = useState<Color[] | null>(null);
   const [tokens, setTokens] = useState<Record<Color, number[]>>({ green:[HOME,HOME,HOME,HOME], yellow:[HOME,HOME,HOME,HOME], red:[HOME,HOME,HOME,HOME], blue:[HOME,HOME,HOME,HOME] });
   const [message, setMessage] = useState("You are Red + Yellow. Roll once, then choose either color.");
   const [animating, setAnimating] = useState(false);
@@ -50,6 +50,11 @@ export default function HomePage() {
   const isHuman = (color: Color) => humanColors.includes(color);
   const teamName = mode === "bot" ? (teamTurn === "human" ? "YOUR TEAM" : "BOT TEAM") : mode === "two" ? (teamTurn === "human" ? "PLAYER 1" : "PLAYER 2") : `${String(teamTurn).toUpperCase()} PLAYER`;
 
+  function teamForColor(color: Color): Color[] {
+    if (mode === "four") return [color];
+    if (mode === "bot") return isHuman(color) ? ["red", "yellow"] : ["green", "blue"];
+    return ["green", "blue"].includes(color) ? ["green", "blue"] : ["red", "yellow"];
+  }
   function nextTeam() {
     setDice(null); setSixStreak(0);
     if (mode === "four") setTeamTurn(t => ORDER[(ORDER.indexOf(t as Color) + 1) % 4]);
@@ -85,8 +90,9 @@ export default function HomePage() {
         for (const opponent of ORDER) if (opponent !== color) next[opponent] = next[opponent].map(p => { if (sameSquare(color, landed, opponent, p) && !isSafe(color, landed)) { captured++; return HOME; } return p; });
         next[color][tokenIndex] = landed; return next;
       });
-      const completed = tokens[color].filter(p => p === FINAL_HOME).length + (landed === FINAL_HOME ? 1 : 0);
-      if (completed >= 4) { setWinner(color); setDice(null); setMessage(`🏆 ${color.toUpperCase()} wins! All four tokens are home.`); return; }
+      const team = teamForColor(color);
+      const teamWon = team.every(c => tokens[c].every((p, i) => c === color && i === tokenIndex ? landed === FINAL_HOME : p === FINAL_HOME));
+      if (teamWon) { setWinner(team); setDice(null); setMessage(`🏆 ${team.map(c => c.toUpperCase()).join(" + ")} wins! All team tokens are home.`); return; }
       if (rollValue === 6 || captured > 0) { setDice(null); setMessage(captured ? `${teamName} captured a token. Same team rolls again.` : `${teamName} rolled 6. Same team rolls again.`); return; }
       nextTeam();
     });
@@ -94,7 +100,7 @@ export default function HomePage() {
   function chooseToken(color: Color, tokenIndex: number) {
     if (animating || winner) return;
     if (mode === "four") { if (color !== teamTurn) { setMessage(`It is ${String(teamTurn).toUpperCase()}'s turn.`); return; } }
-    else { if (teamTurn !== "human") { setMessage("It is the bot's turn."); return; } if (!isHuman(color)) { setMessage("Choose one of your two colors."); return; } }
+    else { if (teamTurn !== "human") { setMessage("It is the other team's turn."); return; } if (!isHuman(color)) { setMessage("Choose one of your two colors."); return; } }
     if (dice === null) { setMessage("Roll the dice first."); return; }
     if (!legalMoves(color, dice).includes(tokenIndex)) { setMessage("That token cannot move with this roll."); return; }
     resolveMove(color, tokenIndex, dice);
@@ -137,12 +143,12 @@ export default function HomePage() {
   const playerLabel = (color: Color) => mode === "bot" ? (isHuman(color) ? "YOU" : "BOT") : mode === "two" ? (["green","blue"].includes(color) ? "PLAYER 1" : "PLAYER 2") : "PLAYER";
 
   return <main className="board-page"><section className="game-shell">
-    <div className="game-controls"><div><strong>{winner ? `${winner.toUpperCase()} WINS` : teamName}</strong>{!winner && " turn"} <span className="test-badge">{mode === "bot" ? "HUMAN + BOT" : mode === "two" ? "2 PLAYERS" : "4 PLAYERS"}</span></div><div className="dice-value">{dice ?? "—"}</div><button onClick={() => roll()} className="control-button" disabled={animating || !!winner || dice !== null || (mode !== "four" && teamTurn !== "human")}>Roll Dice</button><button onClick={() => roll(6)} className="control-button" disabled={animating || !!winner || dice !== null || (mode !== "four" && teamTurn !== "human")}>Force 6</button><button onClick={reset} className="control-button secondary" disabled={animating}>New Game</button></div>
+    <div className="game-controls"><div><strong>{winner ? `${winner.map(c => c.toUpperCase()).join(" + ")} WINS` : teamName}</strong>{!winner && " turn"} <span className="test-badge">{mode === "bot" ? "HUMAN + BOT" : mode === "two" ? "2 PLAYERS" : "4 PLAYERS"}</span></div><div className="dice-value">{dice ?? "—"}</div><button onClick={() => roll()} className="control-button" disabled={animating || !!winner || dice !== null || (mode !== "four" && teamTurn !== "human")}>Roll Dice</button><button onClick={() => roll(6)} className="control-button" disabled={animating || !!winner || dice !== null || (mode !== "four" && teamTurn !== "human")}>Force 6</button><button onClick={reset} className="control-button secondary" disabled={animating}>New Game</button></div>
     <div className="mode-controls"><button className="control-button" onClick={() => changeMode("bot")}>Me vs Bot</button><button className="control-button secondary" onClick={() => changeMode("two")}>2 Players</button><button className="control-button secondary" onClick={() => changeMode("four")}>4 Players</button></div>
     <p className="status">{message}</p>
     <div className="player-strip">{ORDER.map(c => <div key={c} className={`player-chip ${playerActive(c) && !winner ? "active" : ""}`}><span className="player-dot" style={{ background: COLORS[c] }}/><strong>{c.toUpperCase()}</strong><small>{playerLabel(c)} · {remaining[c]} to home</small></div>)}</div>
     <div className="ludo-board" aria-label="Ludo board"><div className="grid">{Array.from({ length: 225 }, (_, index) => { const row = Math.floor(index / 15), col = index % 15, key = `${row}-${col}`; const routeIndex = BOARD_ROUTE.findIndex(([r,c]) => r === row && c === col); const exitColor = COLORED_EXITS[key]; const laneColor = (Object.keys(LANES) as Color[]).find(color => LANES[color].some(([r,c]) => r === row && c === col)); if (routeIndex >= 0) return <div key={key} className={`cell path ${SAFE_SQUARES.has(routeIndex) ? "safe" : ""} ${exitColor ? `exit-${exitColor}` : ""}`}>{exitColor && <span className="safe-star">★</span>}</div>; if (laneColor) return <div key={key} className={`cell home-lane lane-${laneColor}`}/>; return <div key={key} className="cell empty"/>; })}</div>
-      {tokenVisuals.map(t => t.kind === "final" ? <div key={`${t.color}-${t.token}`} className="final-token" style={{ background: COLORS[t.color] }} aria-label={`${t.color} token ${t.token + 1} in final home`}/> : <button key={`${t.color}-${t.token}`} className={`route-token ${t.kind === "lane" ? "lane-token" : ""}`} style={{ "--row": t.row, "--col": t.col, background: COLORS[t.color] } as CSSProperties} onClick={() => chooseToken(t.color, t.token)} aria-label={`Move ${t.color} token ${t.token + 1}`}/>)}
+      {tokenVisuals.map(t => t.kind === "final" ? <div key={`${t.color}-${t.token}`} className="final-token" style={{ background: COLORS[t.color] }} aria-label={`${t.color} token ${t.token + 1} in final home`}/> : <button key={`${t.color}-${t.token}`} className={`route-token ${t.kind === "lane" ? "lane-token" : ""}`} style={{ "--row": t.row, "--col": t.col, background: COLORS[t.color] } as CSSProperties} onClick={() => chooseToken(t.color, t.token)} aria-label={`Move ${t.color} token ${t.token + 1}`}/>) }
       <Home color="green" className="home-green" tokens={tokens.green} onTokenClick={i => chooseToken("green", i)}/><Home color="yellow" className="home-yellow" tokens={tokens.yellow} onTokenClick={i => chooseToken("yellow", i)}/><Home color="red" className="home-red" tokens={tokens.red} onTokenClick={i => chooseToken("red", i)}/><Home color="blue" className="home-blue" tokens={tokens.blue} onTokenClick={i => chooseToken("blue", i)}/><Center/>
     </div>
   </section></main>;
