@@ -5,7 +5,6 @@ import { useState } from "react";
 const COLORS = { green: "#08a63b", yellow: "#ffad08", red: "#f21b2d", blue: "#1769e8" } as const;
 type Color = (typeof COLORS)[keyof typeof COLORS];
 type Choice = "blue" | "green" | "red" | null;
-
 type DieValue = number | null;
 
 function Token({ color, name }: { color: Color; name: string }) {
@@ -32,7 +31,7 @@ function TrackCell({ row, col }: { row: number; col: number }) {
 }
 
 function Die({ value, rolling, onClick, label }: { value: DieValue; rolling: boolean; onClick: () => void; label: string }) {
-  return <button className={`die ${rolling ? "die-rolling" : ""}`} onClick={onClick} disabled={rolling} aria-label={label} title="Tap to roll both dice">
+  return <button className={`die ${rolling ? "die-rolling" : ""}`} onClick={onClick} disabled={rolling} aria-label={label} title="Tap either die to roll both dice">
     {value === null ? <span className="die-question">?</span> : <span className={`pip-grid pips-${value}`}>{Array.from({ length: value }, (_, i) => <i key={i} />)}</span>}
   </button>;
 }
@@ -68,21 +67,22 @@ export default function HomePage() {
     <div className="board-wrap"><div className="ludo-board" aria-label="Ludo board">
       <div className="track" aria-hidden="true">{Array.from({ length: 15 }, (_, row) => Array.from({ length: 15 }, (_, col) => { const inCross = (row >= 6 && row <= 8) || (col >= 6 && col <= 8); return inCross ? <TrackCell key={`${row}-${col}`} row={row} col={col} /> : <div key={`${row}-${col}`} className="empty-cell" />; }))}</div>
       <Home color={COLORS.green} name="Player1" className="home-green" /><Home color={COLORS.yellow} name="Player1" className="home-yellow" /><Home color={COLORS.red} name="Me" className="home-red" /><Home color={COLORS.blue} name="Me" className="home-blue" />
-      <div className="center-home" aria-label="Dice and move selection">
-        <div className="center-backdrop">LUDO</div>
+      <div className="center-home" aria-label="Dice area">
+        <div className="center-backdrop" aria-hidden="true">LUDO</div>
         <div className="center-controls">
           <div className="dice-pair">
             <Die value={dice[0]} rolling={rolling} onClick={rollDice} label="Roll dice" />
             <Die value={dice[1]} rolling={rolling} onClick={rollDice} label="Roll dice" />
           </div>
-          <div className="choice-row" aria-label="Choose a move value">
-            <ChoiceToken color="blue" value={dice[0]} selected={choice === "blue"} disabled={!canChoose} label="Play first die" onClick={() => setChoice("blue")} />
-            <ChoiceToken color="green" value={dice[1]} selected={choice === "green"} disabled={!canChoose} label="Play second die" onClick={() => setChoice("green")} />
-            <ChoiceToken color="red" value={total} selected={choice === "red"} disabled={!canChoose} label="Merge both dice" onClick={() => setChoice("red")} />
-          </div>
         </div>
-        {forfeits && <div className="forfeit-message">Turn forfeited</div>}
       </div>
     </div></div>
+
+    <div className="move-controls" aria-label="Choose a move value">
+      <ChoiceToken color="blue" value={dice[0]} selected={choice === "blue"} disabled={!canChoose} label="Play first die" onClick={() => setChoice("blue")} />
+      <ChoiceToken color="green" value={dice[1]} selected={choice === "green"} disabled={!canChoose} label="Play second die" onClick={() => setChoice("green")} />
+      <ChoiceToken color="red" value={total} selected={choice === "red"} disabled={!canChoose} label="Merge both dice" onClick={() => setChoice("red")} />
+    </div>
+    {forfeits && <div className="forfeit-message">Turn forfeited</div>}
   </div></main>;
 }
