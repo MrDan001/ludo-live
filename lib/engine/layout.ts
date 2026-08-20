@@ -28,36 +28,30 @@ if (GLOBAL_PATH_COORDS.length !== GLOBAL_PATH_LENGTH) {
   throw new Error("GLOBAL_PATH_COORDS length mismatch with engine constant");
 }
 
-// Each color's entry ("exit") square onto the shared path, derived from its start offset.
 export const ENTRY_COORDS: Record<PlayerColor, Coord> = ALL_COLORS.reduce((acc, color) => {
   acc[color] = GLOBAL_PATH_COORDS[START_OFFSET[color]];
   return acc;
 }, {} as Record<PlayerColor, Coord>);
 
-// Each color's private 6-square home stretch leading to the center.
+// Private home stretches point inward from the four reference-image corners:
+// Green = top-left, Yellow = top-right, Red = bottom-left, Blue = bottom-right.
 export const HOME_STRETCH_COORDS: Record<PlayerColor, Coord[]> = {
-  RED: [{ row: 7, col: 1 }, { row: 7, col: 2 }, { row: 7, col: 3 }, { row: 7, col: 4 }, { row: 7, col: 5 }, { row: 7, col: 6 }],
+  RED: [{ row: 13, col: 7 }, { row: 12, col: 7 }, { row: 11, col: 7 }, { row: 10, col: 7 }, { row: 9, col: 7 }, { row: 8, col: 7 }],
   GREEN: [{ row: 1, col: 7 }, { row: 2, col: 7 }, { row: 3, col: 7 }, { row: 4, col: 7 }, { row: 5, col: 7 }, { row: 6, col: 7 }],
   YELLOW: [{ row: 7, col: 13 }, { row: 7, col: 12 }, { row: 7, col: 11 }, { row: 7, col: 10 }, { row: 7, col: 9 }, { row: 7, col: 8 }],
-  BLUE: [{ row: 13, col: 7 }, { row: 12, col: 7 }, { row: 11, col: 7 }, { row: 10, col: 7 }, { row: 9, col: 7 }, { row: 8, col: 7 }],
+  BLUE: [{ row: 7, col: 1 }, { row: 7, col: 2 }, { row: 7, col: 3 }, { row: 7, col: 4 }, { row: 7, col: 5 }, { row: 7, col: 6 }],
 };
 
 export const CENTER_COORD: Coord = { row: 7, col: 7 };
 
-// Corner "yard" zones where each color's tokens sit before entering play.
+// Reference-image home positions.
 export const BASE_ZONE: Record<PlayerColor, { rowStart: number; colStart: number }> = {
-  RED: { rowStart: 0, colStart: 0 },
-  GREEN: { rowStart: 0, colStart: 9 },
-  YELLOW: { rowStart: 9, colStart: 9 },
-  BLUE: { rowStart: 9, colStart: 0 },
+  GREEN: { rowStart: 0, colStart: 0 },
+  YELLOW: { rowStart: 0, colStart: 9 },
+  RED: { rowStart: 9, colStart: 0 },
+  BLUE: { rowStart: 9, colStart: 9 },
 };
 
-// 4 token slots per color, clustered close together directly above/below
-// the yard's center avatar badge (rows 2-3 stay clear for that) instead of
-// spread out to the yard's 4 far corners. Left one full empty column
-// between the pair (col+1 / col+3, not col+2 / col+3) so the bigger
-// tokens sit with a clean visible gap instead of overlapping into a
-// fused blob at the tighter spacing.
 export const BASE_COORDS: Record<PlayerColor, Coord[]> = ALL_COLORS.reduce((acc, color) => {
   const { rowStart, colStart } = BASE_ZONE[color];
   acc[color] = [
@@ -69,7 +63,6 @@ export const BASE_COORDS: Record<PlayerColor, Coord[]> = ALL_COLORS.reduce((acc,
   return acc;
 }, {} as Record<PlayerColor, Coord[]>);
 
-// The 4 decorative unused corners of the center 3x3 block.
 export const DECO_CORNERS: Coord[] = [
   { row: 6, col: 6 }, { row: 6, col: 8 }, { row: 8, col: 6 }, { row: 8, col: 8 },
 ];
@@ -84,7 +77,6 @@ export function getSafeCoordSet(): Set<string> {
   return set;
 }
 
-// Resolves a token's engine position into an actual board coordinate.
 export function getRenderCoord(
   color: PlayerColor,
   position: number | "YARD",
@@ -110,7 +102,6 @@ export const COLOR_BG_LIGHT: Record<PlayerColor, string> = {
   BLUE: "bg-blue-50",
 };
 
-// Deep, saturated fills for the board quadrants (yard + home stretch + exit squares).
 export const COLOR_BG_SOLID: Record<PlayerColor, string> = {
   RED: "bg-red-600",
   GREEN: "bg-green-600",
@@ -118,7 +109,6 @@ export const COLOR_BG_SOLID: Record<PlayerColor, string> = {
   BLUE: "bg-blue-600",
 };
 
-// Text-color equivalents of COLOR_BG_SOLID, for use with `fill-current` on SVG shapes.
 export const COLOR_TEXT_SOLID: Record<PlayerColor, string> = {
   RED: "text-red-600",
   GREEN: "text-green-600",
