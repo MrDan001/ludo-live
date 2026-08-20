@@ -15,37 +15,114 @@ const LANES: Record<Color,[number,number][]> = { red:[[13,7],[12,7],[11,7],[10,7
 const FINAL_HOME = 57;
 const HOME = -1;
 
-function routeIndexFor(color: Color, progress: number){ return (START_INDEX[color] + progress) % BOARD_ROUTE.length; }
-function isSafe(color: Color, progress: number){ return progress < 0 || progress >= BOARD_ROUTE.length || SAFE_SQUARES.has(routeIndexFor(color, progress)); }
-function sameSquare(aColor: Color,aProgress:number,bColor:Color,bProgress:number){ return aProgress>=0&&bProgress>=0&&aProgress<BOARD_ROUTE.length&&bProgress<BOARD_ROUTE.length&&routeIndexFor(aColor,aProgress)===routeIndexFor(bColor,bProgress); }
-function Home({color,className,tokens,onTokenClick}:{color:Color;className:string;tokens:number[];onTokenClick:(i:number)=>void}){return <div className={`home ${className}`} style={{background:COLORS[color]}}><div className="home-yard">{tokens.map((progress,i)=><button key={i} className="home-slot" onClick={()=>onTokenClick(i)} aria-label={`${color} token ${i+1}`}>{progress===HOME?<span className="token token-home" style={{background:COLORS[color]}}/>:<span className="token token-home token-hidden"/>}</button>)}</div></div>}
-function Center(){return <div className="center"><div className="center-triangle center-green"/><div className="center-triangle center-yellow"/><div className="center-triangle center-red"/><div className="center-triangle center-blue"/></div>}
+function routeIndexFor(color: Color, progress: number) { return (START_INDEX[color] + progress) % BOARD_ROUTE.length; }
+function isSafe(color: Color, progress: number) { return progress < 0 || progress >= BOARD_ROUTE.length || SAFE_SQUARES.has(routeIndexFor(color, progress)); }
+function sameSquare(aColor: Color, aProgress: number, bColor: Color, bProgress: number) { return aProgress >= 0 && bProgress >= 0 && aProgress < BOARD_ROUTE.length && bProgress < BOARD_ROUTE.length && routeIndexFor(aColor, aProgress) === routeIndexFor(bColor, bProgress); }
 
-export default function HomePage(){
- const [mode,setMode]=useState<Mode>("bot");
- const [teamTurn,setTeamTurn]=useState<"human"|"bot"|Color>("human");
- const [turn,setTurn]=useState<Color>("red");
- const [dice,setDice]=useState<number|null>(null);
- const [sixStreak,setSixStreak]=useState(0);
- const [winner,setWinner]=useState<Color|null>(null);
- const [tokens,setTokens]=useState<Record<Color,number[]>>({green:[HOME,HOME,HOME,HOME],yellow:[HOME,HOME,HOME,HOME],red:[HOME,HOME,HOME,HOME],blue:[HOME,HOME,HOME,HOME]});
- const [message,setMessage]=useState("You are Red + Yellow. Roll once, then choose either color.");
- const [animating,setAnimating]=useState(false);
- const tokenVisuals=useMemo(()=>{const result:{color:Color;token:number;progress:number;kind:"route"|"lane"|"final";row?:number;col?:number}[]=[];ORDER.forEach(color=>tokens[color].forEach((progress,token)=>{if(progress===HOME)return;if(progress<BOARD_ROUTE.length){const [row,col]=BOARD_ROUTE[routeIndexFor(color,progress)];result.push({color,token,progress,kind:"route",row,col});}else if(progress<FINAL_HOME){const lane=LANES[color][progress-BOARD_ROUTE.length];if(lane)result.push({color,token,progress,kind:"lane",row:lane[0],col:lane[1]});}else result.push({color,token,progress,kind:"final"});}));return result},[tokens]);
- const remaining=useMemo(()=>Object.fromEntries(ORDER.map(c=>[c,tokens[c].filter(p=>p!==FINAL_HOME).length])) as Record<Color,number>,[tokens]);
- const humanColors:Color[]=mode==="bot"?["red","yellow"]:mode==="two"?["green","blue"]:ORDER;
- const botColors:Color[]=mode==="bot"?["green","blue"]:[];
- const isHuman=(color:Color)=>humanColors.includes(color);
- const teamName=mode==="bot"?(teamTurn==="human"?"YOUR TEAM":"BOT TEAM"):mode==="two"?(teamTurn==="human"?"PLAYER 1":"PLAYER 2"):String(teamTurn).toUpperCase();
- const nextTeam=()=>{setDice(null);setSixStreak(0);if(mode==="four"){setTeamTurn(t=>ORDER[(ORDER.indexOf(t as Color)+1)%4]);setTurn(t=>ORDER[(ORDER.indexOf(t)+1)%4]);}else setTeamTurn(t=>t==="human"?"bot":"human");};
- function roll(value?:number){if(animating||winner||dice!==null)return;if(mode!=="four"&&teamTurn!=="human"&&mode!=="bot")return;const next=value??Math.floor(Math.random()*6)+1;const streak=next===6?sixStreak+1:0;if(streak>=4){setDice(null);setSixStreak(0);setMessage(`${teamName} rolled four 6s. Turn forfeited.`);nextTeam();return}setDice(next);setSixStreak(streak);setMessage(`${teamName} rolled ${next}. Choose any legal token from your team.`)}
- function legalMoves(color:Color,rollValue:number){return tokens[color].map((p,i)=>({p,i})).filter(({p})=>p===HOME?rollValue===6:p<FINAL_HOME&&p+rollValue<=FINAL_HOME).map(x=>x.i)}
- function animateMove(color:Color,tokenIndex:number,start:number,end:number,after:(landed:number)=>void){setAnimating(true);let progress=start;const step=()=>{progress++;setTokens(prev=>({...prev,[color]:prev[color].map((p,i)=>i===tokenIndex?progress:p)}));if(progress<end)setTimeout(step,180);else{setAnimating(false);after(progress)}};setTimeout(step,180)}
- function resolveMove(color:Color,tokenIndex:number,rollValue:number){const current=tokens[color][tokenIndex];if(current===HOME){setTokens(prev=>({...prev,[color]:prev[color].map((p,i)=>i===tokenIndex?0:p)}));setDice(null);setMessage(`${color.toUpperCase()} token ${tokenIndex+1} entered its start/exit square.`);if(rollValue===6){setMessage(`${teamName} rolled 6. Same team rolls again.`);return}nextTeam();return}const target=current+rollValue;animateMove(color,tokenIndex,current,target,(landed)=>{let captured=0;setTokens(prev=>{const next={...prev,[color]:[...prev[color]]};for(const opponent of ORDER){if(opponent===color)continue;next[opponent]=next[opponent].map(p=>{if(sameSquare(color,landed,opponent,p)&&!isSafe(color,landed)){captured++;return HOME}return p})}next[color][tokenIndex]=landed;return next});const completed=tokens[color].filter(p=>p===FINAL_HOME).length+(landed===FINAL_HOME?1:0);if(completed>=4){setWinner(color);setDice(null);setMessage(`🏆 ${color.toUpperCase()} wins! All four tokens are home.`);return}if(rollValue===6||captured>0){setDice(null);setMessage(captured?`${teamName} captured a token. Same team rolls again.`:`${teamName} rolled 6. Same team rolls again.`);return}nextTeam()})}
- function chooseToken(color:Color,tokenIndex:number){if(animating||winner)return;if(mode==="four"){if(color!==teamTurn){setMessage(`It is ${String(teamTurn).toUpperCase()}'s turn.`);return}}else{if(teamTurn!=="human"){setMessage("It is the bot's turn.");return}if(!isHuman(color)){setMessage("Choose one of your two colors.");return}}if(dice===null){setMessage("Roll the dice first.");return}if(!legalMoves(color,dice).includes(tokenIndex)){setMessage("That token cannot move with this roll.");return}resolveMove(color,tokenIndex,dice)}
- function botMove(){if(mode!=="bot"||teamTurn!=="bot"||dice===null||animating||winner)return;const candidates=botColors.flatMap(color=>legalMoves(color,dice).map(i=>({color,i})));if(!candidates.length){setMessage("Bot team has no legal move. Passing turn.");nextTeam();return}const home=candidates.find(x=>tokens[x.color][x.i]===HOME);const chosen=home??candidates[0];setTimeout(()=>resolveMove(chosen.color,chosen.i,dice),600)}
- useEffect(()=>{if(mode==="bot"&&teamTurn==="bot"&&!winner){if(dice===null){setTimeout(()=>roll(),600)}else botMove()}},[teamTurn,dice,mode,winner]);
- function reset(){if(animating)return;setTokens({green:[HOME,HOME,HOME,HOME],yellow:[HOME,HOME,HOME,HOME],red:[HOME,HOME,HOME,HOME],blue:[HOME,HOME,HOME,HOME]});setTeamTurn(mode==="bot"?"human":"green");setTurn(mode==="bot"?"red":"green");setDice(null);setSixStreak(0);setWinner(null);setMessage(mode==="bot"?"You are Red + Yellow. Roll once, then choose either color.":mode==="two"?"2-player mode: Player 1 Green + Blue, Player 2 Red + Yellow.":"4-player mode: one color per player.")}
- function changeMode(next:Mode){if(animating)return;setMode(next);setTeamTurn(next==="bot"?"human":"green");setTurn(next==="bot"?"red":"green");setDice(null);setSixStreak(0);setWinner(null);setTokens({green:[HOME,HOME,HOME,HOME],yellow:[HOME,HOME,HOME,HOME],red:[HOME,HOME,HOME,HOME],blue:[HOME,HOME,HOME,HOME]});setMessage(next==="bot"?"Bot mode: you are Red + Yellow. Roll once, then choose either color.":next==="two"?"2-player mode: Player 1 Green + Blue, Player 2 Red + Yellow.":"4-player mode: one player per color.")}
- return <main className="board-page"><section className="game-shell"><div className="game-controls"><div><strong>{winner?`${winner.toUpperCase()} WINS`:teamName}</strong>{!winner&&" turn"} <span className="test-badge">{mode==="bot"?"HUMAN + BOT":mode==="two"?"2 PLAYERS":"4 PLAYERS"}</span></div><div className="dice-value">{dice??"—"}</div><button onClick={()=>roll()} className="control-button" disabled={animating||!!winner||dice!==null||(mode!=="four"&&teamTurn!=="human")}>Roll Dice</button><button onClick={()=>roll(6)} className="control-button" disabled={animating||!!winner||dice!==null||(mode!=="four"&&teamTurn!=="human")}>Force 6</button><button onClick={reset} className="control-button secondary" disabled={animating}>New Game</button></div><div className="mode-controls"><button className="control-button" onClick={()=>changeMode("bot")}>Me vs Bot</button><button className="control-button secondary" onClick={()=>changeMode("two")}>2 Players</button><button className="control-button secondary" onClick={()=>changeMode("four")}>4 Players</button></div><p className="status">{message}</p><div className="player-strip">{ORDER.map(c=><div key={c} className={`player-chip ${((mode==="bot"?((teamTurn==="human"&&isHuman(c))||(teamTurn==="bot"&&!isHuman(c))):mode==="two"?((teamTurn==="green"&&["green","blue"].includes(c))||(teamTurn==="red"&&["red","yellow"].includes(c))):teamTurn===c)&&!winner?"active":""}`}><span className="player-dot" style={{background:COLORS[c]}}/><strong>{c.toUpperCase()}</strong><small>{mode==="bot"?(isHuman(c)?"YOU":"BOT"):mode==="two"?(["green","blue"].includes(c)?"PLAYER 1":"PLAYER 2"):"PLAYER"} · {remaining[c]} to home</small></div>)}</div><div className="ludo-board" aria-label="Ludo board"><div className="grid">{Array.from({length:225},(_,index)=>{const row=Math.floor(index/15),col=index%15,key=`${row}-${col}`;const routeIndex=BOARD_ROUTE.findIndex(([r,c])=>r===row&&c===col);const exitColor=COLORED_EXITS[key];const laneColor=(Object.keys(LANES) as Color[]).find(color=>LANES[color].some(([r,c])=>r===row&&c===col));if(routeIndex>=0)return <div key={key} className={`cell path ${SAFE_SQUARES.has(routeIndex)?"safe":""} ${exitColor?`exit-${exitColor}`:""}`}>{exitColor&&<span className="safe-star">★</span>}</div>;if(laneColor)return <div key={key} className={`cell home-lane lane-${laneColor}`}/>;return <div key={key} className="cell empty"/>})}</div>{tokenVisuals.map(t=>{if(t.kind==="final")return <div key={`${t.color}-${t.token}`} className="final-token" style={{background:COLORS[t.color]}} aria-label={`${t.color} token ${t.token+1} in final home`}/>;return <button key={`${t.color}-${t.token}`} className={`route-token ${t.kind==="lane"?"lane-token":""}`} style={{"--row":t.row,"--col":t.col,background:COLORS[t.color]} as CSSProperties} onClick={()=>chooseToken(t.color,t.token)} aria-label={`Move ${t.color} token ${t.token+1}`}/>})}<Home color="green" className="home-green" tokens={tokens.green} onTokenClick={i=>chooseToken("green",i)}/><Home color="yellow" className="home-yellow" tokens={tokens.yellow} onTokenClick={i=>chooseToken("yellow",i)}/><Home color="red" className="home-red" tokens={tokens.red} onTokenClick={i=>chooseToken("red",i)}/><Home color="blue" className="home-blue" tokens={tokens.blue} onTokenClick={i=>chooseToken("blue",i)}/><Center/></div></section></main>
+function Home({ color, className, tokens, onTokenClick }: { color: Color; className: string; tokens: number[]; onTokenClick: (i: number) => void }) {
+  return <div className={`home ${className}`} style={{ background: COLORS[color] }}><div className="home-yard">{tokens.map((progress, i) => <button key={i} className="home-slot" onClick={() => onTokenClick(i)} aria-label={`${color} token ${i + 1}`}>{progress === HOME ? <span className="token token-home" style={{ background: COLORS[color] }} /> : <span className="token token-home token-hidden" />}</button>)}</div></div>;
+}
+function Center() { return <div className="center"><div className="center-triangle center-green"/><div className="center-triangle center-yellow"/><div className="center-triangle center-red"/><div className="center-triangle center-blue"/></div>; }
+
+export default function HomePage() {
+  const [mode, setMode] = useState<Mode>("bot");
+  const [teamTurn, setTeamTurn] = useState<"human" | "bot" | Color>("human");
+  const [dice, setDice] = useState<number | null>(null);
+  const [sixStreak, setSixStreak] = useState(0);
+  const [winner, setWinner] = useState<Color | null>(null);
+  const [tokens, setTokens] = useState<Record<Color, number[]>>({ green:[HOME,HOME,HOME,HOME], yellow:[HOME,HOME,HOME,HOME], red:[HOME,HOME,HOME,HOME], blue:[HOME,HOME,HOME,HOME] });
+  const [message, setMessage] = useState("You are Red + Yellow. Roll once, then choose either color.");
+  const [animating, setAnimating] = useState(false);
+
+  const tokenVisuals = useMemo(() => {
+    const result: { color: Color; token: number; progress: number; kind: "route" | "lane" | "final"; row?: number; col?: number }[] = [];
+    ORDER.forEach(color => tokens[color].forEach((progress, token) => {
+      if (progress === HOME) return;
+      if (progress < BOARD_ROUTE.length) { const [row, col] = BOARD_ROUTE[routeIndexFor(color, progress)]; result.push({ color, token, progress, kind: "route", row, col }); }
+      else if (progress < FINAL_HOME) { const lane = LANES[color][progress - BOARD_ROUTE.length]; if (lane) result.push({ color, token, progress, kind: "lane", row: lane[0], col: lane[1] }); }
+      else result.push({ color, token, progress, kind: "final" });
+    }));
+    return result;
+  }, [tokens]);
+  const remaining = useMemo(() => Object.fromEntries(ORDER.map(c => [c, tokens[c].filter(p => p !== FINAL_HOME).length])) as Record<Color, number>, [tokens]);
+  const humanColors: Color[] = mode === "bot" ? ["red", "yellow"] : mode === "two" ? ["green", "blue"] : ORDER;
+  const botColors: Color[] = mode === "bot" ? ["green", "blue"] : [];
+  const isHuman = (color: Color) => humanColors.includes(color);
+  const teamName = mode === "bot" ? (teamTurn === "human" ? "YOUR TEAM" : "BOT TEAM") : mode === "two" ? (teamTurn === "human" ? "PLAYER 1" : "PLAYER 2") : `${String(teamTurn).toUpperCase()} PLAYER`;
+
+  function nextTeam() {
+    setDice(null); setSixStreak(0);
+    if (mode === "four") setTeamTurn(t => ORDER[(ORDER.indexOf(t as Color) + 1) % 4]);
+    else setTeamTurn(t => t === "human" ? "bot" : "human");
+  }
+  function roll(value?: number) {
+    if (animating || winner || dice !== null) return;
+    if (mode !== "four" && teamTurn !== "human") return;
+    const next = value ?? Math.floor(Math.random() * 6) + 1;
+    const streak = next === 6 ? sixStreak + 1 : 0;
+    if (streak >= 4) { setDice(null); setSixStreak(0); setMessage(`${teamName} rolled four 6s. Turn forfeited.`); nextTeam(); return; }
+    setDice(next); setSixStreak(streak); setMessage(`${teamName} rolled ${next}. Choose any legal token from your team.`);
+  }
+  function legalMoves(color: Color, rollValue: number) { return tokens[color].map((p, i) => ({ p, i })).filter(({ p }) => p === HOME ? rollValue === 6 : p < FINAL_HOME && p + rollValue <= FINAL_HOME).map(x => x.i); }
+  function animateMove(color: Color, tokenIndex: number, start: number, end: number, after: (landed: number) => void) {
+    setAnimating(true); let progress = start;
+    const step = () => { progress++; setTokens(prev => ({ ...prev, [color]: prev[color].map((p, i) => i === tokenIndex ? progress : p) })); if (progress < end) setTimeout(step, 180); else { setAnimating(false); after(progress); } };
+    setTimeout(step, 180);
+  }
+  function resolveMove(color: Color, tokenIndex: number, rollValue: number) {
+    const current = tokens[color][tokenIndex];
+    if (current === HOME) {
+      setTokens(prev => ({ ...prev, [color]: prev[color].map((p, i) => i === tokenIndex ? 0 : p) }));
+      setDice(null); setMessage(`${teamName} brought ${color.toUpperCase()} token ${tokenIndex + 1} onto its start.`);
+      if (rollValue === 6) { setMessage(`${teamName} rolled 6. Same team rolls again.`); return; }
+      nextTeam(); return;
+    }
+    const target = current + rollValue;
+    animateMove(color, tokenIndex, current, target, landed => {
+      let captured = 0;
+      setTokens(prev => {
+        const next = { ...prev, [color]: [...prev[color]] };
+        for (const opponent of ORDER) if (opponent !== color) next[opponent] = next[opponent].map(p => { if (sameSquare(color, landed, opponent, p) && !isSafe(color, landed)) { captured++; return HOME; } return p; });
+        next[color][tokenIndex] = landed; return next;
+      });
+      const completed = tokens[color].filter(p => p === FINAL_HOME).length + (landed === FINAL_HOME ? 1 : 0);
+      if (completed >= 4) { setWinner(color); setDice(null); setMessage(`🏆 ${color.toUpperCase()} wins! All four tokens are home.`); return; }
+      if (rollValue === 6 || captured > 0) { setDice(null); setMessage(captured ? `${teamName} captured a token. Same team rolls again.` : `${teamName} rolled 6. Same team rolls again.`); return; }
+      nextTeam();
+    });
+  }
+  function chooseToken(color: Color, tokenIndex: number) {
+    if (animating || winner) return;
+    if (mode === "four") { if (color !== teamTurn) { setMessage(`It is ${String(teamTurn).toUpperCase()}'s turn.`); return; } }
+    else { if (teamTurn !== "human") { setMessage("It is the bot's turn."); return; } if (!isHuman(color)) { setMessage("Choose one of your two colors."); return; } }
+    if (dice === null) { setMessage("Roll the dice first."); return; }
+    if (!legalMoves(color, dice).includes(tokenIndex)) { setMessage("That token cannot move with this roll."); return; }
+    resolveMove(color, tokenIndex, dice);
+  }
+  function botMove() {
+    if (mode !== "bot" || teamTurn !== "bot" || dice === null || animating || winner) return;
+    const candidates = botColors.flatMap(color => legalMoves(color, dice).map(i => ({ color, i })));
+    if (!candidates.length) { setMessage("Bot team has no legal move. Passing turn."); nextTeam(); return; }
+    const home = candidates.find(x => tokens[x.color][x.i] === HOME);
+    const chosen = home ?? candidates[0];
+    setTimeout(() => resolveMove(chosen.color, chosen.i, dice), 600);
+  }
+  useEffect(() => { if (mode === "bot" && teamTurn === "bot" && !winner) { if (dice === null) setTimeout(() => { const next = Math.floor(Math.random() * 6) + 1; setDice(next); setSixStreak(next === 6 ? sixStreak + 1 : 0); setMessage(`BOT TEAM rolled ${next}.`); }, 600); else botMove(); } }, [teamTurn, dice, mode, winner]);
+
+  function reset() { if (animating) return; setTokens({ green:[HOME,HOME,HOME,HOME], yellow:[HOME,HOME,HOME,HOME], red:[HOME,HOME,HOME,HOME], blue:[HOME,HOME,HOME,HOME] }); setTeamTurn(mode === "bot" ? "human" : "green"); setDice(null); setSixStreak(0); setWinner(null); setMessage(mode === "bot" ? "You are Red + Yellow. Roll once, then choose either color." : mode === "two" ? "2-player mode: Player 1 Green + Blue, Player 2 Red + Yellow." : "4-player mode: one color per player."); }
+  function changeMode(next: Mode) { if (animating) return; setMode(next); setTeamTurn(next === "bot" ? "human" : "green"); setDice(null); setSixStreak(0); setWinner(null); setTokens({ green:[HOME,HOME,HOME,HOME], yellow:[HOME,HOME,HOME,HOME], red:[HOME,HOME,HOME,HOME], blue:[HOME,HOME,HOME,HOME] }); setMessage(next === "bot" ? "Bot mode: you are Red + Yellow. Roll once, then choose either color." : next === "two" ? "2-player mode: Player 1 Green + Blue, Player 2 Red + Yellow." : "4-player mode: one player per color."); }
+
+  const playerActive = (color: Color) => mode === "bot" ? ((teamTurn === "human" && isHuman(color)) || (teamTurn === "bot" && !isHuman(color))) : mode === "two" ? ((teamTurn === "human" && ["green","blue"].includes(color)) || (teamTurn === "bot" && ["red","yellow"].includes(color))) : teamTurn === color;
+  const playerLabel = (color: Color) => mode === "bot" ? (isHuman(color) ? "YOU" : "BOT") : mode === "two" ? (["green","blue"].includes(color) ? "PLAYER 1" : "PLAYER 2") : "PLAYER";
+
+  return <main className="board-page"><section className="game-shell">
+    <div className="game-controls"><div><strong>{winner ? `${winner.toUpperCase()} WINS` : teamName}</strong>{!winner && " turn"} <span className="test-badge">{mode === "bot" ? "HUMAN + BOT" : mode === "two" ? "2 PLAYERS" : "4 PLAYERS"}</span></div><div className="dice-value">{dice ?? "—"}</div><button onClick={() => roll()} className="control-button" disabled={animating || !!winner || dice !== null || (mode !== "four" && teamTurn !== "human")}>Roll Dice</button><button onClick={() => roll(6)} className="control-button" disabled={animating || !!winner || dice !== null || (mode !== "four" && teamTurn !== "human")}>Force 6</button><button onClick={reset} className="control-button secondary" disabled={animating}>New Game</button></div>
+    <div className="mode-controls"><button className="control-button" onClick={() => changeMode("bot")}>Me vs Bot</button><button className="control-button secondary" onClick={() => changeMode("two")}>2 Players</button><button className="control-button secondary" onClick={() => changeMode("four")}>4 Players</button></div>
+    <p className="status">{message}</p>
+    <div className="player-strip">{ORDER.map(c => <div key={c} className={`player-chip ${playerActive(c) && !winner ? "active" : ""}`}><span className="player-dot" style={{ background: COLORS[c] }}/><strong>{c.toUpperCase()}</strong><small>{playerLabel(c)} · {remaining[c]} to home</small></div>)}</div>
+    <div className="ludo-board" aria-label="Ludo board"><div className="grid">{Array.from({ length: 225 }, (_, index) => { const row = Math.floor(index / 15), col = index % 15, key = `${row}-${col}`; const routeIndex = BOARD_ROUTE.findIndex(([r,c]) => r === row && c === col); const exitColor = COLORED_EXITS[key]; const laneColor = (Object.keys(LANES) as Color[]).find(color => LANES[color].some(([r,c]) => r === row && c === col)); if (routeIndex >= 0) return <div key={key} className={`cell path ${SAFE_SQUARES.has(routeIndex) ? "safe" : ""} ${exitColor ? `exit-${exitColor}` : ""}`}>{exitColor && <span className="safe-star">★</span>}</div>; if (laneColor) return <div key={key} className={`cell home-lane lane-${laneColor}`}/>; return <div key={key} className="cell empty"/>; })}</div>
+      {tokenVisuals.map(t => t.kind === "final" ? <div key={`${t.color}-${t.token}`} className="final-token" style={{ background: COLORS[t.color] }} aria-label={`${t.color} token ${t.token + 1} in final home`}/> : <button key={`${t.color}-${t.token}`} className={`route-token ${t.kind === "lane" ? "lane-token" : ""}`} style={{ "--row": t.row, "--col": t.col, background: COLORS[t.color] } as CSSProperties} onClick={() => chooseToken(t.color, t.token)} aria-label={`Move ${t.color} token ${t.token + 1}`}/>)}
+      <Home color="green" className="home-green" tokens={tokens.green} onTokenClick={i => chooseToken("green", i)}/><Home color="yellow" className="home-yellow" tokens={tokens.yellow} onTokenClick={i => chooseToken("yellow", i)}/><Home color="red" className="home-red" tokens={tokens.red} onTokenClick={i => chooseToken("red", i)}/><Home color="blue" className="home-blue" tokens={tokens.blue} onTokenClick={i => chooseToken("blue", i)}/><Center/>
+    </div>
+  </section></main>;
 }
