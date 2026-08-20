@@ -20,11 +20,13 @@ const BOARD_ROUTE: [number, number][] = [
 
 const route = new Set(BOARD_ROUTE.map(([r, c]) => `${r}-${c}`));
 const safe = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
+
+// Exact colored entry/exit squares marked in the user's reference image.
 const COLORED_EXITS: Record<string, keyof typeof COLORS> = {
-  "6-7": "yellow",
-  "8-5": "green",
+  "6-1": "green",
+  "1-8": "yellow",
   "8-13": "blue",
-  "14-7": "red",
+  "13-6": "red",
 };
 
 const LANES: Record<keyof typeof COLORS, [number, number][]> = {
