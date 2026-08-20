@@ -7,8 +7,7 @@ const COLORS = { green: "#08a63b", yellow: "#ffad08", red: "#f21b2d", blue: "#17
 type Choice = "blue" | "green" | "red" | null;
 type Dice = [number | null, number | null];
 
-// 48 visible shared-track squares. Each player's entry is aligned with the
-// correct home lane so the token makes the intended L/J-shaped turn into it.
+// 48 visible shared-track squares.
 const BOARD_ROUTE: [number, number][] = [
   [13,6],[12,6],[11,6],[10,6],[9,6],
   [8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],
@@ -18,19 +17,14 @@ const BOARD_ROUTE: [number, number][] = [
 ];
 const TRACK_LENGTH = BOARD_ROUTE.length;
 
-// Entry points remain tied to the existing shared route. The coloured lanes
-// below now sit on the home-facing edge of each quadrant, producing the
-// L/J-shaped turn seen in the reference board.
-const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 16, yellow: 33, blue: 40 };
-
-// Five inner home-lane squares. The sixth coloured square is the visible
-// exit/start square rendered by TrackCell, so the lane visually forms the
-// requested L/J turn without changing the existing progress rules.
+// Each player reaches the correct visible exit square, then counts five more
+// visible home-lane squares. The covered centre square is never counted.
+const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 17, yellow: 34, blue: 40 };
 const HOME_LANES: Record<PlayerColor, [number, number][]> = {
-  red: [[12,6],[11,6],[10,6],[9,6],[8,6]],
-  green: [[5,6],[4,6],[3,6],[2,6],[1,6]],
-  yellow: [[6,9],[6,10],[6,11],[6,12],[6,13]],
-  blue: [[8,9],[8,10],[8,11],[8,12],[8,13]],
+  red: [[13,6],[12,6],[11,6],[10,6],[9,6]],
+  green: [[4,6],[3,6],[2,6],[1,6],[0,6]],
+  yellow: [[6,12],[6,11],[6,10],[6,9],[6,8]],
+  blue: [[8,8],[8,7],[8,6],[7,6],[6,6]],
 };
 const NEXT: Record<PlayerColor, PlayerColor> = { red: "green", green: "yellow", yellow: "blue", blue: "red" };
 
@@ -43,7 +37,8 @@ function tokenPos(color: PlayerColor, progress: number) {
     const [r, c] = BOARD_ROUTE[(START_INDEX[color] + progress) % TRACK_LENGTH];
     return pos(r, c);
   }
-  return HOME_LANES[color][progress - TRACK_LENGTH] ? pos(...HOME_LANES[color][progress - TRACK_LENGTH]) : null;
+  const lane = HOME_LANES[color][progress - TRACK_LENGTH];
+  return lane ? pos(...lane) : null;
 }
 function Token({ color }: { color: PlayerColor }) {
   return <div className="token-slot"><div className="token" style={{ background: COLORS[color] }} /></div>;
@@ -66,8 +61,13 @@ export default function HomePage() {
   const [doubleSixes, setDoubleSixes] = useState(0);
   const [started, setStarted] = useState(false);
   const [botBusy, setBotBusy] = useState(false);
+  const [botCycle, setBotCycle] = useState(0);
   const playersRef = useRef(players);
+  const turnRef = useRef(turn);
+  const doubleSixesRef = useRef(doubleSixes);
   playersRef.current = players;
+  turnRef.current = turn;
+  doubleSixesRef.current = doubleSixes;
 
   const me = players.find(p => p.color === "red")!;
   const available = useMemo(() => dice.map((v, i) => v !== null && !used[i]), [dice, used]);
@@ -75,19 +75,20 @@ export default function HomePage() {
   const forfeited = doubleSixes >= 3;
 
   function clearDice() { setDice([null, null]); setUsed([false, false]); setChoice(null); }
-  function nextTurn() { clearDice(); setDoubleSixes(0); setTurn(NEXT[turn]); }
+  function nextTurn(from: PlayerColor = turnRef.current) { clearDice(); setDoubleSixes(0); setTurn(NEXT[from]); }
   function legal(token: PlayerState["tokens"][number], roll: number, merged: boolean) {
     return !(merged && token.status === "home") && isMovable(token, roll);
   }
 
   function roll() {
     if (turn !== "red" || rolling || moving || botBusy || forfeited || !(dice[0] === null || (used[0] && used[1]))) return;
-    setRolling(true);
-    setChoice(null);
+    setRolling(true); setChoice(null);
     window.setTimeout(() => {
       const a = !started ? 6 : Math.floor(Math.random() * 6) + 1;
       const b = Math.floor(Math.random() * 6) + 1;
-      setStarted(true); setDice([a, b]); setUsed([false, false]); setDoubleSixes(a === 6 && b === 6 ? doubleSixes + 1 : 0); setRolling(false);
+      setStarted(true); setDice([a, b]); setUsed([false, false]);
+      setDoubleSixes(prev => a === 6 && b === 6 ? prev + 1 : 0);
+      setRolling(false);
     }, 350);
   }
 
@@ -103,28 +104,33 @@ export default function HomePage() {
 
   async function moveHuman(id: number) {
     if (!choice || turn !== "red" || moving || forfeited) return;
-    const value = choice === "blue" ? dice[0] : choice === "green" ? dice[1] : total;
+    const selectedChoice = choice;
+    const value = selectedChoice === "blue" ? dice[0] : selectedChoice === "green" ? dice[1] : total;
     if (value === null) return;
     const token = playersRef.current.find(p => p.color === "red")?.tokens.find(t => t.id === id);
-    if (!token || !legal(token, value, choice === "red")) return;
+    if (!token || !legal(token, value, selectedChoice === "red")) return;
     setMoving(true);
-    if (token.status === "home") {
-      setPlayers(s => s.map(p => p.color === "red" ? { ...p, tokens: p.tokens.map(t => t.id === id ? { ...t, status: "track", progress: 0 } : t) } : p));
-      await new Promise(r => window.setTimeout(r, 220));
-    } else {
-      for (let n = 1; n <= value; n++) {
-        setPlayers(s => s.map(p => p.color === "red" ? { ...p, tokens: p.tokens.map(t => t.id === id ? { ...t, status: t.progress + 1 === FINISH_PROGRESS ? "finished" : "track", progress: t.progress + 1 } : t) } : p));
-        await new Promise(r => window.setTimeout(r, 170));
+    try {
+      if (token.status === "home") {
+        setPlayers(s => s.map(p => p.color === "red" ? { ...p, tokens: p.tokens.map(t => t.id === id ? { ...t, status: "track", progress: 0 } : t) } : p));
+        await new Promise(r => window.setTimeout(r, 220));
+      } else {
+        for (let n = 1; n <= value; n++) {
+          setPlayers(s => s.map(p => p.color === "red" ? { ...p, tokens: p.tokens.map(t => t.id === id ? { ...t, status: t.progress + 1 === FINISH_PROGRESS ? "finished" : "track", progress: t.progress + 1 } : t) } : p));
+          await new Promise(r => window.setTimeout(r, 170));
+        }
       }
-    }
-    const after = playersRef.current.find(p => p.color === "red")?.tokens.find(t => t.id === id);
-    if (after) setPlayers(s => killOneOpponent(s, "red", after));
-    const nextUsed: [boolean, boolean] = [used[0] || choice === "blue" || choice === "red", used[1] || choice === "green" || choice === "red"];
-    setUsed(nextUsed); setChoice(null); setMoving(false);
-    if (nextUsed[0] && nextUsed[1]) {
-      const extra = dice[0] === 6 || dice[1] === 6;
-      clearDice();
-      if (extra) setDoubleSixes(0); else nextTurn();
+      const after = playersRef.current.find(p => p.color === "red")?.tokens.find(t => t.id === id);
+      if (after) setPlayers(s => killOneOpponent(s, "red", after));
+      const nextUsed: [boolean, boolean] = [used[0] || selectedChoice === "blue" || selectedChoice === "red", used[1] || selectedChoice === "green" || selectedChoice === "red"];
+      setUsed(nextUsed); setChoice(null);
+      if (nextUsed[0] && nextUsed[1]) {
+        const extra = dice[0] === 6 || dice[1] === 6;
+        clearDice();
+        if (extra) setDoubleSixes(0); else nextTurn("red");
+      }
+    } finally {
+      setMoving(false);
     }
   }
 
@@ -132,39 +138,56 @@ export default function HomePage() {
     if (turn === "red" || botBusy) return;
     setBotBusy(true); setChoice(null);
     let cancelled = false;
+    const botColor = turn;
     const timer = window.setTimeout(async () => {
-      if (cancelled) return;
-      const a = Math.floor(Math.random() * 6) + 1;
-      const b = Math.floor(Math.random() * 6) + 1;
-      setDice([a, b]); setUsed([false, false]);
-      if (a === 6 && b === 6) {
-        setDoubleSixes(v => v + 1);
-      } else setDoubleSixes(0);
-      await new Promise(r => window.setTimeout(r, 550));
-      if (cancelled) return;
-      if (doubleSixes >= 2 && a === 6 && b === 6) { setBotBusy(false); nextTurn(); return; }
-      setMoving(true);
-      for (const value of [a, b]) {
-        const state = playersRef.current;
-        const id = chooseBotToken(state, turn, value);
-        const token = id === null ? null : state.find(p => p.color === turn)?.tokens.find(t => t.id === id);
-        if (!token || !isMovable(token, value)) continue;
-        if (token.status === "home") {
-          setPlayers(s => applyMove(s, turn, id!, value));
-          await new Promise(r => window.setTimeout(r, 220));
-        } else {
-          for (let n = 1; n <= value; n++) {
-            setPlayers(s => s.map(p => p.color === turn ? { ...p, tokens: p.tokens.map(t => t.id === id ? { ...t, progress: t.progress + 1, status: t.progress + 1 === FINISH_PROGRESS ? "finished" : "track" } : t) } : p));
-            await new Promise(r => window.setTimeout(r, 170));
+      try {
+        if (cancelled) return;
+        const a = Math.floor(Math.random() * 6) + 1;
+        const b = Math.floor(Math.random() * 6) + 1;
+        const isDoubleSix = a === 6 && b === 6;
+        const nextDoubleCount = isDoubleSix ? doubleSixesRef.current + 1 : 0;
+        setDice([a, b]); setUsed([false, false]); setDoubleSixes(nextDoubleCount);
+        await new Promise(r => window.setTimeout(r, 550));
+        if (cancelled) return;
+        if (nextDoubleCount >= 3) {
+          setMoving(false); setBotBusy(false); nextTurn(botColor); return;
+        }
+        setMoving(true);
+        for (const value of [a, b] as const) {
+          if (cancelled) return;
+          const state = playersRef.current;
+          const id = chooseBotToken(state, botColor, value);
+          const token = id === null ? null : state.find(p => p.color === botColor)?.tokens.find(t => t.id === id);
+          if (!token || !isMovable(token, value)) continue;
+          if (token.status === "home") {
+            setPlayers(s => applyMove(s, botColor, id, value));
+            await new Promise(r => window.setTimeout(r, 220));
+          } else {
+            for (let n = 1; n <= value; n++) {
+              if (cancelled) return;
+              setPlayers(s => s.map(p => p.color === botColor ? { ...p, tokens: p.tokens.map(t => t.id === id ? { ...t, progress: t.progress + 1, status: t.progress + 1 === FINISH_PROGRESS ? "finished" : "track" } : t) } : p));
+              await new Promise(r => window.setTimeout(r, 170));
+            }
+          }
+          const after = playersRef.current.find(p => p.color === botColor)?.tokens.find(t => t.id === id);
+          if (after) setPlayers(s => killOneOpponent(s, botColor, after));
+        }
+        if (!cancelled) {
+          setMoving(false); setBotBusy(false); setDice([null, null]); setUsed([false, false]);
+          if (a === 6 || b === 6) {
+            setDoubleSixes(0);
+            setBotCycle(v => v + 1);
+          } else {
+            setDoubleSixes(0);
+            setTurn(NEXT[botColor]);
           }
         }
-        const after = playersRef.current.find(p => p.color === turn)?.tokens.find(t => t.id === id);
-        if (after) setPlayers(s => killOneOpponent(s, turn, after));
+      } catch {
+        if (!cancelled) { setMoving(false); setBotBusy(false); clearDice(); nextTurn(botColor); }
       }
-      if (!cancelled) { setMoving(false); setBotBusy(false); setDice([null, null]); setUsed([false, false]); if (a === 6 || b === 6) setTurn(turn); else setTurn(NEXT[turn]); }
     }, 500);
     return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [turn]);
+  }, [turn, botCycle]);
 
   const chosen = choice === "blue" ? dice[0] : choice === "green" ? dice[1] : total;
   const canMove = chosen !== null && me.tokens.some(t => legal(t, chosen, choice === "red"));
@@ -207,8 +230,6 @@ export default function HomePage() {
 }
 
 function TrackCell({ row, col }: { row: number; col: number }) {
-  // Six coloured exit squares sit directly against each home quadrant. The
-  // inner five continue as HOME_LANES, creating the visible L/J entry shape.
   const green = col === 6 && row >= 0 && row <= 5;
   const yellow = row === 6 && col >= 9 && col <= 14;
   const red = col === 6 && row >= 9 && row <= 14;
