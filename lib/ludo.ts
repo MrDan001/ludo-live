@@ -5,8 +5,8 @@ export type PlayerState = { color: PlayerColor; tokens: TokenState[] };
 
 // The playable perimeter follows only the visible board squares. The four
 // squares hidden by the centre box are deliberately NOT part of the route.
-export const TRACK_LENGTH = 48;
-export const FINISH_PROGRESS = 52;
+export const TRACK_LENGTH = 44;
+export const FINISH_PROGRESS = 49;
 export const HOME_ENTRY_ROLL = 6;
 export const START_INDEX: Record<PlayerColor, number> = { red: 0, blue: 10, green: 22, yellow: 32 };
 export const COLORS: PlayerColor[] = ["red", "blue", "green", "yellow"];
