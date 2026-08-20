@@ -1,65 +1,79 @@
-const colors = {
+const COLORS = {
   green: "#08a63b",
   yellow: "#ffad08",
   red: "#f21b2d",
   blue: "#1769e8",
-};
+} as const;
 
-function Token({ color, label }: { color: string; label: string }) {
+type Color = (typeof COLORS)[keyof typeof COLORS];
+
+function Token({ color, name }: { color: Color; name: string }) {
   return (
-    <div className="token-slot" aria-label={`${label} token`}>
+    <div className="token-slot" aria-label={`${name} token`}>
       <div className="token" style={{ background: color }} />
     </div>
   );
 }
 
-function Home({ color, label }: { color: string; label: string }) {
+function Home({ color, name }: { color: Color; name: string }) {
   return (
-    <section className="home" style={{ background: color }}>
-      <h2>{label}</h2>
+    <section className="home" style={{ backgroundColor: color }}>
+      <h2>{name}</h2>
       <div className="tokens">
         {Array.from({ length: 4 }, (_, i) => (
-          <Token key={i} color={color} label={label} />
+          <Token key={i} color={color} name={name} />
         ))}
       </div>
-      <div className="home-player">{label === "Me" ? "M" : "P"}</div>
     </section>
   );
 }
 
-const track = Array.from({ length: 33 }, (_, i) => i);
+function TrackCell({ row, col }: { row: number; col: number }) {
+  const isGreenPath = col === 7 && row >= 1 && row <= 5;
+  const isYellowPath = row === 7 && col >= 9 && col <= 13;
+  const isRedPath = col === 7 && row >= 9 && row <= 13;
+  const isBluePath = row === 7 && col >= 1 && col <= 5;
+  const isStart = (row === 6 && col === 1) || (row === 1 && col === 8) || (row === 8 && col === 13) || (row === 13 && col === 6);
+  const isSafe = (row + col) % 11 === 0;
 
-export default function Home() {
+  let className = "track-cell";
+  if (isGreenPath) className += " green-path";
+  if (isYellowPath) className += " yellow-path";
+  if (isRedPath) className += " red-path";
+  if (isBluePath) className += " blue-path";
+  if (isStart) className += " start-cell";
+  if (isSafe) className += " safe-cell";
+
+  let mark = "";
+  if (isSafe) mark = "★";
+  else if (row === 7 && col === 2) mark = "→";
+  else if (row === 2 && col === 7) mark = "↓";
+  else if (row === 12 && col === 7) mark = "↑";
+  else if (row === 7 && col === 12) mark = "←";
+
+  return <div className={className}>{mark}</div>;
+}
+
+export default function HomePage() {
   return (
     <main className="game-page">
       <div className="board-wrap">
         <div className="ludo-board" aria-label="Ludo board">
-          <Home color={colors.green} label="Player1" />
-          <Home color={colors.yellow} label="Player1" />
-          <Home color={colors.red} label="Me" />
-          <Home color={colors.blue} label="Me" />
-
           <div className="track" aria-hidden="true">
-            {track.map((cell, i) => (
-              <div
-                className={`track-cell cell-${i}`}
-                key={cell}
-                style={
-                  i >= 11 && i <= 16
-                    ? { background: colors.green }
-                    : i >= 17 && i <= 22
-                      ? { background: colors.yellow }
-                      : i >= 23 && i <= 28
-                        ? { background: colors.red }
-                        : undefined
-                }
-              >
-                {i % 9 === 0 ? "★" : i % 7 === 0 ? "→" : ""}
-              </div>
-            ))}
+            {Array.from({ length: 15 }, (_, row) =>
+              Array.from({ length: 15 }, (_, col) => {
+                const inCross = row >= 6 && row <= 8 || col >= 6 && col <= 8;
+                return inCross ? <TrackCell key={`${row}-${col}`} row={row} col={col} /> : <div key={`${row}-${col}`} className="empty-cell" />;
+              }),
+            )}
           </div>
 
-          <div className="center-home">
+          <Home color={COLORS.green} name="Player1" />
+          <Home color={COLORS.yellow} name="Player1" />
+          <Home color={COLORS.red} name="Me" />
+          <Home color={COLORS.blue} name="Me" />
+
+          <div className="center-home" aria-label="Ludo center">
             <div className="triangle triangle-green" />
             <div className="triangle triangle-yellow" />
             <div className="triangle triangle-red" />
