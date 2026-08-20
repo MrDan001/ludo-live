@@ -13,17 +13,30 @@ const PLAYER_NAMES: Partial<Record<PlayerColor, string>> = { RED: "Me", GREEN: "
 type UsedDice = { d1: boolean; d2: boolean };
 const freshGame = (): GameState => createInitialGameState(COLORS, [], false);
 
-const PIPS: Record<number, [number, number][]> = {
-  1: [[2, 2]], 2: [[1, 1], [3, 3]], 3: [[1, 1], [2, 2], [3, 3]],
-  4: [[1, 1], [1, 3], [3, 1], [3, 3]], 5: [[1, 1], [1, 3], [2, 2], [3, 1], [3, 3]],
-  6: [[1, 1], [1, 3], [2, 1], [2, 3], [3, 1], [3, 3]],
+const PIP_CELLS: Record<number, number[]> = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8],
 };
 
 function Die({ value, active, used, onClick, disabled }: { value: number; active: boolean; used: boolean; onClick: () => void; disabled: boolean }) {
+  const cells = PIP_CELLS[Math.max(1, Math.min(6, value))];
   return (
-    <button type="button" aria-label={`Die ${value}`} onClick={onClick} disabled={disabled}
-      className={`relative grid aspect-square w-[clamp(48px,14vw,76px)] shrink-0 place-items-center rounded-[18px] border-[3px] border-red-950/40 bg-gradient-to-br from-red-500 to-red-700 shadow-[0_7px_14px_rgba(0,0,0,.35)] transition-transform ${active ? "-translate-y-1 scale-105 ring-2 ring-yellow-300" : ""} ${used ? "opacity-45" : ""}`}>
-      {PIPS[value]?.map(([r, c], i) => <span key={i} className="absolute h-[18%] w-[18%] rounded-full bg-white shadow" style={{ top: `${r * 25 - 3}%`, left: `${c * 25 - 3}%` }} />)}
+    <button
+      type="button"
+      aria-label={`Die ${value}`}
+      onClick={onClick}
+      disabled={disabled}
+      className={`relative grid aspect-square w-[clamp(54px,15vw,78px)] shrink-0 grid-cols-3 grid-rows-3 gap-[7%] rounded-[18px] border-[3px] border-red-950/40 bg-gradient-to-br from-red-500 to-red-700 p-[11%] shadow-[0_7px_14px_rgba(0,0,0,.35)] transition-transform ${active ? "-translate-y-1 scale-105 ring-2 ring-yellow-300" : ""} ${used ? "opacity-50" : ""}`}
+    >
+      {Array.from({ length: 9 }, (_, i) => (
+        <span key={i} className="grid place-items-center">
+          {cells.includes(i) && <span className="block h-full w-full max-h-[14px] max-w-[14px] rounded-full bg-white shadow-[0_1px_2px_rgba(0,0,0,.3)]" />}
+        </span>
+      ))}
     </button>
   );
 }
@@ -47,19 +60,35 @@ export default function TestBoardPage() {
 
   const roll = () => {
     const next = rollTwoDice();
-    setDiceRoll(next); setUsedDice({ d1: false, d2: false });
+    setDiceRoll(next);
+    setUsedDice({ d1: false, d2: false });
     setValidMoves(getValidMoves(gameState, next).filter((m) => m.source === "d1" || m.source === "d2"));
-    setActiveSource(null); setHistory((h) => [next.d1, next.d2, ...h].slice(0, 3));
+    setActiveSource(null);
+    setHistory((h) => [next.d1, next.d2, ...h].slice(0, 3));
   };
-  const chooseDie = (source: MoveSource) => { if (diceRoll && source !== "sum" && sourceMoves(source).length) setActiveSource(source); };
+
+  const chooseDie = (source: MoveSource) => {
+    if (diceRoll && source !== "sum" && sourceMoves(source).length) setActiveSource(source);
+  };
+
   const selectMove = (tokenId: string) => {
     if (!diceRoll || !activeSource) return;
-    const move = sourceMoves(activeSource).find((m) => m.tokenId === tokenId); if (!move) return;
-    const next = applyMove(gameState, move); const nextUsed = { ...usedDice, [activeSource]: true } as UsedDice;
-    setGameState(next); setUsedDice(nextUsed); setActiveSource(null); setCaptureText("Move!"); setTimeout(() => setCaptureText(null), 650);
+    const move = sourceMoves(activeSource).find((m) => m.tokenId === tokenId);
+    if (!move) return;
+    const next = applyMove(gameState, move);
+    const nextUsed = { ...usedDice, [activeSource]: true } as UsedDice;
+    setGameState(next);
+    setUsedDice(nextUsed);
+    setActiveSource(null);
+    setCaptureText("Move!");
+    setTimeout(() => setCaptureText(null), 650);
     const remaining = getValidMoves(next, diceRoll).filter((m) => (m.source === "d1" && !nextUsed.d1) || (m.source === "d2" && !nextUsed.d2));
     setValidMoves(remaining);
-    if (!remaining.length || next.winner) { setDiceRoll(null); setUsedDice({ d1: false, d2: false }); setValidMoves([]); }
+    if (!remaining.length || next.winner) {
+      setDiceRoll(null);
+      setUsedDice({ d1: false, d2: false });
+      setValidMoves([]);
+    }
   };
 
   return (
@@ -76,13 +105,13 @@ export default function TestBoardPage() {
         </div>
       </header>
 
-      <main className="flex min-h-0 flex-1 items-center justify-center px-2 py-2">
-        <div className="flex h-full w-full max-w-[900px] flex-col items-center justify-center gap-[clamp(6px,1.5vh,14px)]">
+      <main className="flex min-h-0 flex-1 items-center justify-center px-2 py-1">
+        <div className="flex h-full w-full max-w-[900px] flex-col items-center justify-center gap-[clamp(5px,1.1vh,12px)]">
           <div className="z-50 flex shrink-0 gap-[clamp(8px,2vw,18px)] rounded-full bg-[#073f4a] px-2.5 py-2 shadow-2xl ring-1 ring-white/20">
             <Die value={diceRoll?.d1 ?? 4} used={usedDice.d1} active={activeSource === "d1"} onClick={() => chooseDie("d1")} disabled={!diceRoll || !enabled.d1} />
             <Die value={diceRoll?.d2 ?? 5} used={usedDice.d2} active={activeSource === "d2"} onClick={() => chooseDie("d2")} disabled={!diceRoll || !enabled.d2} />
           </div>
-          <div className="relative min-h-0 min-w-0 shrink-0" style={{ width: "min(96vw, calc(100dvh - 225px), 900px)", height: "min(96vw, calc(100dvh - 225px), 900px)" }}>
+          <div className="relative min-h-0 min-w-0 shrink-0" style={{ width: "min(96vw, calc(100dvh - 250px), 900px)", height: "min(96vw, calc(100dvh - 250px), 900px)" }}>
             <Board players={gameState.players} selectableTokenIds={selectableTokenIds} playerNames={PLAYER_NAMES} onTokenClick={selectMove} showTapHint />
           </div>
         </div>
