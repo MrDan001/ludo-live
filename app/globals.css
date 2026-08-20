@@ -18,7 +18,9 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 .track{position:absolute;inset:0;z-index:2;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr);pointer-events:none}
 .empty-cell{background:transparent}
 .track-cell{border:1px solid #c9d0d4;background:#fafafa;color:#333;display:grid;place-items:center;font-size:clamp(8px,2vw,17px);font-weight:900}
-.green-path{background:#08a63b;color:#fff}.yellow-path{background:#ffad08;color:#fff}.red-path{background:#f21b2d;color:#fff}.blue-path{background:#1769e8;color:#fff}.start-cell{background:#fff}.safe-cell{color:#f4a900;font-size:clamp(10px,2.5vw,20px)}
+/* All four home-adjacent lanes are intentionally plain white for this stage. */
+.green-path,.yellow-path,.red-path,.blue-path{background:#fafafa;color:#333}
+.start-cell{background:#fff}.safe-cell{color:#f4a900;font-size:clamp(10px,2.5vw,20px)}
 /* Tokens cross the center junction above the center artwork. Dice stay above tokens. */
 .board-token-layer{position:absolute;inset:0;z-index:12;pointer-events:none}
 .board-token{position:absolute;transform:translate(-50%,-50%);margin-left:3.333333%;margin-top:3.333333%;width:clamp(20px,5.2%,36px);height:clamp(20px,5.2%,36px);border-radius:50%;border:clamp(2px,.5vw,3px) solid #fff;background:#f21b2d;box-shadow:inset 0 4px 7px #fff8,0 2px 6px #0008;display:grid;place-items:center;color:transparent;font-size:0;pointer-events:auto;cursor:default;touch-action:manipulation;transition:transform .12s ease,box-shadow .18s ease}
@@ -26,7 +28,8 @@ body{font-family:Arial,Helvetica,sans-serif;color:#fff}
 .board-token:disabled{opacity:1}
 @keyframes tokenPulse{to{transform:translate(-50%,-50%) scale(1.12)}}
 .center-home{position:absolute;z-index:10;left:40%;top:40%;width:20%;height:20%;overflow:visible;background:#fff;display:grid;place-items:center}
-.center-backdrop{position:absolute;inset:0;background:linear-gradient(135deg,#08a63b 0 25%,#ffad08 25% 50%,#1769e8 50% 75%,#f21b2d 75%);font-size:clamp(8px,2vw,14px);font-weight:900;display:grid;place-items:center;color:#fff;text-shadow:0 1px 2px #0008}
+/* The center junction is plain white; no quadrant colors are rendered here. */
+.center-backdrop{position:absolute;inset:0;background:#fff;font-size:clamp(8px,2vw,14px);font-weight:900;display:grid;place-items:center;color:#333;text-shadow:none}
 .center-controls{position:absolute;z-index:20;left:50%;top:50%;transform:translate(-50%,-50%);width:min(180%,130px);display:flex;align-items:center;justify-content:center}
 .dice-pair{display:flex;align-items:center;justify-content:center;gap:clamp(4px,.8vw,8px)}
 .die{width:clamp(32px,7vw,50px);height:clamp(32px,7vw,50px);padding:clamp(3px,.8vw,6px);border:clamp(2px,.5vw,3px) solid #d8e8ff;border-radius:clamp(7px,1.5vw,11px);background:linear-gradient(145deg,#fff,#dce8f6);box-shadow:0 3px 7px #0008,inset 0 1px 2px #fff;display:grid;place-items:center;cursor:pointer;touch-action:manipulation}
