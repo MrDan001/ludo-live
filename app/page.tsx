@@ -1,50 +1,88 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createGame, FINISH_PROGRESS, isMovable, chooseBotToken, applyMove, PlayerColor, PlayerState } from "../lib/ludo";
+const COLORS = {
+  green: "#16a34a",
+  yellow: "#f4b400",
+  red: "#ef233c",
+  blue: "#2563eb",
+} as const;
 
-const COLORS = { green: "#08a63b", yellow: "#ffad08", red: "#f21b2d", blue: "#1769e8" } as const;
-type Choice = "blue" | "yellow" | "red" | null;
-type Dice = [number | null, number | null];
+const BOARD_ROUTE: [number, number][] = [
+  [14,6],[13,6],[12,6],[11,6],[10,6],[9,6],
+  [8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],
+  [6,0],[6,1],[6,2],[6,3],[6,4],[6,5],
+  [5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],
+  [1,8],[2,8],[3,8],[4,8],[5,8],
+  [6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],
+  [8,14],[8,13],[8,12],[8,11],[8,10],[8,9],
+  [9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],
+];
 
-const BOARD_ROUTE: [number, number][] = [[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,13],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6]];
-const TRACK_LENGTH = BOARD_ROUTE.length;
-const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 17, yellow: 35, blue: 11 };
-const HOME_LANES: Record<PlayerColor, [number, number][]> = { red: [[13,7],[12,7],[11,7],[10,7],[9,7]], green: [[4,7],[3,7],[2,7],[1,7],[0,7]], yellow: [[7,12],[7,11],[7,10],[7,9],[7,8]], blue: [[7,2],[7,3],[7,4],[7,5],[7,6]] };
-const NEXT: Record<PlayerColor, PlayerColor> = { red: "green", green: "yellow", yellow: "blue", blue: "red" };
-const routeKey = new Set(BOARD_ROUTE.map(([r,c]) => `${r}-${c}`));
-const laneKeys = new Map<string, PlayerColor>();
-(Object.keys(HOME_LANES) as PlayerColor[]).forEach(color => HOME_LANES[color].forEach(([r,c]) => laneKeys.set(`${r}-${c}`, color)));
-const SAFE_INDICES = new Set([0,11,17,35]);
+const route = new Set(BOARD_ROUTE.map(([r, c]) => `${r}-${c}`));
+const safe = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
 
-function pos(row:number,col:number){return{left:`${((col+.5)/15)*100}%`,top:`${((row+.5)/15)*100}%`};}
-function tokenPos(color:PlayerColor,progress:number){if(progress<0||progress>FINISH_PROGRESS)return null;if(progress<TRACK_LENGTH){const [r,c]=BOARD_ROUTE[(START_INDEX[color]+progress)%TRACK_LENGTH];return pos(r,c);}const lane=HOME_LANES[color][progress-TRACK_LENGTH];return lane?pos(...lane):null;}
-function Token({color}:{color:PlayerColor}){return <div className="token-slot"><div className="token" style={{background:COLORS[color]}}/></div>}
-function BirdMark({color="#b8860b"}:{color?:string}){return <svg className="bird-mark" viewBox="0 0 32 24" aria-hidden="true"><path fill={color} d="M2 13c5-7 10-8 15-3 3-5 7-7 13-6-4 3-5 7-4 11-4-3-7-4-10-2-4 3-8 4-14 0Z"/><circle cx="25" cy="7" r="1.5" fill="#fff"/></svg>}
-function BirdLogo(){return <svg viewBox="0 0 160 120" className="bird-logo" aria-hidden="true"><path fill="#1769e8" d="M76 60C50 35 27 28 8 36c20 6 30 18 38 34-16 3-27 11-35 24 25-4 43-11 61-25Z"/><path fill="#08a63b" d="M78 60C54 36 42 16 45 2c18 10 30 22 35 40 10-16 23-27 38-31-2 20-12 36-31 49Z"/><path fill="#ffad08" d="M83 60c24-25 47-32 69-24-18 8-30 19-37 35 16 1 29 8 39 20-27-1-48-10-71-25Z"/><path fill="#f21b2d" d="M80 62c19 19 38 29 59 31-13 8-27 9-42 4 1 10-2 18-9 23-7-16-9-34-8-58Z"/><path fill="#f6c343" d="M80 22c14 0 24 10 24 24 0 13-10 24-24 30-14-6-24-17-24-30 0-14 10-24 24-24Z"/><circle cx="88" cy="31" r="3" fill="#18263a"/></svg>}
-function Home({color,name,tokens,onToken}:{color:PlayerColor;name:string;tokens:PlayerState["tokens"];onToken?:(id:number)=>void}){return <section className={`home home-${color}`} style={{background:COLORS[color]}}><div className="feather-wash"/><h2>{name}</h2><div className="tokens">{tokens.filter(t=>t.status==="home").map(t=>onToken?<button key={t.id} className="token-home-button token-movable-home" onClick={()=>onToken(t.id)}><Token color={color}/></button>:<Token key={t.id} color={color}/>)}</div></section>}
-function Die({value,onClick,disabled}:{value:number|null;onClick:()=>void;disabled:boolean}){return <button className="die" onClick={onClick} disabled={disabled} aria-label="Roll die">{value===null?"":<span className={`pip-grid pips-${value}`}>{Array.from({length:value},(_,i)=><i key={i}/>)}</span>}</button>}
+const LANES: Record<keyof typeof COLORS, [number, number][]> = {
+  red: [[13,7],[12,7],[11,7],[10,7],[9,7]],
+  green: [[7,1],[7,2],[7,3],[7,4],[7,5]],
+  yellow: [[1,7],[2,7],[3,7],[4,7],[5,7]],
+  blue: [[9,7],[10,7],[11,7],[12,7],[13,7]],
+};
 
-export default function HomePage(){
- const[players,setPlayers]=useState<PlayerState[]>(()=>createGame());const[turn,setTurn]=useState<PlayerColor>("red");const[dice,setDice]=useState<Dice>([null,null]);const[used,setUsed]=useState<[boolean,boolean]>([false,false]);const[choice,setChoice]=useState<Choice>(null);const[moving,setMoving]=useState(false);const[rolling,setRolling]=useState(false);const[doubleSixes,setDoubleSixes]=useState(0);const[started,setStarted]=useState(false);const[botBusy,setBotBusy]=useState(false);const[botCycle,setBotCycle]=useState(0);const[history,setHistory]=useState<PlayerColor[]>([]);const playersRef=useRef(players);const doubleSixesRef=useRef(doubleSixes);playersRef.current=players;doubleSixesRef.current=doubleSixes;
- const me=players.find(p=>p.color==="red")!;const available=useMemo(()=>dice.map((v,i)=>v!==null&&!used[i]),[dice,used]);const total=dice[0]!==null&&dice[1]!==null?dice[0]+dice[1]:null;const forfeited=doubleSixes>=3;
- function addHistory(color:PlayerColor){setHistory(h=>[color,...h].slice(0,3))}
- function clearDice(){setDice([null,null]);setUsed([false,false]);setChoice(null)}
- function nextTurn(from:PlayerColor){clearDice();setDoubleSixes(0);setTurn(NEXT[from])}
- function legal(token:PlayerState["tokens"][number],roll:number,merged:boolean){return!(merged&&token.status==="home")&&isMovable(token,roll)}
- function roll(){if(turn!=="red"||rolling||moving||botBusy||forfeited||!(dice[0]===null||(used[0]&&used[1])))return;setRolling(true);setChoice(null);window.setTimeout(()=>{const a=!started?6:Math.floor(Math.random()*6)+1,b=Math.floor(Math.random()*6)+1;setStarted(true);setDice([a,b]);setUsed([false,false]);setDoubleSixes(prev=>a===6&&b===6?prev+1:0);setRolling(false)},350)}
- function selectChoice(c:Choice){if(turn!=="red"||moving||forfeited||c===null)return;if(c==="blue"&&!available[0])return;if(c==="yellow"&&!available[1])return;if(c==="red"&&!(available[0]&&available[1]))return;const value=c==="blue"?dice[0]:c==="yellow"?dice[1]:total;if(value===null||!me.tokens.some(t=>legal(t,value,c==="red")))return;setChoice(c);addHistory(c)}
- async function moveHuman(id:number){if(!choice||turn!=="red"||moving||forfeited)return;const selectedChoice=choice,value=selectedChoice==="blue"?dice[0]:selectedChoice==="yellow"?dice[1]:total;if(value===null)return;const token=playersRef.current.find(p=>p.color==="red")?.tokens.find(t=>t.id===id);if(!token||!legal(token,value,selectedChoice==="red"))return;setMoving(true);try{setPlayers(s=>applyMove(s,"red",id,value));await new Promise(r=>window.setTimeout(r,Math.max(250,value*110)));const nextUsed:[boolean,boolean]=[used[0]||selectedChoice==="blue"||selectedChoice==="red",used[1]||selectedChoice==="yellow"||selectedChoice==="red"];setUsed(nextUsed);setChoice(null);if(nextUsed[0]&&nextUsed[1]){if(dice[0]===6||dice[1]===6){clearDice();setDoubleSixes(0)}else nextTurn("red")}}finally{setMoving(false)}}
- useEffect(()=>{if(turn==="red"||botBusy)return;setBotBusy(true);setChoice(null);let cancelled=false;const botColor=turn;const timer=window.setTimeout(async()=>{try{const a=Math.floor(Math.random()*6)+1,b=Math.floor(Math.random()*6)+1,isDoubleSix=a===6&&b===6,nextDoubleCount=isDoubleSix?doubleSixesRef.current+1:0;setDice([a,b]);setDoubleSixes(nextDoubleCount);await new Promise(r=>window.setTimeout(r,500));if(cancelled)return;if(nextDoubleCount>=3){nextTurn(botColor);return}setMoving(true);for(const value of [a,b]){const state=playersRef.current,id=chooseBotToken(state,botColor,value);if(id===null)continue;setPlayers(s=>applyMove(s,botColor,id,value));await new Promise(r=>window.setTimeout(r,350))}if(!cancelled){setMoving(false);if(a===6||b===6){setDice([null,null]);setDoubleSixes(0);setBotCycle(v=>v+1)}else nextTurn(botColor)}}finally{if(!cancelled){setMoving(false);setBotBusy(false)}}},700);return()=>{cancelled=true;window.clearTimeout(timer)}},[turn,botCycle]);
- return <main className="game-page"><div className="game-stage"><div className="board-wrap"><div className="ludo-board">
-   <div className="track">{Array.from({length:225},(_,i)=>{const r=Math.floor(i/15),c=i%15,key=`${r}-${c}`;const isRoute=routeKey.has(key);const laneColor=laneKeys.get(key);if(isRoute){const startIdx=BOARD_ROUTE.findIndex(([rr,cc])=>rr===r&&cc===c);const safe=SAFE_INDICES.has(startIdx);const isStart=[0,11,17,35].includes(startIdx);return <div key={key} className={`track-cell ${safe?"safe-cell":""} ${isStart?"start-cell":""}`}>{safe?<BirdMark/>:""}</div>}if(laneColor){return <div key={key} className={`lane-cell lane-${laneColor}`}/>}return <div key={key} className="empty-cell"/>})}</div>
-   <Home color="green" name="GREEN" tokens={players.find(p=>p.color==="green")?.tokens??[]}/>
-   <Home color="yellow" name="YELLOW" tokens={players.find(p=>p.color==="yellow")?.tokens??[]}/>
-   <Home color="red" name="RED" tokens={me.tokens} onToken={moveHuman}/>
-   <Home color="blue" name="BLUE" tokens={players.find(p=>p.color==="blue")?.tokens??[]}/>
-   <div className="center-home"><div className="center-bird"><BirdLogo/><span>LUDO</span></div><div className="center-dice"><Die value={dice[0]} onClick={roll} disabled={turn!=="red"||rolling||moving||botBusy||forfeited||available[0]}/><Die value={dice[1]} onClick={roll} disabled={turn!=="red"||rolling||moving||botBusy||forfeited||available[0]}/></div></div>
-   <div className="board-token-layer">{players.flatMap(p=>p.tokens.filter(t=>t.status!=="home").map(t=>{const pnt=tokenPos(p.color,t.progress);return pnt?<button key={`${p.color}-${t.id}`} className={`board-token token-movable moved-${p.color}`} style={{...pnt,background:COLORS[p.color]}} onClick={()=>p.color==="red"&&moveHuman(t.id)} aria-label={`${p.color} token ${t.id+1}`}/>:null}))}</div>
- </div></div>
- <div className="history-bar"><button className={`history-token history-blue ${choice==="blue"?"chosen":""}`} onClick={()=>selectChoice("blue")} disabled={!available[0]||moving||turn!=="red"}><span/></button><button className={`history-token history-red ${choice==="red"?"chosen":""}`} onClick={()=>selectChoice("red")} disabled={!(available[0]&&available[1])||moving||turn!=="red"}><span/></button><button className={`history-token history-yellow ${choice==="yellow"?"chosen":""}`} onClick={()=>selectChoice("yellow")} disabled={!available[1]||moving||turn!=="red"}><span/></button>{history.map((c,i)=><span key={`${c}-${i}`} className={`history-mini mini-${c}`}/>)}</div>
- </div></main>
+const laneMap = new Map<string, keyof typeof COLORS>();
+(Object.keys(LANES) as (keyof typeof COLORS)[]).forEach((color) => {
+  LANES[color].forEach(([r, c]) => laneMap.set(`${r}-${c}`, color));
+});
+
+function Home({ color, className }: { color: keyof typeof COLORS; className: string }) {
+  return (
+    <div className={`home ${className}`} style={{ background: COLORS[color] }}>
+      <div className="home-yard">
+        {[0, 1, 2, 3].map((slot) => <span key={slot} />)}
+      </div>
+    </div>
+  );
+}
+
+function Center() {
+  return (
+    <div className="center">
+      <div className="center-triangle center-green" />
+      <div className="center-triangle center-yellow" />
+      <div className="center-triangle center-red" />
+      <div className="center-triangle center-blue" />
+    </div>
+  );
+}
+
+export default function HomePage() {
+  return (
+    <main className="board-page">
+      <div className="ludo-board" aria-label="Ludo board">
+        <div className="grid">
+          {Array.from({ length: 225 }, (_, index) => {
+            const row = Math.floor(index / 15);
+            const col = index % 15;
+            const key = `${row}-${col}`;
+            const laneColor = laneMap.get(key);
+            const routeIndex = BOARD_ROUTE.findIndex(([r, c]) => r === row && c === col);
+
+            if (route.has(key)) {
+              return (
+                <div key={key} className={`cell path ${safe.has(routeIndex) ? "safe" : ""}`}>
+                  {safe.has(routeIndex) && <span className="safe-star">★</span>}
+                </div>
+              );
+            }
+            if (laneColor) return <div key={key} className={`cell home-lane lane-${laneColor}`} />;
+            return <div key={key} className="cell empty" />;
+          })}
+        </div>
+        <Home color="green" className="home-green" />
+        <Home color="yellow" className="home-yellow" />
+        <Home color="red" className="home-red" />
+        <Home color="blue" className="home-blue" />
+        <Center />
+      </div>
+    </main>
+  );
 }
