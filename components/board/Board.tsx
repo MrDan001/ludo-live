@@ -4,7 +4,7 @@ import { useMemo } from "react";
 import { Player, PlayerColor, ALL_COLORS } from "@/lib/engine";
 import {
   BASE_ZONE, BASE_COORDS, GLOBAL_PATH_COORDS, HOME_STRETCH_COORDS,
-  CENTER_COORD, ENTRY_COORDS, COLOR_BG_SOLID, getSafeCoordSet, getRenderCoord,
+  ENTRY_COORDS, COLOR_BG_SOLID, getSafeCoordSet, getRenderCoord,
 } from "@/lib/engine/layout";
 import Token from "./Token";
 
@@ -12,12 +12,11 @@ const BOARD_SIZE = 15;
 type Pos = number | "YARD";
 type Cell = { type: "yard" | "path" | "home" | "empty"; color?: PlayerColor; safe?: boolean; entryColor?: PlayerColor; yardSlot?: boolean; homeIndex?: number };
 const key = (r: number, c: number) => `${r},${c}`;
-
 const HOME_ARROW: Record<PlayerColor, string> = { RED: "↑", GREEN: "↓", YELLOW: "←", BLUE: "→" };
 const CLOCKWISE_ARROWS: Record<string, string> = {
   "1,6": "↑", "3,6": "↑", "5,6": "↑", "0,8": "→", "0,10": "→", "0,12": "→",
   "8,14": "↓", "10,14": "↓", "12,14": "↓", "14,6": "←", "14,8": "←", "14,10": "←",
-  "6,0": "↑", "8,0": "↑",
+  "6,0": "→", "8,0": "→",
 };
 
 function buildBoard(): Record<string, Cell> {
@@ -43,24 +42,21 @@ interface BoardProps {
   players: Player[];
   selectableTokenIds: Set<string>;
   onTokenClick: (id: string) => void;
-  onMoveAnimationComplete?: () => void;
   playerNames?: Partial<Record<PlayerColor, string>>;
   playerAvatars?: Partial<Record<PlayerColor, string | undefined>>;
   emptyColors?: Set<PlayerColor>;
-  disconnectedColors?: Set<PlayerColor>;
   currentTurnColors?: Set<PlayerColor>;
-  onCapture?: (info: { tokenId: string; color: PlayerColor }) => void;
   showTapHint?: boolean;
 }
 
 function AvatarCluster({ color, name, avatar, empty, turn }: { color: PlayerColor; name: string; avatar?: string; empty: boolean; turn: boolean }) {
   const z = BASE_ZONE[color];
   return (
-    <div className="absolute z-30 pointer-events-none flex items-center justify-center" style={{ top: `${((z.rowStart + 2.5) / BOARD_SIZE) * 100}%`, left: `${((z.colStart + 2.5) / BOARD_SIZE) * 100}%`, width: `${(1.65 / BOARD_SIZE) * 100}%`, height: `${(1.65 / BOARD_SIZE) * 100}%`, transform: "translate(-50%,-50%)" }}>
+    <div className="absolute z-30 pointer-events-none flex items-center justify-center" style={{ top: `${((z.rowStart + 2.65) / BOARD_SIZE) * 100}%`, left: `${((z.colStart + 2.65) / BOARD_SIZE) * 100}%`, width: `${(1.85 / BOARD_SIZE) * 100}%`, height: `${(1.85 / BOARD_SIZE) * 100}%`, transform: "translate(-50%,-50%)" }}>
       <div className={`relative flex h-full w-full items-center justify-center rounded-full border-2 border-white bg-black/10 shadow-lg ${turn ? "ring-2 ring-amber-300" : ""}`}>
-        <div className="absolute -left-[45%] top-[18%] grid aspect-square w-[48%] place-items-center rounded-full border border-black/20 bg-white/85 text-[clamp(7px,2vw,16px)]">🧑🏽</div>
-        <div className="absolute -right-[45%] top-[18%] grid aspect-square w-[48%] place-items-center rounded-full border border-black/20 bg-white/85 text-[clamp(7px,2vw,16px)]">👩🏽</div>
-        <div className="relative grid h-[76%] w-[76%] place-items-center overflow-hidden rounded-full border-2 border-white bg-black/20 text-[clamp(8px,2.2vw,18px)] font-black text-white">
+        <div className="absolute -left-[40%] top-[17%] grid aspect-square w-[44%] place-items-center rounded-full border border-black/20 bg-white/90 text-[clamp(8px,2vw,16px)]">🧑🏽</div>
+        <div className="absolute -right-[40%] top-[17%] grid aspect-square w-[44%] place-items-center rounded-full border border-black/20 bg-white/90 text-[clamp(8px,2vw,16px)]">👩🏽</div>
+        <div className="relative grid h-[76%] w-[76%] place-items-center overflow-hidden rounded-full border-2 border-white bg-black/20 text-[clamp(9px,2.2vw,18px)] font-black text-white">
           {empty ? "+" : avatar ? <img src={avatar} alt={name} className="h-full w-full object-cover" /> : name.charAt(0).toUpperCase()}
         </div>
       </div>
@@ -94,8 +90,7 @@ export default function Board({ players, selectableTokenIds, onTokenClick, playe
     <div dir="ltr" className="relative isolate mx-auto grid aspect-square w-full overflow-hidden rounded-[20px] border-[5px] border-slate-950 bg-white shadow-2xl" style={{ gridTemplateColumns: `repeat(${BOARD_SIZE},minmax(0,1fr))`, gridTemplateRows: `repeat(${BOARD_SIZE},minmax(0,1fr))` }} aria-label="Ludo board">
       {Array.from({ length: BOARD_SIZE * BOARD_SIZE }).map((_, i) => {
         const row = Math.floor(i / BOARD_SIZE), col = i % BOARD_SIZE;
-        const centerCell = row >= 6 && row <= 8 && col >= 6 && col <= 8;
-        if (centerCell) return null;
+        if (row >= 6 && row <= 8 && col >= 6 && col <= 8) return null;
         const cell = BOARD_CELLS[key(row, col)];
         const tokens = tokensByCell[key(row, col)] ?? [];
         const isHome = cell.type === "home";
@@ -103,7 +98,7 @@ export default function Board({ players, selectableTokenIds, onTokenClick, playe
         const arrow = CLOCKWISE_ARROWS[key(row, col)];
         return (
           <div key={key(row, col)} style={{ gridRow: row + 1, gridColumn: col + 1 }} className={`relative flex items-center justify-center ${bg} ${cell.type !== "yard" ? "border border-slate-300" : ""}`}>
-            {cell.yardSlot && tokens.length === 0 && <div className="absolute h-[68%] w-[68%] rounded-full border-[3px] border-white/90 bg-black/10 shadow-inner" />}
+            {cell.yardSlot && <div className="pointer-events-none absolute left-1/2 top-1/2 z-[5] h-[150%] w-[150%] -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] border-white/95 bg-white/10 shadow-inner" />}
             {cell.type === "path" && cell.safe && <span className="absolute z-10 font-black text-amber-500" style={{ fontSize: "clamp(10px,3vw,22px)" }}>★</span>}
             {arrow && <span className="absolute z-10 font-black text-slate-800/80" style={{ fontSize: "clamp(10px,3vw,20px)" }}>{arrow}</span>}
             {isHome && cell.homeIndex === 2 && <span className="absolute z-10 font-black text-white/90" style={{ fontSize: "clamp(10px,3vw,20px)" }}>{HOME_ARROW[cell.color!]}</span>}
@@ -115,7 +110,6 @@ export default function Board({ players, selectableTokenIds, onTokenClick, playe
         );
       })}
 
-      {/* True 3x3 center, matching the reference instead of a single-cell LUDO badge. */}
       <div className="pointer-events-none absolute left-[40%] top-[40%] z-40 h-[20%] w-[20%] overflow-hidden bg-white" aria-label="Ludo center">
         <div className={`${COLOR_BG_SOLID.GREEN} absolute inset-0`} style={{ clipPath: "polygon(0 0,100% 0,50% 50%)" }} />
         <div className={`${COLOR_BG_SOLID.YELLOW} absolute inset-0`} style={{ clipPath: "polygon(100% 0,100% 100%,50% 50%)" }} />
@@ -130,7 +124,7 @@ export default function Board({ players, selectableTokenIds, onTokenClick, playe
 
       {ALL_COLORS.map((color) => {
         const z = BASE_ZONE[color];
-        return <div key={`label-${color}`} className="absolute z-35 pointer-events-none font-black text-white drop-shadow-[0_2px_1px_rgba(0,0,0,.8)]" style={{ top: `${((z.rowStart + 0.18) / BOARD_SIZE) * 100}%`, left: `${((z.colStart + 1.55) / BOARD_SIZE) * 100}%`, fontSize: "clamp(10px,3vw,24px)" }}>{playerNames?.[color] ?? color.toLowerCase()}</div>;
+        return <div key={`label-${color}`} className="absolute z-35 pointer-events-none font-black text-white drop-shadow-[0_2px_1px_rgba(0,0,0,.8)] text-center" style={{ top: `${((z.rowStart + 0.18) / BOARD_SIZE) * 100}%`, left: `${((z.colStart + 1.5) / BOARD_SIZE) * 100}%`, width: `${(3 / BOARD_SIZE) * 100}%`, fontSize: "clamp(10px,3vw,24px)" }}>{playerNames?.[color] ?? color.toLowerCase()}</div>;
       })}
 
       {showTapHint && hint && <div className="absolute z-[60] pointer-events-none" style={{ top: `${((hint.row + .5) / BOARD_SIZE) * 100}%`, left: `${((hint.col + .5) / BOARD_SIZE) * 100}%`, transform: "translate(-10%,-10%)" }}><div className="text-[clamp(24px,8vw,60px)] leading-none drop-shadow-xl animate-bounce">👆</div></div>}
