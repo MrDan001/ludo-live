@@ -6,9 +6,10 @@ export type PlayerState = { color: PlayerColor; tokens: TokenState[] };
 export const TRACK_LENGTH = 48;
 export const FINISH_PROGRESS = 53;
 export const HOME_ENTRY_ROLL = 6;
-export const START_INDEX: Record<PlayerColor, number> = { red: 0, blue: 33, green: 17, yellow: 34 };
+// The four visible starting/exit squares on the shared route.
+export const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 17, yellow: 33, blue: 9 };
 export const COLORS: PlayerColor[] = ["red", "green", "yellow", "blue"];
-export const SAFE_TRACK_INDICES = new Set([0, 17, 34, 40]);
+export const SAFE_TRACK_INDICES = new Set([0, 9, 17, 33]);
 
 export function createToken(id: number): TokenState { return { id, progress: -1, status: "home" }; }
 export function createPlayer(color: PlayerColor): PlayerState { return { color, tokens: [0, 1, 2, 3].map(createToken) }; }
