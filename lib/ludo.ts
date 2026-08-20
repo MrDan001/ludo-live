@@ -6,10 +6,10 @@ export type PlayerState = { color: PlayerColor; tokens: TokenState[] };
 export const TRACK_LENGTH = 48;
 export const FINISH_PROGRESS = 53;
 export const HOME_ENTRY_ROLL = 6;
-// The four visible starting/exit squares on the shared route.
-export const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 17, yellow: 33, blue: 9 };
+// Same clockwise shared-track direction for every player as the red route.
+export const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 17, yellow: 35, blue: 11 };
 export const COLORS: PlayerColor[] = ["red", "green", "yellow", "blue"];
-export const SAFE_TRACK_INDICES = new Set([0, 9, 17, 33]);
+export const SAFE_TRACK_INDICES = new Set([0, 11, 17, 35]);
 
 export function createToken(id: number): TokenState { return { id, progress: -1, status: "home" }; }
 export function createPlayer(color: PlayerColor): PlayerState { return { color, tokens: [0, 1, 2, 3].map(createToken) }; }
@@ -61,9 +61,9 @@ export function movableTokenIds(players: PlayerState[], color: PlayerColor, roll
 export function chooseBotToken(players: PlayerState[], color: PlayerColor, roll: number): number | null {
   const p = players.find(x => x.color === color); if (!p) return null;
   const movable = p.tokens.filter(t => isMovable(t, roll)); if (!movable.length) return null;
-  const safe = movable.filter(t => { const m = advanceToken(t, roll); return m !== null && !landingBlocked(players, color, m); });
+  const safe = movable.filter(t => { const m = advanceToken(t, roll); return m && !landingBlocked(players, color, m); });
   const pool = safe.length ? safe : movable;
-  const capture = pool.find(t => { const m = advanceToken(t, roll); return m !== null && players.some(o => o.color !== color && o.tokens.some(e => canKill(color, m, o.color, e))); });
+  const capture = pool.find(t => { const m = advanceToken(t, roll); return m && players.some(o => o.color !== color && o.tokens.some(e => canKill(color, m, o.color, e))); });
   if (capture) return capture.id;
   const finish = pool.find(t => t.status === "track" && t.progress + roll === FINISH_PROGRESS);
   if (finish) return finish.id;
@@ -71,12 +71,11 @@ export function chooseBotToken(players: PlayerState[], color: PlayerColor, roll:
   if (enter) return enter.id;
   return pool.reduce((best, t) => t.progress > best.progress ? t : best).id;
 }
-export function applyMove(players: PlayerState[], color: PlayerColor, tokenId: number | null, roll: number): PlayerState[] {
-  if (tokenId === null) return players;
+export function applyMove(players: PlayerState[], color: PlayerColor, tokenId: number, roll: number): PlayerState[] {
   const next = players.map(p => ({ ...p, tokens: p.tokens.map(t => ({ ...t })) }));
   const p = next.find(x => x.color === color); if (!p) return next;
   const token = p.tokens.find(t => t.id === tokenId); if (!token) return next;
-  const moved = advanceToken(token, roll); if (moved === null || landingBlocked(next, color, moved)) return next;
+  const moved = advanceToken(token, roll); if (!moved || landingBlocked(next, color, moved)) return next;
   p.tokens = p.tokens.map(t => t.id === tokenId ? moved : t);
   return killOneOpponent(next, color, moved);
 }
