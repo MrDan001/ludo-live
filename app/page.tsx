@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { advanceToken, allFinished, createGame, FINISH_PROGRESS, isMovable, killOneOpponent, PlayerState, PlayerColor } from "@/lib/ludo";
+import { advanceToken, allFinished, createGame, FINISH_PROGRESS, isMovable, killOneOpponent, PlayerState, PlayerColor } from "../lib/ludo";
 
 const COLORS = { green: "#08a63b", yellow: "#ffad08", red: "#f21b2d", blue: "#1769e8" } as const;
 type Choice = "blue" | "green" | "red" | null;
