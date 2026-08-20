@@ -6,8 +6,18 @@ export type PlayerState = { color: PlayerColor; tokens: TokenState[] };
 export const TRACK_LENGTH = 48;
 export const FINISH_PROGRESS = 53;
 export const HOME_ENTRY_ROLL = 6;
-// Same clockwise shared-track direction for every player as the red route.
-export const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 17, yellow: 35, blue: 11 };
+
+// IMPORTANT: these are board-route indices, not arbitrary player offsets.
+// BOARD_ROUTE is clockwise. Each player enters the shared route from the
+// square immediately outside the opposite side of their home box.
+// Red is the reference route and remains unchanged.
+export const START_INDEX: Record<PlayerColor, number> = {
+  red: 0,
+  green: 17,
+  yellow: 35,
+  blue: 11,
+};
+
 export const COLORS: PlayerColor[] = ["red", "green", "yellow", "blue"];
 export const SAFE_TRACK_INDICES = new Set([0, 11, 17, 35]);
 
