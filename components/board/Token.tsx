@@ -11,11 +11,11 @@ interface TokenProps {
 }
 
 export default function Token({ color, selectable, onClick, resting = false }: TokenProps) {
-  const sizeClass = selectable
-    ? "h-[82%] w-[82%] sm:h-[78%] sm:w-[78%]"
-    : resting
-      ? "h-[76%] w-[76%] sm:h-[72%] sm:w-[72%]"
-      : "h-[92%] w-[92%]";
+  const sizeClass = resting
+    ? "h-[122%] w-[122%] sm:h-[118%] sm:w-[118%]"
+    : selectable
+      ? "h-[92%] w-[92%]"
+      : "h-[100%] w-[100%]";
 
   return (
     <button
@@ -23,14 +23,14 @@ export default function Token({ color, selectable, onClick, resting = false }: T
       disabled={!selectable}
       aria-label={`${color} token`}
       className={[
-        "absolute left-1/2 top-1/2 z-10 block aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] sm:border-[4px] shadow-xl transition-all duration-200 ease-out",
+        "absolute left-1/2 top-1/2 z-10 block aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-[3px] sm:border-[4px] shadow-[0_3px_6px_rgba(0,0,0,.35)] transition-all duration-200 ease-out",
         sizeClass,
-        selectable ? "ring-4 ring-white/80 cursor-pointer" : "cursor-default",
+        selectable ? "ring-4 ring-white/90 cursor-pointer scale-105" : "cursor-default",
         COLOR_BG[color],
         COLOR_BORDER[color],
       ].join(" ")}
     >
-      <span className="absolute top-[10%] left-[16%] aspect-square w-[36%] rounded-full bg-white/45 blur-[1px]" />
+      <span className="absolute top-[9%] left-[15%] aspect-square w-[34%] rounded-full bg-white/45 blur-[1px]" />
     </button>
   );
 }
