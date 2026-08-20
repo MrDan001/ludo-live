@@ -6,8 +6,6 @@ export type PlayerState = { color: PlayerColor; tokens: TokenState[] };
 export const TRACK_LENGTH = 52;
 export const FINISH_PROGRESS = 57;
 export const HOME_ENTRY_ROLL = 6;
-
-// These indexes match the visual route used by the board.
 export const START_INDEX: Record<PlayerColor, number> = { red: 0, blue: 11, green: 24, yellow: 35 };
 export const COLORS: PlayerColor[] = ["red", "blue", "green", "yellow"];
 
@@ -42,7 +40,7 @@ export function canKill(attackerColor: PlayerColor, attacker: TokenState, defend
   return !safe.has(a);
 }
 
-/** Requested kill rule: kill only one opponent token; another token on the same square remains. */
+/** Kill exactly one opponent token. If two opponents share the square, the other stays. */
 export function killOneOpponent(players: PlayerState[], attackerColor: PlayerColor, movedToken: TokenState): PlayerState[] {
   const next = players.map((player) => ({ ...player, tokens: player.tokens.map((token) => ({ ...token })) }));
   for (const player of next) {
@@ -57,4 +55,35 @@ export function playerHasMove(players: PlayerState[], color: PlayerColor, roll: 
   const player = players.find((item) => item.color === color);
   return !!player?.tokens.some((token) => isMovable(token, roll));
 }
+
+/** Simple bot: prefer a kill, then finishing a token, then entering from home, then the furthest token. */
+export function chooseBotToken(players: PlayerState[], color: PlayerColor, roll: number): number | null {
+  const player = players.find((item) => item.color === color);
+  if (!player) return null;
+  const movable = player.tokens.filter((token) => isMovable(token, roll));
+  if (!movable.length) return null;
+  const kill = movable.find((token) => {
+    const moved = advanceToken(token, roll);
+    return moved && players.some((opponent) => opponent.color !== color && opponent.tokens.some((enemy) => canKill(color, moved, opponent.color, enemy)));
+  });
+  if (kill) return kill.id;
+  const finish = movable.find((token) => token.status === "track" && token.progress + roll === FINISH_PROGRESS);
+  if (finish) return finish.id;
+  const enter = movable.find((token) => token.status === "home");
+  if (enter) return enter.id;
+  return movable.reduce((best, token) => token.progress > best.progress ? token : best).id;
+}
+
+export function applyMove(players: PlayerState[], color: PlayerColor, tokenId: number, roll: number): PlayerState[] {
+  const next = players.map((player) => ({ ...player, tokens: player.tokens.map((token) => ({ ...token })) }));
+  const player = next.find((item) => item.color === color);
+  if (!player) return next;
+  const token = player.tokens.find((item) => item.id === tokenId);
+  if (!token) return next;
+  const moved = advanceToken(token, roll);
+  if (!moved) return next;
+  player.tokens = player.tokens.map((item) => item.id === tokenId ? moved : item);
+  return killOneOpponent(next, color, moved);
+}
+
 export function allFinished(player: PlayerState): boolean { return player.tokens.every((token) => token.status === "finished"); }
