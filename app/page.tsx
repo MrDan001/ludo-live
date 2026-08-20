@@ -134,7 +134,7 @@ export default function HomePage(){
     setChoice(v);
   }
 
-  function updateToken(color:PlayerColor,id:number,tokenUpdater:(token:PlayerState["tokens"][number])=>PlayerState[PlayerColor extends never ? never : "tokens"][number]){
+  function updateToken(color:PlayerColor,id:number,tokenUpdater:(token:PlayerState["tokens"][number])=>PlayerState["tokens"][number]){
     setPlayers(current=>current.map(p=>p.color===color?{...p,tokens:p.tokens.map(t=>t.id===id?tokenUpdater(t):t)}:p));
   }
 
