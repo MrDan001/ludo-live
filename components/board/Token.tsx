@@ -12,10 +12,10 @@ interface TokenProps {
 
 export default function Token({ color, selectable, onClick, resting = false }: TokenProps) {
   const sizeClass = selectable
-    ? "h-[64%] w-[64%] scale-90"
+    ? "h-[68%] w-[68%]"
     : resting
-      ? "h-[112%] w-[112%]"
-      : "h-[86%] w-[86%]";
+      ? "h-[118%] w-[118%]"
+      : "h-[94%] w-[94%]";
 
   return (
     <button
@@ -26,7 +26,7 @@ export default function Token({ color, selectable, onClick, resting = false }: T
         "absolute left-1/2 top-1/2 z-10 block aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-[4px] shadow-xl transition-all duration-250 ease-out",
         sizeClass,
         selectable
-          ? "ring-4 ring-white/80 cursor-pointer"
+          ? "ring-4 ring-white/80 cursor-pointer scale-95"
           : "cursor-default",
         COLOR_BG[color],
         COLOR_BORDER[color],
