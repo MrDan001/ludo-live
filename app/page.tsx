@@ -8,7 +8,7 @@ type Choice = "blue" | "green" | "red" | null;
 type Dice = [number | null, number | null];
 
 // 48 visible shared-track squares. Each player's entry is aligned with the
-// correct home lane so the token makes the intended L-shaped turn into it.
+// correct home lane so the token makes the intended L/J-shaped turn into it.
 const BOARD_ROUTE: [number, number][] = [
   [13,6],[12,6],[11,6],[10,6],[9,6],
   [8,5],[8,4],[8,3],[8,2],[8,1],[7,1],[6,1],[6,2],[6,3],[6,4],[6,5],
@@ -18,17 +18,19 @@ const BOARD_ROUTE: [number, number][] = [
 ];
 const TRACK_LENGTH = BOARD_ROUTE.length;
 
-// Correct entry points: red bottom-left, green top-left, yellow top-right,
-// blue bottom-right. The previous blue/green indices were on the wrong sides.
+// Entry points remain tied to the existing shared route. The coloured lanes
+// below now sit on the home-facing edge of each quadrant, producing the
+// L/J-shaped turn seen in the reference board.
 const START_INDEX: Record<PlayerColor, number> = { red: 0, green: 16, yellow: 33, blue: 40 };
 
-// Five coloured home-lane squares. Blue uses the right-hand bottom column,
-// mirroring red's left-hand bottom lane and creating the requested L turn.
+// Five inner home-lane squares. The sixth coloured square is the visible
+// exit/start square rendered by TrackCell, so the lane visually forms the
+// requested L/J turn without changing the existing progress rules.
 const HOME_LANES: Record<PlayerColor, [number, number][]> = {
-  red: [[12,7],[11,7],[10,7],[9,7],[8,7]],
-  green: [[2,7],[3,7],[4,7],[5,7],[6,7]],
-  yellow: [[7,12],[7,11],[7,10],[7,9],[7,8]],
-  blue: [[12,8],[11,8],[10,8],[9,8],[8,8]],
+  red: [[12,6],[11,6],[10,6],[9,6],[8,6]],
+  green: [[5,6],[4,6],[3,6],[2,6],[1,6]],
+  yellow: [[6,9],[6,10],[6,11],[6,12],[6,13]],
+  blue: [[8,9],[8,10],[8,11],[8,12],[8,13]],
 };
 const NEXT: Record<PlayerColor, PlayerColor> = { red: "green", green: "yellow", yellow: "blue", blue: "red" };
 
@@ -205,10 +207,12 @@ export default function HomePage() {
 }
 
 function TrackCell({ row, col }: { row: number; col: number }) {
-  const green = col === 7 && row >= 1 && row <= 5;
-  const yellow = row === 7 && col >= 9 && col <= 13;
-  const red = col === 7 && row >= 9 && row <= 13;
-  const blue = col === 8 && row >= 9 && row <= 13;
+  // Six coloured exit squares sit directly against each home quadrant. The
+  // inner five continue as HOME_LANES, creating the visible L/J entry shape.
+  const green = col === 6 && row >= 0 && row <= 5;
+  const yellow = row === 6 && col >= 9 && col <= 14;
+  const red = col === 6 && row >= 9 && row <= 14;
+  const blue = row === 8 && col >= 9 && col <= 14;
   let cls = "track-cell";
   if (green) cls += " green-path"; else if (yellow) cls += " yellow-path"; else if (red) cls += " red-path"; else if (blue) cls += " blue-path";
   return <div className={cls} />;
