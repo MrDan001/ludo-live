@@ -3,10 +3,12 @@ export type TokenStatus = "home" | "track" | "finished";
 export type TokenState = { id: number; progress: number; status: TokenStatus };
 export type PlayerState = { color: PlayerColor; tokens: TokenState[] };
 
-export const TRACK_LENGTH = 52;
-export const FINISH_PROGRESS = 57;
+// The playable perimeter follows only the visible board squares. The four
+// squares hidden by the centre box are deliberately NOT part of the route.
+export const TRACK_LENGTH = 48;
+export const FINISH_PROGRESS = 52;
 export const HOME_ENTRY_ROLL = 6;
-export const START_INDEX: Record<PlayerColor, number> = { red: 0, blue: 11, green: 24, yellow: 35 };
+export const START_INDEX: Record<PlayerColor, number> = { red: 0, blue: 10, green: 22, yellow: 32 };
 export const COLORS: PlayerColor[] = ["red", "blue", "green", "yellow"];
 
 export function createToken(id: number): TokenState { return { id, progress: -1, status: "home" }; }
@@ -36,7 +38,8 @@ export function canKill(attackerColor: PlayerColor, attacker: TokenState, defend
   if (attackerColor === defenderColor) return false;
   const a = globalTrackIndex(attackerColor, attacker), d = globalTrackIndex(defenderColor, defender);
   if (a === null || d === null || a !== d) return false;
-  const safe = new Set([0, 11, 13, 24, 25, 26, 35, 37, 39, 45]);
+  // Visible start squares plus the four visible star/safe squares.
+  const safe = new Set([0, 1, 10, 12, 22, 23, 32, 34]);
   return !safe.has(a);
 }
 
