@@ -7,21 +7,18 @@ export const TRACK_LENGTH = 48;
 export const FINISH_PROGRESS = 53;
 export const HOME_ENTRY_ROLL = 6;
 
-// IMPORTANT: these are board-route indices, not arbitrary player offsets.
-// BOARD_ROUTE is clockwise. Each player enters the shared route from the
-// square immediately outside the opposite side of their home box.
-// Red is the reference route and remains unchanged.
+// Board-route indices for the four marked first-exit squares on the board.
+// A token entering from home with a 6 starts at progress 0 on its own exit.
 export const START_INDEX: Record<PlayerColor, number> = {
-  red: 0,
-  green: 17,
-  yellow: 35,
-  blue: 11,
+  red: 1,    // (13,6) bottom exit
+  green: 14, // (6,1) left exit
+  yellow: 26,// (1,8) top exit
+  blue: 39,  // (8,13) right exit
 };
 
 export const COLORS: PlayerColor[] = ["red", "green", "yellow", "blue"];
-export const SAFE_TRACK_INDICES = new Set([0, 11, 17, 35]);
+export const SAFE_TRACK_INDICES = new Set([1, 14, 26, 39]);
 
-// Board/engine alignment marker: keep this route mapping authoritative.
 export const BOARD_ROUTE_CLOCKWISE = true;
 
 export function createToken(id: number): TokenState { return { id, progress: -1, status: "home" }; }
