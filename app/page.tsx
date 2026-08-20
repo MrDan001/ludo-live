@@ -20,7 +20,8 @@ const BOARD_ROUTE: [number, number][] = [
 
 const route = new Set(BOARD_ROUTE.map(([r, c]) => `${r}-${c}`));
 const safe = new Set([0, 8, 13, 21, 26, 34, 39, 47]);
-const BLUE_EXIT = "8-14";
+// The blue exit is the small path box immediately above the previously colored exit box.
+const BLUE_EXIT = "7-14";
 
 const LANES: Record<keyof typeof COLORS, [number, number][]> = {
   red: [[13,7],[12,7],[11,7],[10,7],[9,7]],
@@ -83,7 +84,7 @@ export default function HomePage() {
         <Home color="yellow" className="home-yellow" />
         <Home color="red" className="home-red" />
         <Home color="blue" className="home-blue" />
-        <Center />
+        <Center/>
       </div>
     </main>
   );
