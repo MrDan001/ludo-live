@@ -11,14 +11,13 @@ interface TokenProps {
 }
 
 export default function Token({ color, selectable, onClick, resting = false }: TokenProps) {
-  // Keep tokens large enough to read on small screens while remaining centred
-  // inside their square. The transform below centres the token itself, so the
-  // larger resting token cannot become visually biased to one side.
+  // The token is centred against the full board cell by left/top 50% and
+  // both translations. Selectable tokens are deliberately larger on mobile.
   const sizeClass = selectable
-    ? "h-[78%] w-[78%] sm:h-[72%] sm:w-[72%]"
+    ? "h-[90%] w-[90%] sm:h-[84%] sm:w-[84%]"
     : resting
-      ? "h-[108%] w-[108%] sm:h-[118%] sm:w-[118%]"
-      : "h-[94%] w-[94%]";
+      ? "h-[112%] w-[112%] sm:h-[118%] sm:w-[118%]"
+      : "h-[100%] w-[100%]";
 
   return (
     <button
@@ -29,7 +28,7 @@ export default function Token({ color, selectable, onClick, resting = false }: T
         "absolute left-1/2 top-1/2 z-10 block aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-[4px] shadow-xl transition-all duration-250 ease-out",
         sizeClass,
         selectable
-          ? "ring-4 ring-white/80 cursor-pointer scale-95"
+          ? "ring-4 ring-white/80 cursor-pointer"
           : "cursor-default",
         COLOR_BG[color],
         COLOR_BORDER[color],
