@@ -11,16 +11,22 @@ interface TokenProps {
 }
 
 export default function Token({ color, selectable, onClick, resting = false }: TokenProps) {
+  const sizeClass = selectable
+    ? "h-[64%] w-[64%] scale-90"
+    : resting
+      ? "h-[112%] w-[112%]"
+      : "h-[86%] w-[86%]";
+
   return (
     <button
       onClick={onClick}
       disabled={!selectable}
       aria-label={`${color} token`}
       className={[
-        "absolute left-1/2 top-1/2 z-10 block aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-[4px] shadow-xl transition-transform duration-200",
-        resting ? "h-[88%] w-[88%]" : "h-[78%] w-[78%]",
+        "absolute left-1/2 top-1/2 z-10 block aspect-square -translate-x-1/2 -translate-y-1/2 rounded-full border-[4px] shadow-xl transition-all duration-250 ease-out",
+        sizeClass,
         selectable
-          ? "ring-4 ring-white/80 cursor-pointer animate-bounce"
+          ? "ring-4 ring-white/80 cursor-pointer"
           : "cursor-default",
         COLOR_BG[color],
         COLOR_BORDER[color],
