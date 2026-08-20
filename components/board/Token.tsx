@@ -11,12 +11,12 @@ interface TokenProps {
 }
 
 export default function Token({ color, selectable, onClick, resting = false }: TokenProps) {
-  // The token is centred against the full board cell by left/top 50% and
-  // both translations. Selectable tokens are deliberately larger on mobile.
+  // Keep resting tokens 150% larger than the previous mobile resting size,
+  // while preserving true centre alignment inside the board cell.
   const sizeClass = selectable
     ? "h-[90%] w-[90%] sm:h-[84%] sm:w-[84%]"
     : resting
-      ? "h-[112%] w-[112%] sm:h-[118%] sm:w-[118%]"
+      ? "h-[168%] w-[168%] sm:h-[118%] sm:w-[118%]"
       : "h-[100%] w-[100%]";
 
   return (
