@@ -14,7 +14,16 @@ const stars=[{row:6,col:1,color:"green"},{row:1,col:8,color:"yellow"},{row:13,co
 const mainPath=[...Array.from({length:5},(_,i)=>[6,i+1] as const),...Array.from({length:6},(_,i)=>[5-i,6] as const),[0,7],[0,8],...Array.from({length:5},(_,i)=>[i+1,8] as const),...Array.from({length:5},(_,i)=>[6,i+9] as const),[7,13],[7,14],[8,14],...Array.from({length:5},(_,i)=>[8,13-i] as const),...Array.from({length:6},(_,i)=>[9+i,8] as const),[14,7],[14,6],...Array.from({length:5},(_,i)=>[13-i,6] as const),...Array.from({length:6},(_,i)=>[8,5-i] as const),[7,0],[6,0]];
 const starts={green:0,yellow:13,red:39,blue:26} as const;
 const lanePath={green:[[7,1],[7,2],[7,3],[7,4],[7,5]],yellow:[[1,7],[2,7],[3,7],[4,7],[5,7]],red:[[13,7],[12,7],[11,7],[10,7],[9,7]],blue:[[7,13],[7,12],[7,11],[7,10],[7,9]]} as const;
-function tokenCell(color:DemoToken["color"],position:number){if(position<=0)return null;if(position<=52){const index=(starts[color]+position-1)%52;return mainPath[index]}if(position<=57)return lanePath[color][position-53];if(position===58)return [7,7] as const;return null}
+
+// Standard Ludo distance model: 51 shared-track steps, 5 color-lane steps, then center.
+function tokenCell(color:DemoToken["color"],position:number){
+  if(position<=0)return null;
+  if(position<=51){const index=(starts[color]+position-1)%52;return mainPath[index]}
+  if(position<=56)return lanePath[color][position-52];
+  if(position===57)return [7,7] as const;
+  return null;
+}
+
 export default function LudoBoardFixed({theme="classic",preview=false,className="",style,demoTokens=[],onTokenClick}:{theme?:BoardThemeId;preview?:boolean;className?:string;style?:React.CSSProperties;demoTokens?:DemoToken[];onTokenClick?:(color:DemoToken["color"],id:number)=>void}){
  const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic,cells=Array.from({length:225},(_,index)=>({index,row:Math.floor(index/15),col:index%15}));
  const laneAt=(row:number,col:number)=>lanes.find(l=>l.row===row&&l.col===col)?.color;const starAt=(row:number,col:number)=>stars.find(s=>s.row===row&&s.col===col);const visibleTokens=demoTokens.map(t=>{const cell=tokenCell(t.color,t.position);return cell?{...t,row:cell[0],col:cell[1]}:null}).filter(Boolean) as Array<DemoToken&{row:number;col:number}>;const isDemo=demoTokens.length>0;
