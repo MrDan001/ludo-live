@@ -1,8 +1,6 @@
 "use client";
 
-import { Suspense } from "react";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import type { CSSProperties } from "react";
 
 const COLORS = { green: "#16a34a", yellow: "#f4b400", red: "#ef233c", blue: "#2563eb" } as const;
@@ -26,9 +24,10 @@ function Dice({value,onClick,disabled}:{value:number|null;onClick:()=>void;disab
 function Home({color,className,tokens,onTokenClick}:{color:Color;className:string;tokens:number[];onTokenClick:(i:number)=>void}){return <div className={`home ${className}`} style={{background:COLORS[color]}}><div className="home-yard">{tokens.map((p,i)=><button key={i} className="home-slot" onClick={()=>onTokenClick(i)}>{p===HOME?<span className="token token-home" style={{background:COLORS[color]}}/>:<span className="token token-home token-hidden"/>}</button>)}</div></div>}
 function Center({tokens}:{tokens:Record<Color,number[]>}){const finished=(c:Color)=>tokens[c].filter(p=>p===FINAL_HOME);return <div className="center"><div className="center-triangle center-green"/><div className="center-triangle center-yellow"/><div className="center-triangle center-red"/><div className="center-triangle center-blue"/><div className="finished-layer"><div className="finished-zone finished-zone-green">{finished("green").map((_,i)=><span key={i} className="finished-token" style={{background:COLORS.green}}/>)}</div><div className="finished-zone finished-zone-yellow">{finished("yellow").map((_,i)=><span key={i} className="finished-token" style={{background:COLORS.yellow}}/>)}</div><div className="finished-zone finished-zone-red">{finished("red").map((_,i)=><span key={i} className="finished-token" style={{background:COLORS.red}}/>)}</div><div className="finished-zone finished-zone-blue">{finished("blue").map((_,i)=><span key={i} className="finished-token" style={{background:COLORS.blue}}/>)}</div></div></div>}
 function GameBoard(){
- const searchParams=useSearchParams(); const requestedMode=searchParams.get("mode");
+ const [requestedMode,setRequestedMode]=useState<string|null>(null);
  const initialMode:Mode=requestedMode==="two"||requestedMode==="four"||requestedMode==="bot"?requestedMode:"bot";
  const [mode,setMode]=useState<Mode>(initialMode);const [teamTurn,setTeamTurn]=useState<"human"|"bot"|Color>(initialMode==="bot"?"human":"green");const [dice,setDice]=useState<number|null>(null);const [sixStreak,setSixStreak]=useState(0);const [winner,setWinner]=useState<Color[]|null>(null);const [tokens,setTokens]=useState<Record<Color,number[]>>({green:[HOME,HOME,HOME,HOME],yellow:[HOME,HOME,HOME,HOME],red:[HOME,HOME,HOME,HOME],blue:[HOME,HOME,HOME,HOME]});const [animating,setAnimating]=useState(false);
+ useEffect(()=>{setRequestedMode(new URLSearchParams(window.location.search).get("mode"))},[]);
  const tokenVisuals=useMemo(()=>{const r:any[]=[];ORDER.forEach(c=>tokens[c].forEach((p,i)=>{if(p===HOME||p===FINAL_HOME)return;if(p<LANE_START_PROGRESS){const [row,col]=BOARD_ROUTE[routeIndexFor(c,p)];r.push({color:c,token:i,kind:"route",row,col})}else if(p<FINAL_HOME){const lane=LANES[c][p-LANE_START_PROGRESS];if(lane)r.push({color:c,token:i,kind:"lane",row:lane[0],col:lane[1]})}}));return r},[tokens]);
  const humanColors:Color[]=mode==="bot"?["red","yellow"]:mode==="two"?["green","blue"]:ORDER;const botColors:Color[]=mode==="bot"?["green","blue"]:[];const isHuman=(c:Color)=>humanColors.includes(c);
  function currentColors():Color[]{return mode==="four"?[teamTurn as Color]:(teamTurn==="human"?humanColors:botColors)}
@@ -48,6 +47,4 @@ function GameBoard(){
  return <main className="board-page"><section className="game-shell"><div className="game-header"><div className="turn-label">{winner?`${winner.map(c=>c.toUpperCase()).join(" + ")} WINS`:mode==="bot"?(teamTurn==="human"?"YOUR TEAM":"BOT TEAM"):mode==="two"?(teamTurn==="human"?"PLAYER 1":"PLAYER 2"):teamTurn.toUpperCase()+" PLAYER"}</div><Dice value={dice} onClick={roll} disabled={animating||!!winner||dice!==null||(mode!=="four"&&teamTurn!=="human")}/></div><div className="ludo-board"><div className="grid">{Array.from({length:225},(_,idx)=>{const row=Math.floor(idx/15),col=idx%15,key=`${row}-${col}`;const ri=BOARD_ROUTE.findIndex(([r,c])=>r===row&&c===col);const exit=COLORED_EXITS[key];const lane=(Object.keys(LANES) as Color[]).find(c=>LANES[c].some(([r,c2])=>r===row&&c2===col));if(ri>=0)return <div key={key} className={`cell path ${SAFE_SQUARES.has(ri)?"safe":""} ${exit?`exit-${exit}`:""}`}>{exit&&<span className="safe-star">★</span>}</div>;if(lane)return <div key={key} className={`cell home-lane lane-${lane}`}/>;return <div key={key} className="cell empty"/>})}</div>{tokenVisuals.map(t=><button key={`${t.color}-${t.token}`} className={`route-token ${t.kind==="lane"?"lane-token":""}`} style={{"--row":t.row,"--col":t.col,background:COLORS[t.color as Color]} as CSSProperties} onClick={()=>chooseToken(t.color,t.token)}/>)}<Home color="green" className="home-green" tokens={tokens.green} onTokenClick={i=>chooseToken("green",i)}/><Home color="yellow" className="home-yellow" tokens={tokens.yellow} onTokenClick={i=>chooseToken("yellow",i)}/><Home color="red" className="home-red" tokens={tokens.red} onTokenClick={i=>chooseToken("red",i)}/><Home color="blue" className="home-blue" tokens={tokens.blue} onTokenClick={i=>chooseToken("blue",i)}/><Center tokens={tokens}/></div></section></main>
 }
 
-export default function HomePage(){
-  return <Suspense fallback={<main className="board-page"><section className="game-shell"><div className="turn-label">Loading game…</div></section></main>}><GameBoard /></Suspense>;
-}
+export default function HomePage(){return <GameBoard/>;}
