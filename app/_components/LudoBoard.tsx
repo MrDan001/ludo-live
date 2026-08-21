@@ -19,14 +19,25 @@ export const BOARD_NAMES:Record<BoardThemeId,string>={classic:"Classic Ludo",gol
 
 export default function LudoBoard({theme="classic",preview=false,className="",style}: {theme?:BoardThemeId;preview?:boolean;className?:string;style?:React.CSSProperties}){
   const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
-  const cells=Array.from({length:225},(_,index)=>index);
+  const cells=Array.from({length:225},(_,index)=>({
+    index,
+    row:Math.floor(index/15),
+    col:index%15
+  }));
 
   return <div
     className={`shared-ludo-board ${preview?"shared-ludo-board-preview":""} ${className}`.trim()}
     style={{...style,background:p.bg,borderColor:p.accent}}
     aria-label={`${BOARD_NAMES[theme]} Ludo board`}
   >
-    {cells.map(index=><div className="board-cell" key={index} aria-hidden="true" />)}
+    {cells.map(({index,row,col})=>{
+      const isTrack = row>=6 && row<=8 || col>=6 && col<=8;
+      return <div
+        className={`board-cell ${isTrack?"track-cell":""}`}
+        key={index}
+        aria-hidden="true"
+      />;
+    })}
 
     <div className="home-area home-green" aria-hidden="true" />
     <div className="home-area home-yellow" aria-hidden="true" />
@@ -62,6 +73,12 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
 
       .board-cell:nth-child(15n){border-right:0}
       .board-cell:nth-last-child(-n+15){border-bottom:0}
+
+      /* Step 2: the three-cell-wide Ludo track crossing the board. */
+      .track-cell{
+        background:#fafafa;
+        box-shadow:inset 0 0 0 1px #c8cdd3;
+      }
 
       .home-area{
         position:absolute;
