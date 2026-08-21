@@ -2,7 +2,14 @@
 import { useState } from "react";
 
 type DiceFace = 1 | 2 | 3 | 4 | 5 | 6;
-const faces: Record<DiceFace, number[]> = {
+
+type Props = {
+  value: DiceFace;
+  onRoll: (value: DiceFace) => void;
+  disabled?: boolean;
+};
+
+const pips: Record<DiceFace, number[]> = {
   1: [4],
   2: [0, 8],
   3: [0, 4, 8],
@@ -11,16 +18,66 @@ const faces: Record<DiceFace, number[]> = {
   6: [0, 2, 3, 5, 6, 8],
 };
 
-export default function DemoDice() {
-  const [value, setValue] = useState<DiceFace>(1);
+const facePips = (value: DiceFace) =>
+  Array.from({ length: 9 }, (_, i) => <i key={i}>{pips[value].includes(i) ? <b /> : null}</i>);
+
+export default function DemoDice({ value, onRoll, disabled = false }: Props) {
   const [rolling, setRolling] = useState(false);
+  const [rotation, setRotation] = useState(0);
+
   const roll = () => {
-    if (rolling) return;
+    if (rolling || disabled) return;
     setRolling(true);
+    const next = (Math.floor(Math.random() * 6) + 1) as DiceFace;
     window.setTimeout(() => {
-      setValue((Math.floor(Math.random() * 6) + 1) as DiceFace);
+      setRotation((r) => r + 720);
+      onRoll(next);
       setRolling(false);
     }, 850);
   };
-  return <section className="dice-area"><div className="dice-title">DICE DEMO</div><button aria-label="Roll dice" className={`dice-button ${rolling ? "rolling" : ""}`} onClick={roll}><span className="cube"><span className="face front">{Array.from({ length: 9 }, (_, i) => <i key={i}>{faces[value].includes(i) ? <b /> : null}</i>)}</span><span className="face back" /><span className="face right" /><span className="face left" /><span className="face top" /><span className="face bottom" /></span></button><div className="dice-hint">Tap the dice to roll</div><style jsx>{`.dice-area{width:100%;display:grid;place-items:center;gap:8px;padding:18px 0 4px}.dice-title{font-size:10px;letter-spacing:2px;font-weight:900;color:#64748b}.dice-button{width:112px;height:112px;border:0;background:transparent;perspective:900px;cursor:pointer;display:grid;place-items:center}.cube{position:relative;width:72px;height:72px;transform-style:preserve-3d;transform:rotateX(-18deg) rotateY(28deg);transition:transform .55s cubic-bezier(.2,.8,.2,1)}.face{position:absolute;width:72px;height:72px;border-radius:14px;border:2px solid #111;box-sizing:border-box;background:linear-gradient(145deg,#fff 0%,#e5e7eb 58%,#aeb5bf 100%);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:9px;gap:2px;box-shadow:inset 3px 3px 5px #fff,inset -6px -7px 10px #8d96a1}.face i{display:grid;place-items:center}.face b{width:12px;height:12px;border-radius:50%;background:#111;box-shadow:inset 1px 1px 2px #555}.front{transform:translateZ(36px)}.back{transform:rotateY(180deg) translateZ(36px)}.right{transform:rotateY(90deg) translateZ(36px)}.left{transform:rotateY(-90deg) translateZ(36px)}.top{transform:rotateX(90deg) translateZ(36px)}.bottom{transform:rotateX(-90deg) translateZ(36px)}.rolling .cube{animation:diceRoll .85s cubic-bezier(.35,.05,.25,1) 1}.rolling{animation:vibrate .08s linear infinite}@keyframes diceRoll{0%{transform:rotateX(-18deg) rotateY(28deg)}50%{transform:rotateX(170deg) rotateY(205deg)}100%{transform:rotateX(342deg) rotateY(388deg)}}@keyframes vibrate{0%{transform:translate(0)}25%{transform:translate(-2px,1px)}50%{transform:translate(2px,-1px)}75%{transform:translate(-1px,-1px)}100%{transform:translate(0)}}.dice-hint{font-size:11px;color:#64748b}`}</style></section>;
+
+  return (
+    <section className="dice-area" aria-label="Dice">
+      <button
+        type="button"
+        aria-label="Roll dice"
+        className={`dice-button ${rolling ? "rolling" : ""}`}
+        onClick={roll}
+        disabled={disabled || rolling}
+      >
+        <span className="cube" style={{ transform: `rotateX(-18deg) rotateY(${28 + rotation}deg)` }}>
+          <span className="face front">{facePips(1)}</span>
+          <span className="face back">{facePips(6)}</span>
+          <span className="face right">{facePips(3)}</span>
+          <span className="face left">{facePips(4)}</span>
+          <span className="face top">{facePips(5)}</span>
+          <span className="face bottom">{facePips(2)}</span>
+        </span>
+      </button>
+      <div className="dice-value">{rolling ? "Rolling…" : value}</div>
+      <div className="dice-hint">Tap the dice to roll</div>
+      <style jsx>{`
+        .dice-area{display:grid;place-items:center;gap:5px;min-width:142px}
+        .dice-button{width:132px;height:112px;border:0;background:transparent;perspective:900px;cursor:pointer;display:grid;place-items:center;padding:0}
+        .dice-button:disabled{cursor:default}
+        .cube{position:relative;width:76px;height:76px;transform-style:preserve-3d;transition:transform .18s linear}
+        .face{position:absolute;width:76px;height:76px;border-radius:13px;border:2px solid #111;box-sizing:border-box;background:linear-gradient(145deg,#fff 0%,#eef1f4 55%,#b4bcc6 100%);display:grid;grid-template-columns:repeat(3,1fr);grid-template-rows:repeat(3,1fr);padding:9px;gap:2px;box-shadow:inset 3px 3px 5px #fff,inset -6px -7px 10px #8d96a1,0 7px 10px rgba(0,0,0,.18)}
+        .face i{display:grid;place-items:center}
+        .face b{width:12px;height:12px;border-radius:50%;background:#111;box-shadow:inset 1px 1px 2px #555,0 1px 1px rgba(255,255,255,.45)}
+        .front{transform:translateZ(38px)}
+        .back{transform:rotateY(180deg) translateZ(38px)}
+        .right{transform:rotateY(90deg) translateZ(38px)}
+        .left{transform:rotateY(-90deg) translateZ(38px)}
+        .top{transform:rotateX(90deg) translateZ(38px)}
+        .bottom{transform:rotateX(-90deg) translateZ(38px)}
+        .rolling .cube{animation:diceShake .09s linear infinite,diceTumble .85s cubic-bezier(.2,.7,.2,1) 1}
+        .rolling{animation:buttonShake .09s linear infinite}
+        @keyframes diceShake{0%{transform:rotateX(-18deg) rotateY(28deg) translate(0,0) rotateZ(0)}25%{transform:rotateX(12deg) rotateY(65deg) translate(-2px,1px) rotateZ(-2deg)}50%{transform:rotateX(-8deg) rotateY(110deg) translate(2px,-1px) rotateZ(2deg)}75%{transform:rotateX(18deg) rotateY(155deg) translate(-1px,-1px) rotateZ(-1deg)}100%{transform:rotateX(-18deg) rotateY(208deg) translate(0,0) rotateZ(0)}}
+        @keyframes diceTumble{0%{filter:brightness(1)}45%{filter:brightness(.92)}100%{filter:brightness(1)}}
+        @keyframes buttonShake{0%{transform:translate(0)}25%{transform:translate(-2px,1px)}50%{transform:translate(2px,-1px)}75%{transform:translate(-1px,-1px)}100%{transform:translate(0)}}
+        .dice-value{font-size:16px;font-weight:950;color:#e5edf8;min-height:20px}
+        .dice-hint{font-size:10px;color:#9fb5d8}
+      `}</style>
+    </section>
+  );
 }
