@@ -1,51 +1,56 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import type { CSSProperties } from "react";
-import { awardGameWinXP } from "../lib/playerProgress";
+import { useState } from "react";
 
-const COLORS = { green: "#16a34a", yellow: "#f4b400", red: "#ef233c", blue: "#2563eb" } as const;
-type Color = keyof typeof COLORS;
-type Mode = "bot" | "two" | "four";
-const ORDER: Color[] = ["green", "yellow", "red", "blue"];
-const BOARD_ROUTE: [number, number][] = [[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0],[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[6,14],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7]];
-const START_INDEX: Record<Color, number> = { green: 14, yellow: 27, blue: 40, red: 1 };
-const SAFE_SQUARES = new Set([12,8,21,25,34,38,47,51]);
-const COLORED_EXITS: Record<string, Color> = { "6-1":"green", "1-8":"yellow", "8-13":"blue", "13-6":"red" };
-const LANES: Record<Color,[number,number][]> = { red:[[13,7],[12,7],[11,7],[10,7],[9,7]], green:[[7,1],[7,2],[7,3],[7,4],[7,5]], yellow:[[1,7],[2,7],[3,7],[4,7],[5,7]], blue:[[7,9],[7,10],[7,11],[7,12],[7,13]] };
-const LANE_START_PROGRESS = BOARD_ROUTE.length - 1;
-const FINAL_HOME = LANE_START_PROGRESS + 5;
-const HOME = -1;
-function routeIndexFor(color: Color, progress: number){return (START_INDEX[color]+progress)%BOARD_ROUTE.length}
-function isSafe(color: Color, progress: number){return progress<0||progress>=LANE_START_PROGRESS||SAFE_SQUARES.has(routeIndexFor(color,progress))}
-function sameSquare(a:Color,ap:number,b:Color,bp:number){return ap>=0&&bp>=0&&ap<LANE_START_PROGRESS&&bp<LANE_START_PROGRESS&&routeIndexFor(a,ap)===routeIndexFor(b,bp)}
-function sameTeam(a:Color,b:Color,mode:Mode){if(mode==="four")return a===b;return (["green","blue"] as Color[]).includes(a)===( ["green","blue"] as Color[]).includes(b)}
-const DICE_POSITIONS: Record<number,number[]> = {1:[5],2:[1,9],3:[1,5,9],4:[1,3,7,9],5:[1,3,5,7,9],6:[1,3,4,6,7,9]};
-function Dice({value,onClick,disabled}:{value:number|null;onClick:()=>void;disabled:boolean}){const positions=value?(DICE_POSITIONS[value]||[]):[];return <button aria-label={value?`Dice shows ${value}`:"Roll dice"} className={`dice ${value?`dice-${value}`:"dice-ready"}`} onClick={onClick} disabled={disabled}>{positions.map(p=><span key={p} className={`dice-dot pos-${p}`}/>)}</button>}
-function Home({color,className,tokens,onTokenClick}:{color:Color;className:string;tokens:number[];onTokenClick:(i:number)=>void}){return <div className={`home ${className}`} style={{background:COLORS[color]}}><div className="home-yard">{tokens.map((p,i)=><button key={i} className="home-slot" onClick={()=>onTokenClick(i)}>{p===HOME?<span className="token token-home" style={{background:COLORS[color]}}/>:<span className="token token-home token-hidden"/>}</button>)}</div></div>}
-function Center({tokens}:{tokens:Record<Color,number[]>}){const finished=(c:Color)=>tokens[c].filter(p=>p===FINAL_HOME);return <div className="center"><div className="center-triangle center-green"/><div className="center-triangle center-yellow"/><div className="center-triangle center-red"/><div className="center-triangle center-blue"/><div className="finished-layer"><div className="finished-zone finished-zone-green">{finished("green").map((_,i)=><span key={i} className="finished-token" style={{background:COLORS.green}}/>)}</div><div className="finished-zone finished-zone-yellow">{finished("yellow").map((_,i)=><span key={i} className="finished-token" style={{background:COLORS.yellow}}/>)}</div><div className="finished-zone finished-zone-red">{finished("red").map((_,i)=><span key={i} className="finished-token" style={{background:COLORS.red}}/>)}</div><div className="finished-zone finished-zone-blue">{finished("blue").map((_,i)=><span key={i} className="finished-token" style={{background:COLORS.blue}}/>)}</div></div></div>}
-function GameBoard(){
- const [requestedMode,setRequestedMode]=useState<string|null>(null);
- const initialMode:Mode=requestedMode==="two"||requestedMode==="four"||requestedMode==="bot"?requestedMode:"bot";
- const [mode,setMode]=useState<Mode>(initialMode);const [teamTurn,setTeamTurn]=useState<"human"|"bot"|Color>(initialMode==="bot"?"human":"green");const [dice,setDice]=useState<number|null>(null);const [sixStreak,setSixStreak]=useState(0);const [winner,setWinner]=useState<Color[]|null>(null);const [tokens,setTokens]=useState<Record<Color,number[]>>({green:[HOME,HOME,HOME,HOME],yellow:[HOME,HOME,HOME,HOME],red:[HOME,HOME,HOME,HOME],blue:[HOME,HOME,HOME,HOME]});const [animating,setAnimating]=useState(false);
- useEffect(()=>{setRequestedMode(new URLSearchParams(window.location.search).get("mode"))},[]);
- const tokenVisuals=useMemo(()=>{const r:any[]=[];ORDER.forEach(c=>tokens[c].forEach((p,i)=>{if(p===HOME||p===FINAL_HOME)return;if(p<LANE_START_PROGRESS){const [row,col]=BOARD_ROUTE[routeIndexFor(c,p)];r.push({color:c,token:i,kind:"route",row,col})}else if(p<FINAL_HOME){const lane=LANES[c][p-LANE_START_PROGRESS];if(lane)r.push({color:c,token:i,kind:"lane",row:lane[0],col:lane[1]})}}));return r},[tokens]);
- const humanColors:Color[]=mode==="bot"?["red","yellow"]:mode==="two"?["green","blue"]:ORDER;const botColors:Color[]=mode==="bot"?["green","blue"]:[];const isHuman=(c:Color)=>humanColors.includes(c);
- function currentColors():Color[]{return mode==="four"?[teamTurn as Color]:(teamTurn==="human"?humanColors:botColors)}
- function nextTeam(){setDice(null);setSixStreak(0);setTeamTurn(t=>mode==="four"?ORDER[(ORDER.indexOf(t as Color)+1)%4]:t==="human"?"bot":"human")}
- function forfeitTurn(){setDice(null);setSixStreak(0);setTeamTurn(t=>mode==="four"?ORDER[(ORDER.indexOf(t as Color)+1)%4]:t==="human"?"bot":"human")}
- function legalMoves(c:Color,r:number){return tokens[c].map((p,i)=>({p,i})).filter(x=>{if(x.p===HOME){if(r!==6)return false;const target=START_INDEX[c];const opponents=ORDER.filter(o=>o!==c&&!sameTeam(c,o,mode));return !opponents.some(o=>tokens[o].filter(q=>q>=0&&q<LANE_START_PROGRESS&&routeIndexFor(o,q)===target).length>=2)}if(x.p<0||x.p>=FINAL_HOME||x.p+r>FINAL_HOME)return false;for(let step=x.p+1;step<=Math.min(x.p+r,LANE_START_PROGRESS-1);step++){const idx=routeIndexFor(c,step);const blocked=ORDER.some(o=>!sameTeam(c,o,mode)&&tokens[o].filter(q=>q>=0&&q<LANE_START_PROGRESS&&routeIndexFor(o,q)===idx).length>=2);if(blocked)return false}return true}).map(x=>x.i)}
- function animateMove(c:Color,i:number,start:number,end:number,after:(landed:number)=>void){setAnimating(true);let p=start;const step=()=>{p++;setTokens(prev=>({...prev,[c]:prev[c].map((x,j)=>j===i?p:x)}));if(p<end)setTimeout(step,180);else{setAnimating(false);after(p)}};setTimeout(step,180)}
- function resolveMove(c:Color,i:number,r:number){const cur=tokens[c][i];if(cur===HOME){setTokens(prev=>({...prev,[c]:prev[c].map((x,j)=>j===i?0:x)}));setDice(null);if(r===6)return;nextTeam();return}animateMove(c,i,cur,cur+r,landed=>{let captured=0;setTokens(prev=>{const next={...prev,[c]:[...prev[c]]};for(const o of ORDER)if(o!==c&&!sameTeam(c,o,mode))next[o]=next[o].map(p=>{if(sameSquare(c,landed,o,p)&&!isSafe(c,landed)){captured++;return HOME}return p});next[c][i]=landed;return next});const team:Color[]=mode==="bot"?["red","yellow"]:mode==="two"?["green","blue"]:mode==="four"?[c]:[c];const won=team.every(x=>tokens[x].every(p=>p===FINAL_HOME));if(won){if(mode!=="bot"||team.some(x=>isHuman(x)))awardGameWinXP();setWinner(team);setDice(null);return}if(r===6||captured>0){setDice(null);return}nextTeam()})}
- function chooseToken(c:Color,i:number){if(animating||winner)return;if(mode==="four"?c!==teamTurn:teamTurn!=="human"||!isHuman(c))return;if(dice===null)return;if(!legalMoves(c,dice).includes(i))return;resolveMove(c,i,dice)}
- function passIfNoMoves(n:number){const colors=currentColors();if(colors.every(c=>legalMoves(c,n).length===0)){setDice(null);setSixStreak(0);setTimeout(nextTeam,0);return true}return false}
- function roll(){if(animating||winner||dice!==null)return;if(mode!=="four"&&teamTurn!=="human")return;const n=Math.floor(Math.random()*6)+1;const streak=n===6?sixStreak+1:0;if(streak>=4){forfeitTurn();return}if(passIfNoMoves(n))return;setDice(n);setSixStreak(streak)}
- function botRoll(){if(mode!=="bot"||teamTurn!=="bot"||winner||dice!==null||animating)return;const n=Math.floor(Math.random()*6)+1;const streak=n===6?sixStreak+1:0;if(streak>=4){forfeitTurn();return}if(passIfNoMoves(n))return;setDice(n);setSixStreak(streak)}
- function botMove(){if(mode!=="bot"||teamTurn!=="bot"||dice===null||animating||winner)return;const choices=botColors.flatMap(c=>legalMoves(c,dice).map(i=>({c,i})));if(!choices.length){nextTeam();return}const chosen=choices.find(x=>tokens[x.c][x.i]===HOME)||choices[0];resolveMove(chosen.c,chosen.i,dice)}
- useEffect(()=>{if(mode!=="bot"||teamTurn!=="bot"||winner||animating)return;const timer=setTimeout(()=>{if(dice===null)botRoll();else botMove()},650);return()=>clearTimeout(timer)},[mode,teamTurn,dice,winner,animating,sixStreak,tokens]);
- useEffect(()=>{if(winner||animating||dice===null)return;const humanTurn=mode==="four"||teamTurn==="human";if(!humanTurn)return;const colors=currentColors();if(colors.every(c=>legalMoves(c,dice).length===0)){setDice(null);setSixStreak(0);const timer=setTimeout(nextTeam,0);return()=>clearTimeout(timer)}},[mode,teamTurn,dice,winner,animating,tokens]);
- useEffect(()=>{const nextMode:Mode=requestedMode==="two"||requestedMode==="four"||requestedMode==="bot"?requestedMode:"bot";setMode(nextMode);setTeamTurn(nextMode==="bot"?"human":"green");setDice(null);setSixStreak(0);setWinner(null);setTokens({green:[HOME,HOME,HOME,HOME],yellow:[HOME,HOME,HOME,HOME],red:[HOME,HOME,HOME,HOME],blue:[HOME,HOME,HOME,HOME]})},[requestedMode]);
- return <main className="board-page"><section className="game-shell"><div className="game-header"><div className="turn-label">{winner?`${winner.map(c=>c.toUpperCase()).join(" + ")} WINS`:mode==="bot"?(teamTurn==="human"?"YOUR TEAM":"BOT TEAM"):mode==="two"?(teamTurn==="human"?"PLAYER 1":"PLAYER 2"):teamTurn.toUpperCase()+" PLAYER"}</div><Dice value={dice} onClick={roll} disabled={animating||!!winner||dice!==null||(mode!=="four"&&teamTurn!=="human")}/></div><div className="ludo-board"><div className="grid">{Array.from({length:225},(_,idx)=>{const row=Math.floor(idx/15),col=idx%15,key=`${row}-${col}`;const ri=BOARD_ROUTE.findIndex(([r,c])=>r===row&&c===col);const exit=COLORED_EXITS[key];const lane=(Object.keys(LANES) as Color[]).find(c=>LANES[c].some(([r,c2])=>r===row&&c2===col));if(ri>=0)return <div key={key} className={`cell path ${SAFE_SQUARES.has(ri)?"safe":""} ${exit?`exit-${exit}`:""}`}>{exit&&<span className="safe-star">★</span>}</div>;if(lane)return <div key={key} className={`cell home-lane lane-${lane}`}/>;return <div key={key} className="cell empty"/>})}</div>{tokenVisuals.map(t=><button key={`${t.color}-${t.token}`} className={`route-token ${t.kind==="lane"?"lane-token":""}`} style={{"--row":t.row,"--col":t.col,background:COLORS[t.color as Color]} as CSSProperties} onClick={()=>chooseToken(t.color,t.token)}/>)}<Home color="green" className="home-green" tokens={tokens.green} onTokenClick={i=>chooseToken("green",i)}/><Home color="yellow" className="home-yellow" tokens={tokens.yellow} onTokenClick={i=>chooseToken("yellow",i)}/><Home color="red" className="home-red" tokens={tokens.red} onTokenClick={i=>chooseToken("red",i)}/><Home color="blue" className="home-blue" tokens={tokens.blue} onTokenClick={i=>chooseToken("blue",i)}/><Center tokens={tokens}/></div></section></main>
+export default function LandingPage(){
+ const [busy,setBusy]=useState(false);
+ const go=(url:string)=>{setBusy(true);window.location.href=url};
+ const guest=()=>{localStorage.setItem("ludo-guest-mode","1");localStorage.removeItem("ludo-account-created");go("/home")};
+ return <main style={shell}>
+  <div style={glow}/>
+  <section style={hero}>
+   <div style={brand}><span style={brandIcon}>🎲</span><span>LUDO LIVE</span></div>
+   <div style={badge}>🌍 PLAY • COMPETE • CONNECT</div>
+   <h1 style={title}>Your next Ludo game<br/><span style={accent}>starts here.</span></h1>
+   <p style={subtitle}>Create your player account to keep your profile, XP, level, coins, gems, friends and achievements safe and connected.</p>
+   <div style={card}>
+    <h2 style={cardTitle}>Welcome to Ludo Live</h2>
+    <p style={cardText}>Sign in or create an account to unlock the full social experience.</p>
+    <button disabled={busy} onClick={()=>go("/account?next=/home")} style={primary}>CREATE ACCOUNT</button>
+    <button disabled={busy} onClick={()=>go("/account?next=/home")} style={secondary}>SIGN IN</button>
+    <div style={divider}><span>OR CONTINUE WITH</span></div>
+    <div style={socialRow}>
+      <button disabled={busy} onClick={()=>go("/api/auth/google?next=/home")} style={google}><span style={googleG}>G</span> Google</button>
+      <button disabled={busy} onClick={()=>go("/api/auth/facebook?next=/home")} style={facebook}><span style={fb}>f</span> Facebook</button>
+    </div>
+    <button disabled={busy} onClick={guest} style={guestBtn}>CONTINUE AS GUEST</button>
+    <p style={guestNote}>Guest mode lets you play, but social features require an account.</p>
+   </div>
+   <div style={features}><span>🪙 Save your balance</span><span>⭐ Keep your XP & level</span><span>👥 Add friends</span><span>🏆 Keep achievements</span></div>
+  </section>
+ </main>
 }
 
-export default function HomePage(){return <GameBoard/>;}
+const shell={minHeight:"100vh",position:"relative" as const,overflow:"hidden",display:"flex",justifyContent:"center",padding:"28px 16px 40px",boxSizing:"border-box" as const,background:"radial-gradient(circle at 50% -10%,#153f8c 0,#071a3e 35%,#020817 78%)",color:"#fff",fontFamily:"Arial,Helvetica,sans-serif"};
+const glow={position:"absolute" as const,width:420,height:420,borderRadius:"50%",top:-260,left:"50%",transform:"translateX(-50%)",background:"rgba(37,99,235,.28)",filter:"blur(70px)"};
+const hero={position:"relative" as const,zIndex:1,width:"min(100%,620px)",textAlign:"center" as const};
+const brand={display:"inline-flex",alignItems:"center",gap:9,fontWeight:1000,letterSpacing:2,fontSize:19,color:"#dbeafe"};
+const brandIcon={fontSize:28};
+const badge={display:"inline-block",marginTop:28,padding:"8px 13px",borderRadius:999,background:"rgba(37,99,235,.16)",border:"1px solid rgba(96,165,250,.3)",color:"#93c5fd",fontSize:11,fontWeight:900,letterSpacing:1};
+const title={fontSize:"clamp(40px,10vw,64px)",lineHeight:1.03,margin:"22px 0 14px",fontWeight:1000,letterSpacing:-2};
+const accent={color:"#38bdf8"};
+const subtitle={maxWidth:520,margin:"0 auto 24px",fontSize:16,lineHeight:1.55,color:"#9fb2cf"};
+const card={margin:"0 auto",padding:"22px",borderRadius:25,background:"linear-gradient(145deg,rgba(8,31,73,.97),rgba(4,17,39,.98))",border:"1px solid rgba(92,142,223,.28)",boxShadow:"0 24px 80px rgba(0,0,0,.35)"};
+const cardTitle={margin:"0 0 5px",fontSize:24};
+const cardText={margin:"0 0 17px",color:"#8fa7c9",fontSize:13};
+const primary={width:"100%",border:0,borderRadius:13,padding:15,background:"linear-gradient(90deg,#1769e8,#2b8cff)",color:"#fff",fontWeight:1000,fontSize:15};
+const secondary={width:"100%",border:"1px solid #2d5a93",borderRadius:13,padding:14,marginTop:10,background:"#081a38",color:"#dbeafe",fontWeight:950,fontSize:14};
+const divider={display:"flex",alignItems:"center",justifyContent:"center",gap:10,margin:"18px 0 12px",color:"#6682a9",fontSize:10,fontWeight:900};
+const socialRow={display:"grid",gridTemplateColumns:"1fr 1fr",gap:10};
+const google={border:"1px solid #3b557b",borderRadius:12,padding:13,background:"#fff",color:"#1f2937",fontWeight:900,fontSize:14};
+const facebook={border:0,borderRadius:12,padding:13,background:"#1877f2",color:"#fff",fontWeight:900,fontSize:14};
+const googleG={display:"inline-grid",placeItems:"center",width:20,height:20,marginRight:5,fontWeight:1000,color:"#4285f4",background:"#fff"};
+const fb={display:"inline-block",fontSize:20,lineHeight:0,marginRight:4,fontWeight:1000};
+const guestBtn={width:"100%",marginTop:12,border:"1px solid rgba(96,165,250,.28)",borderRadius:12,padding:13,background:"transparent",color:"#9cc7ff",fontWeight:950,fontSize:13};
+const guestNote={margin:"10px 0 0",fontSize:11,color:"#607a9f"};
+const features={display:"flex",justifyContent:"center",flexWrap:"wrap" as const,gap:"9px 15px",marginTop:20,color:"#7189ad",fontSize:11,fontWeight:800};
