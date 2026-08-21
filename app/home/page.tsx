@@ -46,8 +46,8 @@ export default function HomePage() {
 
   return (
     <main style={{ height: "100dvh", minHeight: 0, overflow: "hidden", background: "linear-gradient(180deg,#031536 0%,#020b1d 48%,#010611 100%)", color: "#fff" }}>
-      <div style={{ width: "100%", maxWidth: 560, height: "calc(100% - 68px)", margin: "0 auto", padding: "6px 12px 0", boxSizing: "border-box", display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        <header style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: "5px 2px 8px", flex: "0 0 auto" }}>
+      <div style={{ width: "100%", maxWidth: 560, height: "calc(100dvh - 68px)", margin: "0 auto", padding: "5px 12px 0", boxSizing: "border-box", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <header style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: "4px 2px 7px", flex: "0 0 auto" }}>
           <Link href="/profile" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 9 }}>
             <div style={{ position: "relative", width: 56, height: 56, flex: "0 0 56px", borderRadius: "50%", display: "grid", placeItems: "center", background: "linear-gradient(145deg,#ffe45c,#ffb300)", border: "3px solid #ffd43b", boxShadow: "0 0 0 2px rgba(255,193,7,.22),0 4px 10px rgba(0,0,0,.3)" }}>
               <div style={{ width: 46, height: 46, borderRadius: "50%", display: "grid", placeItems: "center", background: "#c58a54", border: "2px solid #8b5a32", overflow: "hidden", fontSize: 32, lineHeight: 1 }}>👩🏻</div>
@@ -74,7 +74,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section style={{ display: "grid", gridTemplateRows: "repeat(4,clamp(54px,10.5vh,92px))", gap: 6, flex: "0 0 auto" }}>
+        <section style={{ display: "grid", gridTemplateRows: "repeat(4,minmax(48px,1fr))", gap: 6, flex: "1 1 0", minHeight: 192, overflow: "hidden" }}>
           {[
             { icon: "🌐", h: "PLAY ONLINE", s: "See real players waiting in open rooms", href: "/lobby", background: "linear-gradient(135deg,#159447,#31c936)" },
             { icon: "👥", h: "PLAY WITH FRIENDS", s: "Invite friends and play together", href: "/lobby", background: "linear-gradient(135deg,#087b61,#16b875)" },
@@ -89,15 +89,15 @@ export default function HomePage() {
           ))}
         </section>
 
-        <section style={{ marginTop: 7, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 2, padding: "11px 5px 10px", borderRadius: 18, background: "#06152f", border: "1px solid rgba(77,126,210,.22)", flex: "0 0 auto", minHeight: 88, boxSizing: "border-box" }}>
+        <section style={{ marginTop: 6, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 2, padding: "12px 5px 11px", borderRadius: 18, background: "#06152f", border: "1px solid rgba(77,126,210,.22)", flex: "0 0 auto", minHeight: 94, boxSizing: "border-box" }}>
           {[["🎁", "Daily Reward", "/daily-reward"], ["🛒", "Shop", "/shop"], ["📅", "Events", "/events"], ["🎡", "Spin Wheel", "/spin"]].map(([icon, label, href]) => (
             <Link key={label} href={href} style={{ color: "#fff", textDecoration: "none", display: "grid", justifyItems: "center", alignContent: "center", gap: 4, fontWeight: 900, fontSize: 10.5, textAlign: "center" }}><span style={{ fontSize: 30, lineHeight: 1 }}>{icon}</span><span>{label}</span></Link>
           ))}
         </section>
 
-        <section style={{ marginTop: 7, minHeight: 76, padding: "10px 11px 10px 13px", boxSizing: "border-box", borderRadius: 18, background: "#0a214b", border: "1px solid rgba(77,126,210,.28)", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
+        <section style={{ marginTop: 6, minHeight: 82, padding: "11px 11px 11px 13px", boxSizing: "border-box", borderRadius: 18, background: "#0a214b", border: "1px solid rgba(77,126,210,.28)", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
           <div><strong style={{ display: "block", color: "#ffd21a", fontSize: 14 }}>🔥 DAILY STREAK</strong><span style={{ display: "block", marginTop: 3, color: "#a9bddb", fontSize: 11 }}>Keep playing to unlock bigger rewards.</span></div>
-          <button type="button" style={{ border: 0, borderRadius: 12, padding: "11px 16px", background: "#ffd21a", color: "#111", fontWeight: 950, fontSize: 12 }}>CLAIM</button>
+          <button type="button" style={{ border: 0, borderRadius: 12, padding: "12px 17px", background: "#ffd21a", color: "#111", fontWeight: 950, fontSize: 12 }}>CLAIM</button>
         </section>
       </div>
 
