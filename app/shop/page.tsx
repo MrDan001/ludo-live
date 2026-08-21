@@ -1,107 +1,11 @@
 "use client";
-
-import { useEffect, useMemo, useState } from "react";
-import AppFrame from "../_components/AppFrame";
-import { addBadge, awardGemPurchaseXP, STARTING_COINS, STARTING_GEMS } from "../../lib/playerProgress";
-
-type Tab = "Coins" | "Gems" | "Items" | "Avatars";
-type Wallet = { coins: number; gems: number; spins: number; mystery: number };
-type Purchase = { id: string; name: string; price: number; kind: "coins" | "item" | "avatar"; quantity?: number };
-
-const tabs: Tab[] = ["Coins", "Gems", "Items", "Avatars"];
-const defaults: Wallet = { coins: STARTING_COINS, gems: STARTING_GEMS, spins: 0, mystery: 0 };
-const gemPackages = [
-  { id: "gems-50", gems: 50, naira: 1000 }, { id: "gems-100", gems: 100, naira: 1500 },
-  { id: "gems-200", gems: 200, naira: 2500 }, { id: "gems-400", gems: 400, naira: 4000 },
-  { id: "gems-500", gems: 500, naira: 5000 }, { id: "gems-1000", gems: 1000, naira: 8000 },
-  { id: "gems-1500", gems: 1500, naira: 10000 },
-];
-const coinPackages = [
-  { id: "coins-500", coins: 500, gems: 25 }, { id: "coins-1000", coins: 1000, gems: 50 },
-  { id: "coins-2000", coins: 2000, gems: 100 }, { id: "coins-4000", coins: 4000, gems: 200 },
-  { id: "coins-8000", coins: 8000, gems: 400 }, { id: "coins-15000", coins: 15000, gems: 800 },
-  { id: "coins-20000", coins: 20000, gems: 1000 },
-];
-const avatars = [
-  { id: "avatar-1", name: "Avatar 1", icon: "🧑🏽‍🎮", price: 500 }, { id: "avatar-2", name: "Avatar 2", icon: "👩🏽‍🎤", price: 700 },
-  { id: "avatar-3", name: "Avatar 3", icon: "🧔🏾‍♂️", price: 1000 }, { id: "avatar-4", name: "Avatar 4", icon: "👨🏽‍🚀", price: 1200 },
-  { id: "avatar-5", name: "Avatar 5", icon: "👩🏾‍🚀", price: 1300 }, { id: "avatar-6", name: "Avatar 6", icon: "🧙🏽‍♂️", price: 2000 },
-];
-const items = [
-  { id: "golden-dice", name: "Golden Dice", description: "Lucky dice skin", icon: "🎲" },
-  { id: "shield", name: "Shield", description: "Animated profile frame", icon: "🛡️" },
-  { id: "trail", name: "Trail", description: "Token movement effect", icon: "🔥" },
-  { id: "crown", name: "Crown", description: "Winner celebration", icon: "👑" },
-];
-function readWallet(): Wallet { try { const stored = JSON.parse(localStorage.getItem("ludo-wallet") || "null"); return { ...defaults, ...(stored || {}) }; } catch { return defaults; } }
-function writeWallet(wallet: Wallet) { localStorage.setItem("ludo-wallet", JSON.stringify(wallet)); window.dispatchEvent(new Event("ludo-wallet-updated")); }
-function naira(value: number) { return `₦${value.toLocaleString("en-NG")}`; }
-
-export default function ShopPage() {
-  const [tab, setTab] = useState<Tab>("Coins"); const [wallet, setWallet] = useState<Wallet>(defaults); const [notice, setNotice] = useState("");
-  const [email, setEmail] = useState(""); const [emailOpen, setEmailOpen] = useState(false); const [pendingGemPackage, setPendingGemPackage] = useState<(typeof gemPackages)[number] | null>(null);
-  const [confirm, setConfirm] = useState<Purchase | null>(null); const [busy, setBusy] = useState(false); const [owned, setOwned] = useState<string[]>([]);
-
-  useEffect(() => {
-    setWallet(readWallet()); const sync = () => setWallet(readWallet()); window.addEventListener("ludo-wallet-updated", sync); window.addEventListener("storage", sync);
-    try { setEmail(localStorage.getItem("ludo-paystack-email") || ""); setOwned(JSON.parse(localStorage.getItem("ludo-inventory") || "[]")); } catch {}
-    const params = new URLSearchParams(window.location.search); const payment = params.get("payment"); const gems = Number(params.get("gems") || 0); const reference = params.get("reference") || "";
-    if (payment === "success" && gems > 0 && reference) {
-      const appliedKey = `ludo-payment-applied-${reference}`;
-      if (!localStorage.getItem(appliedKey)) {
-        const current = readWallet(); const next = { ...current, gems: current.gems + gems }; writeWallet(next); localStorage.setItem(appliedKey, "1"); setWallet(next);
-        awardGemPurchaseXP(); setNotice(`Payment confirmed. ${gems.toLocaleString()} gems have been added to your wallet. +5 XP earned.`);
-      }
-      window.history.replaceState({}, "", "/shop");
-    } else if (payment === "failed") { setNotice("Payment was not completed. No gems were added."); window.history.replaceState({}, "", "/shop"); }
-    return () => { window.removeEventListener("ludo-wallet-updated", sync); window.removeEventListener("storage", sync); };
-  }, []);
-
-  const balanceText = useMemo(() => `${wallet.coins.toLocaleString()} 🪙    ${wallet.gems.toLocaleString()} 💎`, [wallet]);
-  const buyGemPackage = async () => {
-    if (!pendingGemPackage || !email.trim()) return; setBusy(true); setNotice("");
-    try { localStorage.setItem("ludo-paystack-email", email.trim()); const response = await fetch("/api/paystack/initialize", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ packageId: pendingGemPackage.id, email: email.trim() }) }); const data = await response.json(); if (!response.ok || !data.authorization_url) throw new Error(data.error || "Unable to start payment."); window.location.href = data.authorization_url; }
-    catch (error) { setNotice(error instanceof Error ? error.message : "Unable to start payment."); setBusy(false); }
-  };
-  const confirmPurchase = () => {
-    if (!confirm) return;
-    if (wallet.gems < confirm.price) { setConfirm(null); setNotice(`You need ${confirm.price.toLocaleString()} gems for ${confirm.name}. Buy more gems from the Gems tab.`); setTab("Gems"); return; }
-    const next = { ...wallet, gems: wallet.gems - confirm.price, ...(confirm.kind === "coins" ? { coins: wallet.coins + (confirm.quantity || 0) } : {}) }; writeWallet(next); setWallet(next);
-    if (confirm.kind !== "coins") { const nextOwned = Array.from(new Set([...owned, confirm.id])); localStorage.setItem("ludo-inventory", JSON.stringify(nextOwned)); setOwned(nextOwned); addBadge({ id: `store-${confirm.id}`, label: confirm.name, icon: confirm.kind === "avatar" ? "🧑" : "🏅", source: "store" }); }
-    setConfirm(null); setNotice(`${confirm.name} purchased successfully.`);
-  };
-
-  return <AppFrame back="/home"><main className="shop-page" style={page}>
-    <header className="shop-header" style={header}><h1 style={title}>Shop</h1><div className="shop-wallet" style={walletBadge}>{balanceText}</div></header>
-    <nav className="shop-tabs" style={tabsStyle} aria-label="Shop categories">{tabs.map((item) => <button key={item} onClick={() => setTab(item)} className="shop-tab" style={{ ...tabStyle, ...(tab === item ? tabActive : {}) }}>{item}</button>)}</nav>
-    {notice && <div style={noticeStyle}>{notice}</div>}
-    <section style={list}>
-      {tab === "Gems" && gemPackages.map((pack) => <article key={pack.id} className="shop-row" style={row}><strong style={rowTitle}>💎 {pack.gems.toLocaleString()} Gems</strong><button onClick={() => { setPendingGemPackage(pack); setEmailOpen(true); }} style={buyBtn}>{naira(pack.naira)}</button></article>)}
-      {tab === "Coins" && coinPackages.map((pack) => <article key={pack.id} className="shop-row" style={row}><strong style={rowTitle}>🪙 {pack.coins.toLocaleString()} Coins</strong><button onClick={() => setConfirm({ id: pack.id, name: `${pack.coins.toLocaleString()} Coins`, price: pack.gems, quantity: pack.coins, kind: "coins" })} style={buyBtn}>💎 {pack.gems.toLocaleString()}</button></article>)}
-      {tab === "Items" && items.map((item) => { const isOwned = owned.includes(item.id); return <article key={item.id} className="shop-row" style={row}><div className="shop-row-copy"><strong style={rowTitle}>{item.icon} {item.name}</strong><div style={description}>{item.description}</div></div><button disabled={isOwned} onClick={() => setConfirm({ id: item.id, name: item.name, price: 500, kind: "item" })} style={{ ...buyBtn, opacity: isOwned ? .55 : 1 }}>{isOwned ? "OWNED" : "💎 500"}</button></article>; })}
-      {tab === "Avatars" && <div className="shop-avatar-grid" style={avatarGrid}>{avatars.map((avatar) => { const isOwned = owned.includes(avatar.id); return <article key={avatar.id} className="shop-avatar-card" style={avatarCard}><div style={avatarIcon}>{avatar.icon}</div><strong>{avatar.name}</strong><button disabled={isOwned} onClick={() => setConfirm({ id: avatar.id, name: avatar.name, price: avatar.price, kind: "avatar" })} style={{ ...buyBtn, width: "100%", opacity: isOwned ? .55 : 1 }}>{isOwned ? "OWNED" : `💎 ${avatar.price.toLocaleString()}`}</button></article>; })}</div>}
-    </section>
-    {emailOpen && pendingGemPackage && <div style={overlay}><div className="shop-modal" style={modal}><h2 style={modalTitle}>Buy {pendingGemPackage.gems.toLocaleString()} Gems</h2><p style={modalText}>You will pay <b>{naira(pendingGemPackage.naira)}</b> securely through Paystack.</p><label style={label}>Payment email<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={input} autoComplete="email" /></label><div style={modalActions}><button onClick={() => setEmailOpen(false)} style={cancelBtn} disabled={busy}>CANCEL</button><button onClick={buyGemPackage} style={buyBtn} disabled={busy || !email.trim()}>{busy ? "OPENING…" : "PAY WITH PAYSTACK"}</button></div></div></div>}
-    {confirm && <div style={overlay}><div className="shop-modal" style={modal}><h2 style={modalTitle}>Confirm purchase</h2><p style={modalText}>Buy <b>{confirm.name}</b> for <b>{confirm.price.toLocaleString()} gems</b>?</p><p style={balanceTextStyle}>Current balance: {wallet.gems.toLocaleString()} gems</p><div style={modalActions}><button onClick={() => setConfirm(null)} style={cancelBtn}>CANCEL</button><button onClick={confirmPurchase} style={buyBtn}>CONFIRM PURCHASE</button></div></div></div>}
-  </main></AppFrame>;
-}
-
-const page: React.CSSProperties = { width: "100%", maxWidth: 760, minWidth: 0, margin: "0 auto", paddingBottom: 48 };
-const header: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "end", gap: 14, marginBottom: 18, minWidth: 0 };
-const title: React.CSSProperties = { fontSize: "clamp(34px, 8vw, 42px)", margin: 0, fontWeight: 950 };
-const walletBadge: React.CSSProperties = { color: "#f8d35a", fontSize: "clamp(14px, 3.8vw, 16px)", fontWeight: 900, textAlign: "right", overflowWrap: "anywhere" };
-const tabsStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 5, background: "#061735", padding: 5, borderRadius: 14, width: "100%", minWidth: 0 };
-const tabStyle: React.CSSProperties = { border: 0, borderRadius: 11, padding: "15px 8px", color: "#fff", fontWeight: 900, background: "transparent", cursor: "pointer", minWidth: 0 };
-const tabActive: React.CSSProperties = { background: "#1769e8" }; const list: React.CSSProperties = { display: "grid", gap: 12, marginTop: 16, minWidth: 0 };
-const row: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: 18, borderRadius: 15, background: "linear-gradient(90deg,#071a40,#092354)", border: "1px solid rgba(78,125,211,.22)", minWidth: 0, flexWrap: "wrap" };
-const rowTitle: React.CSSProperties = { fontSize: "clamp(18px, 4.5vw, 22px)" }; const description: React.CSSProperties = { color: "#94a3b8", marginTop: 4, fontSize: 16 };
-const buyBtn: React.CSSProperties = { border: 0, borderRadius: 11, padding: "13px 18px", background: "#39a51d", color: "#fff", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap", maxWidth: "100%" };
-const avatarGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(170px,100%),1fr))", gap: 12, width: "100%", minWidth: 0 };
-const avatarCard: React.CSSProperties = { border: "1px solid rgba(78,125,211,.25)", borderRadius: 16, padding: 16, background: "#081b42", color: "#fff", display: "grid", gap: 10, placeItems: "center", textAlign: "center", minWidth: 0, overflow: "hidden" };
-const avatarIcon: React.CSSProperties = { fontSize: "clamp(48px, 12vw, 58px)", minHeight: 70, display: "grid", placeItems: "center" };
-const noticeStyle: React.CSSProperties = { marginTop: 14, padding: 13, borderRadius: 12, background: "rgba(22,101,52,.5)", border: "1px solid rgba(74,222,128,.25)", color: "#bbf7d0", fontWeight: 700 };
-const overlay: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 1000, display: "grid", placeItems: "center", padding: 18, background: "rgba(0,0,0,.72)" };
-const modal: React.CSSProperties = { width: "min(440px,100%)", borderRadius: 18, padding: 22, background: "linear-gradient(180deg,#0b234e,#06142f)", border: "1px solid rgba(96,165,250,.35)", boxShadow: "0 20px 60px rgba(0,0,0,.45)", boxSizing: "border-box" };
-const modalTitle: React.CSSProperties = { marginTop: 0, fontSize: 25 }; const modalText: React.CSSProperties = { color: "#cbd5e1", lineHeight: 1.5 }; const balanceTextStyle: React.CSSProperties = { color: "#f8d35a", fontWeight: 800 };
-const label: React.CSSProperties = { display: "grid", gap: 7, color: "#bfdbfe", fontWeight: 800, marginTop: 16 }; const input: React.CSSProperties = { width: "100%", boxSizing: "border-box", padding: 13, borderRadius: 11, border: "1px solid #315b9f", background: "#041128", color: "#fff", outline: "none" };
-const modalActions: React.CSSProperties = { display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20, flexWrap: "wrap" }; const cancelBtn: React.CSSProperties = { border: 0, borderRadius: 11, padding: "13px 16px", background: "#334155", color: "#fff", fontWeight: 900, cursor: "pointer" };
+import{useEffect,useState}from"react";import AppFrame from"../_components/AppFrame";
+type Item={id:string;name:string;currency:"coins"|"gems";price:number;rarity:string};
+const boardArt:Record<string,string>={classic:"🌈",golden:"👑",neon:"💡",beach:"🏖️",galaxy:"🌌",wood:"🪵",dragon:"🐉",christmas:"🎄",football:"⚽",candy:"🍬"};const diceArt:Record<string,string>={classic:"⚪",golden:"🟡",crystal:"🔷",fire:"🔥",rainbow:"🌈",diamond:"💎",skull:"💀",sports:"🏀"};
+const fallbackBoards:Item[]=[{id:"classic",name:"Classic Ludo",currency:"coins",price:0,rarity:"COMMON"},{id:"golden",name:"Golden Royal",currency:"gems",price:50,rarity:"EPIC"},{id:"neon",name:"Neon Glow",currency:"gems",price:100,rarity:"LEGENDARY"},{id:"beach",name:"Beach Vibes",currency:"coins",price:3000,rarity:"RARE"},{id:"galaxy",name:"Galaxy Space",currency:"gems",price:75,rarity:"EPIC"},{id:"wood",name:"Wooden Classic",currency:"coins",price:1000,rarity:"COMMON"},{id:"dragon",name:"Dragon Theme",currency:"gems",price:80,rarity:"EPIC"},{id:"christmas",name:"Christmas Edition",currency:"coins",price:3500,rarity:"RARE"},{id:"football",name:"Football Arena",currency:"gems",price:70,rarity:"EPIC"},{id:"candy",name:"Candy Land",currency:"gems",price:120,rarity:"LEGENDARY"}];
+const fallbackDice:Item[]=[{id:"classic",name:"Classic White",currency:"coins",price:0,rarity:"COMMON"},{id:"golden",name:"Golden Dice",currency:"coins",price:1500,rarity:"RARE"},{id:"crystal",name:"Crystal Blue",currency:"gems",price:40,rarity:"EPIC"},{id:"fire",name:"Fire Dice",currency:"gems",price:90,rarity:"LEGENDARY"},{id:"rainbow",name:"Rainbow Dice",currency:"gems",price:70,rarity:"EPIC"},{id:"diamond",name:"Diamond Dice",currency:"gems",price:120,rarity:"LEGENDARY"},{id:"skull",name:"Skull Dice",currency:"coins",price:2000,rarity:"RARE"},{id:"sports",name:"Sports Dice",currency:"coins",price:1000,rarity:"COMMON"}];
+export default function ShopPage(){const[boards,setBoards]=useState(fallbackBoards),[dice,setDice]=useState(fallbackDice),[ownedBoards,setOwnedBoards]=useState<string[]>(["classic"]),[ownedDice,setOwnedDice]=useState<string[]>(["classic"]),[board,setBoard]=useState("classic"),[die,setDie]=useState("classic"),[coins,setCoins]=useState(0),[gems,setGems]=useState(0),[tab,setTab]=useState<"boards"|"dice">("boards"),[notice,setNotice]=useState(""),[busy,setBusy]=useState("");
+ const load=async()=>{const r=await fetch("/api/customization",{cache:"no-store"});const d=await r.json();if(!r.ok){setNotice(d.error||"Sign in to use the customization shop.");return}setCoins(d.coins);setGems(d.gems);setOwnedBoards(d.ownedBoards);setOwnedDice(d.ownedDice);setBoard(d.equippedBoard);setDie(d.equippedDice);setBoards(d.boards);setDice(d.dice)};useEffect(()=>{load()},[]);
+ const act=async(type:"board"|"dice",id:string,action:"purchase"|"equip")=>{setBusy(id+action);setNotice("");try{const r=await fetch("/api/customization",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type,id,action})});const d=await r.json();if(!r.ok){setNotice(d.error||"Action failed.");return}setNotice(action==="purchase"?`${d.item.name} is now in your collection.`:`${type==="board"?"Board":"Dice"} equipped for your games.`);await load()}finally{setBusy("")}};
+ const items=tab==="boards"?boards:dice,owned=tab==="boards"?ownedBoards:ownedDice,equipped=tab==="boards"?board:die;return <AppFrame back="/dashboard"><main style={page}><header style={header}><div><div style={eyebrow}>LUDO LIVE CUSTOMIZATION</div><h1 style={title}>Make every match yours.</h1><p style={sub}>Buy, equip and bring your board & dice skins into real rooms.</p></div><div style={wallet}><span>🪙 {coins.toLocaleString()}</span><span>💎 {gems.toLocaleString()}</span></div></header><nav style={tabs}><button onClick={()=>setTab("boards")} style={{...tab,...(tab==="boards"?active:{})}}>🎲 BOARDS</button><button onClick={()=>setTab("dice")} style={{...tab,...(tab==="dice"?active:{})}}>⚄ DICE</button></nav>{notice&&<div style={noticeBox}>{notice}</div>}<section style={hero}><div><b style={{fontSize:26}}>{tab==="boards"?"Game Boards":"Dice Collection"}</b><p style={{margin:"5px 0",color:"#9fb5d8"}}>{tab==="boards"?"Choose the board your opponents will see when you host.":"Choose the dice skin used by your player in live games."}</p></div><div style={heroArt}>{tab==="boards"?boardArt[equipped]:diceArt[equipped]}</div></section><section style={grid}>{items.map(item=>{const isOwned=owned.includes(item.id),isEquipped=equipped===item.id;return <article key={item.id} style={{...card,...(isEquipped?equippedCard:{})}}><div style={art}>{tab==="boards"?boardArt[item.id]:diceArt[item.id]}</div><div style={rarity}>{item.rarity}</div><h3 style={name}>{item.name}</h3><div style={price}>{item.price===0?"FREE":<>{item.currency==="coins"?"🪙":"💎"} {item.price.toLocaleString()}</>}</div>{isEquipped?<button disabled style={{...button,background:"#16a34a"}}>✓ EQUIPPED</button>:isOwned?<button onClick={()=>act(tab==="boards"?"board":"dice",item.id,"equip")} disabled={!!busy} style={button}>{busy?"…":"EQUIP"}</button>:<button onClick={()=>act(tab==="boards"?"board":"dice",item.id,"purchase")} disabled={!!busy} style={button}>{busy?"…":"BUY"}</button>}</article>})}</section><div style={banner}><b>YOUR STYLE, THEIR VIEW.</b><span>When you host a room, your equipped board becomes the match board for every opponent.</span></div></main></AppFrame>}
+const page:React.CSSProperties={maxWidth:1100,width:"100%",margin:"0 auto",paddingBottom:55};const header:React.CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:18,marginBottom:18,flexWrap:"wrap"};const eyebrow:React.CSSProperties={fontSize:12,letterSpacing:2,color:"#60a5fa",fontWeight:900};const title:React.CSSProperties={fontSize:"clamp(30px,6vw,50px)",margin:"5px 0",fontWeight:950};const sub:React.CSSProperties={color:"#9fb5d8",margin:0,fontSize:16};const wallet:React.CSSProperties={display:"flex",gap:18,fontWeight:950,color:"#f8d35a",fontSize:17};const tabs:React.CSSProperties={display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,padding:6,borderRadius:16,background:"#06152f",border:"1px solid #193765",marginBottom:16};const tab:React.CSSProperties={border:0,borderRadius:12,padding:"15px 10px",background:"transparent",color:"#cbd5e1",fontWeight:950,cursor:"pointer"};const active:React.CSSProperties={background:"linear-gradient(135deg,#1769e8,#7c3aed)",color:"white"};const noticeBox:React.CSSProperties={padding:13,borderRadius:12,background:"#0b2348",border:"1px solid #27548d",color:"#bfdbfe",fontWeight:700,marginBottom:14};const hero:React.CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:16,padding:20,borderRadius:20,background:"linear-gradient(135deg,#071a3b,#0a2753)",border:"1px solid rgba(96,165,250,.28)",marginBottom:16};const heroArt:React.CSSProperties={fontSize:64,filter:"drop-shadow(0 8px 16px rgba(0,0,0,.45))"};const grid:React.CSSProperties={display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(170px,1fr))",gap:14};const card:React.CSSProperties={minWidth:0,borderRadius:18,padding:14,background:"linear-gradient(160deg,#0a2147,#06142d)",border:"1px solid rgba(75,115,178,.28)",boxShadow:"0 8px 25px rgba(0,0,0,.18)",display:"flex",flexDirection:"column",gap:8};const equippedCard:React.CSSProperties={border:"2px solid #22c55e",boxShadow:"0 0 25px rgba(34,197,94,.14)"};const art:React.CSSProperties={height:145,borderRadius:13,display:"grid",placeItems:"center",fontSize:72,background:"radial-gradient(circle at 50% 35%,rgba(37,99,235,.45),rgba(4,15,35,.95) 70%)",border:"1px solid #244875"};const rarity:React.CSSProperties={fontSize:9,fontWeight:950,letterSpacing:1.3,color:"#facc15"};const name:React.CSSProperties={margin:0,fontSize:17};const price:React.CSSProperties={fontWeight:900,color:"#f8d35a",minHeight:22};const button:React.CSSProperties={border:0,borderRadius:10,padding:"12px 10px",background:"linear-gradient(135deg,#1769e8,#7c3aed)",color:"white",fontWeight:950,cursor:"pointer"};const banner:React.CSSProperties={marginTop:18,padding:18,borderRadius:16,display:"flex",gap:12,flexWrap:"wrap",alignItems:"center",background:"linear-gradient(90deg,#21114b,#082b50)",border:"1px solid rgba(168,85,247,.35)"};
