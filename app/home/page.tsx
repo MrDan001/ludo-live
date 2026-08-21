@@ -4,110 +4,26 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { readProgress, xpRequiredForLevel } from "../../lib/playerProgress";
 
-type Wallet = { coins: number; gems: number };
+type Wallet={coins:number;gems:number};
+const actions=[
+  ["🌐","PLAY ONLINE","See real players waiting in open rooms","/lobby","linear-gradient(135deg,#159447,#31c936)"],
+  ["👥","PLAY WITH FRIENDS","Invite friends and play together","/lobby","linear-gradient(135deg,#087b61,#16b875)"],
+  ["🎯","MISSIONS","Complete objectives before rewards unlock","/missions","linear-gradient(135deg,#173fba,#1769e8)"],
+  ["🏆","TOURNAMENT","Join tournaments and compete for rewards","/mode","linear-gradient(135deg,#6b1998,#a126c8)"],
+] as const;
+const shortcuts=[["🎁","Daily Reward","/daily-reward"],["🛒","Shop","/shop"],["📅","Events","/events"],["🎡","Spin Wheel","/spin"]] as const;
+const nav=[["⌂","Home","/home"],["👥","Friends","/friends"],["💬","Chat","/chat"],["👤","Profile","/profile"]] as const;
 
-export default function HomePage() {
-  const [wallet, setWallet] = useState<Wallet | null>(null);
-  const [name, setName] = useState("PlayerOne");
-  const [progress, setProgress] = useState(() => readProgress());
-
-  useEffect(() => {
-    let alive = true;
-    const refresh = async () => {
-      try {
-        const r = await fetch("/api/wallet", { cache: "no-store" });
-        const d = await r.json();
-        if (alive && r.ok && d?.wallet) setWallet({ coins: Number(d.wallet.coins) || 0, gems: Number(d.wallet.gems) || 0 });
-      } catch {}
-    };
-    refresh();
-    setName(localStorage.getItem("ludo-player-name") || "PlayerOne");
-    setProgress(readProgress());
-    const t = setInterval(refresh, 15000);
-    const f = () => refresh();
-    const p = () => setProgress(readProgress());
-    window.addEventListener("focus", f);
-    window.addEventListener("ludo-wallet-updated", f);
-    window.addEventListener("ludo-progression-updated", p);
-    return () => {
-      alive = false;
-      clearInterval(t);
-      window.removeEventListener("focus", f);
-      window.removeEventListener("ludo-wallet-updated", f);
-      window.removeEventListener("ludo-progression-updated", p);
-    };
-  }, []);
-
-  const required = xpRequiredForLevel(progress.level);
-  const xpPercent = Math.min(100, (progress.xp / required) * 100);
-  const levelPercent = Math.min(100, (progress.level / Math.max(progress.level + 1, 1)) * 100);
-  const money = wallet ? `${wallet.coins.toLocaleString()}` : "…";
-  const gems = wallet ? `${wallet.gems.toLocaleString()}` : "…";
-
-  return (
-    <main style={{ position: "fixed", inset: 0, height: "100dvh", minHeight: 0, overflow: "hidden", background: "linear-gradient(180deg,#031536 0%,#020b1d 48%,#010611 100%)", color: "#fff" }}>
-      <div style={{ width: "100%", maxWidth: 560, height: "calc(100dvh - 68px)", margin: "0 auto", padding: "5px 12px 0", boxSizing: "border-box", display: "flex", flexDirection: "column", justifyContent: "space-between", overflow: "hidden" }}>
-        <header style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: "4px 2px 5px", flex: "0 0 auto" }}>
-          <Link href="/profile" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 9 }}>
-            <div style={{ position: "relative", width: 56, height: 56, flex: "0 0 56px", borderRadius: "50%", display: "grid", placeItems: "center", background: "linear-gradient(145deg,#ffe45c,#ffb300)", border: "3px solid #ffd43b", boxShadow: "0 0 0 2px rgba(255,193,7,.22),0 4px 10px rgba(0,0,0,.3)" }}>
-              <div style={{ width: 46, height: 46, borderRadius: "50%", display: "grid", placeItems: "center", background: "#c58a54", border: "2px solid #8b5a32", overflow: "hidden", fontSize: 32, lineHeight: 1 }}>👩🏻</div>
-              <div style={{ position: "absolute", left: "50%", bottom: -8, transform: "translateX(-50%)", minWidth: 31, height: 22, padding: "0 5px", borderRadius: 7, display: "grid", placeItems: "center", background: "#ffd21a", color: "#111", border: "2px solid #f5b900", fontWeight: 950, fontSize: 12 }}>{progress.level}</div>
-            </div>
-            <div style={{ minWidth: 0, paddingBottom: 1 }}>
-              <div style={{ fontWeight: 950, fontSize: 21, lineHeight: 1.05, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{name}</div>
-              <div style={{ marginTop: 5, display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ fontSize: 8, fontWeight: 950, color: "#ffd21a" }}>XP</span>
-                <div style={{ width: "min(108px,27vw)", height: 7, borderRadius: 99, background: "#102746", overflow: "hidden" }}><span style={{ display: "block", width: `${xpPercent}%`, height: "100%", background: "linear-gradient(90deg,#ffb51b,#ffe15a)" }} /></div>
-                <span style={{ fontSize: 10, fontWeight: 950, color: "#ffd21a", lineHeight: 1 }}>{progress.xp}/{required}</span>
-              </div>
-              <div style={{ marginTop: 3, display: "flex", alignItems: "center", gap: 5 }}>
-                <span style={{ fontSize: 7, fontWeight: 950, color: "#8ec5ff" }}>LEVEL</span>
-                <div style={{ width: "min(108px,27vw)", height: 4, borderRadius: 99, background: "#102746", overflow: "hidden" }}><span style={{ display: "block", width: `${levelPercent}%`, height: "100%", background: "linear-gradient(90deg,#1677ff,#4ab3ff)" }} /></div>
-              </div>
-            </div>
-          </Link>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-            <div style={currency}>🪙 <b>{money}</b></div>
-            <div style={currency}>💎 <b>{gems}</b></div>
-            <Link href="/shop" style={{ width: 38, height: 38, borderRadius: "50%", display: "grid", placeItems: "center", textDecoration: "none", background: "#37b92e", border: "2px solid #83ec64", color: "#fff", fontWeight: 950, fontSize: 22 }}>+</Link>
-          </div>
-        </header>
-
-        <section style={{ display: "grid", gridTemplateRows: "repeat(4,clamp(118px,11.2dvh,148px))", gap: 6, flex: "0 0 auto", overflow: "hidden" }}>
-          {[
-            { icon: "🌐", h: "PLAY ONLINE", s: "See real players waiting in open rooms", href: "/lobby", background: "linear-gradient(135deg,#159447,#31c936)" },
-            { icon: "👥", h: "PLAY WITH FRIENDS", s: "Invite friends and play together", href: "/lobby", background: "linear-gradient(135deg,#087b61,#16b875)" },
-            { icon: "🎯", h: "MISSIONS", s: "Complete objectives before rewards unlock", href: "/missions", background: "linear-gradient(135deg,#173fba,#1769e8)" },
-            { icon: "🏆", h: "TOURNAMENT", s: "Join tournaments and compete for rewards", href: "/mode", background: "linear-gradient(135deg,#6b1998,#a126c8)" },
-          ].map((a) => (
-            <Link key={a.h} href={a.href} style={{ minHeight: 0, borderRadius: 16, display: "grid", gridTemplateColumns: "68px 1fr 20px", alignItems: "center", padding: "4px 10px", boxSizing: "border-box", color: "#fff", textDecoration: "none", background: a.background, border: "1px solid rgba(255,255,255,.24)", boxShadow: "0 4px 12px rgba(0,0,0,.18)" }}>
-              <span style={{ fontSize: "clamp(30px,5.5vw,40px)", lineHeight: 1, textAlign: "center" }}>{a.icon}</span>
-              <span><strong style={{ display: "block", fontSize: "clamp(14px,3vw,18px)", fontWeight: 950 }}>{a.h}</strong><small style={{ display: "block", marginTop: 3, fontSize: "clamp(8px,1.9vw,11px)", lineHeight: 1.1, fontWeight: 750 }}>{a.s}</small></span>
-              <span style={{ fontSize: 25, opacity: 0.85, textAlign: "center" }}>›</span>
-            </Link>
-          ))}
-        </section>
-
-        <section style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 2, padding: "12px 5px 11px", borderRadius: 18, background: "#06152f", border: "1px solid rgba(77,126,210,.22)", flex: "0 0 auto", height: "clamp(92px,10.5dvh,112px)", boxSizing: "border-box" }}>
-          {[["🎁", "Daily Reward", "/daily-reward"], ["🛒", "Shop", "/shop"], ["📅", "Events", "/events"], ["🎡", "Spin Wheel", "/spin"]].map(([icon, label, href]) => (
-            <Link key={label} href={href} style={{ color: "#fff", textDecoration: "none", display: "grid", justifyItems: "center", alignContent: "center", gap: 4, fontWeight: 900, fontSize: 10.5, textAlign: "center" }}><span style={{ fontSize: 30, lineHeight: 1 }}>{icon}</span><span>{label}</span></Link>
-          ))}
-        </section>
-
-        <section style={{ height: "clamp(76px,8.5dvh,94px)", padding: "11px 11px 11px 13px", boxSizing: "border-box", borderRadius: 18, background: "#0a214b", border: "1px solid rgba(77,126,210,.28)", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
-          <div><strong style={{ display: "block", color: "#ffd21a", fontSize: 14 }}>🔥 DAILY STREAK</strong><span style={{ display: "block", marginTop: 3, color: "#a9bddb", fontSize: 11 }}>Keep playing to unlock bigger rewards.</span></div>
-          <button type="button" style={{ border: 0, borderRadius: 12, padding: "12px 17px", background: "#ffd21a", color: "#111", fontWeight: 950, fontSize: 12 }}>CLAIM</button>
-        </section>
-      </div>
-
-      <nav aria-label="Bottom navigation" style={{ position: "fixed", left: 0, right: 0, bottom: 0, zIndex: 50, height: 68, background: "#020b1d", borderTop: "1px solid rgba(91,129,190,.28)", display: "grid", gridTemplateColumns: "repeat(4,1fr)", maxWidth: 560, margin: "0 auto" }}>
-        {[["⌂", "Home", "/home"], ["👥", "Friends", "/friends"], ["💬", "Chat", "/chat"], ["👤", "Profile", "/profile"]].map(([icon, label, href], i) => (
-          <Link key={label} href={href} style={{ display: "grid", placeItems: "center", alignContent: "center", gap: 1, color: i === 0 ? "#fff" : "#9eb3d7", background: i === 0 ? "#123a72" : "transparent", textDecoration: "none", fontWeight: 950, fontSize: 13 }}><span style={{ fontSize: 24, lineHeight: 1 }}>{icon}</span><span>{label}</span></Link>
-        ))}
-      </nav>
-    </main>
-  );
+export default function HomePage(){
+ const [wallet,setWallet]=useState<Wallet|null>(null); const [name,setName]=useState("PlayerOne"); const [progress,setProgress]=useState(()=>readProgress());
+ useEffect(()=>{let alive=true; const refresh=async()=>{try{const r=await fetch("/api/wallet",{cache:"no-store"});const d=await r.json();if(alive&&r.ok&&d?.wallet)setWallet({coins:Number(d.wallet.coins)||0,gems:Number(d.wallet.gems)||0})}catch{}}; const p=()=>setProgress(readProgress()); refresh(); setName(localStorage.getItem("ludo-player-name")||"PlayerOne"); p(); const t=setInterval(refresh,15000); window.addEventListener("focus",refresh);window.addEventListener("ludo-wallet-updated",refresh);window.addEventListener("ludo-progression-updated",p);return()=>{alive=false;clearInterval(t);window.removeEventListener("focus",refresh);window.removeEventListener("ludo-wallet-updated",refresh);window.removeEventListener("ludo-progression-updated",p)}} ,[]);
+ const required=Math.max(1,xpRequiredForLevel(progress.level)); const xp=Math.min(100,Math.max(0,progress.xp/required*100)); const level=Math.min(100,Math.max(0,progress.level/Math.max(progress.level+1,1)*100));
+ return <main className="home"><div className="shell">
+  <header className="header"><Link href="/profile" className="profile"><div className="avatarWrap"><div className="avatar">👩🏻</div><div className="badge">{progress.level}</div></div><div className="info"><strong>{name}</strong><div className="row"><b className="gold">XP</b><i><em style={{width:`${xp}%`}}/></i><b className="gold val">{progress.xp}/{required}</b></div><div className="row"><b className="blue">LEVEL</b><i className="level"><em style={{width:`${level}%`}}/></i></div></div></Link><div className="wallet"><span>🪙 <b>{wallet?wallet.coins.toLocaleString():"…"}</b></span><span>💎 <b>{wallet?wallet.gems.toLocaleString():"…"}</b></span><Link href="/shop">+</Link></div></header>
+  <section className="actions">{actions.map(([icon,title,sub,href,bg])=><Link key={title} href={href} className="card" style={{background:bg}}><span className="icon">{icon}</span><span className="copy"><b>{title}</b><small>{sub}</small></span><span className="arrow">›</span></Link>)}</section>
+  <section className="shortcuts">{shortcuts.map(([icon,label,href])=><Link key={label} href={href}><span>{icon}</span><b>{label}</b></Link>)}</section>
+  <section className="streak"><div><b>🔥 DAILY STREAK</b><span>Keep playing to unlock bigger rewards.</span></div><button>CLAIM</button></section>
+ </div><nav>{nav.map(([icon,label,href],i)=><Link key={label} href={href} className={i===0?"active":""}><span>{icon}</span><b>{label}</b></Link>)}</nav>
+ <style jsx>{`*{box-sizing:border-box}.home{position:fixed;inset:0;height:100dvh;overflow:hidden;background:linear-gradient(180deg,#031536,#020b1d 52%,#010611);color:#fff;font-family:Arial,Helvetica,sans-serif}.shell{width:min(100%,720px);height:calc(100dvh - 68px);margin:auto;padding:6px 12px;display:grid;grid-template-rows:auto minmax(0,1fr) clamp(78px,10dvh,108px) clamp(66px,8.2dvh,90px);gap:7px;overflow:hidden}.header{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:6px;min-height:70px}.profile{display:flex;align-items:center;gap:9px;min-width:0;color:#fff;text-decoration:none}.avatarWrap{position:relative;flex:0 0 clamp(52px,13vw,64px);width:clamp(52px,13vw,64px);height:clamp(52px,13vw,64px);border-radius:50%;display:grid;place-items:center;background:linear-gradient(145deg,#ffe45c,#ffb300);border:3px solid #ffd43b}.avatar{width:82%;height:82%;border-radius:50%;display:grid;place-items:center;background:#c58a54;border:2px solid #8b5a32;font-size:clamp(27px,7vw,36px);overflow:hidden}.badge{position:absolute;bottom:-7px;left:50%;transform:translateX(-50%);min-width:30px;height:21px;border-radius:7px;display:grid;place-items:center;background:#ffd21a;color:#111;border:2px solid #f5b900;font-size:12px;font-weight:950}.info{min-width:0}.info>strong{display:block;font-size:clamp(18px,4.8vw,25px);line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.row{display:flex;align-items:center;gap:5px;margin-top:5px;min-width:0}.row>b{font-size:8px;flex:0 0 auto}.gold{color:#ffd21a}.blue{color:#8ec5ff;font-size:7px!important}.val{font-size:10px!important}.row i{display:block;flex:1;min-width:30px;height:7px;border-radius:99px;background:#102746;overflow:hidden}.row i.level{height:4px}.row em{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,#ffb51b,#ffe15a)}.row i.level em{background:linear-gradient(90deg,#1677ff,#4ab3ff)}.wallet{display:flex;align-items:center;gap:5px}.wallet span{padding:7px 8px;border-radius:11px;background:#051737;border:1px solid #173766;font-size:clamp(10px,2.4vw,14px);white-space:nowrap}.wallet>a{width:clamp(38px,9vw,48px);height:clamp(38px,9vw,48px);border-radius:50%;display:grid;place-items:center;background:#37b92e;border:2px solid #83ec64;color:#fff;text-decoration:none;font-size:28px;font-weight:950}.actions{min-height:0;display:grid;grid-template-rows:repeat(4,minmax(0,1fr));gap:7px;overflow:hidden}.card{min-height:0;display:grid;grid-template-columns:clamp(54px,12vw,82px) minmax(0,1fr) 20px;align-items:center;gap:10px;padding:5px 12px;border-radius:18px;border:1px solid rgba(255,255,255,.25);color:#fff;text-decoration:none;box-shadow:0 4px 12px #0003}.icon{text-align:center;font-size:clamp(32px,7vw,52px);line-height:1}.copy{min-width:0}.copy b{display:block;font-size:clamp(15px,3.6vw,25px);line-height:1.05;font-weight:950}.copy small{display:block;margin-top:4px;font-size:clamp(9px,2vw,14px);line-height:1.15;font-weight:750}.arrow{font-size:30px;text-align:center}.shortcuts{display:grid;grid-template-columns:repeat(4,1fr);padding:8px 5px;border-radius:18px;background:#06152f;border:1px solid #173766;overflow:hidden}.shortcuts a{display:grid;place-items:center;align-content:center;gap:4px;color:#fff;text-decoration:none;font-size:clamp(9px,2.4vw,13px);text-align:center}.shortcuts span{font-size:clamp(25px,7vw,38px);line-height:1}.shortcuts b{white-space:nowrap}.streak{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px;padding:9px 11px 9px 13px;border-radius:18px;background:#0a214b;border:1px solid #173766}.streak b{display:block;color:#ffd21a;font-size:clamp(12px,3vw,16px)}.streak span{display:block;margin-top:3px;color:#a9bddb;font-size:clamp(9px,2.5vw,13px);white-space:nowrap}.streak button{border:0;border-radius:12px;padding:11px clamp(13px,3.5vw,20px);background:#ffd21a;color:#111;font-weight:950;font-size:clamp(10px,2.7vw,14px)}nav{position:fixed;bottom:0;left:50%;transform:translateX(-50%);width:min(100%,720px);height:68px;display:grid;grid-template-columns:repeat(4,1fr);background:#020b1d;border-top:1px solid #173766;z-index:20}nav a{display:grid;place-items:center;align-content:center;gap:1px;color:#9eb3d7;text-decoration:none;font-size:clamp(12px,3vw,17px);font-weight:950}nav a span{font-size:clamp(23px,6vw,31px);line-height:1}nav a.active{color:#fff;background:#123a72}@media(min-width:700px){.shell{padding-left:20px;padding-right:20px}}`}</style>
+ </main>
 }
-
-const currency: React.CSSProperties = { display: "flex", alignItems: "center", gap: 3, padding: "6px 7px", borderRadius: 10, background: "rgba(5,23,55,.9)", border: "1px solid rgba(79,124,204,.24)", fontSize: 11 };
