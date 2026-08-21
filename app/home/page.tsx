@@ -74,16 +74,16 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section style={{ display: "grid", gap: 7, flex: "0 0 auto" }}>
+        <section style={{ display: "grid", gridTemplateRows: "repeat(4,minmax(78px,1fr))", gap: 7, flex: "1 1 auto", minHeight: 312 }}>
           {[
             { icon: "🌐", h: "PLAY ONLINE", s: "See real players waiting in open rooms", href: "/lobby", background: "linear-gradient(135deg,#159447,#31c936)" },
             { icon: "👥", h: "PLAY WITH FRIENDS", s: "Invite friends and play together", href: "/lobby", background: "linear-gradient(135deg,#087b61,#16b875)" },
             { icon: "🎯", h: "MISSIONS", s: "Complete objectives before rewards unlock", href: "/missions", background: "linear-gradient(135deg,#173fba,#1769e8)" },
             { icon: "🏆", h: "TOURNAMENT", s: "Join tournaments and compete for rewards", href: "/mode", background: "linear-gradient(135deg,#6b1998,#a126c8)" },
           ].map((a) => (
-            <Link key={a.h} href={a.href} style={{ minHeight: 78, borderRadius: 18, display: "grid", gridTemplateColumns: "74px 1fr 22px", alignItems: "center", padding: "6px 12px", boxSizing: "border-box", color: "#fff", textDecoration: "none", background: a.background, border: "1px solid rgba(255,255,255,.24)", boxShadow: "0 4px 12px rgba(0,0,0,.18)" }}>
-              <span style={{ fontSize: 42, lineHeight: 1, textAlign: "center" }}>{a.icon}</span>
-              <span><strong style={{ display: "block", fontSize: 17, fontWeight: 950 }}>{a.h}</strong><small style={{ display: "block", marginTop: 3, fontSize: 10.5, lineHeight: 1.15, fontWeight: 750 }}>{a.s}</small></span>
+            <Link key={a.h} href={a.href} style={{ minHeight: 0, borderRadius: 18, display: "grid", gridTemplateColumns: "74px 1fr 22px", alignItems: "center", padding: "6px 12px", boxSizing: "border-box", color: "#fff", textDecoration: "none", background: a.background, border: "1px solid rgba(255,255,255,.24)", boxShadow: "0 4px 12px rgba(0,0,0,.18)" }}>
+              <span style={{ fontSize: "clamp(34px,6vw,42px)", lineHeight: 1, textAlign: "center" }}>{a.icon}</span>
+              <span><strong style={{ display: "block", fontSize: "clamp(15px,3.2vw,18px)", fontWeight: 950 }}>{a.h}</strong><small style={{ display: "block", marginTop: 4, fontSize: "clamp(9px,2vw,11px)", lineHeight: 1.15, fontWeight: 750 }}>{a.s}</small></span>
               <span style={{ fontSize: 27, opacity: 0.85, textAlign: "center" }}>›</span>
             </Link>
           ))}
