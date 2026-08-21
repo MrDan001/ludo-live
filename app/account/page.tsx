@@ -1,21 +1,17 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
 import { createAccount, getAccount, hashPassword, syncLegacyProfile } from "../../lib/account";
 
 export default function AccountPage(){
- const params=useSearchParams();
- const next=params.get("next")||"/home";
+ const [next,setNext]=useState("/home");
  const [mode,setMode]=useState<"create"|"login">("create");
  const [username,setUsername]=useState("");const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[confirm,setConfirm]=useState("");
  const [busy,setBusy]=useState(false);const[error,setError]=useState("");
- useEffect(()=>{if(getAccount())setMode("login")},[]);
+ useEffect(()=>{if(typeof window!=="undefined"){const n=new URLSearchParams(window.location.search).get("next");if(n&&n.startsWith("/"))setNext(n)}if(getAccount())setMode("login")},[]);
  const submit=async(e:FormEvent)=>{e.preventDefault();setError("");setBusy(true);try{
    if(mode==="create"){
     if(password!==confirm)throw new Error("Passwords do not match.");
-    const account=await createAccount(username,email,password);
-    localStorage.setItem("ludo-account-created","1");
-    window.location.href=next;
+    await createAccount(username,email,password);localStorage.setItem("ludo-account-created","1");window.location.href=next;
    }else{
     const account=getAccount();if(!account)throw new Error("Create an account first.");
     const identifier=(username||email).trim().toLowerCase();
