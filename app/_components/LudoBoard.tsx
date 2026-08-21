@@ -32,8 +32,14 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
   >
     {cells.map(({index,row,col})=>{
       const isTrack = row>=6 && row<=8 || col>=6 && col<=8;
+      const isGreenLane = row<=5 && col>=6 && col<=8;
+      const isYellowLane = col>=9 && col<=14 && row>=6 && row<=8;
+      const isRedLane = col<=5 && row>=6 && row<=8;
+      const isBlueLane = row>=9 && row<=14 && col>=6 && col<=8;
+      const laneClass = isGreenLane ? "lane-green" : isYellowLane ? "lane-yellow" : isRedLane ? "lane-red" : isBlueLane ? "lane-blue" : "";
+
       return <div
-        className={`board-cell ${isTrack?"track-cell":""}`}
+        className={`board-cell ${isTrack?"track-cell":""} ${laneClass}`}
         key={index}
         aria-hidden="true"
       />;
@@ -79,6 +85,12 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
         background:#fafafa;
         box-shadow:inset 0 0 0 1px #c8cdd3;
       }
+
+      /* Step 3: six-cell home lanes leading from each side into the center. */
+      .lane-green{background:#63c174;box-shadow:inset 0 0 0 1px #4a9f59}
+      .lane-yellow{background:#f5cf4a;box-shadow:inset 0 0 0 1px #d2ae2d}
+      .lane-red{background:#e85a5a;box-shadow:inset 0 0 0 1px #c94343}
+      .lane-blue{background:#5b9ee8;box-shadow:inset 0 0 0 1px #417fbe}
 
       .home-area{
         position:absolute;
