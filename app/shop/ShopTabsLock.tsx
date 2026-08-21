@@ -31,7 +31,7 @@ export default function ShopTabsLock() {
     sync();
     const observer = new MutationObserver(sync);
     const root = document.querySelector(".shop-page");
-    if (root) observer.observe(root, { subtree: true, attributes: true, attributeFilter: ["class"] });
+    if (root) observer.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
 
     return () => observer.disconnect();
   }, []);
