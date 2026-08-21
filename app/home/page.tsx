@@ -5,7 +5,6 @@ import { useEffect, useState } from "react";
 import { readProgress, xpRequiredForLevel } from "../../lib/playerProgress";
 
 type Wallet = { coins: number; gems: number };
-
 type Action = { icon: string; title: string; sub: string; href: string; bg: string };
 
 const actions: Action[] = [
@@ -14,7 +13,6 @@ const actions: Action[] = [
   { icon: "🎯", title: "MISSIONS", sub: "Complete objectives before rewards unlock", href: "/missions", bg: "linear-gradient(135deg,#173fba,#1769e8)" },
   { icon: "🏆", title: "TOURNAMENT", sub: "Join tournaments and compete for rewards", href: "/mode", bg: "linear-gradient(135deg,#6b1998,#a126c8)" },
 ];
-
 const shortcuts = [["🎁", "Daily Reward", "/daily-reward"], ["🛒", "Shop", "/shop"], ["📅", "Events", "/events"], ["🎡", "Spin Wheel", "/spin"]] as const;
 const nav = [["⌂", "Home", "/home"], ["👥", "Friends", "/friends"], ["💬", "Chat", "/chat"], ["👤", "Profile", "/profile"]] as const;
 
@@ -30,7 +28,6 @@ export default function HomePage() {
     document.documentElement.style.margin = "0";
     document.documentElement.style.width = "100%";
     document.documentElement.style.overflow = "hidden";
-
     let alive = true;
     const refresh = async () => {
       try {
@@ -71,7 +68,7 @@ export default function HomePage() {
   const badge: React.CSSProperties = { position: "absolute", bottom: -7, left: "50%", transform: "translateX(-50%)", minWidth: 30, height: 21, borderRadius: 7, display: "grid", placeItems: "center", background: "#ffd21a", color: "#111", border: "2px solid #f5b900", fontSize: 12, fontWeight: 950 };
   const row: React.CSSProperties = { display: "flex", alignItems: "center", gap: 5, marginTop: 5, minWidth: 0 };
   const track: React.CSSProperties = { display: "block", flex: 1, minWidth: 30, height: 7, borderRadius: 99, background: "#102746", overflow: "hidden" };
-  const wallet: React.CSSProperties = { display: "flex", alignItems: "center", gap: 5 };
+  const walletRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 5 };
   const walletItem: React.CSSProperties = { padding: "7px 8px", borderRadius: 11, background: "#051737", border: "1px solid #173766", fontSize: "clamp(10px,2.4vw,14px)", whiteSpace: "nowrap" };
   const add: React.CSSProperties = { width: "clamp(38px,9vw,48px)", height: "clamp(38px,9vw,48px)", borderRadius: "50%", display: "grid", placeItems: "center", background: "#37b92e", border: "2px solid #83ec64", color: "#fff", textDecoration: "none", fontSize: 28, fontWeight: 950 };
   const actionsStyle: React.CSSProperties = { minHeight: 0, display: "grid", gridTemplateRows: "repeat(4,minmax(0,1fr))", gap: 7, overflow: "hidden" };
@@ -91,18 +88,14 @@ export default function HomePage() {
               <div style={{ ...row, marginTop: 3 }}><b style={{ color: "#8ec5ff", fontSize: 7 }}>LEVEL</b><i style={{ ...track, height: 4 }}><em style={{ display: "block", height: "100%", width: `${levelPercent}%`, background: "linear-gradient(90deg,#1677ff,#4ab3ff)" }} /></i></div>
             </div>
           </Link>
-          <div style={wallet}><span style={walletItem}>🪙 <b>{wallet ? wallet.coins.toLocaleString() : "…"}</b></span><span style={walletItem}>💎 <b>{wallet ? wallet.gems.toLocaleString() : "…"}</b></span><Link href="/shop" style={add}>+</Link></div>
+          <div style={walletRow}><span style={walletItem}>🪙 <b>{wallet ? wallet.coins.toLocaleString() : "…"}</b></span><span style={walletItem}>💎 <b>{wallet ? wallet.gems.toLocaleString() : "…"}</b></span><Link href="/shop" style={add}>+</Link></div>
         </header>
-
         <section style={actionsStyle}>
           {actions.map((a) => <Link key={a.title} href={a.href} style={{ minHeight: 0, display: "grid", gridTemplateColumns: "clamp(54px,12vw,82px) minmax(0,1fr) 20px", alignItems: "center", gap: 10, padding: "5px 12px", borderRadius: 18, border: "1px solid rgba(255,255,255,.25)", color: "#fff", textDecoration: "none", background: a.bg, boxShadow: "0 4px 12px rgba(0,0,0,.18)" }}><span style={{ textAlign: "center", fontSize: "clamp(32px,7vw,52px)", lineHeight: 1 }}>{a.icon}</span><span style={{ minWidth: 0 }}><b style={{ display: "block", fontSize: "clamp(15px,3.6vw,25px)", lineHeight: 1.05, fontWeight: 950 }}>{a.title}</b><small style={{ display: "block", marginTop: 4, fontSize: "clamp(9px,2vw,14px)", lineHeight: 1.15, fontWeight: 750 }}>{a.sub}</small></span><span style={{ fontSize: 30, textAlign: "center" }}>›</span></Link>)}
         </section>
-
         <section style={shortcutStyle}>{shortcuts.map(([icon, label, href]) => <Link key={label} href={href} style={{ display: "grid", placeItems: "center", alignContent: "center", gap: 4, color: "#fff", textDecoration: "none", fontSize: "clamp(9px,2.4vw,13px)", textAlign: "center" }}><span style={{ fontSize: "clamp(25px,7vw,38px)", lineHeight: 1 }}>{icon}</span><b style={{ whiteSpace: "nowrap" }}>{label}</b></Link>)}</section>
-
         <section style={streakStyle}><div style={{ minWidth: 0 }}><b style={{ display: "block", color: "#ffd21a", fontSize: "clamp(12px,3vw,16px)" }}>🔥 DAILY STREAK</b><span style={{ display: "block", marginTop: 3, color: "#a9bddb", fontSize: "clamp(9px,2.5vw,13px)", whiteSpace: "nowrap" }}>Keep playing to unlock bigger rewards.</span></div><button type="button" style={{ border: 0, borderRadius: 12, padding: "11px clamp(13px,3.5vw,20px)", background: "#ffd21a", color: "#111", fontWeight: 950, fontSize: "clamp(10px,2.7vw,14px)" }}>CLAIM</button></section>
       </div>
-
       <nav style={bottomNav}>{nav.map(([icon, label, href], i) => <Link key={label} href={href} style={{ display: "grid", placeItems: "center", alignContent: "center", gap: 1, color: i === 0 ? "#fff" : "#9eb3d7", background: i === 0 ? "#123a72" : "transparent", textDecoration: "none", fontSize: "clamp(12px,3vw,17px)", fontWeight: 950 }}><span style={{ fontSize: "clamp(23px,6vw,31px)", lineHeight: 1 }}>{icon}</span><b>{label}</b></Link>)}</nav>
     </main>
   );
