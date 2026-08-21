@@ -4,6 +4,7 @@ import "./globals.css";
 import "./home.css";
 import GameSocialOverlay from "./_components/GameSocialOverlay";
 import AppShell from "./AppShell";
+import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 
 export const metadata: Metadata = {
   title: "Ludo Live",
@@ -16,8 +17,8 @@ export const metadata: Metadata = {
     statusBarStyle: "black-translucent"
   },
   icons: {
-    icon: "/icons/icon-192.png",
-    apple: "/icons/icon-192.png"
+    icon: "/icons/icon.svg",
+    apple: "/icons/icon.svg"
   }
 };
 
@@ -29,5 +30,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({children}:{children:React.ReactNode}){
- return <html lang="en"><body><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense></body></html>;
+ return <html lang="en"><body><ServiceWorkerRegistration /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense></body></html>;
 }
