@@ -34,25 +34,26 @@ const lanes=[
 ] as const;
 
 const stars=[
-  {row:6,col:1},
-  {row:1,col:8},
-  {row:13,col:6},
-  {row:8,col:13}
+  {row:6,col:1,color:"green"},
+  {row:1,col:8,color:"yellow"},
+  {row:13,col:6,color:"red"},
+  {row:8,col:13,color:"blue"}
 ] as const;
 
 export default function LudoBoard({theme="classic",preview=false,className="",style}:{theme?:BoardThemeId;preview?:boolean;className?:string;style?:React.CSSProperties}){
   const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
   const cells=Array.from({length:225},(_,index)=>({index,row:Math.floor(index/15),col:index%15}));
   const laneAt=(row:number,col:number)=>lanes.find(l=>l.row===row&&l.col===col)?.color;
-  const starAt=(row:number,col:number)=>stars.some(s=>s.row===row&&s.col===col);
+  const starAt=(row:number,col:number)=>stars.find(s=>s.row===row&&s.col===col);
 
   return <div className={`shared-ludo-board ${preview?"shared-ludo-board-preview":""} ${className}`.trim()} style={{...style,background:p.bg,borderColor:p.accent}} aria-label={`${BOARD_NAMES[theme]} Ludo board`}>
     {cells.map(({index,row,col})=>{
       const lane=laneAt(row,col);
+      const star=starAt(row,col);
       const isHome=homes.some(h=>row>=h.row&&row<h.row+6&&col>=h.col&&col<h.col+6);
       const isTrack=!isHome;
-      return <div className={`board-cell ${isTrack?"track-cell":""} ${lane?`lane-${lane}`:""}`} key={index} aria-hidden="true">
-        {starAt(row,col)&&<span className="safe-star">★</span>}
+      return <div className={`board-cell ${isTrack?"track-cell":""} ${lane?`lane-${lane}`:""} ${star?`star-home-${star.color}`:""}`} key={index} aria-hidden="true">
+        {star&&<span className="safe-star">★</span>}
       </div>;
     })}
 
@@ -78,6 +79,7 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
       .board-cell:nth-child(15n){border-right:0}.board-cell:nth-last-child(-n+15){border-bottom:0}
       .track-cell{background:#fff}
       .lane-green{background:${p.green}}.lane-yellow{background:${p.yellow}}.lane-red{background:${p.red}}.lane-blue{background:${p.blue}}
+      .star-home-green{background:${p.green}}.star-home-yellow{background:${p.yellow}}.star-home-red{background:${p.red}}.star-home-blue{background:${p.blue}}
       .safe-star{font-size:clamp(11px,2.8vw,24px);line-height:1;color:#111;position:relative;z-index:1}
       .home-area{position:absolute;width:40%;height:40%;box-sizing:border-box;border:3px solid #222;pointer-events:none;z-index:3;padding:5.8%;}
       .home-green{top:0;left:0}.home-yellow{top:0;right:0}.home-red{bottom:0;left:0}.home-blue{bottom:0;right:0}
