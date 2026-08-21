@@ -1,26 +1,22 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
-import { createAccount, continueAsGuest, getAccount, hashPassword, syncLegacyProfile } from "../../lib/account";
+import { createAccount, continueAsGuest, getAccount, loginAccount, restoreSession } from "../../lib/account";
 
 export default function AccountPage(){
  const [next,setNext]=useState("/dashboard");
  const [mode,setMode]=useState<"create"|"login">("create");
  const [username,setUsername]=useState("");const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[confirm,setConfirm]=useState("");
  const [busy,setBusy]=useState(false);const[error,setError]=useState("");
- useEffect(()=>{if(typeof window!=="undefined"){const n=new URLSearchParams(window.location.search).get("next");if(n&&n.startsWith("/"))setNext(n)}if(getAccount()&&!getAccount()?.isGuest)setMode("login")},[]);
+ useEffect(()=>{let active=true;(async()=>{if(typeof window!=="undefined"){const n=new URLSearchParams(window.location.search).get("next");if(n&&n.startsWith("/"))setNext(n)}if(getAccount()&&!getAccount()?.isGuest){setMode("login");return}const account=await restoreSession();if(active&&account&&!account.isGuest)setMode("login")})();return()=>{active=false}},[]);
  const submit=async(e:FormEvent)=>{e.preventDefault();setError("");setBusy(true);try{
    if(mode==="create"){
     if(password!==confirm)throw new Error("Passwords do not match.");
-    await createAccount(username,email,password);localStorage.setItem("ludo-account-created","1");window.location.href=next;
+    await createAccount(username,email,password);window.location.href=next;
    }else{
-    const account=getAccount();if(!account||account.isGuest)throw new Error("No registered account is saved on this device yet. Create an account first.");
-    const identifier=(username||email).trim().toLowerCase();
-    const matches=account.username.toLowerCase()===identifier||account.email===identifier;
-    if(!matches||account.passwordHash!==await hashPassword(password))throw new Error("Incorrect account details.");
-    syncLegacyProfile(account);window.location.href=next;
+    await loginAccount(username||email,password);window.location.href=next;
    }
   }catch(err:any){setError(err?.message||"Something went wrong.");}finally{setBusy(false)}};
- const guest=()=>{setError("");setBusy(true);try{continueAsGuest();window.location.href=next}catch(err:any){setError(err?.message||"Unable to continue as guest.");setBusy(false)}};
+ const guest=async()=>{setError("");setBusy(true);try{await continueAsGuest();window.location.href=next}catch(err:any){setError(err?.message||"Unable to continue as guest.");setBusy(false)}};
  return <main style={shell}><div style={card}>
   <div style={brand}><div style={dice}>🎲</div><div><div style={eyebrow}>LUDO LIVE</div><h1 style={{margin:0,fontSize:30}}>Play your way.</h1></div></div>
   <p style={subtitle}>Create a free account to keep your player profile, level, XP, coins and gems. You can also jump straight into the game as a guest.</p>
@@ -36,7 +32,7 @@ export default function AccountPage(){
   </form>
   <div style={divider}><span>OR</span></div>
   <button disabled={busy} onClick={guest} style={guestButton}><span style={{fontSize:20}}>👤</span><span><b>Continue as guest</b><small>Play now without creating an account</small></span><span style={{marginLeft:"auto"}}>→</span></button>
-  <p style={finePrint}>Guest progress is stored on this device. Create an account later to keep your profile tied to an email.</p>
+  <p style={finePrint}>Guest play is available immediately. Create an account later to keep a persistent profile tied to your email.</p>
  </div></main>
 }
 const shell={minHeight:"100vh",display:"grid",placeItems:"center",padding:20,boxSizing:"border-box" as const,background:"radial-gradient(circle at 50% 0%,#123a76 0%,#031536 38%,#010611 100%)",color:"#fff"};
