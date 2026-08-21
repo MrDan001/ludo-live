@@ -3,7 +3,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { createAccount, getAccount, hashPassword, syncLegacyProfile } from "../../lib/account";
 
 export default function AccountPage(){
- const [next,setNext]=useState("/home");
+ const [next,setNext]=useState("/dashboard");
  const [mode,setMode]=useState<"create"|"login">("create");
  const [username,setUsername]=useState("");const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[confirm,setConfirm]=useState("");
  const [busy,setBusy]=useState(false);const[error,setError]=useState("");
@@ -32,7 +32,7 @@ export default function AccountPage(){
    {error&&<div style={errorBox}>{error}</div>}
    <button disabled={busy} type="submit" style={primary}>{busy?"PLEASE WAIT…":mode==="create"?"CREATE ACCOUNT":"SIGN IN"}</button>
   </form>
-  <button onClick={()=>window.location.href="/home"} style={skip}>← Back to Home</button>
+  <button onClick={()=>window.location.href="/dashboard"} style={skip}>← Back to Dashboard</button>
  </div></main>
 }
 const shell={minHeight:"100vh",display:"grid",placeItems:"center",padding:20,boxSizing:"border-box" as const,background:"linear-gradient(180deg,#031536,#010611)",color:"#fff"};
