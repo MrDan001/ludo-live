@@ -11,12 +11,11 @@ export const BOARD_NAMES:Record<BoardThemeId,string>={classic:"Classic Ludo",gol
 const homes=[{key:"green",row:0,col:0,color:"green"},{key:"yellow",row:0,col:9,color:"yellow"},{key:"red",row:9,col:0,color:"red"},{key:"blue",row:9,col:9,color:"blue"}] as const;
 const lanes=[...Array.from({length:5},(_,i)=>({color:"yellow",row:i+1,col:7})),...Array.from({length:5},(_,i)=>({color:"blue",row:7,col:i+9})),...Array.from({length:5},(_,i)=>({color:"red",row:13-i,col:7})),...Array.from({length:5},(_,i)=>({color:"green",row:7,col:i+1}))] as const;
 const stars=[{row:6,col:1,color:"green"},{row:1,col:8,color:"yellow"},{row:13,col:6,color:"red"},{row:8,col:13,color:"blue"}] as const;
-const mainPath=[...Array.from({length:5},(_,i)=>[6,i+1] as const),...Array.from({length:6},(_,i)=>[5-i,6] as const),[0,7],[0,8],...Array.from({length:5},(_,i)=>[i+1,8] as const),...Array.from({length:5},(_,i)=>[6,i+9] as const),[7,13],[7,14],[8,14],...Array.from({length:5},(_,i)=>[8,13-i] as const),...Array.from({length:6},(_,i)=>[9+i,8] as const),[14,7],[14,6],...Array.from({length:5},(_,i)=>[13-i,6] as const),...Array.from({length:6},(_,i)=>[8,5-i] as const),[7,0],[6,0]];
+const mainPath=[...Array.from({length:5},(_,i)=>[6,i+1] as const),...Array.from({length:6},(_,i)=>[5-i,6] as const),[0,7],[0,8],...Array.from({length:5},(_,i)=>[i+1,8] as const),...Array.from({length:6},(_,i)=>[6,i+9] as const),[7,14],[8,14],...Array.from({length:5},(_,i)=>[8,13-i] as const),...Array.from({length:6},(_,i)=>[9+i,8] as const),[14,7],[14,6],...Array.from({length:5},(_,i)=>[13-i,6] as const),...Array.from({length:6},(_,i)=>[8,5-i] as const),[7,0],[6,0]];
 const starts={green:0,yellow:13,red:39,blue:26} as const;
 const lanePath={green:[[7,1],[7,2],[7,3],[7,4],[7,5]],yellow:[[1,7],[2,7],[3,7],[4,7],[5,7]],red:[[13,7],[12,7],[11,7],[10,7],[9,7]],blue:[[7,13],[7,12],[7,11],[7,10],[7,9]]} as const;
 
-// Standard Ludo geometry: all 52 outer-track cells are visited first.
-// Only after the final outer cell does a token enter its five colored home-lane cells.
+// Exactly 52 shared-track cells. The blue home lane is not part of the shared track.
 function tokenCell(color:DemoToken["color"],position:number){
   if(position<=0)return null;
   if(position<=52){const index=(starts[color]+position-1)%52;return mainPath[index]}
