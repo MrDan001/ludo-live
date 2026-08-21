@@ -13,7 +13,7 @@
   ],
   "categories": ["games", "social"],
   "shortcuts": [
-    { "name": "Play Online", "short_name": "Play", "url": "/online" },
+    { "name": "Play Online", "short_name": "Play", "url": "/rooms" },
     { "name": "Friends", "short_name": "Friends", "url": "/friends" },
     { "name": "Chat", "short_name": "Chat", "url": "/chat" }
   ]
