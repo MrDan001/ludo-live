@@ -70,23 +70,28 @@ export async function GET(request: NextRequest) {
     const today = dayKey();
 
     if (id) {
+      // GET is deliberately read-only. A page refresh must never create or reset a spin.
       const r = await pool.query("SELECT last_free_spin,spins,total_spins FROM ludo_spin_state WHERE user_id=$1", [id]);
-      let row = r.rows[0];
-      if (!row) {
-        await pool.query("INSERT INTO ludo_spin_state(user_id,last_free_spin,spins,total_spins) VALUES($1,$2,1,0)", [id, today]);
-        row = { last_free_spin: today, spins: 1, total_spins: 0 };
-      } else if (String(row.last_free_spin).slice(0, 10) !== today) {
-        await pool.query("UPDATE ludo_spin_state SET last_free_spin=$2,spins=1 WHERE user_id=$1", [id, today]);
-        row = { ...row, last_free_spin: today, spins: 1 };
-      }
-      return NextResponse.json({ spins: Number(row.spins), totalSpins: Number(row.total_spins), visitor: false }, { headers: { "Cache-Control": "no-store" } });
+      const row = r.rows[0];
+      const ready = !row || !row.last_free_spin || String(row.last_free_spin).slice(0, 10) !== today;
+      return NextResponse.json(
+        {
+          spins: ready ? 1 : Number(row.spins),
+          totalSpins: Number(row?.total_spins || 0),
+          visitor: false,
+        },
+        { headers: { "Cache-Control": "no-store" } }
+      );
     }
 
     const key = browserKey(request);
     const r = await pool.query("SELECT last_spin,total_spins FROM ludo_spin_visitor_state WHERE browser_key=$1", [key]);
     const row = r.rows[0];
     const ready = !row || !row.last_spin || String(row.last_spin).slice(0, 10) !== today;
-    const response = NextResponse.json({ spins: ready ? 1 : 0, totalSpins: Number(row?.total_spins || 0), visitor: true }, { headers: { "Cache-Control": "no-store" } });
+    const response = NextResponse.json(
+      { spins: ready ? 1 : 0, totalSpins: Number(row?.total_spins || 0), visitor: true },
+      { headers: { "Cache-Control": "no-store" } }
+    );
     return withBrowserCookie(response, key, !request.cookies.get(BROWSER_COOKIE)?.value);
   } catch (e) {
     console.error(e);
@@ -103,6 +108,9 @@ export async function POST(request: NextRequest) {
     const prize = prizes[Math.floor(Math.random() * prizes.length)];
 
     if (id) {
+      // The POST is the only operation allowed to claim the daily spin.
+      // It resets the allowance only when the calendar day actually changes,
+      // then atomically consumes the single available spin.
       await pool.query(
         `INSERT INTO ludo_spin_state(user_id,last_free_spin,spins,total_spins)
          VALUES($1,$2,1,0)
@@ -144,11 +152,17 @@ export async function POST(request: NextRequest) {
     );
 
     if (!claimed.rows[0]) {
-      const response = NextResponse.json({ error: "This browser has already used today's spin." }, { status: 409, headers: { "Cache-Control": "no-store" } });
+      const response = NextResponse.json(
+        { error: "This browser has already used today's spin." },
+        { status: 409, headers: { "Cache-Control": "no-store" } }
+      );
       return withBrowserCookie(response, key, !request.cookies.get(BROWSER_COOKIE)?.value);
     }
 
-    const response = NextResponse.json({ prize, spins: 0, totalSpins: Number(claimed.rows[0].total_spins), visitor: true }, { headers: { "Cache-Control": "no-store" } });
+    const response = NextResponse.json(
+      { prize, spins: 0, totalSpins: Number(claimed.rows[0].total_spins), visitor: true },
+      { headers: { "Cache-Control": "no-store" } }
+    );
     return withBrowserCookie(response, key, !request.cookies.get(BROWSER_COOKIE)?.value);
   } catch (e) {
     console.error(e);
