@@ -3,7 +3,7 @@ import{useEffect,useState}from"react";import{io}from"socket.io-client";import Ap
 const diceNames:Record<DiceSkinId,string>={classic:"Classic White",golden:"Golden Dice",crystal:"Crystal Blue",fire:"Fire Dice",rainbow:"Rainbow Dice",diamond:"Diamond Dice",skull:"Skull Dice",sports:"Sports Dice"};
 type TokenColor="green"|"yellow";
 type DemoToken={color:TokenColor;position:number;id:number};
-const initialTokens:DemoToken[]=Array.from({length:4},(_,id)=>({color:"green",position:0,id})).concat(Array.from({length:4},(_,id)=>({color:"yellow",position:0,id})));
+const initialTokens:DemoToken[]=Array.from({length:4},(_,id):DemoToken=>({color:"green",position:0,id})).concat(Array.from({length:4},(_,id):DemoToken=>({color:"yellow",position:0,id})));
 
 export default function BoardPage(){
   const[theme,setTheme]=useState<BoardThemeId>("classic"),[die,setDie]=useState<DiceSkinId>("classic"),[roll,setRoll]=useState(1),[turn,setTurn]=useState<0|1>(0),[tokens,setTokens]=useState<DemoToken[]>(initialTokens),[notice,setNotice]=useState("Roll the dice to play."),[players,setPlayers]=useState<any[]>([]),[botThinking,setBotThinking]=useState(false),p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
