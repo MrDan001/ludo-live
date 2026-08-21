@@ -24,10 +24,14 @@ export default function HomePage() {
   useEffect(() => {
     document.body.style.margin = "0";
     document.body.style.width = "100%";
-    document.body.style.overflow = "hidden";
+    // Keep the document root scrollable so mobile browsers can perform their
+    // native pull-to-refresh gesture. The Home UI itself remains fixed/non-scrollable.
+    document.body.style.overflow = "";
+    document.body.style.overscrollBehaviorY = "auto";
     document.documentElement.style.margin = "0";
     document.documentElement.style.width = "100%";
-    document.documentElement.style.overflow = "hidden";
+    document.documentElement.style.overflow = "";
+    document.documentElement.style.overscrollBehaviorY = "auto";
     let alive = true;
     const refresh = async () => {
       try {
@@ -51,7 +55,9 @@ export default function HomePage() {
       window.removeEventListener("ludo-wallet-updated", refresh);
       window.removeEventListener("ludo-progression-updated", refreshProgress);
       document.body.style.overflow = "";
+      document.body.style.overscrollBehaviorY = "";
       document.documentElement.style.overflow = "";
+      document.documentElement.style.overscrollBehaviorY = "";
     };
   }, []);
 
