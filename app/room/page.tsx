@@ -5,15 +5,17 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import AppFrame from "../_components/AppFrame";
 import LiveSocial from "../_components/LiveSocial";
+import { AccountGateModal, useAccountGate } from "../_components/AccountGate";
 
 type Room={code:string;players:number;host:boolean;name:string};
 function makeCode(){return Math.random().toString(36).slice(2,8).toUpperCase()}
 function bumpStat(key:string){try{const s=JSON.parse(localStorage.getItem("ludo-stats")||"{}");s[key]=(s[key]||0)+1;localStorage.setItem("ludo-stats",JSON.stringify(s));window.dispatchEvent(new Event("ludo-stats-updated"))}catch{}}
 function RoomContent(){
  const params=useSearchParams(); const action=params.get("action")||"create"; const presetCode=params.get("code")||""; const presetSize=params.get("size")||"4";
- const [room,setRoom]=useState<Room|null>(null); const [players,setPlayers]=useState(presetSize); const [code,setCode]=useState(presetCode.toUpperCase()); const [name,setName]=useState("Player 1"); const [notice,setNotice]=useState("");
+ const [room,setRoom]=useState<Room|null>(null); const [players,setPlayers]=useState(presetSize); const [code,setCode]=useState(presetCode.toUpperCase()); const [name,setName]=useState("Player 1"); const [notice,setNotice]=useState(""); const gate=useAccountGate();
  const create=()=>{const r={code:makeCode(),players:Number(players),host:true,name:name.trim()||"Player 1"};localStorage.setItem("ludo-room",JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
  const join=()=>{const c=code.trim().toUpperCase();if(c.length<4){setNotice("Enter the room code.");return}const r={code:c,players:Number(players)||4,host:false,name:name.trim()||"Player"};localStorage.setItem("ludo-room",JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
+ const gatedAction=(fn:()=>void)=>gate.check(fn);
  const start=()=>{window.location.href=`/game?room=${encodeURIComponent(room!.code)}&name=${encodeURIComponent(room!.name)}${room!.host?"&host=1":""}`};
  if(room)return <AppFrame back="/lobby"><div style={{maxWidth:900,margin:"0 auto"}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}><div><h1 style={{fontSize:38,marginBottom:4}}>Room Lobby</h1><p style={{color:"#94a3b8",marginTop:0}}>Share the code and wait for everyone to get ready.</p></div><div style={{textAlign:"right"}}><small style={{color:"#64748b"}}>ROOM ID</small><div style={{fontSize:30,fontWeight:950,letterSpacing:5}}>{room.code}</div><button onClick={()=>navigator.clipboard?.writeText(room.code)} style={copyBtn}>📋 Copy code</button></div></div>
@@ -24,8 +26,9 @@ function RoomContent(){
  return <AppFrame back="/lobby"><div style={{maxWidth:520,margin:"0 auto"}}><h1 style={{fontSize:38}}>{action==="join"?"Join a Game":"Create a Game"}</h1><p style={{color:"#94a3b8"}}>{action==="join"?"Join an open room and take an available seat.":"Create a real room. It will immediately appear in Online Players while it has space."}</p>
   <label style={label}>Your name<input value={name} onChange={e=>setName(e.target.value)} style={input}/></label>
   {action==="join"?<><label style={label}>Room code<input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} style={input}/></label><label style={label}>Players<select value={players} onChange={e=>setPlayers(e.target.value)} style={input}><option value="2">2 Players</option><option value="4">4 Players</option></select></label></>:<label style={label}>Number of players<select value={players} onChange={e=>setPlayers(e.target.value)} style={input}><option value="2">2 Players</option><option value="4">4 Players</option></select></label>}
-  <button onClick={action==="join"?join:create} style={primary}>{action==="join"?"Join Room":"Create Room"}</button>{notice&&<p style={{color:"#fbbf24"}}>{notice}</p>}
- </div></AppFrame>;
+  <button onClick={()=>gatedAction(action==="join"?join:create)} style={primary}>{action==="join"?"Join Room":"Create Room"}</button>{notice&&<p style={{color:"#fbbf24"}}>{notice}</p>}
+  <div style={{marginTop:18,padding:12,borderRadius:12,background:"rgba(30,41,59,.55)",color:"#94a3b8",fontSize:12}}>🔐 A registered account is required to create or join a game. Guest mode is for exploring the app only.</div>
+ </div><AccountGateModal open={gate.open} onClose={()=>gate.setOpen(false)}/></AppFrame>;
 }
 export default function RoomPage(){return <Suspense fallback={<AppFrame back="/lobby"><p>Loading room…</p></AppFrame>}><RoomContent/></Suspense>}
 const label={display:"grid",gap:8,marginBottom:16,color:"#cbd5e1",fontWeight:700};
