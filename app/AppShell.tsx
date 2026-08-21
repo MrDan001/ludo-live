@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 
 type Room = { code: string; players: number; roomSize: number; hostName: string };
+type Wallet={coins:number;gems:number};
+const defaults:Wallet={coins:25680,gems:320};
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [path, setPath] = useState("");
@@ -11,11 +13,16 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [name, setName] = useState("PlayerOne");
   const [showCreate, setShowCreate] = useState(false);
   const [roomSize, setRoomSize] = useState(4);
+  const [wallet,setWallet]=useState<Wallet>(defaults);
 
   useEffect(() => {
     setPath(window.location.pathname);
     const saved = localStorage.getItem("ludo-player-name");
     if (saved) setName(saved);
+    try{const w=JSON.parse(localStorage.getItem("ludo-wallet")||"null");if(w)setWallet({...defaults,...w})}catch{}
+    const sync=()=>{try{const w=JSON.parse(localStorage.getItem("ludo-wallet")||"null");if(w)setWallet({...defaults,...w})}catch{}};
+    window.addEventListener("ludo-wallet-updated",sync);window.addEventListener("storage",sync);
+    return()=>{window.removeEventListener("ludo-wallet-updated",sync);window.removeEventListener("storage",sync)};
   }, []);
 
   useEffect(() => {
@@ -44,7 +51,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     <main className="app-home">
       <header className="home-topbar">
         <div className="player-mini"><div className="avatar">P</div><div><b>{name || "PlayerOne"}</b><span>Level 1 · Online</span></div></div>
-        <div className="wallet"><span>🪙 25,680</span><span>💎 320</span></div>
+        <div className="wallet"><span>🪙 {wallet.coins.toLocaleString()}</span><span>💎 {wallet.gems.toLocaleString()}</span></div>
         <a className="icon-btn" href="/profile" aria-label="Profile">⚙️</a>
       </header>
       <section className="hero-card"><div className="hero-copy"><small>LUDO LIVE</small><h1>PLAY. CONNECT. WIN.</h1><p>Real rooms. Real players. One live game.</p></div><div className="hero-dice">🎲</div></section>
