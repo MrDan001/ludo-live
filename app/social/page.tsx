@@ -9,16 +9,17 @@ type ChatRoom={code:string;title:string;hostName:string;members:number;maxMember
 type Member={id:string;name:string;host?:boolean};
 type Message={id:string;name:string;text:string;at:number};
 const quick=["👋 Hi!","😂 LOL","🔥 Nice!","😮 Wow!","👏 Good move","🎉 GG","❤️","😎"];
+function bumpStat(key:string){try{const s=JSON.parse(localStorage.getItem("ludo-stats")||"{}");s[key]=(s[key]||0)+1;localStorage.setItem("ludo-stats",JSON.stringify(s));window.dispatchEvent(new Event("ludo-stats-updated"))}catch{}}
 
 function SocialContent(){
  const params=useSearchParams();const initial=params.get("tab")||"chat";const [tab,setTab]=useState(initial==="friends"?"friends":"chat");
  const [name,setName]=useState("PlayerOne");const [rooms,setRooms]=useState<ChatRoom[]>([]);const [room,setRoom]=useState<ChatRoom|null>(null);const [members,setMembers]=useState<Member[]>([]);const [messages,setMessages]=useState<Message[]>([]);const [text,setText]=useState("");const [title,setTitle]=useState("");const [code,setCode]=useState("");const [notice,setNotice]=useState("");const [connected,setConnected]=useState(false);const [socket,setSocket]=useState<Socket|null>(null);
- useEffect(()=>{const s=io(window.location.origin,{transports:["websocket","polling"]});setSocket(s);s.on("connect",()=>{setConnected(true);s.emit("list-chat-rooms")});s.on("disconnect",()=>setConnected(false));s.on("chat-room-list",setRooms);s.on("chat-room-joined",(payload)=>{setRoom({code:payload.code,title:payload.title,hostName:name,members:payload.members.length,maxMembers:20,locked:false});setMembers(payload.members);setMessages(payload.messages||[]);setNotice("")});s.on("chat-room-members",(m:Member[])=>{setMembers(m);setRoom(r=>r?r?{...r,members:m.length}:r:null)});s.on("chat-room-message",(m:Message)=>setMessages(x=>[...x,m].slice(-100)));s.on("chat-room-error",(m:string)=>setNotice(m));s.on("chat-kicked",()=>{setRoom(null);setMembers([]);setMessages([]);setNotice("You were removed from that chat room by its host.")});return()=>{s.disconnect()}},[name]);
- const create=()=>{if(!socket||!connected)return;socket.emit("create-chat-room",{title:title.trim()||`${name}'s Chat`,name});setTitle("")};
- const join=(roomCode:string)=>{if(!socket)return;socket.emit("join-chat-room",{roomCode,name})};
+ useEffect(()=>{const s=io(window.location.origin,{transports:["websocket","polling"]});setSocket(s);s.on("connect",()=>{setConnected(true);s.emit("list-chat-rooms")});s.on("disconnect",()=>setConnected(false));s.on("chat-room-list",setRooms);s.on("chat-room-joined",(payload)=>{setRoom({code:payload.code,title:payload.title,hostName:name,members:payload.members.length,maxMembers:20,locked:false});setMembers(payload.members);setMessages(payload.messages||[]);setNotice("")});s.on("chat-room-members",(m:Member[])=>{setMembers(m);setRoom(r=>r?{...r,members:m.length}:r)});s.on("chat-room-message",(m:Message)=>setMessages(x=>[...x,m].slice(-100)));s.on("chat-room-error",(m:string)=>setNotice(m));s.on("chat-kicked",()=>{setRoom(null);setMembers([]);setMessages([]);setNotice("You were removed from that chat room by its host.")});return()=>{s.disconnect()}},[name]);
+ const create=()=>{if(!socket||!connected)return;socket.emit("create-chat-room",{title:title.trim()||`${name}'s Chat`,name});bumpStat("chatRoomsCreated");setTitle("")};
+ const join=(roomCode:string)=>{if(!socket)return;socket.emit("join-chat-room",{roomCode,name});bumpStat("chatRoomsJoined")};
  const joinCode=()=>{if(code.trim())join(code.trim().toUpperCase())};
  const leave=()=>{socket?.emit("leave-chat-room");setRoom(null);setMembers([]);setMessages([])};
- const send=(value=text)=>{const v=value.trim();if(!v||!room)return;socket?.emit("chat-room-message",{text:v});setText("")};
+ const send=(value=text)=>{const v=value.trim();if(!v||!room)return;socket?.emit("chat-room-message",{text:v});bumpStat("messagesSent");setText("")};
  const kick=(id:string)=>socket?.emit("kick-chat-member",id);
  const isHost=!!members.find(m=>m.name===name&&m.host);
  return <AppFrame back="/home"><div style={{maxWidth:980,margin:"0 auto",paddingBottom:50}}>
