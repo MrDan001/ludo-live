@@ -1,0 +1,26 @@
+(function(){
+  function loadPeer(){return new Promise(function(resolve,reject){if(window.Peer)return resolve(window.Peer);var s=document.createElement('script');s.src='https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js';s.onload=function(){resolve(window.Peer)};s.onerror=reject;document.head.appendChild(s)})}
+  function uid(){return 'p-'+Math.random().toString(36).slice(2,10)}
+  class LudoLiveSocial{
+    constructor(o){this.roomCode=o.roomCode;this.name=o.name||'Player';this.host=!!o.host;this.roomSize=o.roomSize||4;this.onState=o.onState||function(){};this.onMessage=o.onMessage||function(){};this.peer=null;this.connections={};this.members={};this.stream=null;this.mic=false;this.started=false}
+    async start(){if(this.started)return;this.started=true;await loadPeer();var id=this.host?'ludo-'+this.roomCode:uid();this.peer=new window.Peer(id);this.peer.on('open',this.open.bind(this));this.peer.on('connection',this.incomingConnection.bind(this));this.peer.on('call',this.incomingCall.bind(this));this.peer.on('error',function(e){console.warn('Peer error',e)});return this}
+    open(id){this.selfId=id;this.members[id]={id:id,name:this.name,host:this.host,ready:false,roomSize:this.roomSize};this.emit();if(!this.host){this.connect('ludo-'+this.roomCode,function(c){c.send({type:'join',member:this.members[id]})}.bind(this))}}
+    connect(id,after){if(!id||id===this.selfId)return;if(this.connections[id]&&this.connections[id].open){if(after)after(this.connections[id]);return this.connections[id]}var c=this.peer.connect(id,{reliable:true});this.bindConnection(c);c.on('open',function(){if(after)after(c);this.syncVoiceTo(id)}.bind(this));return c}
+    bindConnection(c){var id=c.peer;this.connections[id]=c;c.on('data',function(m){this.receive(m,c)}.bind(this));c.on('close',function(){delete this.connections[id];if(this.host){delete this.members[id];this.broadcastRoster()}else{delete this.members[id];this.emit()}}.bind(this));c.on('error',function(e){console.warn('connection error',e)});}
+    incomingConnection(c){this.bindConnection(c)}
+    receive(m,c){if(!m)return;if(m.type==='join'&&this.host){this.members[m.member.id]=m.member;this.members[m.member.id].host=false;this.broadcastRoster();return}if(m.type==='roster'){var next={};(m.members||[]).forEach(function(x){next[x.id]=x});this.members=next;this.emit();Object.keys(next).forEach(function(id){if(id!==this.selfId)this.connect(id)}.bind(this));this.syncAllVoice();return}if(m.type==='chat'){this.onMessage(m);this.broadcast(m,c.peer);return}if(m.type==='ready'){if(this.members[m.id])this.members[m.id].ready=m.ready;this.emit();if(this.host)this.broadcastRoster();else this.broadcast(m,c.peer);return}if(m.type==='start'){this.onMessage(m);this.broadcast(m,c.peer);return}}
+    broadcastRoster(){var members=Object.keys(this.members).map(function(k){return this.members[k]});this.broadcast({type:'roster',members:members});this.emit()}
+    broadcast(m,except){Object.keys(this.connections).forEach(function(id){if(id!==except){var c=this.connections[id];if(c&&c.open)c.send(m)}}.bind(this))}
+    sendChat(text){var m={type:'chat',id:this.selfId,name:this.name,text:text,at:Date.now()};this.onMessage(m);this.broadcast(m)}
+    setReady(v){if(this.members[this.selfId])this.members[this.selfId].ready=v;this.emit();var m={type:'ready',id:this.selfId,ready:v};this.broadcast(m);if(this.host)this.broadcastRoster()}
+    announceStart(){var m={type:'start'};this.onMessage(m);this.broadcast(m)}
+    emit(){this.onState(Object.keys(this.members).map(function(k){return this.members[k]}))}
+    async toggleMic(){if(!this.mic){try{this.stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});this.mic=true;this.syncAllVoice();return true}catch(e){console.warn('Microphone permission failed',e);return false}}this.mic=false;if(this.stream){this.stream.getTracks().forEach(function(t){t.stop()});this.stream=null}return false}
+    syncAllVoice(){var self=this;if(!this.mic||!this.stream)return;Object.keys(this.members).forEach(function(id){if(id!==self.selfId)self.syncVoiceTo(id)})}
+    syncVoiceTo(id){if(!this.mic||!this.stream||!this.peer)return;try{var call=this.peer.call(id,this.stream);if(call)call.on('stream',function(s){playRemote(id,s)})}catch(e){console.warn('voice call failed',e)}}
+    incomingCall(call){var id=call.peer;if(this.mic&&this.stream)call.answer(this.stream);else call.answer();call.on('stream',function(s){playRemote(id,s)})}
+    stop(){if(this.peer)this.peer.destroy();if(this.stream)this.stream.getTracks().forEach(function(t){t.stop()})}
+  }
+  function playRemote(id,stream){var a=document.getElementById('remote-audio-'+id);if(!a){a=document.createElement('audio');a.id='remote-audio-'+id;a.autoplay=true;a.playsInline=true;a.style.display='none';document.body.appendChild(a)}a.srcObject=stream;a.play().catch(function(){})}
+  window.LudoLiveSocial=LudoLiveSocial;
+})();
