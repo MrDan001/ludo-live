@@ -8,11 +8,12 @@ import LiveSocial from "../_components/LiveSocial";
 
 type Room={code:string;players:number;host:boolean;name:string};
 function makeCode(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+function bumpStat(key:string){try{const s=JSON.parse(localStorage.getItem("ludo-stats")||"{}");s[key]=(s[key]||0)+1;localStorage.setItem("ludo-stats",JSON.stringify(s));window.dispatchEvent(new Event("ludo-stats-updated"))}catch{}}
 function RoomContent(){
  const params=useSearchParams(); const action=params.get("action")||"create"; const presetCode=params.get("code")||""; const presetSize=params.get("size")||"4";
  const [room,setRoom]=useState<Room|null>(null); const [players,setPlayers]=useState(presetSize); const [code,setCode]=useState(presetCode.toUpperCase()); const [name,setName]=useState("Player 1"); const [notice,setNotice]=useState("");
- const create=()=>{const r={code:makeCode(),players:Number(players),host:true,name:name.trim()||"Player 1"};localStorage.setItem("ludo-room",JSON.stringify(r));setRoom(r)};
- const join=()=>{const c=code.trim().toUpperCase();if(c.length<4){setNotice("Enter the room code.");return}const r={code:c,players:Number(players)||4,host:false,name:name.trim()||"Player"};localStorage.setItem("ludo-room",JSON.stringify(r));setRoom(r)};
+ const create=()=>{const r={code:makeCode(),players:Number(players),host:true,name:name.trim()||"Player 1"};localStorage.setItem("ludo-room",JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
+ const join=()=>{const c=code.trim().toUpperCase();if(c.length<4){setNotice("Enter the room code.");return}const r={code:c,players:Number(players)||4,host:false,name:name.trim()||"Player"};localStorage.setItem("ludo-room",JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
  const start=()=>{window.location.href=`/game?room=${encodeURIComponent(room!.code)}&name=${encodeURIComponent(room!.name)}${room!.host?"&host=1":""}`};
  if(room)return <AppFrame back="/lobby"><div style={{maxWidth:900,margin:"0 auto"}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:12,alignItems:"center",flexWrap:"wrap"}}><div><h1 style={{fontSize:38,marginBottom:4}}>Room Lobby</h1><p style={{color:"#94a3b8",marginTop:0}}>Share the code and wait for everyone to get ready.</p></div><div style={{textAlign:"right"}}><small style={{color:"#64748b"}}>ROOM ID</small><div style={{fontSize:30,fontWeight:950,letterSpacing:5}}>{room.code}</div><button onClick={()=>navigator.clipboard?.writeText(room.code)} style={copyBtn}>📋 Copy code</button></div></div>
