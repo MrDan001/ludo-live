@@ -19,7 +19,7 @@ function RoomContent(){
   <div style={{marginTop:18,padding:18,borderRadius:18,background:"linear-gradient(135deg,#071c45,#0b1630)",border:"1px solid rgba(59,130,246,.22)"}}><div style={{fontWeight:900,fontSize:18}}>🎙️ Live room</div><p style={{color:"#94a3b8",marginBottom:0}}>Voice chat and quick text messages are live across devices. Allow microphone access when you tap Mic On.</p></div>
   <LiveSocial roomCode={room.code} name={room.name} host={room.host} roomSize={room.players} onStart={start}/>
   <div style={{marginTop:12}}><Link href="/lobby" style={leaveBtn}>Leave Room</Link></div>
- </div>;
+ </div></AppFrame>;
  return <AppFrame back="/lobby"><div style={{maxWidth:520,margin:"0 auto"}}><h1 style={{fontSize:38}}>{action==="join"?"Join a Game":"Create a Game"}</h1><p style={{color:"#94a3b8"}}>Real-time voice and chat will be available inside the room.</p>
   <label style={label}>Your name<input value={name} onChange={e=>setName(e.target.value)} style={input}/></label>
   {action==="join"?<label style={label}>Room code<input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} style={input}/></label>:<label style={label}>Number of players<select value={players} onChange={e=>setPlayers(e.target.value)} style={input}><option value="2">2 Players</option><option value="4">4 Players</option></select></label>}
