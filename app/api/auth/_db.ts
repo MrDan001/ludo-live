@@ -1,7 +1,33 @@
 import { Pool } from "pg";
+
 const globalForDb=globalThis as unknown as {ludoPool?:Pool};
-export const pool=globalForDb.ludoPool??new Pool({connectionString:process.env.DATABASE_URL,ssl:process.env.NODE_ENV==="production"?{rejectUnauthorized:false}:false});
+
+function databaseConfig(){
+  const raw=process.env.DATABASE_URL;
+  if(!raw) throw new Error("DATABASE_URL is not configured");
+  // Railway's Postgres URL can contain sslmode=require. pg can let that URL
+  // override the explicit SSL object and then reject Railway's certificate
+  // chain. Remove URL-level SSL flags and configure the pool explicitly.
+  let connectionString=raw;
+  try{
+    const u=new URL(raw);
+    u.searchParams.delete("sslmode");
+    u.searchParams.delete("sslcert");
+    u.searchParams.delete("sslkey");
+    u.searchParams.delete("sslrootcert");
+    connectionString=u.toString();
+  }catch{
+    // Keep the original value; pg will report a useful connection error.
+  }
+  return {
+    connectionString,
+    ssl:process.env.NODE_ENV==="production"?{rejectUnauthorized:false}:false,
+  };
+}
+
+export const pool=globalForDb.ludoPool??new Pool(databaseConfig());
 if(!globalForDb.ludoPool)globalForDb.ludoPool=pool;
+
 let schemaPromise:Promise<void>|null=null;
 export function ensureAuthSchema(){if(!schemaPromise){schemaPromise=pool.query(`
 CREATE TABLE IF NOT EXISTS ludo_users(id TEXT PRIMARY KEY,username TEXT NOT NULL,email TEXT UNIQUE,password_hash TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),coins INTEGER NOT NULL DEFAULT 1000,gems INTEGER NOT NULL DEFAULT 10,xp INTEGER NOT NULL DEFAULT 0,level INTEGER NOT NULL DEFAULT 0,is_guest BOOLEAN NOT NULL DEFAULT FALSE,is_banned BOOLEAN NOT NULL DEFAULT FALSE,banned_at TIMESTAMPTZ,ban_reason TEXT,last_seen_at TIMESTAMPTZ);
