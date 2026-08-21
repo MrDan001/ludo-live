@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Suspense } from "react";
 import "./globals.css";
+import "./home.css";
 import GameSocialOverlay from "./_components/GameSocialOverlay";
 import AppShell from "./AppShell";
 
