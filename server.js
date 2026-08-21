@@ -11,10 +11,12 @@ const chatRooms = new Map();
 
 function publicMembers(room){return [...room.members.values()]}
 function publicRooms(){return [...rooms.entries()].map(([code,room])=>({code,players:room.members.size,roomSize:room.roomSize,hostName:room.members.get(room.hostId)?.name||'Host'})).filter(r=>r.players<r.roomSize)}
-function publicChatRooms(){return [...chatRooms.entries()].map(([code,room])=>({code,title:room.title,hostName:room.members.get(room.hostId)?.name||'Host',members:room.members.size,maxMembers:20,locked:room.members.size>=20})).filter(r=>r.members<20)}
+function publicChatMembers(room){return [...room.members.values()].map(m=>({id:m.playerId||m.id,name:m.name,role:m.role||'member',owner:m.role==='owner',online:!!m.socketId}))}
+function publicChatRooms(){return [...chatRooms.entries()].map(([code,room])=>({code,title:room.title,hostName:room.members.get(room.hostId)?.name||'Host',members:room.members.size,maxMembers:20,locked:room.members.size>=20,ownerId:room.hostId}));}
 function broadcastRooms(){io?.emit('room-list',publicRooms())}
 function broadcastChatRooms(){io?.emit('chat-room-list',publicChatRooms())}
 function chatMember(room,id){return room?.members.get(id)}
+function findChatMembership(playerId){for(const [code,room] of chatRooms){const member=room.members.get(playerId);if(member)return {code,room,member}}return null}
 let io;
 
 app.prepare().then(()=>{
@@ -25,7 +27,7 @@ app.prepare().then(()=>{
  io=new Server(httpServer,{cors:{origin:process.env.FRONTEND_URL||'*',methods:['GET','POST']},transports:['polling','websocket']});
  io.on('connection',socket=>{
   socket.on('list-rooms',()=>socket.emit('room-list',publicRooms()));
-  socket.on('list-chat-rooms',()=>socket.emit('chat-room-list',publicChatRooms()));
+  socket.on('list-chat-rooms',({playerId}={})=>{socket.data.playerId=String(playerId||'').trim();socket.emit('chat-room-list',publicChatRooms());const membership=findChatMembership(socket.data.playerId);socket.emit('chat-my-room',membership?{code:membership.code,title:membership.room.title,members:publicChatMembers(membership.room),messages:membership.room.messages}:null)});
 
   socket.on('join-room',({roomCode,name,roomSize})=>{
    if(!roomCode||!name)return;
@@ -43,28 +45,51 @@ app.prepare().then(()=>{
   socket.on('start-game',()=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room||room.hostId!==socket.id)return;const members=publicMembers(room);if(members.length===room.roomSize&&members.every(m=>m.ready))io.to(code).emit('start-game')});
   socket.on('kick-player',targetId=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room||room.hostId!==socket.id||!targetId||targetId===socket.id)return;const target=room.members.get(String(targetId));if(!target)return;room.members.delete(String(targetId));const targetSocket=io.sockets.sockets.get(String(targetId));if(targetSocket){targetSocket.emit('kicked',{roomCode:code,reason:'Removed by the room host'});targetSocket.leave(code);targetSocket.data.roomCode=null}io.to(code).emit('roster',publicMembers(room));broadcastRooms()});
 
-  socket.on('create-chat-room',({title,name})=>{
+  // Chat rooms use a persistent browser playerId so membership survives reconnects.
+  socket.on('create-chat-room',({title,name,playerId}={})=>{
+   const pid=String(playerId||socket.data.playerId||'').trim();if(!pid)return socket.emit('chat-room-error','Player identity is required.');
+   socket.data.playerId=pid;
+   if(findChatMembership(pid))return socket.emit('chat-room-error','You are already a member of a chat room. Leave that room before joining another.');
    const cleanName=String(name||'Player').trim().slice(0,24)||'Player';
    const cleanTitle=String(title||`${cleanName}'s Chat`).trim().slice(0,40)||'Ludo Chat';
-   let code;
-   do{code=Math.random().toString(36).slice(2,8).toUpperCase()}while(chatRooms.has(code));
-   const room={hostId:socket.id,title:cleanTitle,members:new Map(),messages:[]};
-   room.members.set(socket.id,{id:socket.id,name:cleanName,host:true});chatRooms.set(code,room);socket.join(`chat:${code}`);socket.data.chatRoomCode=code;
-   socket.emit('chat-room-joined',{code,title:cleanTitle,host:true,members:publicMembers(room),messages:room.messages});broadcastChatRooms();
+   let code;do{code=Math.random().toString(36).slice(2,8).toUpperCase()}while(chatRooms.has(code));
+   const room={hostId:pid,title:cleanTitle,members:new Map(),messages:[]};
+   room.members.set(pid,{playerId:pid,socketId:socket.id,name:cleanName,role:'owner'});chatRooms.set(code,room);socket.join(`chat:${code}`);socket.data.chatRoomCode=code;
+   socket.emit('chat-room-joined',{code,title:cleanTitle,role:'owner',members:publicChatMembers(room),messages:room.messages});broadcastChatRooms();
   });
-  socket.on('join-chat-room',({roomCode,name})=>{
+
+  socket.on('join-chat-room',({roomCode,name,playerId}={})=>{
+   const pid=String(playerId||socket.data.playerId||'').trim();if(!pid)return socket.emit('chat-room-error','Player identity is required.');socket.data.playerId=pid;
    const code=String(roomCode||'').trim().toUpperCase(),room=chatRooms.get(code);if(!room)return socket.emit('chat-room-error','Chat room not found');
-   if(room.members.size>=20&&!room.members.has(socket.id))return socket.emit('chat-room-error','This chat room is full (20 people).');
-   const cleanName=String(name||'Player').trim().slice(0,24)||'Player';room.members.set(socket.id,{id:socket.id,name:cleanName,host:socket.id===room.hostId});socket.join(`chat:${code}`);socket.data.chatRoomCode=code;
-   socket.emit('chat-room-joined',{code,title:room.title,host:socket.id===room.hostId,members:publicMembers(room),messages:room.messages});io.to(`chat:${code}`).emit('chat-room-members',publicMembers(room));broadcastChatRooms();
+   const existing=findChatMembership(pid);
+   if(existing&&existing.code!==code)return socket.emit('chat-room-error','You are already a member of another chat room. Leave it before joining this one.');
+   if(room.members.size>=20&&!room.members.has(pid))return socket.emit('chat-room-error','This chat room is full (20 people).');
+   const cleanName=String(name||'Player').trim().slice(0,24)||'Player';
+   const old=room.members.get(pid);room.members.set(pid,{playerId:pid,socketId:socket.id,name:old?.name||cleanName,role:old?.role||'member'});socket.join(`chat:${code}`);socket.data.chatRoomCode=code;
+   socket.emit('chat-room-joined',{code,title:room.title,role:room.members.get(pid).role,members:publicChatMembers(room),messages:room.messages});io.to(`chat:${code}`).emit('chat-room-members',publicChatMembers(room));broadcastChatRooms();
   });
-  socket.on('leave-chat-room',()=>{const code=socket.data.chatRoomCode,room=chatRooms.get(code);if(!room)return;room.members.delete(socket.id);socket.leave(`chat:${code}`);socket.data.chatRoomCode=null;if(room.members.size===0)chatRooms.delete(code);else io.to(`chat:${code}`).emit('chat-room-members',publicMembers(room));broadcastChatRooms()});
-  socket.on('chat-room-message',({text})=>{const code=socket.data.chatRoomCode,room=chatRooms.get(code),member=chatMember(room,socket.id);if(!member||!text)return;const message={id:socket.id,name:member.name,text:String(text).slice(0,240),at:Date.now()};room.messages.push(message);if(room.messages.length>100)room.messages.shift();io.to(`chat:${code}`).emit('chat-room-message',message)});
-  socket.on('kick-chat-member',targetId=>{const code=socket.data.chatRoomCode,room=chatRooms.get(code),member=chatMember(room,socket.id);if(!room||!member?.host||!targetId||targetId===socket.id)return;const target=room.members.get(String(targetId));if(!target)return;room.members.delete(String(targetId));const targetSocket=io.sockets.sockets.get(String(targetId));if(targetSocket){targetSocket.emit('chat-kicked',{roomCode:code,reason:'Removed by the chat room host'});targetSocket.leave(`chat:${code}`);targetSocket.data.chatRoomCode=null}io.to(`chat:${code}`).emit('chat-room-members',publicMembers(room));broadcastChatRooms()});
+
+  socket.on('leave-chat-room',({playerId}={})=>{
+   const pid=String(playerId||socket.data.playerId||'').trim(),membership=findChatMembership(pid);if(!membership)return;
+   const {code,room,member}=membership;if(member.role==='owner')return socket.emit('chat-room-error','The room owner cannot leave the room.');
+   room.members.delete(pid);socket.leave(`chat:${code}`);socket.data.chatRoomCode=null;io.to(`chat:${code}`).emit('chat-room-members',publicChatMembers(room));broadcastChatRooms();
+  });
+
+  socket.on('chat-room-message',({text}={})=>{
+   const pid=String(socket.data.playerId||'').trim(),membership=findChatMembership(pid),room=membership?.room,member=membership?.member;if(!member||!text)return;
+   member.socketId=socket.id;const message={id:pid,name:member.name,text:String(text).slice(0,240),at:Date.now()};room.messages.push(message);if(room.messages.length>100)room.messages.shift();io.to(`chat:${membership.code}`).emit('chat-room-message',message);
+  });
+
+  socket.on('kick-chat-member',targetId=>{
+   const pid=String(socket.data.playerId||'').trim(),membership=findChatMembership(pid),room=membership?.room,member=membership?.member;if(!room||member?.role!=='owner'||!targetId||targetId===pid)return;
+   const target=room.members.get(String(targetId));if(!target)return;room.members.delete(String(targetId));const targetSocket=target.socketId?io.sockets.sockets.get(String(target.socketId)):null;
+   if(targetSocket){targetSocket.emit('chat-kicked',{roomCode:membership.code,reason:'Removed by the room owner'});targetSocket.leave(`chat:${membership.code}`);targetSocket.data.chatRoomCode=null}
+   io.to(`chat:${membership.code}`).emit('chat-room-members',publicChatMembers(room));broadcastChatRooms();
+  });
 
   socket.on('disconnect',()=>{
    const code=socket.data.roomCode,room=rooms.get(code);if(room){room.members.delete(socket.id);if(room.hostId===socket.id){const nextHost=room.members.values().next().value;if(nextHost){room.hostId=nextHost.id;nextHost.host=true;nextHost.ready=true}}if(room.members.size===0)rooms.delete(code);else io.to(code).emit('roster',publicMembers(room));broadcastRooms()}
-   const chatCode=socket.data.chatRoomCode,chatRoom=chatRooms.get(chatCode);if(chatRoom){chatRoom.members.delete(socket.id);if(chatRoom.hostId===socket.id){const nextHost=chatRoom.members.values().next().value;if(nextHost){chatRoom.hostId=nextHost.id;nextHost.host=true}}if(chatRoom.members.size===0)chatRooms.delete(chatCode);else io.to(`chat:${chatCode}`).emit('chat-room-members',publicMembers(chatRoom));broadcastChatRooms()}
+   const pid=String(socket.data.playerId||'').trim(),chatCode=socket.data.chatRoomCode,chatRoom=chatRooms.get(chatCode||'');if(chatRoom){const member=chatRoom.members.get(pid);if(member&&member.socketId===socket.id)member.socketId=null;io.to(`chat:${chatCode}`).emit('chat-room-members',publicChatMembers(chatRoom));broadcastChatRooms()}
   });
  });
  httpServer.listen(port,hostname,()=>console.log(`Ludo Live realtime server listening on ${hostname}:${port}`));
