@@ -1,25 +1,15 @@
-// Ludo board movement logic (4 players: Green, Yellow, Blue, Red)
-// Standard board: 52-square outer track + 5 visible home-lane squares per color.
+// Ludo rules and movement. Board geometry lives in lib/ludoBoardCore.ts.
+
+import { SAFE_SQUARES, START_INDEX, TRACK_LENGTH, HOME_STRETCH } from "./ludoBoardCore";
 
 export const COLORS = ["green", "yellow", "blue", "red"] as const;
 export type LudoColor = typeof COLORS[number];
 export type TokenState = "yard" | "track" | "home" | "finished";
 
-// Each color's entry square index on the 52-square shared track (clockwise).
-export const START_INDEX: Record<LudoColor, number> = {
-  green: 0,
-  yellow: 13,
-  blue: 26,
-  red: 39,
-};
+// These are re-exported for existing callers; the values are owned by the board core.
+export { SAFE_SQUARES, START_INDEX, TRACK_LENGTH, HOME_STRETCH };
 
-// Safe squares on the shared track (starting squares + star squares).
-export const SAFE_SQUARES = [0, 8, 13, 21, 26, 34, 39, 47];
-
-export const TRACK_LENGTH = 52;
-export const HOME_STRETCH = 5;
-// A token starts at step 0, travels the remaining 51 outer-track squares,
-// then crosses 5 visible home-lane squares before finishing.
+// A token starts at step 0, travels the shared track, then crosses 5 home-lane squares.
 export const STEPS_TO_FINISH = TRACK_LENGTH + HOME_STRETCH - 1; // 56
 
 export type LudoToken = {
@@ -36,24 +26,20 @@ export function createPlayerTokens(color: LudoColor, count = 4): LudoToken[] {
   return Array.from({ length: count }, () => createToken(color));
 }
 
-// Convert a token's steps into the actual board square.
-// Steps 0..51 are ALL 52 shared-track squares.
-// Steps 52..56 are the 5 colored home-lane squares.
+// Convert a token's steps into the authoritative board coordinate.
 export function getBoardPosition(token: LudoToken): { zone: "track" | "home"; index: number } | null {
   if (token.state !== "track" && token.state !== "home") return null;
 
   const entry = START_INDEX[token.color];
   if (token.steps < TRACK_LENGTH) {
-    const absoluteIndex = (entry + token.steps) % TRACK_LENGTH;
-    return { zone: "track", index: absoluteIndex };
+    return { zone: "track", index: (entry + token.steps) % TRACK_LENGTH };
   }
 
-  const homeIndex = token.steps - TRACK_LENGTH;
-  return { zone: "home", index: homeIndex }; // 0..4
+  return { zone: "home", index: token.steps - TRACK_LENGTH };
 }
 
 export function isSafeSquare(trackIndex: number): boolean {
-  return SAFE_SQUARES.includes(trackIndex);
+  return SAFE_SQUARES.includes(trackIndex as (typeof SAFE_SQUARES)[number]);
 }
 
 export function canMove(token: LudoToken, diceValue: number): boolean {
@@ -69,7 +55,6 @@ export function moveToken(token: LudoToken, diceValue: number, allTokens: LudoTo
   }
 
   if (token.state === "yard") {
-    // A six releases the token to its own starting square.
     token.state = "track";
     token.steps = 0;
   } else {
