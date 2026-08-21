@@ -30,7 +30,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const s: Socket = io(window.location.origin, { transports: ["websocket", "polling"] });
     s.on("room-list", setRooms);
     s.emit("list-rooms");
-    return () => s.disconnect();
+    return () => { s.disconnect(); };
   }, [path]);
 
   if (path && path !== "/") return <>{children}</>;
