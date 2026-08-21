@@ -1,27 +1,29 @@
 "use client";
 import { FormEvent, useEffect, useState } from "react";
-import { createAccount, getAccount, hashPassword, syncLegacyProfile } from "../../lib/account";
+import { createAccount, continueAsGuest, getAccount, hashPassword, syncLegacyProfile } from "../../lib/account";
 
 export default function AccountPage(){
  const [next,setNext]=useState("/dashboard");
  const [mode,setMode]=useState<"create"|"login">("create");
  const [username,setUsername]=useState("");const[email,setEmail]=useState("");const[password,setPassword]=useState("");const[confirm,setConfirm]=useState("");
  const [busy,setBusy]=useState(false);const[error,setError]=useState("");
- useEffect(()=>{if(typeof window!=="undefined"){const n=new URLSearchParams(window.location.search).get("next");if(n&&n.startsWith("/"))setNext(n)}if(getAccount())setMode("login")},[]);
+ useEffect(()=>{if(typeof window!=="undefined"){const n=new URLSearchParams(window.location.search).get("next");if(n&&n.startsWith("/"))setNext(n)}if(getAccount()&&!getAccount()?.isGuest)setMode("login")},[]);
  const submit=async(e:FormEvent)=>{e.preventDefault();setError("");setBusy(true);try{
    if(mode==="create"){
     if(password!==confirm)throw new Error("Passwords do not match.");
     await createAccount(username,email,password);localStorage.setItem("ludo-account-created","1");window.location.href=next;
    }else{
-    const account=getAccount();if(!account)throw new Error("Create an account first.");
+    const account=getAccount();if(!account||account.isGuest)throw new Error("No registered account is saved on this device yet. Create an account first.");
     const identifier=(username||email).trim().toLowerCase();
     const matches=account.username.toLowerCase()===identifier||account.email===identifier;
     if(!matches||account.passwordHash!==await hashPassword(password))throw new Error("Incorrect account details.");
     syncLegacyProfile(account);window.location.href=next;
    }
   }catch(err:any){setError(err?.message||"Something went wrong.");}finally{setBusy(false)}};
+ const guest=()=>{setError("");setBusy(true);try{continueAsGuest();window.location.href=next}catch(err:any){setError(err?.message||"Unable to continue as guest.");setBusy(false)}};
  return <main style={shell}><div style={card}>
-  <div style={{fontSize:42}}>🎲</div><h1 style={{margin:"8px 0 4px",fontSize:30}}>Create your Ludo account</h1><p style={{color:"#9fb2cf",lineHeight:1.5,marginTop:0}}>Your profile, level, XP, coins, gems and social identity stay attached to your account on this device.</p>
+  <div style={brand}><div style={dice}>🎲</div><div><div style={eyebrow}>LUDO LIVE</div><h1 style={{margin:0,fontSize:30}}>Play your way.</h1></div></div>
+  <p style={subtitle}>Create a free account to keep your player profile, level, XP, coins and gems. You can also jump straight into the game as a guest.</p>
   <div style={tabs}><button onClick={()=>{setMode("create");setError("")}} style={mode==="create"?activeTab:tab}>CREATE ACCOUNT</button><button onClick={()=>{setMode("login");setError("")}} style={mode==="login"?activeTab:tab}>SIGN IN</button></div>
   <form onSubmit={submit} style={{display:"grid",gap:13}}>
    <label style={label}>{mode==="create"?"Username":"Username or email"}<input value={username} onChange={e=>setUsername(e.target.value)} autoComplete="username" required placeholder={mode==="create"?"Choose a player name":"Your username or email"} style={input}/></label>
@@ -32,11 +34,17 @@ export default function AccountPage(){
    {error&&<div style={errorBox}>{error}</div>}
    <button disabled={busy} type="submit" style={primary}>{busy?"PLEASE WAIT…":mode==="create"?"CREATE ACCOUNT":"SIGN IN"}</button>
   </form>
-  <button onClick={()=>window.location.href="/dashboard"} style={skip}>← Back to Dashboard</button>
+  <div style={divider}><span>OR</span></div>
+  <button disabled={busy} onClick={guest} style={guestButton}><span style={{fontSize:20}}>👤</span><span><b>Continue as guest</b><small>Play now without creating an account</small></span><span style={{marginLeft:"auto"}}>→</span></button>
+  <p style={finePrint}>Guest progress is stored on this device. Create an account later to keep your profile tied to an email.</p>
  </div></main>
 }
-const shell={minHeight:"100vh",display:"grid",placeItems:"center",padding:20,boxSizing:"border-box" as const,background:"linear-gradient(180deg,#031536,#010611)",color:"#fff"};
+const shell={minHeight:"100vh",display:"grid",placeItems:"center",padding:20,boxSizing:"border-box" as const,background:"radial-gradient(circle at 50% 0%,#123a76 0%,#031536 38%,#010611 100%)",color:"#fff"};
 const card={width:"min(100%,470px)",boxSizing:"border-box" as const,padding:24,borderRadius:24,background:"linear-gradient(145deg,#081f49,#06152f)",border:"1px solid rgba(88,137,218,.3)",boxShadow:"0 25px 70px rgba(0,0,0,.35)"};
+const brand={display:"flex",alignItems:"center",gap:12};
+const dice={fontSize:40};
+const eyebrow={fontSize:11,fontWeight:950,letterSpacing:2,color:"#61a5ff"};
+const subtitle={color:"#9fb2cf",lineHeight:1.55,marginTop:12};
 const tabs={display:"grid",gridTemplateColumns:"1fr 1fr",gap:6,padding:5,margin:"18px 0",borderRadius:13,background:"#06142d"};
 const tab={border:0,background:"transparent",color:"#9db0cd",padding:11,borderRadius:9,fontWeight:900};
 const activeTab={...tab,background:"#1769e8",color:"#fff"};
@@ -45,4 +53,6 @@ const input={width:"100%",boxSizing:"border-box" as const,padding:13,borderRadiu
 const starting={display:"grid",gap:4,padding:12,borderRadius:12,background:"rgba(21,101,216,.12)",border:"1px solid rgba(79,139,236,.22)",color:"#dbeafe",fontSize:12};
 const errorBox={padding:11,borderRadius:10,background:"rgba(153,27,27,.35)",border:"1px solid rgba(248,113,113,.35)",color:"#fecaca",fontSize:13};
 const primary={border:0,padding:14,borderRadius:12,background:"linear-gradient(90deg,#1769e8,#2185ff)",color:"#fff",fontWeight:950,fontSize:15};
-const skip={border:0,background:"transparent",color:"#8fb8f0",padding:14,fontWeight:800,width:"100%"};
+const divider={display:"flex",alignItems:"center",gap:10,margin:"18px 0 12px",color:"#6680a5",fontSize:11,fontWeight:900};
+const guestButton={display:"flex",alignItems:"center",gap:11,width:"100%",boxSizing:"border-box" as const,border:"1px solid #31517f",padding:"13px 14px",borderRadius:12,background:"#071a37",color:"#fff",textAlign:"left" as const,fontSize:14};
+const finePrint={color:"#6f87a9",fontSize:11,lineHeight:1.45,textAlign:"center" as const,margin:"12px 4px 0"};
