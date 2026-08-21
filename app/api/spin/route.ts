@@ -79,14 +79,14 @@ export async function GET(request: NextRequest) {
         await pool.query("UPDATE ludo_spin_state SET last_free_spin=$2,spins=1 WHERE user_id=$1", [id, today]);
         row = { ...row, last_free_spin: today, spins: 1 };
       }
-      return NextResponse.json({ spins: Number(row.spins), totalSpins: Number(row.total_spins), visitor: false });
+      return NextResponse.json({ spins: Number(row.spins), totalSpins: Number(row.total_spins), visitor: false }, { headers: { "Cache-Control": "no-store" } });
     }
 
     const key = browserKey(request);
     const r = await pool.query("SELECT last_spin,total_spins FROM ludo_spin_visitor_state WHERE browser_key=$1", [key]);
     const row = r.rows[0];
-    const ready = !row || String(row.last_spin).slice(0, 10) !== today;
-    const response = NextResponse.json({ spins: ready ? 1 : 0, totalSpins: Number(row?.total_spins || 0), visitor: true });
+    const ready = !row || !row.last_spin || String(row.last_spin).slice(0, 10) !== today;
+    const response = NextResponse.json({ spins: ready ? 1 : 0, totalSpins: Number(row?.total_spins || 0), visitor: true }, { headers: { "Cache-Control": "no-store" } });
     return withBrowserCookie(response, key, !request.cookies.get(BROWSER_COOKIE)?.value);
   } catch (e) {
     console.error(e);
@@ -103,32 +103,52 @@ export async function POST(request: NextRequest) {
     const prize = prizes[Math.floor(Math.random() * prizes.length)];
 
     if (id) {
-      await pool.query("INSERT INTO ludo_spin_state(user_id,last_free_spin,spins,total_spins) VALUES($1,$2,1,0) ON CONFLICT DO NOTHING", [id, today]);
-      const state = await pool.query("SELECT last_free_spin,spins,total_spins FROM ludo_spin_state WHERE user_id=$1 FOR UPDATE", [id]);
-      let row = state.rows[0];
-      if (String(row.last_free_spin).slice(0, 10) !== today) {
-        await pool.query("UPDATE ludo_spin_state SET last_free_spin=$2,spins=1 WHERE user_id=$1", [id, today]);
-        row = { ...row, last_free_spin: today, spins: 1 };
-      }
-      if (Number(row.spins || 0) < 1) return NextResponse.json({ error: "No spin available today." }, { status: 409 });
+      await pool.query(
+        `INSERT INTO ludo_spin_state(user_id,last_free_spin,spins,total_spins)
+         VALUES($1,$2,1,0)
+         ON CONFLICT (user_id) DO UPDATE SET
+           last_free_spin = CASE WHEN ludo_spin_state.last_free_spin IS DISTINCT FROM EXCLUDED.last_free_spin THEN EXCLUDED.last_free_spin ELSE ludo_spin_state.last_free_spin END,
+           spins = CASE WHEN ludo_spin_state.last_free_spin IS DISTINCT FROM EXCLUDED.last_free_spin THEN 1 ELSE ludo_spin_state.spins END`,
+        [id, today]
+      );
 
-      await pool.query("UPDATE ludo_spin_state SET spins=0,total_spins=total_spins+1 WHERE user_id=$1", [id]);
+      const claimed = await pool.query(
+        `UPDATE ludo_spin_state
+         SET spins=0,total_spins=total_spins+1
+         WHERE user_id=$1 AND last_free_spin=$2 AND spins>0
+         RETURNING total_spins`,
+        [id, today]
+      );
+
+      if (!claimed.rows[0]) return NextResponse.json({ error: "No spin available today." }, { status: 409 });
+
       if (prize.kind === "coins") await pool.query("UPDATE ludo_users SET coins=coins+$2 WHERE id=$1", [id, prize.amount]);
       else if (prize.kind === "gems") await pool.query("UPDATE ludo_users SET gems=gems+$2 WHERE id=$1", [id, prize.amount]);
-      return NextResponse.json({ prize, spins: 0 });
+      return NextResponse.json({ prize, spins: 0, totalSpins: Number(claimed.rows[0].total_spins), visitor: false }, { headers: { "Cache-Control": "no-store" } });
     }
 
     const key = browserKey(request);
-    await pool.query("INSERT INTO ludo_spin_visitor_state(browser_key,last_spin,total_spins) VALUES($1,$2,0) ON CONFLICT DO NOTHING", [key, today]);
-    const state = await pool.query("SELECT last_spin,total_spins FROM ludo_spin_visitor_state WHERE browser_key=$1 FOR UPDATE", [key]);
-    const row = state.rows[0];
-    if (String(row.last_spin).slice(0, 10) === today) {
-      const response = NextResponse.json({ error: "This browser has already used today's spin." }, { status: 409 });
+    await pool.query(
+      `INSERT INTO ludo_spin_visitor_state(browser_key,last_spin,total_spins)
+       VALUES($1,NULL,0)
+       ON CONFLICT (browser_key) DO NOTHING`,
+      [key]
+    );
+
+    const claimed = await pool.query(
+      `UPDATE ludo_spin_visitor_state
+       SET last_spin=$2,total_spins=total_spins+1
+       WHERE browser_key=$1 AND (last_spin IS NULL OR last_spin<>$2)
+       RETURNING total_spins`,
+      [key, today]
+    );
+
+    if (!claimed.rows[0]) {
+      const response = NextResponse.json({ error: "This browser has already used today's spin." }, { status: 409, headers: { "Cache-Control": "no-store" } });
       return withBrowserCookie(response, key, !request.cookies.get(BROWSER_COOKIE)?.value);
     }
 
-    await pool.query("UPDATE ludo_spin_visitor_state SET last_spin=$2,total_spins=total_spins+1 WHERE browser_key=$1", [key, today]);
-    const response = NextResponse.json({ prize, spins: 0, visitor: true });
+    const response = NextResponse.json({ prize, spins: 0, totalSpins: Number(claimed.rows[0].total_spins), visitor: true }, { headers: { "Cache-Control": "no-store" } });
     return withBrowserCookie(response, key, !request.cookies.get(BROWSER_COOKIE)?.value);
   } catch (e) {
     console.error(e);
