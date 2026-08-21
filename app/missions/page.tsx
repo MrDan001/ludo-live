@@ -1,27 +1,55 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
+import type { CSSProperties } from "react";
 import AppFrame from "../_components/AppFrame";
 
 type Stats={gameRoomsEntered:number;spinsUsed:number;messagesSent:number;chatRoomsJoined:number;chatRoomsCreated:number};
 type Wallet={coins:number;gems:number;spins:number;mystery:number};
-type Mission={id:string;title:string;target:number;rewardCoins:number;value:(s:Stats)=>number};
+type Mission={id:string;title:string;target:number;rewardCoins:number;value:number};
 const defaults:Stats={gameRoomsEntered:0,spinsUsed:0,messagesSent:0,chatRoomsJoined:0,chatRoomsCreated:0};
 const walletDefault:Wallet={coins:25680,gems:320,spins:0,mystery:0};
-const daily:Mission[]=[
-{id:"games",title:"Win 3 matches",target:3,rewardCoins:1000,value:s=>Math.min(3,s.gameRoomsEntered)},
-{id:"play5",title:"Play 5 matches",target:5,rewardCoins:500,value:s=>Math.min(5,s.gameRoomsEntered)},
-{id:"four",title:"Win a match with 4 players",target:1,rewardCoins:1000,value:()=>Math.min(1,Number(localStorage.getItem("ludo-four-player-wins")||0))},
-{id:"coins500",title:"Collect 500 coins",target:500,rewardCoins:1000,value:()=>Number(localStorage.getItem("ludo-coins-collected")||0)},
-{id:"spin2",title:"Use spin wheel 2 times",target:2,rewardCoins:500,value:s=>s.spinsUsed},
-];
-function readStats(){try{return {...defaults,...JSON.parse(localStorage.getItem("ludo-stats")||"{}")}}catch{return defaults}}
-function readWallet(){try{return {...walletDefault,...JSON.parse(localStorage.getItem("ludo-wallet")||"{}")}}catch{return walletDefault}}
+function readStats():Stats{try{return {...defaults,...JSON.parse(localStorage.getItem("ludo-stats")||"{}")}}catch{return defaults}}
+function readWallet():Wallet{try{return {...walletDefault,...JSON.parse(localStorage.getItem("ludo-wallet")||"{}")}}catch{return walletDefault}}
+function dayKey(){const d=new Date();return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`}
 export default function MissionsPage(){
-const [tab,setTab]=useState("Daily");const [stats,setStats]=useState<Stats>(defaults);const [claimed,setClaimed]=useState<string[]>([]);const [wallet,setWallet]=useState<Wallet>(walletDefault);const [message,setMessage]=useState("");
-const refresh=()=>{setStats(readStats());setWallet(readWallet());try{setClaimed(JSON.parse(localStorage.getItem("ludo-claimed-missions")||"[]"))}catch{setClaimed([])}};
-useEffect(()=>{refresh();window.addEventListener("ludo-stats-updated",refresh);window.addEventListener("ludo-wallet-updated",refresh);window.addEventListener("storage",refresh);return()=>{window.removeEventListener("ludo-stats-updated",refresh);window.removeEventListener("ludo-wallet-updated",refresh);window.removeEventListener("storage",refresh)}},[]);
-const list=useMemo(()=>daily.map(m=>{const value=Math.min(m.target,m.value(stats));return {...m,value,complete:value>=m.target,claimed:claimed.includes(m.id)}}),[stats,claimed]);
-const claim=(m:typeof list[number])=>{if(!m.complete||m.claimed)return;const next=[...claimed,m.id];const w={...wallet,coins:wallet.coins+m.rewardCoins};localStorage.setItem("ludo-claimed-missions",JSON.stringify(next));localStorage.setItem("ludo-wallet",JSON.stringify(w));window.dispatchEvent(new Event("ludo-wallet-updated"));setClaimed(next);setWallet(w);setMessage(`Reward added: ${m.rewardCoins.toLocaleString()} coins.`)};
-const claimAll=()=>list.filter(m=>m.complete&&!m.claimed).forEach(claim);
-return <AppFrame back="/home"><main style={page}><header style={head}><div><div style={eyebrow}>DAILY OBJECTIVES</div><h1 style={title}>Missions</h1></div><span style={targetBadge}>🎯</span></header><div style={tabs}>{["Daily","Weekly","Achievements"].map(t=><button key={t} onClick={()=>setTab(t)} style={{...tabStyle,...(tab===t?tabActive:{})}}>{t}</button>)}</div>{tab!=="Daily"?<section style={empty}><div style={{fontSize:42}}>🏆</div><h2>{tab} Missions</h2><p>More objectives are coming soon. Complete your daily missions to keep building your rewards.</p></section>:<section style={missionList}>{list.map(m=><article key={m.id} style={mission}><div style={{display:"flex",gap:12,alignItems:"center"}}><div style={{...status,background:m.complete?"#20a64a":"#ef9b20"}}>{m.complete?"✓":"×"}</div><div style={{flex:1}}><div style={rowTop}><b>{m.title}</b><span>🪙 {m.rewardCoins.toLocaleString()}</span></div><div style={progressTrack}><div style={{...progressBar,width:`${Math.round((m.value/m.target)*100)}%`,background:m.complete?"#24b957":"#1e78e8"}}/></div><div style={rowBottom}><span>{m.value} / {m.target}</span>{m.complete&&!m.claimed&&<button onClick={()=>claim(m)} style={claimBtn}>Claim</button>}{m.claimed&&<small style={{color:"#54d57b",fontWeight:900}}>CLAIMED</small>}</div></div></div></article>)}</section>}{message&&<div style={messageBox}>✓ {message}</div>}<button onClick={claimAll} disabled={!list.some(m=>m.complete&&!m.claimed)} style={{...claimAllBtn,opacity:list.some(m=>m.complete&&!m.claimed)?1:.45}}>Claim All</button></main></AppFrame>}
-const page={maxWidth:720,margin:"0 auto",paddingBottom:45};const head={display:"flex",justifyContent:"space-between",alignItems:"center",padding:"6px 2px 12px"};const eyebrow={fontSize:12,letterSpacing:2,fontWeight:950,color:"#60a5fa"};const title={fontSize:38,margin:"4px 0 0",fontWeight:950};const targetBadge={width:42,height:42,borderRadius:12,display:"grid",placeItems:"center",background:"#0d2345",border:"1px solid #244a7d",fontSize:22};const tabs={display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:5,padding:5,borderRadius:12,background:"#07162d",border:"1px solid #17345d"};const tabStyle={border:0,borderRadius:8,padding:"10px 5px",fontSize:12,fontWeight:900,cursor:"pointer",color:"#fff",background:"#10213d"};const tabActive={background:"#1769e8"};const missionList={display:"grid",gap:8,marginTop:14};const mission={padding:"12px 13px",borderRadius:12,background:"linear-gradient(145deg,#071a35,#061124)",border:"1px solid #17345d"};const status={flex:"0 0 27px",width:27,height:27,borderRadius:"50%",display:"grid",placeItems:"center",color:"#fff",fontWeight:950};const rowTop={display:"flex",justifyContent:"space-between",gap:8,fontSize:13};const progressTrack={height:7,borderRadius:99,background:"#122641",overflow:"hidden",marginTop:8};const progressBar={height:"100%",borderRadius:99,transition:"width .3s"};const rowBottom={display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:7,fontSize:11,color:"#8fa2bd"};const claimBtn={border:0,borderRadius:8,padding:"6px 15px",background:"#5fcf27",color:"#092006",fontWeight:950,cursor:"pointer"};const claimAllBtn={width:"100%",marginTop:14,border:0,borderRadius:9,padding:"12px",background:"linear-gradient(180deg,#4edc22,#2b9d13)",color:"#fff",fontWeight:950,fontSize:15,cursor:"pointer"};const empty={marginTop:14,padding:40,background:"#07162d",borderRadius:14,textAlign:"center" as const,color:"#9fb0c9"};const messageBox={marginTop:12,padding:11,borderRadius:10,background:"#07331a",border:"1px solid #1c8d4c",color:"#7ff0a8",fontSize:12};
+ const [tab,setTab]=useState("Daily"),[stats,setStats]=useState<Stats>(defaults),[claimed,setClaimed]=useState<string[]>([]),[wallet,setWallet]=useState<Wallet>(walletDefault),[message,setMessage]=useState("");
+ const refresh=()=>{setStats(readStats());setWallet(readWallet());try{const raw=JSON.parse(localStorage.getItem("ludo-claimed-missions")||"{}");setClaimed(raw.day===dayKey()?raw.ids||[]:[])}catch{setClaimed([])}};
+ useEffect(()=>{refresh();window.addEventListener("ludo-stats-updated",refresh);window.addEventListener("ludo-wallet-updated",refresh);window.addEventListener("storage",refresh);return()=>{window.removeEventListener("ludo-stats-updated",refresh);window.removeEventListener("ludo-wallet-updated",refresh);window.removeEventListener("storage",refresh)}},[]);
+ const daily=useMemo<Mission[]>(()=>[
+  {id:"games",title:"Win 3 matches",target:3,value:Math.min(3,stats.gameRoomsEntered),rewardCoins:1000},
+  {id:"play5",title:"Play 5 matches",target:5,value:Math.min(5,stats.gameRoomsEntered),rewardCoins:500},
+  {id:"four",title:"Win a match with 4 players",target:1,value:Math.min(1,Number(typeof window!=="undefined"?localStorage.getItem("ludo-four-player-wins")||0:0)),rewardCoins:1000},
+  {id:"coins500",title:"Collect 500 coins",target:500,value:Math.min(500,Number(typeof window!=="undefined"?localStorage.getItem("ludo-coins-collected")||0:0)),rewardCoins:1000},
+  {id:"spin2",title:"Use spin wheel 2 times",target:2,value:Math.min(2,stats.spinsUsed),rewardCoins:500}
+ ],[stats]);
+ const claim=(m:Mission)=>{if(m.value<m.target||claimed.includes(m.id))return;const ids=[...claimed,m.id],w={...wallet,coins:wallet.coins+m.rewardCoins};localStorage.setItem("ludo-claimed-missions",JSON.stringify({day:dayKey(),ids}));localStorage.setItem("ludo-wallet",JSON.stringify(w));window.dispatchEvent(new Event("ludo-wallet-updated"));setClaimed(ids);setWallet(w);setMessage(`Reward added: ${m.rewardCoins.toLocaleString()} coins.`);setTimeout(()=>setMessage(""),2500)};
+ const claimAll=()=>daily.filter(m=>m.value>=m.target&&!claimed.includes(m.id)).forEach(claim);
+ return <AppFrame back="/home"><main style={page}>
+  <header style={header}><button onClick={()=>history.back()} style={back}>←</button><div style={headerTitle}>Missions</div><div style={target}>🎯</div></header>
+  <div style={tabs}>{["Daily","Weekly","Achievements"].map(t=><button key={t} onClick={()=>setTab(t)} style={{...tabStyle,...(tab===t?tabActive:{})}}>{t}</button>)}</div>
+  {tab==="Daily"?<section style={list}>{daily.map(m=>{const done=m.value>=m.target,percent=Math.min(100,Math.round(m.value/m.target*100));return <article key={m.id} style={card}><div style={{...status,background:done?"#21a94b":"#d98613"}}>{done?"✓":"×"}</div><div style={body}><div style={topRow}><strong>{m.title}</strong><span>🪙 {m.rewardCoins.toLocaleString()}</span></div><div style={track}><div style={{...bar,width:`${percent}%`,background:done?"#24b957":"#1682ed"}}/></div><div style={bottomRow}><span>{m.value} / {m.target}</span>{done&&!claimed.includes(m.id)?<button onClick={()=>claim(m)} style={claimBtn}>Claim</button>:claimed.includes(m.id)?<span style={claimedText}>CLAIMED</span>:null}</div></div></article>})}</section>:<section style={empty}><div style={{fontSize:42}}>{tab==="Weekly"?"📅":"🏆"}</div><h2>{tab}</h2><p>{tab==="Weekly"?"Weekly missions will refresh with larger objectives and rewards.":"Achievements track your long-term Ludo progress."}</p></section>}
+  {message&&<div style={messageBox}>✓ {message}</div>}
+  <button onClick={claimAll} disabled={!daily.some(m=>m.value>=m.target&&!claimed.includes(m.id))} style={{...claimAllBtn,opacity:daily.some(m=>m.value>=m.target&&!claimed.includes(m.id))?1:.45}}>Claim All</button>
+ </main></AppFrame>
+}
+const page:CSSProperties={maxWidth:650,margin:"0 auto",paddingBottom:45};
+const header:CSSProperties={height:54,display:"grid",gridTemplateColumns:"44px 1fr 44px",alignItems:"center",marginBottom:8};
+const back:CSSProperties={border:0,background:"transparent",color:"#fff",fontSize:27,cursor:"pointer",textAlign:"left"};
+const headerTitle:CSSProperties={textAlign:"center",fontSize:20,fontWeight:950};
+const target:CSSProperties={width:38,height:38,borderRadius:11,display:"grid",placeItems:"center",justifySelf:"end",background:"#102b52",border:"1px solid #244b7d",fontSize:19};
+const tabs:CSSProperties={display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4,padding:4,borderRadius:10,background:"#07172d",border:"1px solid #173b67"};
+const tabStyle:CSSProperties={border:0,borderRadius:7,padding:"10px 4px",background:"#0d2341",color:"#dbe8f8",fontSize:12,fontWeight:900,cursor:"pointer"};
+const tabActive:CSSProperties={background:"linear-gradient(180deg,#287ee8,#1762cf)",color:"#fff"};
+const list:CSSProperties={display:"grid",gap:7,marginTop:10};
+const card:CSSProperties={display:"flex",gap:11,alignItems:"center",padding:"11px 12px",borderRadius:10,background:"linear-gradient(145deg,#071a34,#061226)",border:"1px solid #17385f"};
+const status:CSSProperties={flex:"0 0 27px",width:27,height:27,borderRadius:"50%",display:"grid",placeItems:"center",color:"#fff",fontWeight:950};
+const body:CSSProperties={flex:1,minWidth:0};
+const topRow:CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",gap:8,fontSize:12};
+const track:CSSProperties={height:7,borderRadius:99,background:"#102540",overflow:"hidden",marginTop:7};
+const bar:CSSProperties={height:"100%",borderRadius:99,transition:"width .25s"};
+const bottomRow:CSSProperties={display:"flex",justifyContent:"space-between",alignItems:"center",marginTop:6,color:"#91a5c0",fontSize:11};
+const claimBtn:CSSProperties={border:0,borderRadius:7,padding:"5px 15px",background:"#58d126",color:"#082206",fontWeight:950,cursor:"pointer"};
+const claimedText:CSSProperties={color:"#5bd77c",fontWeight:950,fontSize:10};
+const claimAllBtn:CSSProperties={width:"100%",marginTop:10,border:0,borderRadius:8,padding:12,background:"linear-gradient(180deg,#4bd522,#269b11)",color:"#fff",fontWeight:950,fontSize:15};
+const empty:CSSProperties={marginTop:10,padding:38,background:"#07172d",borderRadius:12,border:"1px solid #17385f",textAlign:"center",color:"#9db0c8"};
+const messageBox:CSSProperties={marginTop:9,padding:10,borderRadius:8,background:"#07341b",border:"1px solid #208a4a",color:"#7ef0a4",fontSize:12,textAlign:"center"};
