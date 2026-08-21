@@ -28,6 +28,11 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
   >
     {cells.map(index=><div className="board-cell" key={index} aria-hidden="true" />)}
 
+    <div className="home-area home-green" aria-hidden="true" />
+    <div className="home-area home-yellow" aria-hidden="true" />
+    <div className="home-area home-red" aria-hidden="true" />
+    <div className="home-area home-blue" aria-hidden="true" />
+
     <style jsx>{`
       .shared-ludo-board{
         width:100%;
@@ -36,8 +41,8 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
         position:relative;
         box-sizing:border-box;
         display:grid;
-        grid-template-columns:repeat(15, minmax(0, 1fr));
-        grid-template-rows:repeat(15, minmax(0, 1fr));
+        grid-template-columns:repeat(15,minmax(0,1fr));
+        grid-template-rows:repeat(15,minmax(0,1fr));
         background:#fff;
         border:1px solid #d7dde5;
         border-radius:0;
@@ -57,6 +62,22 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
 
       .board-cell:nth-child(15n){border-right:0}
       .board-cell:nth-last-child(-n+15){border-bottom:0}
+
+      .home-area{
+        position:absolute;
+        width:40%;
+        height:40%;
+        box-sizing:border-box;
+        background:#fff;
+        border:2px solid #222;
+        pointer-events:none;
+        z-index:2;
+      }
+
+      .home-green{top:0;left:0}
+      .home-yellow{top:0;right:0}
+      .home-red{bottom:0;left:0}
+      .home-blue{bottom:0;right:0}
 
       .shared-ludo-board-preview{
         width:100%;
