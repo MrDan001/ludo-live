@@ -27,10 +27,10 @@ const homes=[
 ] as const;
 
 const lanes=[
-  {color:"green",row:7,col:1},
-  {color:"yellow",row:1,col:7},
-  {color:"red",row:9,col:7},
-  {color:"blue",row:7,col:9}
+  ...Array.from({length:5},(_,i)=>({color:"green",row:i+1,col:7})),
+  ...Array.from({length:5},(_,i)=>({color:"yellow",row:7,col:i+9})),
+  ...Array.from({length:5},(_,i)=>({color:"red",row:i+9,col:7})),
+  ...Array.from({length:5},(_,i)=>({color:"blue",row:7,col:i+1}))
 ] as const;
 
 const stars=[
