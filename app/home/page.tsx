@@ -46,7 +46,7 @@ export default function HomePage() {
 
   return (
     <main style={{ height: "100dvh", minHeight: 0, overflow: "hidden", background: "linear-gradient(180deg,#031536 0%,#020b1d 48%,#010611 100%)", color: "#fff" }}>
-      <div style={{ width: "100%", maxWidth: 560, height: "calc(100% - 68px)", margin: "0 auto", padding: "6px 12px 0", boxSizing: "border-box", display: "flex", flexDirection: "column" }}>
+      <div style={{ width: "100%", maxWidth: 560, height: "calc(100% - 68px)", margin: "0 auto", padding: "6px 12px 0", boxSizing: "border-box", display: "flex", flexDirection: "column", overflow: "hidden" }}>
         <header style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 8, alignItems: "center", padding: "5px 2px 8px", flex: "0 0 auto" }}>
           <Link href="/profile" style={{ color: "#fff", textDecoration: "none", display: "flex", alignItems: "center", gap: 9 }}>
             <div style={{ position: "relative", width: 56, height: 56, flex: "0 0 56px", borderRadius: "50%", display: "grid", placeItems: "center", background: "linear-gradient(145deg,#ffe45c,#ffb300)", border: "3px solid #ffd43b", boxShadow: "0 0 0 2px rgba(255,193,7,.22),0 4px 10px rgba(0,0,0,.3)" }}>
@@ -74,30 +74,30 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section style={{ display: "grid", gridTemplateRows: "repeat(4,clamp(108px,14vh,150px))", gap: 7, flex: "0 0 auto" }}>
+        <section style={{ display: "grid", gridTemplateRows: "repeat(4,clamp(54px,10.5vh,92px))", gap: 6, flex: "0 0 auto" }}>
           {[
             { icon: "🌐", h: "PLAY ONLINE", s: "See real players waiting in open rooms", href: "/lobby", background: "linear-gradient(135deg,#159447,#31c936)" },
             { icon: "👥", h: "PLAY WITH FRIENDS", s: "Invite friends and play together", href: "/lobby", background: "linear-gradient(135deg,#087b61,#16b875)" },
             { icon: "🎯", h: "MISSIONS", s: "Complete objectives before rewards unlock", href: "/missions", background: "linear-gradient(135deg,#173fba,#1769e8)" },
             { icon: "🏆", h: "TOURNAMENT", s: "Join tournaments and compete for rewards", href: "/mode", background: "linear-gradient(135deg,#6b1998,#a126c8)" },
           ].map((a) => (
-            <Link key={a.h} href={a.href} style={{ minHeight: 0, borderRadius: 18, display: "grid", gridTemplateColumns: "74px 1fr 22px", alignItems: "center", padding: "6px 12px", boxSizing: "border-box", color: "#fff", textDecoration: "none", background: a.background, border: "1px solid rgba(255,255,255,.24)", boxShadow: "0 4px 12px rgba(0,0,0,.18)" }}>
-              <span style={{ fontSize: "clamp(34px,6vw,42px)", lineHeight: 1, textAlign: "center" }}>{a.icon}</span>
-              <span><strong style={{ display: "block", fontSize: "clamp(15px,3.2vw,18px)", fontWeight: 950 }}>{a.h}</strong><small style={{ display: "block", marginTop: 4, fontSize: "clamp(9px,2vw,11px)", lineHeight: 1.15, fontWeight: 750 }}>{a.s}</small></span>
-              <span style={{ fontSize: 27, opacity: 0.85, textAlign: "center" }}>›</span>
+            <Link key={a.h} href={a.href} style={{ minHeight: 0, borderRadius: 16, display: "grid", gridTemplateColumns: "68px 1fr 20px", alignItems: "center", padding: "4px 10px", boxSizing: "border-box", color: "#fff", textDecoration: "none", background: a.background, border: "1px solid rgba(255,255,255,.24)", boxShadow: "0 4px 12px rgba(0,0,0,.18)" }}>
+              <span style={{ fontSize: "clamp(30px,5.5vw,40px)", lineHeight: 1, textAlign: "center" }}>{a.icon}</span>
+              <span><strong style={{ display: "block", fontSize: "clamp(14px,3vw,18px)", fontWeight: 950 }}>{a.h}</strong><small style={{ display: "block", marginTop: 3, fontSize: "clamp(8px,1.9vw,11px)", lineHeight: 1.1, fontWeight: 750 }}>{a.s}</small></span>
+              <span style={{ fontSize: 25, opacity: 0.85, textAlign: "center" }}>›</span>
             </Link>
           ))}
         </section>
 
-        <section style={{ marginTop: 9, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 2, padding: "8px 5px 7px", borderRadius: 18, background: "#06152f", border: "1px solid rgba(77,126,210,.22)", flex: "0 0 auto" }}>
+        <section style={{ marginTop: 7, display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 2, padding: "11px 5px 10px", borderRadius: 18, background: "#06152f", border: "1px solid rgba(77,126,210,.22)", flex: "0 0 auto", minHeight: 88, boxSizing: "border-box" }}>
           {[["🎁", "Daily Reward", "/daily-reward"], ["🛒", "Shop", "/shop"], ["📅", "Events", "/events"], ["🎡", "Spin Wheel", "/spin"]].map(([icon, label, href]) => (
-            <Link key={label} href={href} style={{ color: "#fff", textDecoration: "none", display: "grid", justifyItems: "center", gap: 3, fontWeight: 900, fontSize: 10, textAlign: "center" }}><span style={{ fontSize: 28, lineHeight: 1 }}>{icon}</span><span>{label}</span></Link>
+            <Link key={label} href={href} style={{ color: "#fff", textDecoration: "none", display: "grid", justifyItems: "center", alignContent: "center", gap: 4, fontWeight: 900, fontSize: 10.5, textAlign: "center" }}><span style={{ fontSize: 30, lineHeight: 1 }}>{icon}</span><span>{label}</span></Link>
           ))}
         </section>
 
-        <section style={{ marginTop: 8, minHeight: 60, padding: "8px 10px 8px 13px", boxSizing: "border-box", borderRadius: 18, background: "#0a214b", border: "1px solid rgba(77,126,210,.28)", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
-          <div><strong style={{ display: "block", color: "#ffd21a", fontSize: 13 }}>🔥 DAILY STREAK</strong><span style={{ display: "block", marginTop: 2, color: "#a9bddb", fontSize: 10.5 }}>Keep playing to unlock bigger rewards.</span></div>
-          <button type="button" style={{ border: 0, borderRadius: 12, padding: "10px 14px", background: "#ffd21a", color: "#111", fontWeight: 950, fontSize: 12 }}>CLAIM</button>
+        <section style={{ marginTop: 7, minHeight: 76, padding: "10px 11px 10px 13px", boxSizing: "border-box", borderRadius: 18, background: "#0a214b", border: "1px solid rgba(77,126,210,.28)", display: "grid", gridTemplateColumns: "1fr auto", alignItems: "center", gap: 8, flex: "0 0 auto" }}>
+          <div><strong style={{ display: "block", color: "#ffd21a", fontSize: 14 }}>🔥 DAILY STREAK</strong><span style={{ display: "block", marginTop: 3, color: "#a9bddb", fontSize: 11 }}>Keep playing to unlock bigger rewards.</span></div>
+          <button type="button" style={{ border: 0, borderRadius: 12, padding: "11px 16px", background: "#ffd21a", color: "#111", fontWeight: 950, fontSize: 12 }}>CLAIM</button>
         </section>
       </div>
 
