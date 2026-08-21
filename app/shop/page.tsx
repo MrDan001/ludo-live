@@ -101,42 +101,41 @@ export default function ShopPage() {
     setConfirm(null); setNotice(`${confirm.name} purchased successfully.`);
   };
 
-  return <AppFrame back="/home"><main style={page}>
-    <header style={header}><div><div style={backLabel}>← Back</div><h1 style={title}>Shop</h1></div><div style={walletBadge}>{balanceText}</div></header>
-    <nav style={tabsStyle} aria-label="Shop categories">{tabs.map((item) => <button key={item} onClick={() => setTab(item)} style={{ ...tabStyle, ...(tab === item ? tabActive : {}) }}>{item}</button>)}</nav>
+  return <AppFrame back="/home"><main className="shop-page" style={page}>
+    <header className="shop-header" style={header}><h1 style={title}>Shop</h1><div className="shop-wallet" style={walletBadge}>{balanceText}</div></header>
+    <nav className="shop-tabs" style={tabsStyle} aria-label="Shop categories">{tabs.map((item) => <button key={item} onClick={() => setTab(item)} className="shop-tab" style={{ ...tabStyle, ...(tab === item ? tabActive : {}) }}>{item}</button>)}</nav>
     {notice && <div style={noticeStyle}>{notice}</div>}
 
     <section style={list}>
-      {tab === "Gems" && gemPackages.map((pack) => <article key={pack.id} style={row}><strong style={rowTitle}>💎 {pack.gems.toLocaleString()} Gems</strong><button onClick={() => { setPendingGemPackage(pack); setEmailOpen(true); }} style={buyBtn}>{naira(pack.naira)}</button></article>)}
-      {tab === "Coins" && coinPackages.map((pack) => <article key={pack.id} style={row}><strong style={rowTitle}>🪙 {pack.coins.toLocaleString()} Coins</strong><button onClick={() => setConfirm({ id: pack.id, name: `${pack.coins.toLocaleString()} Coins`, price: pack.gems, quantity: pack.coins, kind: "coins" })} style={buyBtn}>💎 {pack.gems.toLocaleString()}</button></article>)}
-      {tab === "Items" && items.map((item) => { const isOwned = owned.includes(item.id); return <article key={item.id} style={row}><div><strong style={rowTitle}>{item.icon} {item.name}</strong><div style={description}>{item.description}</div></div><button disabled={isOwned} onClick={() => setConfirm({ id: item.id, name: item.name, price: 500, kind: "item" })} style={{ ...buyBtn, opacity: isOwned ? .55 : 1 }}>{isOwned ? "OWNED" : "💎 500"}</button></article>; })}
-      {tab === "Avatars" && <div style={avatarGrid}>{avatars.map((avatar) => { const isOwned = owned.includes(avatar.id); return <article key={avatar.id} style={avatarCard}><div style={avatarIcon}>{avatar.icon}</div><strong>{avatar.name}</strong><button disabled={isOwned} onClick={() => setConfirm({ id: avatar.id, name: avatar.name, price: avatar.price, kind: "avatar" })} style={{ ...buyBtn, width: "100%", opacity: isOwned ? .55 : 1 }}>{isOwned ? "OWNED" : `💎 ${avatar.price.toLocaleString()}`}</button></article>; })}</div>}
+      {tab === "Gems" && gemPackages.map((pack) => <article key={pack.id} className="shop-row" style={row}><strong style={rowTitle}>💎 {pack.gems.toLocaleString()} Gems</strong><button onClick={() => { setPendingGemPackage(pack); setEmailOpen(true); }} style={buyBtn}>{naira(pack.naira)}</button></article>)}
+      {tab === "Coins" && coinPackages.map((pack) => <article key={pack.id} className="shop-row" style={row}><strong style={rowTitle}>🪙 {pack.coins.toLocaleString()} Coins</strong><button onClick={() => setConfirm({ id: pack.id, name: `${pack.coins.toLocaleString()} Coins`, price: pack.gems, quantity: pack.coins, kind: "coins" })} style={buyBtn}>💎 {pack.gems.toLocaleString()}</button></article>)}
+      {tab === "Items" && items.map((item) => { const isOwned = owned.includes(item.id); return <article key={item.id} className="shop-row" style={row}><div className="shop-row-copy"><strong style={rowTitle}>{item.icon} {item.name}</strong><div style={description}>{item.description}</div></div><button disabled={isOwned} onClick={() => setConfirm({ id: item.id, name: item.name, price: 500, kind: "item" })} style={{ ...buyBtn, opacity: isOwned ? .55 : 1 }}>{isOwned ? "OWNED" : "💎 500"}</button></article>; })}
+      {tab === "Avatars" && <div className="shop-avatar-grid" style={avatarGrid}>{avatars.map((avatar) => { const isOwned = owned.includes(avatar.id); return <article key={avatar.id} className="shop-avatar-card" style={avatarCard}><div style={avatarIcon}>{avatar.icon}</div><strong>{avatar.name}</strong><button disabled={isOwned} onClick={() => setConfirm({ id: avatar.id, name: avatar.name, price: avatar.price, kind: "avatar" })} style={{ ...buyBtn, width: "100%", opacity: isOwned ? .55 : 1 }}>{isOwned ? "OWNED" : `💎 ${avatar.price.toLocaleString()}`}</button></article>; })}</div>}
     </section>
 
-    {emailOpen && pendingGemPackage && <div style={overlay}><div style={modal}><h2 style={modalTitle}>Buy {pendingGemPackage.gems.toLocaleString()} Gems</h2><p style={modalText}>You will pay <b>{naira(pendingGemPackage.naira)}</b> securely through Paystack.</p><label style={label}>Payment email<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={input} autoComplete="email" /></label><div style={modalActions}><button onClick={() => setEmailOpen(false)} style={cancelBtn} disabled={busy}>CANCEL</button><button onClick={buyGemPackage} style={buyBtn} disabled={busy || !email.trim()}>{busy ? "OPENING…" : "PAY WITH PAYSTACK"}</button></div></div></div>}
-    {confirm && <div style={overlay}><div style={modal}><h2 style={modalTitle}>Confirm purchase</h2><p style={modalText}>Buy <b>{confirm.name}</b> for <b>{confirm.price.toLocaleString()} gems</b>?</p><p style={balanceTextStyle}>Current balance: {wallet.gems.toLocaleString()} gems</p><div style={modalActions}><button onClick={() => setConfirm(null)} style={cancelBtn}>CANCEL</button><button onClick={confirmPurchase} style={buyBtn}>CONFIRM PURCHASE</button></div></div></div>}
+    {emailOpen && pendingGemPackage && <div style={overlay}><div className="shop-modal" style={modal}><h2 style={modalTitle}>Buy {pendingGemPackage.gems.toLocaleString()} Gems</h2><p style={modalText}>You will pay <b>{naira(pendingGemPackage.naira)}</b> securely through Paystack.</p><label style={label}>Payment email<input value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="you@example.com" style={input} autoComplete="email" /></label><div style={modalActions}><button onClick={() => setEmailOpen(false)} style={cancelBtn} disabled={busy}>CANCEL</button><button onClick={buyGemPackage} style={buyBtn} disabled={busy || !email.trim()}>{busy ? "OPENING…" : "PAY WITH PAYSTACK"}</button></div></div></div>}
+    {confirm && <div style={overlay}><div className="shop-modal" style={modal}><h2 style={modalTitle}>Confirm purchase</h2><p style={modalText}>Buy <b>{confirm.name}</b> for <b>{confirm.price.toLocaleString()} gems</b>?</p><p style={balanceTextStyle}>Current balance: {wallet.gems.toLocaleString()} gems</p><div style={modalActions}><button onClick={() => setConfirm(null)} style={cancelBtn}>CANCEL</button><button onClick={confirmPurchase} style={buyBtn}>CONFIRM PURCHASE</button></div></div></div>}
   </main></AppFrame>;
 }
 
-const page: React.CSSProperties = { maxWidth: 760, margin: "0 auto", paddingBottom: 48 };
-const header: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "end", gap: 14, marginBottom: 18 };
-const backLabel: React.CSSProperties = { color: "#93c5fd", fontWeight: 800, marginBottom: 8 };
-const title: React.CSSProperties = { fontSize: 42, margin: 0, fontWeight: 950 };
-const walletBadge: React.CSSProperties = { color: "#f8d35a", fontSize: 16, fontWeight: 900, textAlign: "right" };
-const tabsStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: 5, background: "#061735", padding: 5, borderRadius: 14 };
-const tabStyle: React.CSSProperties = { border: 0, borderRadius: 11, padding: "15px 8px", color: "#fff", fontWeight: 900, background: "transparent", cursor: "pointer" };
+const page: React.CSSProperties = { width: "100%", maxWidth: 760, minWidth: 0, margin: "0 auto", paddingBottom: 48 };
+const header: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "end", gap: 14, marginBottom: 18, minWidth: 0 };
+const title: React.CSSProperties = { fontSize: "clamp(34px, 8vw, 42px)", margin: 0, fontWeight: 950 };
+const walletBadge: React.CSSProperties = { color: "#f8d35a", fontSize: "clamp(14px, 3.8vw, 16px)", fontWeight: 900, textAlign: "right", overflowWrap: "anywhere" };
+const tabsStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,minmax(0,1fr))", gap: 5, background: "#061735", padding: 5, borderRadius: 14, width: "100%", minWidth: 0 };
+const tabStyle: React.CSSProperties = { border: 0, borderRadius: 11, padding: "15px 8px", color: "#fff", fontWeight: 900, background: "transparent", cursor: "pointer", minWidth: 0 };
 const tabActive: React.CSSProperties = { background: "#1769e8" };
-const list: React.CSSProperties = { display: "grid", gap: 12, marginTop: 16 };
-const row: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: 18, borderRadius: 15, background: "linear-gradient(90deg,#071a40,#092354)", border: "1px solid rgba(78,125,211,.22)" };
-const rowTitle: React.CSSProperties = { fontSize: 22 };
+const list: React.CSSProperties = { display: "grid", gap: 12, marginTop: 16, minWidth: 0 };
+const row: React.CSSProperties = { display: "flex", alignItems: "center", justifyContent: "space-between", gap: 14, padding: 18, borderRadius: 15, background: "linear-gradient(90deg,#071a40,#092354)", border: "1px solid rgba(78,125,211,.22)", minWidth: 0, flexWrap: "wrap" };
+const rowTitle: React.CSSProperties = { fontSize: "clamp(18px, 4.5vw, 22px)" };
 const description: React.CSSProperties = { color: "#94a3b8", marginTop: 4, fontSize: 16 };
-const buyBtn: React.CSSProperties = { border: 0, borderRadius: 11, padding: "13px 18px", background: "#39a51d", color: "#fff", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap" };
-const avatarGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 12 };
-const avatarCard: React.CSSProperties = { border: "1px solid rgba(78,125,211,.25)", borderRadius: 16, padding: 16, background: "#081b42", color: "#fff", display: "grid", gap: 10, placeItems: "center", textAlign: "center" };
-const avatarIcon: React.CSSProperties = { fontSize: 58, minHeight: 70, display: "grid", placeItems: "center" };
+const buyBtn: React.CSSProperties = { border: 0, borderRadius: 11, padding: "13px 18px", background: "#39a51d", color: "#fff", fontWeight: 900, cursor: "pointer", whiteSpace: "nowrap", maxWidth: "100%" };
+const avatarGrid: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(auto-fit,minmax(min(170px,100%),1fr))", gap: 12, width: "100%", minWidth: 0 };
+const avatarCard: React.CSSProperties = { border: "1px solid rgba(78,125,211,.25)", borderRadius: 16, padding: 16, background: "#081b42", color: "#fff", display: "grid", gap: 10, placeItems: "center", textAlign: "center", minWidth: 0, overflow: "hidden" };
+const avatarIcon: React.CSSProperties = { fontSize: "clamp(48px, 12vw, 58px)", minHeight: 70, display: "grid", placeItems: "center" };
 const noticeStyle: React.CSSProperties = { marginTop: 14, padding: 13, borderRadius: 12, background: "rgba(22,101,52,.5)", border: "1px solid rgba(74,222,128,.25)", color: "#bbf7d0", fontWeight: 700 };
 const overlay: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 1000, display: "grid", placeItems: "center", padding: 18, background: "rgba(0,0,0,.72)" };
-const modal: React.CSSProperties = { width: "min(440px,100%)", borderRadius: 18, padding: 22, background: "linear-gradient(180deg,#0b234e,#06142f)", border: "1px solid rgba(96,165,250,.35)", boxShadow: "0 20px 60px rgba(0,0,0,.45)" };
+const modal: React.CSSProperties = { width: "min(440px,100%)", borderRadius: 18, padding: 22, background: "linear-gradient(180deg,#0b234e,#06142f)", border: "1px solid rgba(96,165,250,.35)", boxShadow: "0 20px 60px rgba(0,0,0,.45)", boxSizing: "border-box" };
 const modalTitle: React.CSSProperties = { marginTop: 0, fontSize: 25 };
 const modalText: React.CSSProperties = { color: "#cbd5e1", lineHeight: 1.5 };
 const balanceTextStyle: React.CSSProperties = { color: "#f8d35a", fontWeight: 800 };
