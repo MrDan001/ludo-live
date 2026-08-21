@@ -7,6 +7,11 @@ type Room = { code: string; players: number; roomSize: number; hostName: string 
 type Wallet={coins:number;gems:number};
 const defaults:Wallet={coins:25680,gems:320};
 
+type InstallPromptEvent = Event & {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
+};
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const [path, setPath] = useState("");
   const [rooms, setRooms] = useState<Room[]>([]);
@@ -14,6 +19,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [showCreate, setShowCreate] = useState(false);
   const [roomSize, setRoomSize] = useState(4);
   const [wallet,setWallet]=useState<Wallet>(defaults);
+  const [installPrompt, setInstallPrompt] = useState<InstallPromptEvent | null>(null);
 
   useEffect(() => {
     setPath(window.location.pathname);
@@ -23,6 +29,23 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     const sync=()=>{try{const w=JSON.parse(localStorage.getItem("ludo-wallet")||"null");if(w)setWallet({...defaults,...w})}catch{}};
     window.addEventListener("ludo-wallet-updated",sync);window.addEventListener("storage",sync);
     return()=>{window.removeEventListener("ludo-wallet-updated",sync);window.removeEventListener("storage",sync)};
+  }, []);
+
+  useEffect(() => {
+    if (!("serviceWorker" in navigator)) return;
+    navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+
+    const onBeforeInstall = (event: Event) => {
+      event.preventDefault();
+      setInstallPrompt(event as InstallPromptEvent);
+    };
+    const onInstalled = () => setInstallPrompt(null);
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
   }, []);
 
   useEffect(() => {
@@ -43,13 +66,22 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
     localStorage.setItem("ludo-player-name", name.trim() || "PlayerOne");
     window.location.href = `/room?action=join&code=${encodeURIComponent(code)}&size=${size}`;
   };
+  const installApp = async () => {
+    if (!installPrompt) return;
+    await installPrompt.prompt();
+    await installPrompt.userChoice;
+    setInstallPrompt(null);
+  };
 
   return (
     <main className="app-home">
       <header className="home-topbar">
         <div className="player-mini"><div className="avatar">P</div><div><b>{name || "PlayerOne"}</b><span>Level 1 · Online</span></div></div>
-        <div className="wallet"><span>🪙 {wallet.coins.toLocaleString()}</span><span>💎 {wallet.gems.toLocaleString()}</span></div>
-        <a className="icon-btn" href="/profile" aria-label="Profile">⚙️</a>
+        <div className="home-top-actions">
+          <div className="wallet"><span>🪙 {wallet.coins.toLocaleString()}</span><span>💎 {wallet.gems.toLocaleString()}</span></div>
+          {installPrompt && <button className="install-btn" onClick={installApp}>📲 INSTALL APP</button>}
+          <a className="icon-btn" href="/profile" aria-label="Profile">⚙️</a>
+        </div>
       </header>
       <section className="hero-card"><div className="hero-copy"><small>LUDO LIVE</small><h1>PLAY. CONNECT. WIN.</h1><p>Real rooms. Real players. One live game.</p></div><div className="hero-dice">🎲</div></section>
       <section className="primary-actions">
