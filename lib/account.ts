@@ -8,6 +8,7 @@ export type PlayerAccount={
  gems:number;
  xp:number;
  level:number;
+ isGuest?:boolean;
 };
 
 const KEY="ludo-account";
@@ -33,15 +34,32 @@ export async function createAccount(username:string,email:string,password:string
  if(cleanUsername.length<3)throw new Error("Username must be at least 3 characters.");
  if(!/^\S+@\S+\.\S+$/.test(cleanEmail))throw new Error("Enter a valid email address.");
  if(password.length<6)throw new Error("Password must be at least 6 characters.");
- const account:PlayerAccount={id:crypto.randomUUID(),username:cleanUsername,email:cleanEmail,passwordHash:await hashPassword(password),createdAt:Date.now(),coins:DEFAULT_COINS,gems:DEFAULT_GEMS,xp:0,level:0};
+ const account:PlayerAccount={id:crypto.randomUUID(),username:cleanUsername,email:cleanEmail,passwordHash:await hashPassword(password),createdAt:Date.now(),coins:DEFAULT_COINS,gems:DEFAULT_GEMS,xp:0,level:0,isGuest:false};
  localStorage.setItem(KEY,JSON.stringify(account));
  syncLegacyProfile(account);
  return account;
 }
 
+export function continueAsGuest(){
+ const account:PlayerAccount={id:`guest-${crypto.randomUUID()}`,username:`Guest${Math.floor(1000+Math.random()*9000)}`,email:"",passwordHash:"",createdAt:Date.now(),coins:DEFAULT_COINS,gems:DEFAULT_GEMS,xp:0,level:0,isGuest:true};
+ localStorage.setItem(KEY,JSON.stringify(account));
+ localStorage.setItem("ludo-guest","1");
+ syncLegacyProfile(account);
+ return account;
+}
+
+export function logoutAccount(){
+ if(typeof window==="undefined")return;
+ localStorage.removeItem(KEY);
+ localStorage.removeItem("ludo-guest");
+ localStorage.removeItem("ludo-account-created");
+ ["ludo-player-id","ludo-player-name","ludo-level","ludo-xp","ludo-wallet"].forEach(k=>localStorage.removeItem(k));
+ window.dispatchEvent(new Event("ludo-profile-updated"));
+}
+
 export async function loginAccount(usernameOrEmail:string,password:string){
  const account=getAccount();
- if(!account)throw new Error("No account is saved on this device yet. Create an account first.");
+ if(!account||account.isGuest)throw new Error("No registered account is saved on this device yet. Create an account first.");
  const identifier=usernameOrEmail.trim().toLowerCase();
  const matches=account.username.toLowerCase()===identifier||account.email===identifier;
  if(!matches||account.passwordHash!==await hashPassword(password))throw new Error("Incorrect account details.");
