@@ -8,8 +8,8 @@ const teamText=(c:TokenColor[])=>c.map(x=>x[0].toUpperCase()+x.slice(1)).join(" 
 const modePlayers=(mode:Mode)=>mode==="4p"?[{name:"You",colors:["green"] as TokenColor[]},{name:"Player 2",colors:["yellow"] as TokenColor[]},{name:"Player 3",colors:["red"] as TokenColor[]},{name:"Player 4",colors:["blue"] as TokenColor[]}]:[{name:"You",colors:["green","blue"] as TokenColor[]},{name:mode==="bot"?"Bot":"Player 2",colors:["red","yellow"] as TokenColor[]}];
 const initialTokens=():DemoToken[]=>colors.flatMap(color=>Array.from({length:4},(_,id)=>({color,position:0,id})));
 
-// One shared clockwise track. Each color has its own start index, then enters its own 5-square home lane.
-const TRACK:readonly [number,number][]= [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,13],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0],[5,0],[4,0]];
+// Keep game logic on the exact same 52 clockwise cells rendered by LudoBoardFixed.
+const TRACK:readonly [number,number][]= [[6,1],[6,2],[6,3],[6,4],[6,5],[5,6],[4,6],[3,6],[2,6],[1,6],[0,6],[0,7],[0,8],[1,8],[2,8],[3,8],[4,8],[5,8],[6,9],[6,10],[6,11],[6,12],[6,13],[7,13],[7,14],[8,14],[8,13],[8,12],[8,11],[8,10],[8,9],[9,8],[10,8],[11,8],[12,8],[13,8],[14,8],[14,7],[14,6],[13,6],[12,6],[11,6],[10,6],[9,6],[8,5],[8,4],[8,3],[8,2],[8,1],[8,0],[7,0],[6,0]];
 const START_INDEX:Record<TokenColor,number>={green:0,yellow:13,blue:26,red:39};
 const HOME_LANE:Record<TokenColor,readonly [number,number][]>= {green:[[7,1],[7,2],[7,3],[7,4],[7,5]],yellow:[[1,7],[2,7],[3,7],[4,7],[5,7]],blue:[[7,13],[7,12],[7,11],[7,10],[7,9]],red:[[13,7],[12,7],[11,7],[10,7],[9,7]]};
 const SAFE_TRACK=new Set([0,8,13,21,26,34,39,47]);
@@ -22,7 +22,6 @@ function applyMove(current:DemoToken[],moving:DemoToken,roll:number,actorColors:
 
 export default function BoardPage(){
  const[theme,setTheme]=useState<BoardThemeId>("classic"),[die,setDie]=useState<DiceSkinId>("classic"),[mode,setMode]=useState<Mode>("bot"),[roll,setRoll]=useState(1),[turn,setTurn]=useState(0),[tokens,setTokens]=useState<DemoToken[]>(initialTokens),[notice,setNotice]=useState("Roll the dice to play."),[botThinking,setBotThinking]=useState(false),[gameOver,setGameOver]=useState(false),p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
- const players=modePlayers(mode),humanColors=players[0].colors;
  useEffect(()=>{try{setTheme((localStorage.getItem("ludo-match-board")||"classic")as BoardThemeId);const ms=JSON.parse(localStorage.getItem("ludo-match-members")||"[]");setDie((ms.find((x:any)=>!x.host)?.dice||"classic")as DiceSkinId)}catch{}const room=new URLSearchParams(location.search).get("room");if(room){const s=io(location.origin,{transports:["websocket","polling"]});s.on("connect",()=>s.emit("list-rooms"));s.on("roster",(m:any[])=>{const self=m.find(x=>x.id===s.id);if(self?.dice)setDie(self.dice as DiceSkinId);const h=m.find(x=>x.host);if(h?.board)setTheme(h.board as BoardThemeId)});return()=>{s.disconnect()}}},[]);
  const resetDemo=(nextMode:Mode=mode)=>{setMode(nextMode);setTokens(initialTokens());setTurn(0);setRoll(1);setNotice(nextMode==="4p"?"4-player demo. You are Green.":nextMode==="2p"?"2-player teams: Green + Blue vs Red + Yellow.":"You + Blue vs Bot: Red + Yellow.");setBotThinking(false);setGameOver(false)};
  const winner=(state:DemoToken[],actorColors:TokenColor[])=>actorColors.every(c=>state.filter(t=>t.color===c&&t.position===57).length===4);
