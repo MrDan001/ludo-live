@@ -19,12 +19,15 @@ export const BOARD_NAMES:Record<BoardThemeId,string>={classic:"Classic Ludo",gol
 
 export default function LudoBoard({theme="classic",preview=false,className="",style}: {theme?:BoardThemeId;preview?:boolean;className?:string;style?:React.CSSProperties}){
   const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
+  const cells=Array.from({length:225},(_,index)=>index);
 
   return <div
     className={`shared-ludo-board ${preview?"shared-ludo-board-preview":""} ${className}`.trim()}
     style={{...style,background:p.bg,borderColor:p.accent}}
     aria-label={`${BOARD_NAMES[theme]} Ludo board`}
   >
+    {cells.map(index=><div className="board-cell" key={index} aria-hidden="true" />)}
+
     <style jsx>{`
       .shared-ludo-board{
         width:100%;
@@ -32,7 +35,9 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
         aspect-ratio:1 / 1;
         position:relative;
         box-sizing:border-box;
-        display:block;
+        display:grid;
+        grid-template-columns:repeat(15, minmax(0, 1fr));
+        grid-template-rows:repeat(15, minmax(0, 1fr));
         background:#fff;
         border:1px solid #d7dde5;
         border-radius:0;
@@ -40,6 +45,18 @@ export default function LudoBoard({theme="classic",preview=false,className="",st
         box-shadow:none;
         margin:0 auto;
       }
+
+      .board-cell{
+        min-width:0;
+        min-height:0;
+        box-sizing:border-box;
+        background:#fff;
+        border-right:1px solid #d7dde5;
+        border-bottom:1px solid #d7dde5;
+      }
+
+      .board-cell:nth-child(15n){border-right:0}
+      .board-cell:nth-last-child(-n+15){border-bottom:0}
 
       .shared-ludo-board-preview{
         width:100%;
