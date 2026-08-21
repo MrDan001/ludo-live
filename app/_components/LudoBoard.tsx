@@ -17,20 +17,111 @@ export const BOARD_PALETTES:Record<BoardThemeId,{bg:string;green:string;yellow:s
 
 export const BOARD_NAMES:Record<BoardThemeId,string>={classic:"Classic Ludo",golden:"Golden Royal",neon:"Neon Glow",beach:"Beach Vibes",galaxy:"Galaxy Space",wood:"Wooden Classic",dragon:"Dragon Theme",christmas:"Christmas Edition",football:"Football Arena",candy:"Candy Land"};
 
-function cellKind(row:number,col:number){
-  if(row<6&&col<6)return "green" as const;
-  if(row<6&&col>8)return "yellow" as const;
-  if(row>8&&col<6)return "red" as const;
-  if(row>8&&col>8)return "blue" as const;
-  if(row>=6&&row<=8&&col>=6&&col<=8)return "center" as const;
-  return "track" as const;
+type HomeColor="green"|"yellow"|"red"|"blue";
+
+function homeAt(row:number,col:number):HomeColor|null{
+  if(row<6&&col<6)return "green";
+  if(row<6&&col>8)return "yellow";
+  if(row>8&&col<6)return "red";
+  if(row>8&&col>8)return "blue";
+  return null;
+}
+
+function isCenter(row:number,col:number){return row>=6&&row<=8&&col>=6&&col<=8;}
+
+function laneColor(row:number,col:number):HomeColor|null{
+  if(col===7&&row>=1&&row<=5)return "green";
+  if(row===7&&col>=9&&col<=13)return "yellow";
+  if(col===7&&row>=9&&row<=13)return "red";
+  if(row===7&&col>=1&&col<=5)return "blue";
+  return null;
+}
+
+const safeCells=new Set(["2:6","2:8","6:2","8:2","6:12","8:12","12:6","12:8"]);
+
+function homeToken(color:HomeColor,index:number,p:{green:string;yellow:string;red:string;blue:string}){
+  return <span key={index} className="home-token" style={{background:p[color]}} aria-hidden="true"><span/></span>;
+}
+
+function HomeZone({color,p,label}:{color:HomeColor;p:typeof BOARD_PALETTES.classic;label:string}){
+  return <div className={`home-zone home-zone-${color}`} style={{background:p[color]}}>
+    <span className="home-label">{label}</span>
+    <div className="home-inner">{[0,1,2,3].map(i=><div className="home-slot" key={i}>{homeToken(color,i,p)}</div>)}</div>
+  </div>;
 }
 
 export default function LudoBoard({theme="classic",preview=false,className="",style}: {theme?:BoardThemeId;preview?:boolean;className?:string;style?:React.CSSProperties}){
   const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
-  const cells=Array.from({length:225},(_,index)=>{const row=Math.floor(index/15),col=index%15;return{index,row,col,kind:cellKind(row,col)}});
-  return <div className={`shared-ludo-board ${preview?"shared-ludo-board-preview":""} ${className}`.trim()} style={{...style,background:p.bg,borderColor:p.accent,"--board-accent":p.accent} as React.CSSProperties} aria-label={`${BOARD_NAMES[theme]} 15 by 15 Ludo board`}>
-    {cells.map(c=>c.kind==="center"?<div key={c.index} className="shared-board-cell shared-center-cell" style={{background:p.accent}}><span>🏆</span></div>:c.kind==="track"?<div key={c.index} className="shared-board-cell shared-track-cell" style={{borderColor:p.accent,background:(c.row+c.col)%2?p.bg:"#fff"}}>{(c.row*15+c.col)%13===0?"★":""}</div>:<div key={c.index} className={`shared-board-cell shared-home-cell shared-home-${c.kind}`} style={{background:p[c.kind]}}>{c.row===(c.kind==="green"?0:c.kind==="yellow"?0:9)&&c.col===(c.kind==="green"?0:c.kind==="yellow"?9:0)&&!preview?<b>{c.kind.toUpperCase()}</b>:null}{((c.kind==="green"||c.kind==="yellow")&&c.row<4&&c.col%3===1)||((c.kind==="red"||c.kind==="blue")&&c.row%3===1&&c.col<14&&((c.kind==="red"&&c.col<4)||(c.kind==="blue"&&c.col>10)))?<span className="shared-home-token-dot" style={{background:p[c.kind]}}/>:null}</div>)}
-    <style jsx>{`.shared-ludo-board{width:min(94vw,650px);aspect-ratio:1;position:relative;border:6px solid;border-radius:22px;overflow:hidden;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr);box-shadow:0 18px 50px rgba(0,0,0,.4);box-sizing:border-box}.shared-board-cell{min-width:0;min-height:0;box-sizing:border-box}.shared-home-cell{position:relative;border:1px solid rgba(255,255,255,.18);display:grid;place-items:center;color:#fff;font-size:clamp(7px,1.7vw,12px);font-weight:900}.shared-home-green{border-bottom-right-radius:8px}.shared-home-yellow{border-bottom-left-radius:8px}.shared-home-red{border-top-right-radius:8px}.shared-home-blue{border-top-left-radius:8px}.shared-home-token-dot{width:58%;aspect-ratio:1;border-radius:50%;border:3px solid rgba(255,255,255,.95);box-shadow:inset 0 4px 7px rgba(255,255,255,.25),0 3px 7px rgba(0,0,0,.3)}.shared-track-cell{display:grid;place-items:center;border:1px solid;font-size:clamp(6px,1.4vw,10px);font-weight:900}.shared-center-cell{display:grid;place-items:center;border:1px solid rgba(255,255,255,.25);z-index:3;color:#fff;font-size:clamp(16px,5vw,34px);box-shadow:inset 0 0 0 3px rgba(255,255,255,.25)}.shared-ludo-board-preview{width:100%;max-width:260px;border-width:3px;border-radius:14px;box-shadow:none}.shared-ludo-board-preview .shared-home-token-dot{border-width:2px}.shared-ludo-board-preview .shared-center-cell{font-size:18px}@media(max-width:480px){.shared-ludo-board{width:min(96vw,650px);border-width:4px;border-radius:16px}.shared-home-token-dot{border-width:2px}}`}</style>
+  const cells=Array.from({length:225},(_,index)=>{const row=Math.floor(index/15),col=index%15;return{index,row,col};});
+
+  return <div className={`shared-ludo-board ${preview?"shared-ludo-board-preview":""} ${className}`.trim()} style={{...style,background:p.bg,borderColor:p.accent,"--board-accent":p.accent} as React.CSSProperties} aria-label={`${BOARD_NAMES[theme]} Ludo board`}>
+    {cells.map(c=>{
+      if(homeAt(c.row,c.col)||isCenter(c.row,c.col))return <div key={c.index} className="board-underlay"/>;
+      const lane=laneColor(c.row,c.col);
+      const safe=safeCells.has(`${c.row}:${c.col}`);
+      const start=(c.row===5&&c.col===6)||(c.row===6&&c.col===9)||(c.row===8&&c.col===8)||(c.row===7&&c.col===5);
+      const arrow=(c.row===0&&c.col===7)?"↓":(c.row===7&&c.col===14)?"←":(c.row===14&&c.col===7)?"↑":(c.row===7&&c.col===0)?"→":"";
+      return <div key={c.index} className={`board-cell ${lane?"board-lane":"board-track"} ${safe?"board-safe":""} ${start?"board-start":""}`} style={{background:lane?p[lane]:(c.row+c.col)%2===0?"#ffffff":p.bg,borderColor:p.accent}}>
+        {safe&&<span className="safe-star">★</span>}
+        {arrow&&<span className="entry-arrow" style={{color:lane?p[lane]:p.accent}}>{arrow}</span>}
+      </div>;
+    })}
+
+    <HomeZone color="green" p={p} label="GREEN"/>
+    <HomeZone color="yellow" p={p} label="YELLOW"/>
+    <HomeZone color="red" p={p} label="RED"/>
+    <HomeZone color="blue" p={p} label="BLUE"/>
+
+    <div className="center-home" aria-hidden="true">
+      <div className="center-triangle center-green" style={{background:p.green}}/>
+      <div className="center-triangle center-yellow" style={{background:p.yellow}}/>
+      <div className="center-triangle center-red" style={{background:p.red}}/>
+      <div className="center-triangle center-blue" style={{background:p.blue}}/>
+      <div className="center-dot" style={{borderColor:p.accent}}/>
+    </div>
+
+    <style jsx>{`
+      .shared-ludo-board{width:min(94vw,650px);aspect-ratio:1;position:relative;border:6px solid;border-radius:22px;overflow:hidden;display:grid;grid-template-columns:repeat(15,1fr);grid-template-rows:repeat(15,1fr);box-shadow:0 18px 50px rgba(0,0,0,.42);box-sizing:border-box;background-clip:padding-box}
+      .board-underlay{min-width:0;min-height:0}
+      .board-cell{min-width:0;min-height:0;position:relative;box-sizing:border-box;display:grid;place-items:center;border:1px solid rgba(11,23,43,.22);font-weight:950}
+      .board-track{color:#0b172b}
+      .board-lane{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.2)}
+      .board-start{box-shadow:inset 0 0 0 3px rgba(255,255,255,.8)}
+      .safe-star{font-size:clamp(13px,2.7vw,22px);line-height:1;color:#0b172b;text-shadow:0 1px 0 rgba(255,255,255,.7)}
+      .entry-arrow{font-size:clamp(18px,4vw,30px);line-height:1;font-weight:1000}
+      .home-zone{position:absolute;width:40%;height:40%;padding:clamp(12px,2.5vw,20px);box-sizing:border-box;color:#fff;z-index:4}
+      .home-zone-green{left:0;top:0;border-radius:16px 0 0 0}
+      .home-zone-yellow{right:0;top:0;border-radius:0 16px 0 0}
+      .home-zone-red{left:0;bottom:0;border-radius:0 0 0 16px}
+      .home-zone-blue{right:0;bottom:0;border-radius:0 0 16px 0}
+      .home-label{position:absolute;top:clamp(7px,1.6vw,12px);left:clamp(9px,1.8vw,14px);font-size:clamp(9px,2vw,14px);font-weight:1000;letter-spacing:.2px;text-shadow:0 1px 2px rgba(0,0,0,.2)}
+      .home-zone-yellow .home-label,.home-zone-blue .home-label{left:auto;right:clamp(9px,1.8vw,14px)}
+      .home-zone-red .home-label,.home-zone-blue .home-label{top:auto;bottom:clamp(7px,1.6vw,12px)}
+      .home-inner{position:absolute;inset:22% 13% 13%;display:grid;grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr);gap:clamp(8px,2.2vw,18px)}
+      .home-slot{display:grid;place-items:center}
+      .home-token{width:72%;max-width:72px;aspect-ratio:1;border-radius:50%;border:clamp(2px,.5vw,4px) solid rgba(255,255,255,.9);box-shadow:inset 0 5px 10px rgba(255,255,255,.25),0 4px 10px rgba(0,0,0,.25);display:grid;place-items:center}
+      .home-token span{width:48%;aspect-ratio:1;border-radius:50%;background:rgba(0,0,0,.16);box-shadow:inset 0 2px 4px rgba(0,0,0,.15)}
+      .center-home{position:absolute;left:40%;top:40%;width:20%;height:20%;z-index:6;overflow:hidden;border:1px solid rgba(11,23,43,.25);background:${p.bg}}
+      .center-triangle{position:absolute;inset:0;clip-path:polygon(0 0,100% 0,50% 50%)}
+      .center-yellow{transform:rotate(90deg)}
+      .center-red{transform:rotate(180deg)}
+      .center-blue{transform:rotate(270deg)}
+      .center-dot{position:absolute;left:42%;top:42%;width:16%;height:16%;border:2px solid;border-radius:50%;background:#fff;box-shadow:0 2px 5px rgba(0,0,0,.25)}
+      .shared-ludo-board-preview{width:100%;max-width:260px;border-width:3px;border-radius:14px;box-shadow:none}
+      .shared-ludo-board-preview .home-zone{padding:8px;border-radius:9px 0 0 0}
+      .shared-ludo-board-preview .home-label{font-size:7px;top:5px;left:6px}
+      .shared-ludo-board-preview .home-zone-yellow .home-label,.shared-ludo-board-preview .home-zone-blue .home-label{left:auto;right:6px}
+      .shared-ludo-board-preview .home-zone-red .home-label,.shared-ludo-board-preview .home-zone-blue .home-label{top:auto;bottom:5px}
+      .shared-ludo-board-preview .home-inner{gap:4px}
+      .shared-ludo-board-preview .home-token{border-width:2px}
+      .shared-ludo-board-preview .safe-star{font-size:12px}
+      .shared-ludo-board-preview .entry-arrow{font-size:16px}
+      @media(max-width:480px){
+        .shared-ludo-board{width:min(96vw,650px);border-width:4px;border-radius:16px}
+        .home-zone{padding:9px}
+        .home-inner{gap:6px}
+        .home-token{width:76%;border-width:2px}
+      }
+    `}</style>
   </div>;
 }
