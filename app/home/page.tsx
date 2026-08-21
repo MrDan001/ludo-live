@@ -1,5 +1,10 @@
+"use client";
 import Link from "next/link";
+import { useEffect, useState } from "react";
 
+type Wallet={coins:number;gems:number;spins:number;mystery:number};
+const defaultWallet:Wallet={coins:25680,gems:320,spins:0,mystery:0};
+function readWallet():Wallet{try{return {...defaultWallet,...JSON.parse(localStorage.getItem("ludo-wallet")||"{}")}}catch{return defaultWallet}}
 const actions = [
   { href: "/lobby", icon: "🌐", title: "PLAY ONLINE", subtitle: "See real players waiting in open rooms", tone: "green" },
   { href: "/lobby", icon: "👥", title: "PLAY WITH FRIENDS", subtitle: "Invite friends and play together", tone: "teal" },
@@ -20,6 +25,8 @@ const toneStyles: Record<string, { background: string; border: string; glow: str
 };
 
 export default function HomePage() {
+  const [wallet,setWallet]=useState<Wallet>(defaultWallet);
+  useEffect(()=>{const refresh=()=>setWallet(readWallet());refresh();window.addEventListener("ludo-wallet-updated",refresh);window.addEventListener("storage",refresh);return()=>{window.removeEventListener("ludo-wallet-updated",refresh);window.removeEventListener("storage",refresh)}},[]);
   return <main style={{ minHeight: "100vh", background: "linear-gradient(180deg,#031536 0%,#020b1d 48%,#010611 100%)", color: "#fff", paddingBottom: 92 }}>
     <div style={{ width: "100%", maxWidth: 560, margin: "0 auto", padding: "12px 14px 0", boxSizing: "border-box" }}>
       <header style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: 12, alignItems: "center", padding: "8px 2px 14px" }}>
@@ -27,7 +34,7 @@ export default function HomePage() {
           <div style={{ width: 48, height: 48, borderRadius: "50%", display: "grid", placeItems: "center", background: "radial-gradient(circle at 35% 30%,#ffd86b,#e49c18 55%,#7d4800 100%)", border: "3px solid #ffd447", boxShadow: "0 0 0 3px rgba(255,210,55,.12),0 5px 18px rgba(0,0,0,.35)", fontSize: 27 }}>🧑🏽</div>
           <div><div style={{ fontWeight: 950, fontSize: 16, lineHeight: 1.1 }}>PlayerOne</div><div style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 5 }}><span style={{ background: "#f6c51b", color: "#382300", borderRadius: 6, padding: "2px 6px", fontSize: 10, fontWeight: 950 }}>25</span><span style={{ width: 70, height: 7, borderRadius: 99, background: "#162b50", overflow: "hidden", display: "inline-block" }}><span style={{ display: "block", width: "58%", height: "100%", background: "linear-gradient(90deg,#f4a51c,#ffe066)" }} /></span><span style={{ color: "#f5d75d", fontSize: 10, fontWeight: 800 }}>4,250 XP</span></div></div>
         </Link>
-        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={currency}>🪙 <b>25,680</b></div><div style={currency}>💎 <b>1,250</b></div><Link href="/shop" aria-label="Shop" style={{ width: 34, height: 34, borderRadius: "50%", display: "grid", placeItems: "center", textDecoration: "none", background: "#37b92e", border: "2px solid #83ec64", color: "#fff", fontWeight: 950, fontSize: 20 }}>+</Link></div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={currency}>🪙 <b>{wallet.coins.toLocaleString()}</b></div><div style={currency}>💎 <b>{wallet.gems.toLocaleString()}</b></div><Link href="/shop" aria-label="Shop" style={{ width: 34, height: 34, borderRadius: "50%", display: "grid", placeItems: "center", textDecoration: "none", background: "#37b92e", border: "2px solid #83ec64", color: "#fff", fontWeight: 950, fontSize: 20 }}>+</Link></div>
       </header>
 
       <section style={{ marginTop: 4, display: "grid", gap: 12 }}>{actions.map(a=>{const t=toneStyles[a.tone];return <Link key={a.title} href={a.href} style={{ minHeight: 84, borderRadius: 19, display: "grid", gridTemplateColumns: "58px 1fr", alignItems: "center", gap: 12, padding: "10px 18px", boxSizing: "border-box", color: "#fff", textDecoration: "none", background: t.background, border: `1px solid ${t.border}`, boxShadow: `0 10px 28px ${t.glow}, inset 0 1px rgba(255,255,255,.16)` }}><span style={{ width: 52, height: 52, display: "grid", placeItems: "center", fontSize: 38 }}>{a.icon}</span><span><strong style={{ display: "block", fontSize: 20, lineHeight: 1.05 }}>{a.title}</strong><small style={{ display: "block", marginTop: 6, fontSize: 12.5, fontWeight: 650 }}>{a.subtitle}</small></span><span style={{ gridColumn: "2", marginTop: -42, justifySelf: "end", fontSize: 26, opacity: .8 }}>›</span></Link>})}</section>
