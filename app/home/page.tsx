@@ -8,13 +8,13 @@ function readWallet():Wallet{try{return {...defaultWallet,...JSON.parse(localSto
 const actions = [
   { href: "/lobby", icon: "🌐", title: "PLAY ONLINE", subtitle: "See real players waiting in open rooms", tone: "green" },
   { href: "/lobby", icon: "👥", title: "PLAY WITH FRIENDS", subtitle: "Invite friends and play together", tone: "teal" },
-  { href: "/social?tab=missions", icon: "🎯", title: "MISSIONS", subtitle: "Complete objectives before rewards unlock", tone: "blue" },
+  { href: "/missions", icon: "🎯", title: "MISSIONS", subtitle: "Complete objectives before rewards unlock", tone: "blue" },
   { href: "/mode", icon: "🏆", title: "TOURNAMENT", subtitle: "Join tournaments and compete for rewards", tone: "purple" },
 ];
 const shortcuts = [
   { href: "/rewards", icon: "🎁", label: "Daily Reward" },
   { href: "/shop", icon: "🛒", label: "Shop" },
-  { href: "/social?tab=events", icon: "📅", label: "Events" },
+  { href: "/events", icon: "📅", label: "Events" },
   { href: "/spin", icon: "🎡", label: "Spin Wheel" },
 ];
 const toneStyles: Record<string, { background: string; border: string; glow: string }> = {
@@ -37,7 +37,7 @@ export default function HomePage() {
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}><div style={currency}>🪙 <b>{wallet.coins.toLocaleString()}</b></div><div style={currency}>💎 <b>{wallet.gems.toLocaleString()}</b></div><Link href="/shop" aria-label="Shop" style={{ width: 34, height: 34, borderRadius: "50%", display: "grid", placeItems: "center", textDecoration: "none", background: "#37b92e", border: "2px solid #83ec64", color: "#fff", fontWeight: 950, fontSize: 20 }}>+</Link></div>
       </header>
 
-      <section style={{ marginTop: 4, display: "grid", gap: 12 }}>{actions.map(a=>{const t=toneStyles[a.tone];return <Link key={a.title} href={a.href} style={{ minHeight: 84, borderRadius: 19, display: "grid", gridTemplateColumns: "58px 1fr", alignItems: "center", gap: 12, padding: "10px 18px", boxSizing: "border-box", color: "#fff", textDecoration: "none", background: t.background, border: `1px solid ${t.border}`, boxShadow: `0 10px 28px ${t.glow}, inset 0 1px rgba(255,255,255,.16)` }}><span style={{ width: 52, height: 52, display: "grid", placeItems: "center", fontSize: 38 }}>{a.icon}</span><span><strong style={{ display: "block", fontSize: 20, lineHeight: 1.05 }}>{a.title}</strong><small style={{ display: "block", marginTop: 6, fontSize: 12.5, fontWeight: 650 }}>{a.subtitle}</small></span><span style={{ gridColumn: "2", marginTop: -42, justifySelf: "end", fontSize: 26, opacity: .8 }}>›</span></Link>})}</section>
+      <section style={{ marginTop: 4, display: "grid", gap: 12 }}>{actions.map(a=>{const t=toneStyles[a.tone];return <Link key={a.title} href={a.href} style={{ minHeight: 84, borderRadius: 19, display: "grid", gridTemplateColumns: "58px minmax(0,1fr) 28px", alignItems: "center", gap: 12, padding: "10px 18px", boxSizing: "border-box", color: "#fff", textDecoration: "none", background: t.background, border: `1px solid ${t.border}`, boxShadow: `0 10px 28px ${t.glow}, inset 0 1px rgba(255,255,255,.16)` }}><span style={{ width: 52, height: 52, display: "grid", placeItems: "center", fontSize: 38 }}>{a.icon}</span><span><strong style={{ display: "block", fontSize: 20, lineHeight: 1.05 }}>{a.title}</strong><small style={{ display: "block", marginTop: 6, fontSize: 12.5, fontWeight: 650 }}>{a.subtitle}</small></span><span style={{ justifySelf: "end", fontSize: 26, opacity: .8 }}>›</span></Link>})}</section>
 
       <section style={{ marginTop: 14, display: "grid", gridTemplateColumns: "repeat(4,1fr)", borderRadius: 17, overflow: "hidden", background: "rgba(4,18,43,.96)", border: "1px solid rgba(73,113,180,.22)" }}>{shortcuts.map(i=><Link key={i.label} href={i.href} style={{ minHeight: 88, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 5, color: "#eaf2ff", textDecoration: "none" }}><span style={{ fontSize: 27 }}>{i.icon}</span><span style={{ fontSize: 10.5, fontWeight: 800, textAlign: "center" }}>{i.label}</span></Link>)}</section>
 
