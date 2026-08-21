@@ -1,4 +1,4 @@
-const CACHE_NAME = "ludo-live-shell-v1";
+const CACHE_NAME = "ludo-live-shell-v2";
 const APP_SHELL = ["/", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
@@ -17,17 +17,17 @@ self.addEventListener("fetch", (event) => {
   if (request.method !== "GET") return;
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
-  // Keep live game/chat/socket data network-only. The service worker is intentionally
-  // conservative so installing the app never interferes with real-time gameplay.
+  // Documents must always come from the network so a browser refresh cannot
+  // keep showing an older Home/app shell. The cache remains only a fallback
+  // for non-document assets when offline.
+  if (request.destination === "document") {
+    event.respondWith(fetch(request, { cache: "no-store" }));
+    return;
+  }
+  // Keep live game/chat/socket data network-only.
   if (url.pathname.startsWith("/_next/") || url.pathname.startsWith("/api/") || url.pathname.includes("socket")) return;
 
   event.respondWith(
-    fetch(request).then((response) => {
-      if (response.ok && request.destination === "document") {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
-      }
-      return response;
-    }).catch(() => caches.match(request).then((cached) => cached || caches.match("/")))
+    fetch(request).then((response) => response).catch(() => caches.match(request))
   );
 });
