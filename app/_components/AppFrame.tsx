@@ -7,6 +7,8 @@ export default function AppFrame({ children, back = "/home" }: { children: React
         <header style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, marginBottom: 22 }}>
           <Link href="/home" style={{ color: "#fff", textDecoration: "none", fontWeight: 950, fontSize: 22 }}>🎲 Ludo Live</Link>
           <nav style={{ display: "flex", gap: 6, flexWrap: "wrap", justifyContent: "flex-end" }}>
+            <Link href="/missions" style={navStyle}>🎯 Missions</Link>
+            <Link href="/events" style={navStyle}>📅 Events</Link>
             <Link href="/profile" style={navStyle}>👤 Profile</Link>
             <Link href="/shop" style={navStyle}>🛍️ Shop</Link>
             <Link href="/rewards" style={navStyle}>🎁 Reward</Link>
