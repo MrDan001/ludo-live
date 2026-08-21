@@ -108,7 +108,9 @@ export default function DemoDice({ value, onRoll, disabled = false }: Props) {
           transform-style: preserve-3d;
           transform: rotateX(-10deg) rotateY(18deg);
         }
-        .face {
+        /* Face is rendered by a child component, so these selectors must
+           bypass styled-jsx scoping or the pip grid/3D face styles are lost. */
+        :global(.face) {
           position: absolute;
           inset: 0;
           width: 82px;
@@ -128,11 +130,12 @@ export default function DemoDice({ value, onRoll, disabled = false }: Props) {
             inset -7px -8px 11px rgba(80,90,100,.28),
             0 3px 5px rgba(0,0,0,.18);
         }
-        .face i {
+        :global(.face i) {
           display: grid;
           place-items: center;
         }
-        .face b {
+        :global(.face b) {
+          display: block;
           width: 12px;
           height: 12px;
           border-radius: 50%;
@@ -141,12 +144,12 @@ export default function DemoDice({ value, onRoll, disabled = false }: Props) {
             inset 1px 1px 2px rgba(255,255,255,.35),
             0 1px 2px rgba(0,0,0,.35);
         }
-        .front  { transform: translateZ(41px); }
-        .back   { transform: rotateY(180deg) translateZ(41px); }
-        .right  { transform: rotateY(90deg) translateZ(41px); }
-        .left   { transform: rotateY(-90deg) translateZ(41px); }
-        .top    { transform: rotateX(90deg) translateZ(41px); }
-        .bottom { transform: rotateX(-90deg) translateZ(41px); }
+        :global(.front)  { transform: translateZ(41px); }
+        :global(.back)   { transform: rotateY(180deg) translateZ(41px); }
+        :global(.right)  { transform: rotateY(90deg) translateZ(41px); }
+        :global(.left)   { transform: rotateY(-90deg) translateZ(41px); }
+        :global(.top)    { transform: rotateX(90deg) translateZ(41px); }
+        :global(.bottom) { transform: rotateX(-90deg) translateZ(41px); }
         .dice-shadow {
           position: absolute;
           width: 70px;
@@ -197,13 +200,13 @@ export default function DemoDice({ value, onRoll, disabled = false }: Props) {
         }
         @media (max-width: 480px) {
           .dice-button { width: 132px; height: 120px; }
-          .cube-wrap, .cube, .face { width: 78px; height: 78px; }
-          .front { transform: translateZ(39px); }
-          .back { transform: rotateY(180deg) translateZ(39px); }
-          .right { transform: rotateY(90deg) translateZ(39px); }
-          .left { transform: rotateY(-90deg) translateZ(39px); }
-          .top { transform: rotateX(90deg) translateZ(39px); }
-          .bottom { transform: rotateX(-90deg) translateZ(39px); }
+          .cube-wrap, .cube, :global(.face) { width: 78px; height: 78px; }
+          :global(.front) { transform: translateZ(39px); }
+          :global(.back) { transform: rotateY(180deg) translateZ(39px); }
+          :global(.right) { transform: rotateY(90deg) translateZ(39px); }
+          :global(.left) { transform: rotateY(-90deg) translateZ(39px); }
+          :global(.top) { transform: rotateX(90deg) translateZ(39px); }
+          :global(.bottom) { transform: rotateX(-90deg) translateZ(39px); }
         }
       `}</style>
     </section>
