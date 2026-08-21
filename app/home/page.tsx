@@ -1,1 +1,188 @@
-"use client";import Link from"next/link";import{useEffect,useState}from"react";import{readProgress,readBadges,xpRequiredForLevel,type Badge}from"../../lib/playerProgress";type Wallet={coins:number;gems:number};export default function HomePage(){const[wallet,setWallet]=useState<Wallet|null>(null),[name,setName]=useState("PlayerOne"),[progress,setProgress]=useState(()=>readProgress()),[badges,setBadges]=useState<Badge[]>(()=>readBadges());useEffect(()=>{let alive=true;const refresh=async()=>{try{const r=await fetch("/api/wallet",{cache:"no-store"});const d=await r.json();if(alive&&r.ok&&d?.wallet)setWallet({coins:Number(d.wallet.coins)||0,gems:Number(d.wallet.gems)||0})}catch{}};refresh();setName(localStorage.getItem("ludo-player-name")||"PlayerOne");setProgress(readProgress());setBadges(readBadges());const t=setInterval(refresh,15000),f=()=>refresh();window.addEventListener("focus",f);window.addEventListener("ludo-wallet-updated",f);return()=>{alive=false;clearInterval(t);window.removeEventListener("focus",f);window.removeEventListener("ludo-wallet-updated",f)}},[]);const required=xpRequiredForLevel(progress.level),xpPercent=Math.min(100,(progress.xp/required)*100),money=wallet?`${wallet.coins.toLocaleString()}`:"…",gems=wallet?`${wallet.gems.toLocaleString()}`:"…";return <main style={{minHeight:"100vh",background:"linear-gradient(180deg,#031536 0%,#020b1d 48%,#010611 100%)",color:"#fff",paddingBottom:92}}><div style={{width:"100%",maxWidth:560,margin:"0 auto",padding:"12px 14px 0",boxSizing:"border-box"}}><header style={{display:"grid",gridTemplateColumns:"1fr auto",gap:12,alignItems:"center",padding:"8px 2px 14px"}}><Link href="/profile" style={{color:"#fff",textDecoration:"none"}}><div style={{fontWeight:950,fontSize:16}}>{name}</div><div style={{marginTop:5,fontSize:9,fontWeight:900,color:"#8ec5ff"}}>LEVEL {progress.level} • XP {Math.round(xpPercent)}%</div><div style={{marginTop:3,width:"min(180px,100%)",height:8,borderRadius:99,background:"#102746",overflow:"hidden"}}><span style={{display:"block",width:`${xpPercent}%`,height:"100%",background:"linear-gradient(90deg,#1677ff,#4ab3ff)"}}/></Link><div style={{display:"flex",alignItems:"center",gap:8}}><div style={currency}>🪙 <b>{money}</b></div><div style={currency}>💎 <b>{gems}</b></div><Link href="/shop" style={{width:34,height:34,borderRadius:"50%",display:"grid",placeItems:"center",textDecoration:"none",background:"#37b92e",border:"2px solid #83ec64",color:"#fff",fontWeight:950,fontSize:20}}>+</Link></div></header><section style={{display:"grid",gap:12}}>{[{h:"🌐 PLAY ONLINE",s:"See real players waiting in open rooms"},{h:"👥 PLAY WITH FRIENDS",s:"Invite friends and play together"},{h:"🎯 MISSIONS",s:"Complete objectives before rewards unlock"},{h:"🏆 TOURNAMENT",s:"Join tournaments and compete for rewards"}].map((a,i)=><Link key={a.h} href={i<2?"/lobby":i===2?"/missions":"/mode"} style={{minHeight:84,borderRadius:19,display:"grid",alignItems:"center",padding:"10px 18px",color:"#fff",textDecoration:"none",background:["#159447","#087b61","#173fba","#6b1998"][i]}}><span><strong style={{display:"block",fontSize:20}}>{a.h}</strong><small style={{display:"block",marginTop:6,fontSize:12.5}}>{a.s}</small></span></Link>)}</section></div></main>};const currency:React.CSSProperties={display:"flex",alignItems:"center",gap:4,padding:"8px 9px",borderRadius:12,background:"rgba(5,23,55,.9)",border:"1px solid rgba(79,124,204,.24)",fontSize:13};
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState } from "react";
+import {
+  readProgress,
+  readBadges,
+  xpRequiredForLevel,
+  type Badge,
+} from "../../lib/playerProgress";
+
+type Wallet = { coins: number; gems: number };
+
+export default function HomePage() {
+  const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [name, setName] = useState("PlayerOne");
+  const [progress, setProgress] = useState(() => readProgress());
+  const [badges, setBadges] = useState<Badge[]>(() => readBadges());
+
+  useEffect(() => {
+    let alive = true;
+
+    const refresh = async () => {
+      try {
+        const r = await fetch("/api/wallet", { cache: "no-store" });
+        const d = await r.json();
+        if (alive && r.ok && d?.wallet) {
+          setWallet({
+            coins: Number(d.wallet.coins) || 0,
+            gems: Number(d.wallet.gems) || 0,
+          });
+        }
+      } catch {}
+    };
+
+    refresh();
+    setName(localStorage.getItem("ludo-player-name") || "PlayerOne");
+    setProgress(readProgress());
+    setBadges(readBadges());
+
+    const t = setInterval(refresh, 15000);
+    const f = () => refresh();
+    window.addEventListener("focus", f);
+    window.addEventListener("ludo-wallet-updated", f);
+
+    return () => {
+      alive = false;
+      clearInterval(t);
+      window.removeEventListener("focus", f);
+      window.removeEventListener("ludo-wallet-updated", f);
+    };
+  }, []);
+
+  const required = xpRequiredForLevel(progress.level);
+  const xpPercent = Math.min(100, (progress.xp / required) * 100);
+  const money = wallet ? `${wallet.coins.toLocaleString()}` : "…";
+  const gems = wallet ? `${wallet.gems.toLocaleString()}` : "…";
+
+  return (
+    <main
+      style={{
+        minHeight: "100vh",
+        background:
+          "linear-gradient(180deg,#031536 0%,#020b1d 48%,#010611 100%)",
+        color: "#fff",
+        paddingBottom: 92,
+      }}
+    >
+      <div
+        style={{
+          width: "100%",
+          maxWidth: 560,
+          margin: "0 auto",
+          padding: "12px 14px 0",
+          boxSizing: "border-box",
+        }}
+      >
+        <header
+          style={{
+            display: "grid",
+            gridTemplateColumns: "1fr auto",
+            gap: 12,
+            alignItems: "center",
+            padding: "8px 2px 14px",
+          }}
+        >
+          <Link href="/profile" style={{ color: "#fff", textDecoration: "none" }}>
+            <div style={{ fontWeight: 950, fontSize: 16 }}>{name}</div>
+            <div
+              style={{
+                marginTop: 5,
+                fontSize: 9,
+                fontWeight: 900,
+                color: "#8ec5ff",
+              }}
+            >
+              LEVEL {progress.level} • XP {Math.round(xpPercent)}%
+            </div>
+            <div
+              style={{
+                marginTop: 3,
+                width: "min(180px,100%)",
+                height: 8,
+                borderRadius: 99,
+                background: "#102746",
+                overflow: "hidden",
+              }}
+            >
+              <span
+                style={{
+                  display: "block",
+                  width: `${xpPercent}%`,
+                  height: "100%",
+                  background: "linear-gradient(90deg,#1677ff,#4ab3ff)",
+                }}
+              />
+            </div>
+          </Link>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <div style={currency}>🪙 <b>{money}</b></div>
+            <div style={currency}>💎 <b>{gems}</b></div>
+            <Link
+              href="/shop"
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: "50%",
+                display: "grid",
+                placeItems: "center",
+                textDecoration: "none",
+                background: "#37b92e",
+                border: "2px solid #83ec64",
+                color: "#fff",
+                fontWeight: 950,
+                fontSize: 20,
+              }}
+            >
+              +
+            </Link>
+          </div>
+        </header>
+
+        <section style={{ display: "grid", gap: 12 }}>
+          {[
+            { h: "🌐 PLAY ONLINE", s: "See real players waiting in open rooms" },
+            { h: "👥 PLAY WITH FRIENDS", s: "Invite friends and play together" },
+            { h: "🎯 MISSIONS", s: "Complete objectives before rewards unlock" },
+            { h: "🏆 TOURNAMENT", s: "Join tournaments and compete for rewards" },
+          ].map((a, i) => (
+            <Link
+              key={a.h}
+              href={i < 2 ? "/lobby" : i === 2 ? "/missions" : "/mode"}
+              style={{
+                minHeight: 84,
+                borderRadius: 19,
+                display: "grid",
+                alignItems: "center",
+                padding: "10px 18px",
+                color: "#fff",
+                textDecoration: "none",
+                background: ["#159447", "#087b61", "#173fba", "#6b1998"][i],
+              }}
+            >
+              <span>
+                <strong style={{ display: "block", fontSize: 20 }}>{a.h}</strong>
+                <small style={{ display: "block", marginTop: 6, fontSize: 12.5 }}>
+                  {a.s}
+                </small>
+              </span>
+            </Link>
+          ))}
+        </section>
+      </div>
+    </main>
+  );
+}
+
+const currency: React.CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+  gap: 4,
+  padding: "8px 9px",
+  borderRadius: 12,
+  background: "rgba(5,23,55,.9)",
+  border: "1px solid rgba(79,124,204,.24)",
+  fontSize: 13,
+};
