@@ -74,7 +74,7 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section style={{ display: "grid", gridTemplateRows: "repeat(4,minmax(78px,1fr))", gap: 7, flex: "1 1 auto", minHeight: 312 }}>
+        <section style={{ display: "grid", gridTemplateRows: "repeat(4,clamp(108px,14vh,150px))", gap: 7, flex: "0 0 auto" }}>
           {[
             { icon: "🌐", h: "PLAY ONLINE", s: "See real players waiting in open rooms", href: "/lobby", background: "linear-gradient(135deg,#159447,#31c936)" },
             { icon: "👥", h: "PLAY WITH FRIENDS", s: "Invite friends and play together", href: "/lobby", background: "linear-gradient(135deg,#087b61,#16b875)" },
