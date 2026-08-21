@@ -20,8 +20,8 @@ export default function LandingPage(){
     <button disabled={busy} onClick={()=>go("/account?next=/home")} style={secondary}>SIGN IN</button>
     <div style={divider}><span>OR CONTINUE WITH</span></div>
     <div style={socialRow}>
-      <button disabled={busy} onClick={()=>go("/api/auth/google?next=/home")} style={google}><span style={googleG}>G</span> Google</button>
-      <button disabled={busy} onClick={()=>go("/api/auth/facebook?next=/home")} style={facebook}><span style={fb}>f</span> Facebook</button>
+      <button disabled={busy} onClick={()=>go("/account?next=/home&social=google")} style={google}><span style={googleG}>G</span> Google</button>
+      <button disabled={busy} onClick={()=>go("/account?next=/home&social=facebook")} style={facebook}><span style={fb}>f</span> Facebook</button>
     </div>
     <button disabled={busy} onClick={guest} style={guestBtn}>CONTINUE AS GUEST</button>
     <p style={guestNote}>Guest mode lets you play, but social features require an account.</p>
