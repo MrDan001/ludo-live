@@ -7,8 +7,9 @@ export type BoardCell = readonly [number, number];
 
 export const TRACK_LENGTH = 52;
 export const HOME_STRETCH = 5;
-// Each color enters its home lane after the final two shared-track boxes.
-export const HOME_ENTRY_STEP = TRACK_LENGTH - 2;
+// A token must traverse the final two shared-track boxes (steps 50 and 51)
+// before entering the first box of its home lane at step 52.
+export const HOME_ENTRY_STEP = TRACK_LENGTH;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
@@ -65,7 +66,7 @@ export function getTokenCell(color: LudoColor, steps: number): BoardCell | null 
 if (MAIN_PATH.length !== TRACK_LENGTH) {
   throw new Error(`Ludo board invariant failed: expected ${TRACK_LENGTH} track cells, got ${MAIN_PATH.length}.`);
 }
-for (const color of ["green", "yellow", "blue", "red"] as LudoColor[]) {
+for (const color of ["green", "yellow", "red", "blue"] as LudoColor[]) {
   if (HOME_LANES[color].length !== HOME_STRETCH) {
     throw new Error(`Ludo board invariant failed: ${color} home lane must contain ${HOME_STRETCH} cells.`);
   }
