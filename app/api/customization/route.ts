@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool, ensureAuthSchema } from "../auth/_db";
 import { currentUser } from "../../../lib/auth-session";
-import { BOARDS, DICE, CATALOG } from "../../../lib/customization-catalog";
+import { BOARDS, DICE, AVATARS, ITEMS, CATALOG } from "../../../lib/customization-catalog";
 
 const clean = (list: unknown) => Array.isArray(list) ? list.map(String) : [];
 
@@ -11,14 +11,20 @@ export async function GET(q: NextRequest) {
     const u = await currentUser(q);
     if (!u) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
     return NextResponse.json({
-      coins: u.coins,
-      gems: u.gems,
+      coins: Number(u.coins) || 0,
+      gems: Number(u.gems) || 0,
       ownedBoards: clean(u.owned_boards || ["classic"]),
       ownedDice: clean(u.owned_dice || ["classic"]),
       equippedBoard: u.equipped_board || "classic",
       equippedDice: u.equipped_dice || "classic",
+      ownedAvatars: clean(u.owned_avatars),
+      equippedAvatar: u.equipped_avatar || "default",
+      ownedItems: clean(u.owned_items),
+      equippedItems: clean(u.equipped_items),
       boards: BOARDS,
       dice: DICE,
+      avatars: AVATARS,
+      items: ITEMS,
     });
   } catch (e) {
     console.error(e);
@@ -44,76 +50,65 @@ export async function POST(q: NextRequest) {
     await client.query("BEGIN");
     inTx = true;
     const row = await client.query<any>(
-      "SELECT coins,gems,owned_boards,owned_dice,equipped_board,equipped_dice FROM ludo_users WHERE id=$1 FOR UPDATE",
+      "SELECT coins,gems,owned_boards,owned_dice,equipped_board,equipped_dice,owned_avatars,equipped_avatar,owned_items,equipped_items FROM ludo_users WHERE id=$1 FOR UPDATE",
       [u.id]
     );
     const cur = row.rows[0];
+    if (!cur) throw new Error("Account not found.");
     const boards = clean(cur.owned_boards || ["classic"]);
     const dice = clean(cur.owned_dice || ["classic"]);
+    const avatars = clean(cur.owned_avatars);
+    const items = clean(cur.owned_items);
+    const equippedItems = clean(cur.equipped_items);
 
     if (action === "equip") {
-      if (!(type === "board" ? boards : dice).includes(id)) {
-        await client.query("ROLLBACK");
-        inTx = false;
-        return NextResponse.json({ error: "Purchase this item first." }, { status: 403 });
+      if (type === "board" && !boards.includes(id)) return fail(client, "Purchase this board first.", 403);
+      if (type === "dice" && !dice.includes(id)) return fail(client, "Purchase these dice first.", 403);
+      if (type === "avatar" && !avatars.includes(id)) return fail(client, "Purchase this avatar first.", 403);
+      if (type === "item" && !items.includes(id)) return fail(client, "Purchase this item first.", 403);
+
+      if (type === "board") await client.query("UPDATE ludo_users SET equipped_board=$1 WHERE id=$2", [id, u.id]);
+      else if (type === "dice") await client.query("UPDATE ludo_users SET equipped_dice=$1 WHERE id=$2", [id, u.id]);
+      else if (type === "avatar") await client.query("UPDATE ludo_users SET equipped_avatar=$1 WHERE id=$2", [id, u.id]);
+      else if (type === "item") {
+        const next = equippedItems.includes(id) ? equippedItems : [...equippedItems, id];
+        await client.query("UPDATE ludo_users SET equipped_items=$1 WHERE id=$2", [JSON.stringify(next), u.id]);
       }
-      if (type === "board") {
-        await client.query("UPDATE ludo_users SET equipped_board=$1 WHERE id=$2", [id, u.id]);
-      } else {
-        await client.query("UPDATE ludo_users SET equipped_dice=$1 WHERE id=$2", [id, u.id]);
-      }
-      await client.query("COMMIT");
-      inTx = false;
-      return NextResponse.json({
-        ok: true,
-        equippedBoard: type === "board" ? id : cur.equipped_board,
-        equippedDice: type === "dice" ? id : cur.equipped_dice,
-      });
+      await client.query("COMMIT"); inTx = false;
+      return NextResponse.json({ ok: true, equippedBoard: type === "board" ? id : cur.equipped_board, equippedDice: type === "dice" ? id : cur.equipped_dice, equippedAvatar: type === "avatar" ? id : cur.equipped_avatar, equippedItems: type === "item" ? [...equippedItems.filter(x => x !== id), id] : equippedItems });
     }
 
-    if (action !== "purchase") {
-      await client.query("ROLLBACK");
-      inTx = false;
-      return NextResponse.json({ error: "Unknown customization action." }, { status: 400 });
-    }
+    if (action !== "purchase") return fail(client, "Unknown customization action.", 400);
 
-    if ((type === "board" ? boards : dice).includes(id)) {
-      await client.query("ROLLBACK");
-      inTx = false;
-      return NextResponse.json({ error: "You already own this item." }, { status: 409 });
-    }
+    const owned = type === "board" ? boards : type === "dice" ? dice : type === "avatar" ? avatars : items;
+    if (owned.includes(id)) return fail(client, "You already own this item.", 409);
 
-    const balance = Number(cur[item.currency as "coins" | "gems"]);
-    if (balance < item.price) {
-      await client.query("ROLLBACK");
-      inTx = false;
-      return NextResponse.json({ error: `Not enough ${item.currency}.` }, { status: 400 });
-    }
-
+    const currency = item.currency as "coins" | "gems";
+    const balance = Number(cur[currency]) || 0;
+    if (balance < item.price) return fail(client, `Not enough ${currency}.`, 400);
     const next = balance - item.price;
-    const column = type === "board" ? "owned_boards" : "owned_dice";
-    await client.query(
-      `UPDATE ludo_users SET ${item.currency}=$1,${column}=CASE WHEN ${column} ? $2 THEN ${column} ELSE ${column} || jsonb_build_array($2) END WHERE id=$3`,
-      [next, id, u.id]
-    );
-    await client.query(
-      "INSERT INTO ludo_admin_ledger(user_id,currency,amount,balance_before,balance_after,reason,source) VALUES($1,$2,$3,$4,$5,$6,'shop')",
-      [u.id, item.currency, -item.price, balance, next, `Purchased ${item.name}`]
-    );
-    await client.query("COMMIT");
-    inTx = false;
 
-    return NextResponse.json({
-      ok: true,
-      coins: item.currency === "coins" ? next : cur.coins,
-      gems: item.currency === "gems" ? next : cur.gems,
-      item,
-    });
+    if (type === "board") {
+      await client.query("UPDATE ludo_users SET coins=CASE WHEN $1='coins' THEN $2 ELSE coins END,gems=CASE WHEN $1='gems' THEN $2 ELSE gems END,owned_boards=owned_boards || jsonb_build_array($3),equipped_board=$3 WHERE id=$4", [currency, next, id, u.id]);
+    } else if (type === "dice") {
+      await client.query("UPDATE ludo_users SET coins=CASE WHEN $1='coins' THEN $2 ELSE coins END,gems=CASE WHEN $1='gems' THEN $2 ELSE gems END,owned_dice=owned_dice || jsonb_build_array($3),equipped_dice=$3 WHERE id=$4", [currency, next, id, u.id]);
+    } else if (type === "avatar") {
+      await client.query("UPDATE ludo_users SET coins=CASE WHEN $1='coins' THEN $2 ELSE coins END,gems=CASE WHEN $1='gems' THEN $2 ELSE gems END,owned_avatars=owned_avatars || jsonb_build_array($3),equipped_avatar=$3 WHERE id=$4", [currency, next, id, u.id]);
+    } else {
+      await client.query("UPDATE ludo_users SET coins=CASE WHEN $1='coins' THEN $2 ELSE coins END,gems=CASE WHEN $1='gems' THEN $2 ELSE gems END,owned_items=owned_items || jsonb_build_array($3),equipped_items=equipped_items || jsonb_build_array($3) WHERE id=$4", [currency, next, id, u.id]);
+    }
+
+    await client.query("INSERT INTO ludo_admin_ledger(user_id,currency,amount,balance_before,balance_after,reason,source) VALUES($1,$2,$3,$4,$5,$6,'shop')", [u.id, currency, -item.price, balance, next, `Purchased ${item.name}`]);
+    await client.query("COMMIT"); inTx = false;
+    return NextResponse.json({ ok: true, coins: currency === "coins" ? next : Number(cur.coins), gems: currency === "gems" ? next : Number(cur.gems), item, purchased: true, equippedAvatar: type === "avatar" ? id : cur.equipped_avatar });
   } catch (e) {
     if (inTx) await client.query("ROLLBACK").catch(() => {});
     console.error(e);
     return NextResponse.json({ error: "Unable to update customization." }, { status: 500 });
-  } finally {
-    client.release();
-  }
+  } finally { client.release(); }
+}
+
+async function fail(client: any, message: string, status: number) {
+  await client.query("ROLLBACK").catch(() => {});
+  throw Object.assign(new Error(message), { status, handled: true });
 }
