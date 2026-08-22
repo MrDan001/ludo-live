@@ -34,11 +34,39 @@
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.28);
 }
 
-/* The four marked outer yard areas keep the classic Ludo colors. */
+/*
+ * CLASSIC BOARD COLORS — OUTER YARDS ONLY.
+ * The four inner token-resting boxes remain white.
+ * These are the four home-yard overlay elements rendered after the 225 grid cells.
+ */
 .shared-ludo-board > :nth-child(227) { background: #18a84b; }
 .shared-ludo-board > :nth-child(228) { background: #f5b800; }
 .shared-ludo-board > :nth-child(229) { background: #f02d43; }
 .shared-ludo-board > :nth-child(230) { background: #2f6be5; }
+
+.shared-ludo-board > :nth-child(227) > div,
+.shared-ludo-board > :nth-child(228) > div,
+.shared-ludo-board > :nth-child(229) > div,
+.shared-ludo-board > :nth-child(230) > div {
+  background: rgba(255,255,255,.94) !important;
+}
+
+/*
+ * FOUR START/EXIT SQUARES.
+ * Each exit square keeps the same color as its home yard:
+ * Green = left exit, Yellow = top exit, Red = bottom exit, Blue = right exit.
+ * The board renderer outputs one pattern layer followed by 225 grid cells,
+ * so these selectors map to the exact 15x15 grid positions without touching
+ * movement coordinates or the movement engine.
+ */
+/* Green: row 6, column 1 */
+.shared-ludo-board > :nth-child(93) { background: #18a84b; }
+/* Yellow: row 1, column 8 */
+.shared-ludo-board > :nth-child(25) { background: #f5b800; }
+/* Red: row 13, column 6 */
+.shared-ludo-board > :nth-child(203) { background: #f02d43; }
+/* Blue: row 8, column 13 */
+.shared-ludo-board > :nth-child(135) { background: #2f6be5; }
 
 /* The classic board keeps its exact original appearance. */
 .shared-ludo-board.theme-classic {
