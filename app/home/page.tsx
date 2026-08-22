@@ -8,10 +8,9 @@ type Wallet = { coins: number; gems: number };
 type Action = { icon: string; title: string; sub: string; href: string; bg: string };
 
 const actions: Action[] = [
-  { icon: "🌐", title: "PLAY ONLINE", sub: "See real players waiting in open rooms", href: "/lobby", bg: "linear-gradient(135deg,#159447,#31c936)" },
-  { icon: "👥", title: "PLAY WITH FRIENDS", sub: "Invite friends and play together", href: "/lobby", bg: "linear-gradient(135deg,#087b61,#16b875)" },
-  { icon: "🎯", title: "MISSIONS", sub: "Complete objectives before rewards unlock", href: "/missions", bg: "linear-gradient(135deg,#173fba,#1769e8)" },
-  { icon: "🏆", title: "TOURNAMENT", sub: "Join tournaments and compete for rewards", href: "/mode", bg: "linear-gradient(135deg,#6b1998,#a126c8)" },
+  { icon: "🌐", title: "PLAY ONLINE", sub: "Find open rooms and play real players", href: "/lobby", bg: "linear-gradient(135deg,#159447,#31c936)" },
+  { icon: "👥", title: "PLAY WITH FRIENDS", sub: "Choose a friend and organize your match", href: "/friends", bg: "linear-gradient(135deg,#087b61,#16b875)" },
+  { icon: "🏆", title: "TOURNAMENTS", sub: "Enter competitions and fight for rewards", href: "/tournament", bg: "linear-gradient(135deg,#6b1998,#a126c8)" },
 ];
 const shortcuts = [["🎁", "Daily Reward", "/daily-reward"], ["🛒", "Shop", "/shop"], ["📅", "Events", "/events"], ["🎡", "Spin Wheel", "/spin"]] as const;
 const nav = [["⌂", "Home", "/home"], ["👥", "Friends", "/friends"], ["💬", "Chat", "/chat"], ["👤", "Profile", "/profile"]] as const;
@@ -24,8 +23,6 @@ export default function HomePage() {
   useEffect(() => {
     document.body.style.margin = "0";
     document.body.style.width = "100%";
-    // Keep the document root scrollable so mobile browsers can perform their
-    // native pull-to-refresh gesture. The Home UI itself remains fixed/non-scrollable.
     document.body.style.overflow = "";
     document.body.style.overscrollBehaviorY = "auto";
     document.documentElement.style.margin = "0";
@@ -65,9 +62,6 @@ export default function HomePage() {
   const xpPercent = Math.min(100, Math.max(0, (progress.xp / required) * 100));
   const levelPercent = Math.min(100, Math.max(0, (progress.level / Math.max(progress.level + 1, 1)) * 100));
 
-  // Use the small viewport height for the fixed app shell. Unlike 100dvh, 100svh
-  // does not change when a mobile browser's address bar expands/collapses, preventing
-  // the first-render jump where the bottom navigation is briefly misplaced.
   const page: React.CSSProperties = { position: "fixed", inset: 0, width: "100%", height: "100svh", overflow: "hidden", background: "linear-gradient(180deg,#031536 0%,#020b1d 52%,#010611 100%)", color: "#fff", fontFamily: "Arial,Helvetica,sans-serif" };
   const shell: React.CSSProperties = { width: "100%", maxWidth: 720, height: "calc(100svh - 68px - env(safe-area-inset-bottom, 0px))", margin: "0 auto", padding: "6px 12px", boxSizing: "border-box", display: "grid", gridTemplateRows: "auto minmax(0,1fr) 88px 76px", gap: 7, overflow: "hidden" };
   const header: React.CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 6, minHeight: 70 };
@@ -80,7 +74,7 @@ export default function HomePage() {
   const walletRow: React.CSSProperties = { display: "flex", alignItems: "center", gap: 5 };
   const walletItem: React.CSSProperties = { padding: "7px 8px", borderRadius: 11, background: "#051737", border: "1px solid #173766", fontSize: "clamp(10px,2.4vw,14px)", whiteSpace: "nowrap" };
   const add: React.CSSProperties = { width: "clamp(38px,9vw,48px)", height: "clamp(38px,9vw,48px)", borderRadius: "50%", display: "grid", placeItems: "center", background: "#37b92e", border: "2px solid #83ec64", color: "#fff", textDecoration: "none", fontSize: 28, fontWeight: 950 };
-  const actionsStyle: React.CSSProperties = { minHeight: 0, display: "grid", gridTemplateRows: "repeat(4,minmax(0,1fr))", gap: 7, overflow: "hidden" };
+  const actionsStyle: React.CSSProperties = { minHeight: 0, display: "grid", gridTemplateRows: "repeat(3,minmax(0,1fr))", gap: 7, overflow: "hidden" };
   const shortcutStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "repeat(4,1fr)", padding: "8px 5px", borderRadius: 18, background: "#06152f", border: "1px solid #173766", overflow: "hidden" };
   const streakStyle: React.CSSProperties = { display: "grid", gridTemplateColumns: "minmax(0,1fr) auto", alignItems: "center", gap: 8, padding: "9px 11px 9px 13px", borderRadius: 18, background: "#0a214b", border: "1px solid #173766", minWidth: 0 };
   const bottomNav: React.CSSProperties = { position: "fixed", bottom: "env(safe-area-inset-bottom, 0px)", left: "50%", transform: "translateX(-50%)", width: "100%", maxWidth: 720, height: 68, display: "grid", gridTemplateColumns: "repeat(4,1fr)", background: "#020b1d", borderTop: "1px solid #173766", zIndex: 20 };
