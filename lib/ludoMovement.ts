@@ -8,9 +8,10 @@ export type TokenState = "yard" | "track" | "home" | "finished";
 
 export { SAFE_SQUARES, START_INDEX, TRACK_LENGTH, HOME_STRETCH };
 
-// MAIN_PATH has 52 physical shared-track cells. The final two of those cells
-// are steps 50 and 51; the token enters its five-cell home lane at step 52.
-export const HOME_ENTRY_STEP = TRACK_LENGTH;
+// MAIN_PATH has 52 physical shared-track cells. Each player's home entry is
+// two cells before the end of that player's lap: step 50 enters the final
+// shared square, and step 51 is the first home-lane step.
+export const HOME_ENTRY_STEP = TRACK_LENGTH - 2;
 export const STEPS_TO_FINISH = HOME_ENTRY_STEP + HOME_STRETCH - 1;
 
 export type LudoToken = {
