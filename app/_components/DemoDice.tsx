@@ -29,20 +29,16 @@ export default function DemoDice({ value, onRoll, disabled = false, botRolling =
     return () => { alive = false; };
   }, []);
 
-  // Bot rolls use the same visible tumble/bounce animation as a human roll.
+  // The parent controls the bot roll duration. Keeping this effect state-driven
+  // prevents the animation from being cancelled when the bot turn state changes.
   useEffect(() => {
-    if (!botRolling) {
-      if (!rolling) setShown(value);
-      previousValue.current = value;
+    if (botRolling) {
+      setRolling(true);
       return;
     }
-    setRolling(true);
-    const timer = window.setTimeout(() => {
-      setShown(value);
-      setRolling(false);
-      previousValue.current = value;
-    }, 900);
-    return () => window.clearTimeout(timer);
+    setShown(value);
+    setRolling(false);
+    previousValue.current = value;
   }, [botRolling, value]);
 
   const roll = () => {
