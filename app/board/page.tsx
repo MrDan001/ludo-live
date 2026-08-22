@@ -83,6 +83,9 @@ export default function BoardPage() {
     if (turn <= 0 || botThinking) return;
     setBotThinking(true);
     setBotRolling(true);
+    // DemoDice's existing CSS animation is 0.9s. Keep botRolling alive
+    // slightly longer so React cannot clear the animation at the same instant
+    // it starts. No dice component/animation code is changed here.
     const timer = window.setTimeout(() => {
       const n = (Math.floor(Math.random() * 6) + 1) as DiceFace;
       setRoll(n);
@@ -90,7 +93,7 @@ export default function BoardPage() {
       setNotice(`${players[turn]?.name || "Bot"} rolled ${n}. Token movement is disabled pending rebuild.`);
       setBotThinking(false);
       if (n !== 6) setTurn((turn + 1) % players.length);
-    }, 900);
+    }, 1000);
     return () => window.clearTimeout(timer);
   }, [turn, players.length, players]);
 
