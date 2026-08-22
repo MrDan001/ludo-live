@@ -30,6 +30,7 @@ export default function BoardPage() {
   const [notice, setNotice] = useState("Your turn — roll the dice.");
   const [botThinking, setBotThinking] = useState(false);
   const [botRolling, setBotRolling] = useState(false);
+  const [botRollKey, setBotRollKey] = useState(0);
   const [tokens] = useState<StaticToken[]>(initialTokens);
   const p = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
   const players = modePlayers(mode);
@@ -76,16 +77,19 @@ export default function BoardPage() {
     setNotice("Your turn — roll the dice.");
     setBotThinking(false);
     setBotRolling(false);
+    setBotRollKey(0);
   };
 
   // Turn rules: players proceed in fixed order. A six grants the same player
-  // another roll; any other result advances to the next player. This is the
-  // requested behavior for bot, 2-player, and 4-player modes.
+  // another roll; any other result advances to the next player. The bot timer
+  // is keyed only to the actual bot turn (and an explicit bonus-roll key), so
+  // changing botThinking cannot cancel its own timer before it fires.
   useEffect(() => {
-    if (turn === 0 || botThinking || mode !== "bot") return;
+    if (turn === 0 || mode !== "bot") return;
     setBotThinking(true);
     setBotRolling(true);
     setNotice(`${players[turn]?.name || "Bot"} is rolling…`);
+
     const timer = window.setTimeout(() => {
       const n = (Math.floor(Math.random() * 6) + 1) as DiceFace;
       setRoll(n);
@@ -93,14 +97,16 @@ export default function BoardPage() {
       setBotThinking(false);
       if (n === 6) {
         setNotice(`${players[turn]?.name || "Bot"} rolled 6 — bonus roll.`);
+        setBotRollKey(k => k + 1);
       } else {
         const nextTurn = (turn + 1) % playerCount;
         setNotice(`${players[turn]?.name || "Bot"} rolled ${n}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
         setTurn(nextTurn);
       }
     }, 1000);
+
     return () => window.clearTimeout(timer);
-  }, [turn, botThinking, mode, playerCount]);
+  }, [turn, mode, playerCount, botRollKey]);
 
   const handleHumanRoll = (n: DiceFace) => {
     if (botThinking) return;
