@@ -27,7 +27,11 @@ export default function GamePage() {
     const load = async () => {
       try {
         const saved = localStorage.getItem("ludo-match-board");
-        if (saved && saved in BOARD_PALETTES && active) setTheme(resolveTheme(saved));
+        const savedIsValid = !!saved && (saved === "midnight-live" || saved in BOARD_PALETTES);
+        if (savedIsValid) {
+          if (active) setTheme(resolveTheme(saved));
+          return;
+        }
       } catch {}
       try {
         const response = await fetch("/api/customization", { cache: "no-store" });
