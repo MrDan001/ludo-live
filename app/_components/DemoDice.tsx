@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DICE_STYLES, type DiceSkinId } from "./LudoDice";
 
 type DiceFace = 1 | 2 | 3 | 4 | 5 | 6;
@@ -15,8 +15,6 @@ const pips: Record<DiceFace, number[]> = {
   6: [0, 2, 3, 5, 6, 8],
 };
 
-// Keep this list in sync with DiceSkinId/DICE_STYLES so every shop skin
-// can also be rendered by the live-game dice presentation layer.
 const validSkins: DiceSkinId[] = [
   "classic",
   "golden",
@@ -45,6 +43,7 @@ export default function DemoDice({ value, onRoll, disabled = false }: Props) {
   const [rolling, setRolling] = useState(false);
   const [shown, setShown] = useState<DiceFace>(value);
   const [skin, setSkin] = useState<DiceSkinId>("classic");
+  const previousValue = useRef(value);
 
   useEffect(() => {
     let alive = true;
@@ -64,9 +63,22 @@ export default function DemoDice({ value, onRoll, disabled = false }: Props) {
     return () => { alive = false; };
   }, []);
 
+  // Bot turns disable the dice while changing the value. Animate that change
+  // exactly like a human roll, and reveal the final face only after the tumble.
   useEffect(() => {
+    if (disabled && value !== previousValue.current && !rolling) {
+      setRolling(true);
+      const timer = window.setTimeout(() => {
+        setShown(value);
+        setRolling(false);
+      }, 900);
+      previousValue.current = value;
+      return () => window.clearTimeout(timer);
+    }
+
+    previousValue.current = value;
     if (!rolling) setShown(value);
-  }, [value, rolling]);
+  }, [value, disabled, rolling]);
 
   const roll = () => {
     if (rolling || disabled) return;
