@@ -39,7 +39,7 @@ function installThemeHeaders(root: HTMLElement) {
     const board = card.querySelector<HTMLElement>(".shared-ludo-board");
     if (!board) return;
     const themeClass = Array.from(board.classList).find((name) => name.startsWith("theme-"));
-    const theme = themeClass?.replace("theme-", "") || "";
+    const theme = card.classList.contains("midnight-live-card") ? "midnight-live" : themeClass?.replace("theme-", "") || "";
     const meta = BOARD_HEADERS[theme];
     if (!meta) return;
 
