@@ -34,6 +34,12 @@
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.28);
 }
 
+/* The four marked outer yard areas keep the classic Ludo colors. */
+.shared-ludo-board > :nth-child(227) { background: #18a84b; }
+.shared-ludo-board > :nth-child(228) { background: #f5b800; }
+.shared-ludo-board > :nth-child(229) { background: #f02d43; }
+.shared-ludo-board > :nth-child(230) { background: #2f6be5; }
+
 /* The classic board keeps its exact original appearance. */
 .shared-ludo-board.theme-classic {
   --skin-frame: #222;
