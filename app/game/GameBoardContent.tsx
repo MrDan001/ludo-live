@@ -1,5 +1,4 @@
 "use client";
-
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import LudoBoard, { BOARD_PALETTES, BoardThemeId, DemoToken } from "../_components/LudoBoardGame";
@@ -9,24 +8,19 @@ import { getTokenCell, SAFE_CELLS } from "../../lib/ludoBoardCore";
 type TokenColor = "green" | "yellow" | "red" | "blue";
 type DiceFace = 1 | 2 | 3 | 4 | 5 | 6;
 type Mode = "bot" | "2p" | "4p";
-
 const colors: TokenColor[] = ["green", "yellow", "red", "blue"];
-const modePlayers = (mode: Mode) => mode === "4p"
-  ? [{ name: "You", colors: ["red"] as TokenColor[] }, { name: "Player 2", colors: ["yellow"] as TokenColor[] }, { name: "Player 3", colors: ["green"] as TokenColor[] }, { name: "Player 4", colors: ["blue"] as TokenColor[] }]
-  : [{ name: "You", colors: ["red", "yellow"] as TokenColor[] }, { name: mode === "bot" ? "Bot" : "Player 2", colors: ["green", "blue"] as TokenColor[] }];
+const modePlayers = (mode: Mode) => mode === "4p" ? [{ name: "You", colors: ["red"] as TokenColor[] }, { name: "Player 2", colors: ["yellow"] as TokenColor[] }, { name: "Player 3", colors: ["green"] as TokenColor[] }, { name: "Player 4", colors: ["blue"] as TokenColor[] }] : [{ name: "You", colors: ["red", "yellow"] as TokenColor[] }, { name: mode === "bot" ? "Bot" : "Player 2", colors: ["green", "blue"] as TokenColor[] }];
 const initialTokens = (): DemoToken[] => colors.flatMap(color => Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const })));
 const STEP_COUNT = 56;
 const HOME_ENTRY = 51;
 const sameCell = (a: readonly number[] | null, b: readonly number[] | null) => !!a && !!b && a[0] === b[0] && a[1] === b[1];
 const isSafeCell = (cell: readonly number[] | null) => SAFE_CELLS.some(s => sameCell(cell, [s.row, s.col]));
 
-type Props = {
-  themeOverride?: BoardThemeId;
-};
+type Props = { themeOverride?: BoardThemeId };
 
 export default function GameBoardContent({ themeOverride }: Props) {
   const [theme, setTheme] = useState<BoardThemeId>(themeOverride || "classic");
-  const [mode, setMode] = useState<Mode>("bot");
+  const [mode] = useState<Mode>("bot");
   const [roll, setRoll] = useState<DiceFace>(1);
   const [turn, setTurn] = useState(0);
   const [notice, setNotice] = useState("Your turn — roll the dice.");
@@ -43,55 +37,17 @@ export default function GameBoardContent({ themeOverride }: Props) {
   const currentColors = players[turn]?.colors || [];
 
   useEffect(() => {
-    if (themeOverride) {
-      setTheme(themeOverride);
-      return;
-    }
-    let active = true;
-    const loadEquippedBoard = async () => {
-      try {
-        const saved = localStorage.getItem("ludo-match-board");
-        if (saved && saved in BOARD_PALETTES) { if (active) setTheme(saved as BoardThemeId); return; }
-      } catch {}
-      try {
-        const c = await fetch("/api/customization", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
-        const equipped = String(c?.equippedBoard || "");
-        if (active && equipped in BOARD_PALETTES) setTheme(equipped as BoardThemeId);
-      } catch {}
-    };
-    loadEquippedBoard();
-    const room = new URLSearchParams(location.search).get("room");
-    if (room) {
-      const s = io(location.origin, { transports: ["websocket", "polling"] });
-      s.on("connect", () => s.emit("list-rooms"));
-      s.on("roster", (m: any[]) => {
-        const h = m.find(x => x.host);
-        if (h?.board && h.board in BOARD_PALETTES) {
-          setTheme(h.board as BoardThemeId);
-          try { localStorage.setItem("ludo-match-board", h.board); } catch {}
-        }
-      });
-      return () => { active = false; s.disconnect(); };
-    }
-    return () => { active = false; };
+    if (themeOverride) setTheme(themeOverride);
   }, [themeOverride]);
 
   const nextTurn = () => (turn + 1) % playerCount;
   const finishTurn = (rolled: DiceFace, actorName: string) => {
     if (rolled === 6) {
       const streak = sixStreak + 1;
-      if (streak >= 3) {
-        const next = nextTurn();
-        setSixStreak(0); setPendingRoll(null); setTurn(next);
-        setNotice(`${actorName} rolled three 6s. ${players[next]?.name || "Next player"}'s turn.`);
-        return;
-      }
-      setSixStreak(streak); setNotice(`${actorName} rolled 6 — bonus roll. Roll again.`);
-      if (mode === "bot" && turn !== 0) setBotRollKey(k => k + 1);
-      return;
+      if (streak >= 3) { const next = nextTurn(); setSixStreak(0); setPendingRoll(null); setTurn(next); setNotice(`${actorName} rolled three 6s. ${players[next]?.name || "Next player"}'s turn.`); return; }
+      setSixStreak(streak); setNotice(`${actorName} rolled 6 — bonus roll. Roll again.`); if (mode === "bot" && turn !== 0) setBotRollKey(k => k + 1); return;
     }
-    const next = nextTurn();
-    setSixStreak(0); setPendingRoll(null); setNotice(`${actorName} rolled ${rolled}. ${players[next]?.name || "Next player"}'s turn.`); setTurn(next);
+    const next = nextTurn(); setSixStreak(0); setPendingRoll(null); setNotice(`${actorName} rolled ${rolled}. ${players[next]?.name || "Next player"}'s turn.`); setTurn(next);
   };
 
   const legalMove = (token: DemoToken, diceValue: DiceFace) => {
@@ -106,18 +62,11 @@ export default function GameBoardContent({ themeOverride }: Props) {
       const opponents = occupants.filter(t => !currentColors.includes(t.color));
       if (opponents.length >= 2) return false;
     }
-
-    // STEP_COUNT is the finished state and intentionally has no board cell.
-    // Reaching it exactly is therefore a legal move even though getTokenCell(56)
-    // returns null. Any roll that overshoots STEP_COUNT remains illegal above.
     if (target === STEP_COUNT) return true;
-
     const targetCell = getTokenCell(token.color, target);
     if (!targetCell) return false;
     const occupants = tokens.filter(t => t.state !== "yard" && t.state !== "finished" && sameCell(getTokenCell(t.color, t.position), targetCell));
-    const opponents = occupants.filter(t => !currentColors.includes(t.color));
-    if (opponents.length >= 2) return false;
-    return true;
+    return occupants.filter(t => !currentColors.includes(t.color)).length < 2;
   };
 
   const applyLandingRules = (color: TokenColor, id: number, target: number) => {
@@ -170,10 +119,7 @@ export default function GameBoardContent({ themeOverride }: Props) {
     let rollTimer: number | undefined;
     const gapTimer = window.setTimeout(() => {
       setBotRolling(true); setNotice(`${players[turn]?.name || "Bot"} is rolling…`);
-      rollTimer = window.setTimeout(() => {
-        const n = (Math.floor(Math.random() * 6) + 1) as DiceFace;
-        setRoll(n); setBotRolling(false); setBotThinking(false); window.setTimeout(() => performBotMove(n), 80);
-      }, 1000);
+      rollTimer = window.setTimeout(() => { const n = (Math.floor(Math.random() * 6) + 1) as DiceFace; setRoll(n); setBotRolling(false); setBotThinking(false); window.setTimeout(() => performBotMove(n), 80); }, 1000);
     }, 1000);
     return () => { window.clearTimeout(gapTimer); if (rollTimer !== undefined) window.clearTimeout(rollTimer); };
   }, [turn, mode, playerCount, botRollKey]);
@@ -190,17 +136,9 @@ export default function GameBoardContent({ themeOverride }: Props) {
   const diceDisabled = botThinking || animating || pendingRoll !== null || (mode === "bot" && turn !== 0);
 
   return <>
-    <section style={boardWrap}>
-      <div style={boardShell}>
-        <LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken} />
-      </div>
-    </section>
+    <section style={boardWrap}><div style={boardShell}><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken} /></div></section>
     <section style={{ ...controls, borderColor: p.accent, background: "rgba(3,14,31,.78)", boxShadow: p.shadow }} aria-label="Dice and turn controls">
-      <div style={{ minWidth: 0 }}>
-        <div style={{ ...turnLabel, color: p.accent }}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "PLAYER"} TURN`}</div>
-        <b style={{ fontSize: 20 }}>Roll the dice</b>
-        <p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p>
-      </div>
+      <div style={{ minWidth: 0 }}><div style={{ ...turnLabel, color: p.accent }}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "PLAYER"} TURN`}</div><b style={{ fontSize: 20 }}>Roll the dice</b><p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p></div>
       <DemoDice value={roll} onRoll={handleHumanRoll} disabled={diceDisabled} botRolling={botRolling} />
     </section>
   </>;
