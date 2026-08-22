@@ -9,11 +9,10 @@ export type TokenState = "yard" | "track" | "home" | "finished";
 // These are re-exported for existing callers; the values are owned by the board core.
 export { SAFE_SQUARES, START_INDEX, TRACK_LENGTH, HOME_STRETCH };
 
-// The 52nd physical ring square is the player's entry/start square. A token
-// starts on that square at step 0, so it completes 51 shared-track positions
-// (0..50) before turning into its 5-square private home lane (51..55).
-export const SHARED_TRACK_STEPS = TRACK_LENGTH - 1; // 51
-export const STEPS_TO_FINISH = SHARED_TRACK_STEPS + HOME_STRETCH; // 56
+// The final two shared-track boxes are the last two countable boxes before
+// the token enters its color home lane. Home begins on step 50.
+export const HOME_ENTRY_STEP = TRACK_LENGTH - 2; // 50
+export const STEPS_TO_FINISH = HOME_ENTRY_STEP + HOME_STRETCH; // 55
 
 export type LudoToken = {
   color: LudoColor;
@@ -30,17 +29,17 @@ export function createPlayerTokens(color: LudoColor, count = 4): LudoToken[] {
 }
 
 // Convert a token's relative progress into the authoritative board coordinate.
-// Step 0 is the player's coloured start square. Steps 0..50 are the shared
-// track; steps 51..55 are the five home-lane squares; 56 is the goal.
+// Steps 0..49 are shared track; steps 50..54 are the five home-lane squares;
+// step 55 is the goal.
 export function getBoardPosition(token: LudoToken): { zone: "track" | "home"; index: number } | null {
   if (token.state !== "track" && token.state !== "home") return null;
 
   const entry = START_INDEX[token.color];
-  if (token.steps < SHARED_TRACK_STEPS) {
+  if (token.steps < HOME_ENTRY_STEP) {
     return { zone: "track", index: (entry + token.steps) % TRACK_LENGTH };
   }
 
-  return { zone: "home", index: token.steps - SHARED_TRACK_STEPS };
+  return { zone: "home", index: token.steps - HOME_ENTRY_STEP };
 }
 
 export function isSafeSquare(trackIndex: number): boolean {
@@ -59,9 +58,6 @@ export function moveToken(token: LudoToken, diceValue: number, allTokens: LudoTo
     return { moved: false, token, captured: [] };
   }
 
-  // Never mutate the token object held in React state. The board animation
-  // compares the previous state with the new state; mutating the old object
-  // makes both positions identical and causes the token to appear to jump.
   const movedToken: LudoToken = { ...token };
 
   if (movedToken.state === "yard") {
@@ -69,7 +65,7 @@ export function moveToken(token: LudoToken, diceValue: number, allTokens: LudoTo
     movedToken.steps = 0;
   } else {
     movedToken.steps += diceValue;
-    if (movedToken.steps >= SHARED_TRACK_STEPS) movedToken.state = "home";
+    if (movedToken.steps >= HOME_ENTRY_STEP) movedToken.state = "home";
     if (movedToken.steps === STEPS_TO_FINISH) {
       movedToken.state = "finished";
       return { moved: true, token: movedToken, captured: [] };
