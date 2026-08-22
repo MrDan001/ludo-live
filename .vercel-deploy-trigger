@@ -3,3 +3,4 @@ Voice and chat preview deployment trigger.
 Dice 3D cube deployment refresh 2026-08-21T00:00:00Z
 Ludo movement, finished-token yard, and full-pip dice refresh 2026-08-21T22:51:30Z
 Shop board/dice renderer deployment refresh 2026-08-22T00:15:00Z
+Force Vercel production sync after shop renderer fix 2026-08-22T00:16:00Z
