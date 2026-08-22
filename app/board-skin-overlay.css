@@ -68,6 +68,23 @@
 /* Blue: row 8, column 13 */
 .shared-ludo-board > :nth-child(135) { background: #2f6be5; }
 
+/*
+ * CENTER HOME BOX ONLY.
+ * Keep the existing small center square and its border, but restore the
+ * four directional triangles so each triangle matches the lane entering it:
+ * top = Yellow, right = Blue, bottom = Red, left = Green.
+ * No grid cell, token position, movement path, or game logic is changed.
+ */
+.shared-ludo-board > :nth-child(231) {
+  background: conic-gradient(
+    from -45deg,
+    #f5b800 0deg 90deg,
+    #2f6be5 90deg 180deg,
+    #f02d43 180deg 270deg,
+    #18a84b 270deg 360deg
+  ) !important;
+}
+
 /* The classic board keeps its exact original appearance. */
 .shared-ludo-board.theme-classic {
   --skin-frame: #222;
