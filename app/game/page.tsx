@@ -19,31 +19,40 @@ const resolveTheme = (value: unknown): BoardThemeId => {
 export default function GamePage() {
   const [theme, setTheme] = useState<BoardThemeId>("classic");
   const palette = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
-  const skinName = BOARD_NAMES[theme] || "Classic";
+  const skinName = BOARD_NAMES[theme] || "Classic Ludo";
   const icon = skinIcons[theme] || "🎲";
 
   useEffect(() => {
     let active = true;
-    const load = async () => {
-      try {
-        const saved = localStorage.getItem("ludo-match-board");
-        const savedIsValid = !!saved && (saved === "midnight-live" || saved in BOARD_PALETTES);
-        if (savedIsValid) {
-          if (active) setTheme(resolveTheme(saved));
-          return;
-        }
-      } catch {}
+
+    const loadEquippedSkin = async () => {
+      // The customization API is the source of truth. localStorage is only a
+      // fallback so an old cached board skin can never override the equipped skin.
       try {
         const response = await fetch("/api/customization", { cache: "no-store" });
-        if (!response.ok) return;
-        const data = await response.json();
-        if (!active) return;
-        const equipped = resolveTheme(data?.equippedBoard);
-        setTheme(equipped);
-        try { localStorage.setItem("ludo-match-board", equipped); } catch {}
+        if (response.ok) {
+          const data = await response.json();
+          const equipped = String(data?.equippedBoard || "");
+          if (equipped && (equipped === "midnight-live" || equipped in BOARD_PALETTES)) {
+            const resolved = resolveTheme(equipped);
+            if (active) setTheme(resolved);
+            try { localStorage.setItem("ludo-match-board", resolved); } catch {}
+            return;
+          }
+        }
+      } catch {}
+
+      // Only use the cached value when the authoritative customization request
+      // is unavailable or does not contain a valid equipped board.
+      try {
+        const saved = localStorage.getItem("ludo-match-board");
+        if (saved && (saved === "midnight-live" || saved in BOARD_PALETTES) && active) {
+          setTheme(resolveTheme(saved));
+        }
       } catch {}
     };
-    load();
+
+    loadEquippedSkin();
     return () => { active = false; };
   }, []);
 
@@ -55,10 +64,12 @@ export default function GamePage() {
         "--skin-accent": palette.accent,
         "--skin-bg": palette.bg,
         "--skin-pattern": palette.pattern,
+        "--skin-shadow": palette.shadow,
         background: palette.bg,
       } as React.CSSProperties}
     >
-      <div className="skinAtmosphere" aria-hidden="true" />
+      <div className="skinPagePattern" aria-hidden="true" />
+      <div className="skinPageGlow" aria-hidden="true" />
 
       <div className="gameContent">
         <header className="skinHeader">
@@ -88,40 +99,45 @@ export default function GamePage() {
       <style jsx global>{`
         * { box-sizing: border-box; }
         .game-shell {
-          min-height: 100dvh;
+          position: relative;
           width: 100%;
+          min-height: 100dvh;
+          min-height: 100svh;
           color: #fff;
           overflow-x: hidden;
-          position: relative;
           isolation: isolate;
           transition: background .35s ease;
         }
-        .skinAtmosphere {
-          position: fixed;
+        .skinPagePattern {
+          position: absolute;
           inset: 0;
-          z-index: -1;
+          z-index: 0;
           pointer-events: none;
           background-image: var(--skin-pattern);
-          background-size: cover;
-          opacity: .17;
-          mix-blend-mode: screen;
+          background-size: 520px 520px;
+          background-repeat: repeat;
+          opacity: .22;
         }
-        .skinAtmosphere::after {
-          content: "";
+        .skinPageGlow {
           position: absolute;
           left: 50%;
-          top: -160px;
+          top: -180px;
+          width: min(900px, 160vw);
+          height: 420px;
           transform: translateX(-50%);
-          width: min(900px, 150vw);
-          height: 380px;
           border-radius: 50%;
           background: var(--skin-accent);
-          opacity: .16;
-          filter: blur(75px);
+          opacity: .18;
+          filter: blur(90px);
+          pointer-events: none;
+          z-index: 0;
         }
         .gameContent {
+          position: relative;
+          z-index: 1;
           width: 100%;
           max-width: 620px;
+          min-height: 100dvh;
           margin: 0 auto;
           padding: 10px 10px 28px;
         }
@@ -137,7 +153,7 @@ export default function GamePage() {
           gap: 10px;
           background:
             linear-gradient(135deg, color-mix(in srgb, var(--skin-bg) 82%, #000 18%), color-mix(in srgb, var(--skin-accent) 18%, #07172e 82%));
-          box-shadow: 0 16px 42px color-mix(in srgb, var(--skin-accent) 22%, transparent);
+          box-shadow: var(--skin-shadow), 0 16px 42px color-mix(in srgb, var(--skin-accent) 22%, transparent);
         }
         .skinHeader::before {
           content: "";
@@ -204,7 +220,7 @@ export default function GamePage() {
         }
         .skinCopy p {
           margin: 0;
-          color: #a9bdd8;
+          color: color-mix(in srgb, var(--skin-accent) 24%, white 76%);
           font-size: 11px;
           font-weight: 700;
         }
@@ -234,6 +250,8 @@ export default function GamePage() {
           animation: ludoLivePulse 1.35s ease-in-out infinite;
         }
         .skinRibbon {
+          position: relative;
+          z-index: 1;
           display: flex;
           align-items: center;
           justify-content: center;
@@ -245,6 +263,15 @@ export default function GamePage() {
           font-weight: 950;
         }
         .skinRibbon span { width: 5px; height: 5px; }
+
+        /* The board component keeps its game mechanics intact; its outer page
+           chrome is made transparent so the selected skin belongs to /game as
+           a whole instead of appearing as a board-only background. */
+        .boardHost {
+          position: relative;
+          z-index: 1;
+          width: 100%;
+        }
         .boardHost > main > header { display: none !important; }
         .boardHost > main {
           min-height: auto !important;
@@ -255,11 +282,17 @@ export default function GamePage() {
         }
         .boardHost > main .liveMatch {
           margin: 7px 0 12px !important;
-          color: #fff !important;
+          color: color-mix(in srgb, var(--skin-accent) 78%, white 22%) !important;
         }
         .boardHost > main section[aria-label="Dice and turn controls"] {
           margin-top: 12px !important;
           border-radius: 24px !important;
+          border-color: color-mix(in srgb, var(--skin-accent) 70%, white 10%) !important;
+          background: color-mix(in srgb, var(--skin-bg) 78%, #061426 22%) !important;
+          box-shadow: var(--skin-shadow), 0 14px 34px color-mix(in srgb, var(--skin-accent) 18%, transparent) !important;
+        }
+        .boardHost > main section[aria-label="Dice and turn controls"] p {
+          color: color-mix(in srgb, var(--skin-accent) 25%, white 75%) !important;
         }
         @keyframes ludoLivePulse {
           0%,100% { transform: scale(1); opacity: 1; }
