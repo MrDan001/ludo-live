@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Suspense } from "react";
 import "./globals.css";
 import "./home.css";
-import "./board-skin-fix.css";
 import GameSocialOverlay from "./_components/GameSocialOverlay";
 import AppShell from "./AppShell";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
