@@ -6,10 +6,12 @@ import type { LudoColor } from "./ludoMovement";
 export type BoardCell = readonly [number, number];
 
 export const TRACK_LENGTH = 52;
+export const PLAYABLE_TRACK_LENGTH = 51;
 export const HOME_STRETCH = 5;
-// A token must traverse the final two shared-track boxes (steps 50 and 51)
-// before entering the first box of its home lane at step 52.
-export const HOME_ENTRY_STEP = TRACK_LENGTH;
+// The outer corner/approach box immediately before each colour's home lane
+// is not a token position on this board. Tokens use the final valid shared
+// track box and then enter the first home-lane box on the next step.
+export const HOME_ENTRY_STEP = PLAYABLE_TRACK_LENGTH;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
@@ -49,9 +51,18 @@ export const SAFE_CELLS = [
   { row: 8, col: 13, color: "blue" },
 ] as const;
 
+const SKIPPED_APPROACH_CELL: Record<LudoColor, BoardCell> = {
+  green: [6, 0],
+  yellow: [0, 8],
+  blue: [8, 14],
+  red: [14, 6],
+};
+
 export function getTrackCell(color: LudoColor, steps: number): BoardCell | null {
-  if (steps < 0 || steps >= HOME_ENTRY_STEP) return null;
-  return MAIN_PATH[(START_INDEX[color] + steps) % TRACK_LENGTH] ?? null;
+  if (steps < 0 || steps >= PLAYABLE_TRACK_LENGTH) return null;
+  const skipped = SKIPPED_APPROACH_CELL[color];
+  const playable = MAIN_PATH.filter(([row, col]) => row !== skipped[0] || col !== skipped[1]);
+  return playable[(START_INDEX[color] + steps) % playable.length] ?? null;
 }
 
 export function getHomeCell(color: LudoColor, steps: number): BoardCell | null {
@@ -66,7 +77,7 @@ export function getTokenCell(color: LudoColor, steps: number): BoardCell | null 
 if (MAIN_PATH.length !== TRACK_LENGTH) {
   throw new Error(`Ludo board invariant failed: expected ${TRACK_LENGTH} track cells, got ${MAIN_PATH.length}.`);
 }
-for (const color of ["green", "yellow", "red", "blue"] as LudoColor[]) {
+for (const color of ["green", "yellow", "blue", "red"] as LudoColor[]) {
   if (HOME_LANES[color].length !== HOME_STRETCH) {
     throw new Error(`Ludo board invariant failed: ${color} home lane must contain ${HOME_STRETCH} cells.`);
   }
