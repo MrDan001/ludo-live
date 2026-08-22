@@ -10,6 +10,17 @@
   --skin-frame: #222;
 }
 
+/* On phones, let the complete board use the available viewport width. */
+@media (max-width: 650px) {
+  .shared-ludo-board {
+    width: calc(100vw - 24px) !important;
+    max-width: calc(100vw - 24px) !important;
+    margin-left: 50% !important;
+    margin-right: 0 !important;
+    transform: translateX(-50%);
+  }
+}
+
 .shared-ludo-board::before {
   content: "";
   position: absolute;
@@ -34,11 +45,7 @@
   box-shadow: inset 0 0 0 1px rgba(255,255,255,.28);
 }
 
-/*
- * CLASSIC BOARD COLORS — OUTER YARDS ONLY.
- * The four inner token-resting boxes remain white.
- * These are the four home-yard overlay elements rendered after the 225 grid cells.
- */
+/* CLASSIC BOARD COLORS — OUTER YARDS ONLY. */
 .shared-ludo-board > :nth-child(227) { background: #18a84b; }
 .shared-ludo-board > :nth-child(228) { background: #f5b800; }
 .shared-ludo-board > :nth-child(229) { background: #f02d43; }
@@ -51,30 +58,13 @@
   background: rgba(255,255,255,.94) !important;
 }
 
-/*
- * FOUR START/EXIT SQUARES.
- * Each exit square keeps the same color as its home yard:
- * Green = left exit, Yellow = top exit, Red = bottom exit, Blue = right exit.
- * The board renderer outputs one pattern layer followed by 225 grid cells,
- * so these selectors map to the exact 15x15 grid positions without touching
- * movement coordinates or the movement engine.
- */
-/* Green: row 6, column 1 */
+/* FOUR START/EXIT SQUARES. */
 .shared-ludo-board > :nth-child(93) { background: #18a84b; }
-/* Yellow: row 1, column 8 */
 .shared-ludo-board > :nth-child(25) { background: #f5b800; }
-/* Red: row 13, column 6 */
 .shared-ludo-board > :nth-child(203) { background: #f02d43; }
-/* Blue: row 8, column 13 */
 .shared-ludo-board > :nth-child(135) { background: #2f6be5; }
 
-/*
- * CENTER HOME BOX ONLY.
- * Keep the existing small center square and its border, but restore the
- * four directional triangles so each triangle matches the lane entering it:
- * top = Yellow, right = Blue, bottom = Red, left = Green.
- * No grid cell, token position, movement path, or game logic is changed.
- */
+/* CENTER HOME BOX ONLY. */
 .shared-ludo-board > :nth-child(231) {
   background: conic-gradient(
     from -45deg,
@@ -85,12 +75,7 @@
   ) !important;
 }
 
-/*
- * TOKEN VISUALS ONLY.
- * Make the rendered circular token 150% of its previous visual size.
- * transform keeps its logical board cell and movement coordinates unchanged,
- * so entering a path remains centered and does not alter game movement.
- */
+/* TOKEN VISUALS ONLY — 150% size, centered in its existing square. */
 .shared-ludo-board [style*="border-radius:50%"],
 .shared-ludo-board [style*="border-radius: 50%"],
 .shared-ludo-board [style*="border-radius:50% !important"],
@@ -102,7 +87,6 @@
   filter: drop-shadow(0 2px 2px rgba(0,0,0,.28));
 }
 
-/* A little extra polish while a token is being interacted with. */
 .shared-ludo-board [style*="border-radius:50%"]:hover,
 .shared-ludo-board [style*="border-radius: 50%"]:hover {
   filter: drop-shadow(0 3px 4px rgba(0,0,0,.34));
