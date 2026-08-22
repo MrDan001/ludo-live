@@ -193,20 +193,18 @@ export default function ShopPage() {
 
       {notice && <div className="notice">{notice}</div>}
 
-      {(tab === "Boards" || tab === "Dice") && <>
-        <section className="collection-section">
-          <div className="section-heading"><div><div className="section-icon">🎨</div><div><h2>Game Boards</h2><p>Choose a board that matches your style.</p></div></div><strong>Different boards, same locked play pattern.</strong></div>
-          <div className="lock-note">🔒 Every skin above uses the same locked Ludo board geometry, path, safe squares and movement rules. The skin changes visuals only.</div>
-          <div className="board-grid">{boards.map(renderBoardCard)}</div>
-        </section>
+      {tab === "Boards" && <section className="collection-section">
+        <div className="section-heading"><div><div className="section-icon">🎨</div><div><h2>Game Boards</h2><p>Choose a board that matches your style.</p></div></div><strong>Different boards, same locked play pattern.</strong></div>
+        <div className="lock-note">🔒 Every skin above uses the same locked Ludo board geometry, path, safe squares and movement rules. The skin changes visuals only.</div>
+        <div className="board-grid">{boards.map(renderBoardCard)}</div>
+      </section>}
 
-        <section className="collection-section dice-section">
-          <div className="section-heading"><div><div className="section-icon">🎲</div><div><h2>Dice Skins</h2><p>Roll in style.</p></div></div><strong>Small change, big style.</strong></div>
-          <div className="dice-grid">{dice.map(renderDiceCard)}</div>
-        </section>
+      {tab === "Dice" && <section className="collection-section dice-section">
+        <div className="section-heading"><div><div className="section-icon">🎲</div><div><h2>Dice Skins</h2><p>Roll in style.</p></div></div><strong>Small change, big style.</strong></div>
+        <div className="dice-grid">{dice.map(renderDiceCard)}</div>
+      </section>}
 
-        <div className="style-banner"><span>♛</span><div><b>EXPRESS YOUR STYLE</b><small>BOARDS • DICE • TOKENS • THEMES</small></div><span>🎲 🎨</span></div>
-      </>}
+      {(tab === "Boards" || tab === "Dice") && <div className="style-banner"><span>♛</span><div><b>EXPRESS YOUR STYLE</b><small>BOARDS • DICE • TOKENS • THEMES</small></div><span>🎲 🎨</span></div>}
 
       {tab === "Coins" && <PackageSection title="🪙 Coins" subtitle="Use gems to stock up on coins." items={coinPackages.map((p) => ({ id: p.id, label: `${p.coins.toLocaleString()} Coins`, price: `💎 ${p.gems}`, onClick: () => setConfirm({ id: p.id, name: `${p.coins.toLocaleString()} Coins`, price: p.gems, quantity: p.coins, kind: "coins" }) }))} />}
       {tab === "Gems" && <PackageSection title="💎 Gems" subtitle="Buy gems securely through Paystack." items={gemPackages.map((p) => ({ id: p.id, label: `${p.gems.toLocaleString()} Gems`, price: naira(p.naira), onClick: () => { setPending(p); setEmailOpen(true); } }))} />}
