@@ -1,8 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import AppFrame from "../_components/AppFrame";
-import LudoBoard, { BOARD_NAMES, BOARD_PALETTES, BoardThemeId, DemoToken } from "../_components/LudoBoardGame";
+import LudoBoard, { BOARD_PALETTES, BoardThemeId, DemoToken } from "../_components/LudoBoardGame";
 import DemoDice from "../_components/DemoDice";
 import { getTokenCell, SAFE_CELLS } from "../../lib/ludoBoardCore";
 
@@ -10,17 +9,12 @@ type TokenColor = "green" | "yellow" | "red" | "blue";
 type DiceFace = 1 | 2 | 3 | 4 | 5 | 6;
 type Mode = "bot" | "2p" | "4p";
 const colors: TokenColor[] = ["green", "yellow", "red", "blue"];
-const teamText = (c: TokenColor[]) => c.map(x => x[0].toUpperCase() + x.slice(1)).join(" + ");
 const modePlayers = (mode: Mode) => mode === "4p"
   ? [{ name: "You", colors: ["red"] as TokenColor[] }, { name: "Player 2", colors: ["yellow"] as TokenColor[] }, { name: "Player 3", colors: ["green"] as TokenColor[] }, { name: "Player 4", colors: ["blue"] as TokenColor[] }]
   : [{ name: "You", colors: ["red", "yellow"] as TokenColor[] }, { name: mode === "bot" ? "Bot" : "Player 2", colors: ["green", "blue"] as TokenColor[] }];
 const initialTokens = (): DemoToken[] => colors.flatMap(color => Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const })));
-
-// LOCKED movement: 51 shared-track positions + 5 home-lane positions.
 const STEP_COUNT = 56;
 const HOME_ENTRY = 51;
-const TEAM_COLORS: Record<"human" | "bot", TokenColor[]> = { human: ["red", "yellow"], bot: ["green", "blue"] };
-
 const sameCell = (a: readonly number[] | null, b: readonly number[] | null) => !!a && !!b && a[0] === b[0] && a[1] === b[1];
 const isSafeCell = (cell: readonly number[] | null) => SAFE_CELLS.some(s => sameCell(cell, [s.row, s.col]));
 
@@ -40,39 +34,46 @@ export default function BoardPage() {
   const p = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
   const players = modePlayers(mode);
   const playerCount = players.length;
-  const humanColors = players[0].colors;
   const currentColors = players[turn]?.colors || [];
 
   useEffect(() => {
     let active = true;
     const loadEquippedBoard = async () => {
-      try { const saved = localStorage.getItem("ludo-match-board"); if (saved && saved in BOARD_PALETTES) { if (active) setTheme(saved as BoardThemeId); return; } } catch {}
-      try { const c = await fetch("/api/customization", { cache: "no-store" }).then(r => r.ok ? r.json() : null); const equipped = String(c?.equippedBoard || ""); if (active && equipped in BOARD_PALETTES) setTheme(equipped as BoardThemeId); } catch {}
+      try {
+        const saved = localStorage.getItem("ludo-match-board");
+        if (saved && saved in BOARD_PALETTES) { if (active) setTheme(saved as BoardThemeId); return; }
+      } catch {}
+      try {
+        const c = await fetch("/api/customization", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
+        const equipped = String(c?.equippedBoard || "");
+        if (active && equipped in BOARD_PALETTES) setTheme(equipped as BoardThemeId);
+      } catch {}
     };
     loadEquippedBoard();
     const room = new URLSearchParams(location.search).get("room");
     if (room) {
       const s = io(location.origin, { transports: ["websocket", "polling"] });
       s.on("connect", () => s.emit("list-rooms"));
-      s.on("roster", (m: any[]) => { const h = m.find(x => x.host); if (h?.board && h.board in BOARD_PALETTES) { setTheme(h.board as BoardThemeId); try { localStorage.setItem("ludo-match-board", h.board); } catch {} } });
+      s.on("roster", (m: any[]) => {
+        const h = m.find(x => x.host);
+        if (h?.board && h.board in BOARD_PALETTES) {
+          setTheme(h.board as BoardThemeId);
+          try { localStorage.setItem("ludo-match-board", h.board); } catch {}
+        }
+      });
       return () => { active = false; s.disconnect(); };
     }
     return () => { active = false; };
   }, []);
 
-  const resetDemo = (nextMode: Mode = mode) => {
-    setMode(nextMode); setTurn(0); setRoll(1); setNotice("Your turn — roll the dice."); setBotThinking(false); setBotRolling(false); setBotRollKey(0); setTokens(initialTokens()); setPendingRoll(null); setAnimating(false); setSixStreak(0);
-  };
-
-  const teamForTurn = (index: number) => index === 0 ? "human" as const : "bot" as const;
   const nextTurn = () => (turn + 1) % playerCount;
-
   const finishTurn = (rolled: DiceFace, actorName: string) => {
     if (rolled === 6) {
       const streak = sixStreak + 1;
       if (streak >= 3) {
         const next = nextTurn();
-        setSixStreak(0); setPendingRoll(null); setTurn(next); setNotice(`${actorName} rolled three 6s. ${players[next]?.name || "Next player"}'s turn.`);
+        setSixStreak(0); setPendingRoll(null); setTurn(next);
+        setNotice(`${actorName} rolled three 6s. ${players[next]?.name || "Next player"}'s turn.`);
         return;
       }
       setSixStreak(streak); setNotice(`${actorName} rolled 6 — bonus roll. Roll again.`);
@@ -88,21 +89,18 @@ export default function BoardPage() {
     if (token.state === "yard") return diceValue === 6;
     const target = token.position + diceValue;
     if (target > STEP_COUNT) return false;
-    // A block on any traversed shared-track square stops an incoming opponent.
     for (let step = token.position + 1; step <= Math.min(target, HOME_ENTRY); step++) {
       const cell = getTokenCell(token.color, step);
       if (!cell) return false;
       const occupants = tokens.filter(t => t.state !== "yard" && t.state !== "finished" && t.position === step && sameCell(getTokenCell(t.color, t.position), cell));
       const opponents = occupants.filter(t => !currentColors.includes(t.color));
-      const opponentBlock = opponents.length >= 2;
-      if (opponentBlock) return false;
+      if (opponents.length >= 2) return false;
     }
-    const targetCell = target <= HOME_ENTRY ? getTokenCell(token.color, target) : getTokenCell(token.color, target);
+    const targetCell = getTokenCell(token.color, target);
     if (!targetCell) return false;
     const occupants = tokens.filter(t => t.state !== "yard" && t.state !== "finished" && sameCell(getTokenCell(t.color, t.position), targetCell));
     const opponents = occupants.filter(t => !currentColors.includes(t.color));
     if (opponents.length >= 2) return false;
-    if (opponents.length === 1 && !isSafeCell(targetCell)) return true;
     return true;
   };
 
@@ -146,11 +144,7 @@ export default function BoardPage() {
 
   const performBotMove = (n: DiceFace) => {
     const candidate = tokens.find(t => currentColors.includes(t.color) && t.state !== "finished" && legalMove(t, n));
-    if (!candidate) {
-      // A 6 with no legal move still earns the bonus roll; otherwise pass.
-      finishTurn(n, players[turn]?.name || "Bot");
-      return;
-    }
+    if (!candidate) { finishTurn(n, players[turn]?.name || "Bot"); return; }
     animateToken(candidate.color, candidate.id, n, players[turn]?.name || "Bot");
   };
 
@@ -173,38 +167,32 @@ export default function BoardPage() {
     if (mode === "bot" && turn !== 0) return;
     setRoll(n); setPendingRoll(n);
     const legal = tokens.some(t => currentColors.includes(t.color) && legalMove(t, n));
-    if (!legal) {
-      setPendingRoll(null);
-      finishTurn(n, players[turn]?.name || "Player");
-      return;
-    }
+    if (!legal) { setPendingRoll(null); finishTurn(n, players[turn]?.name || "Player"); return; }
     setNotice(`${players[turn]?.name || "Player"} rolled ${n}. Select a legal token to move.`);
   };
 
-  const teamLabel = mode === "4p" ? "Red · Yellow · Green · Blue" : `You: ${teamText(humanColors)} · ${players[1].name}: ${teamText(players[1].colors)}`;
   const diceDisabled = botThinking || animating || pendingRoll !== null || (mode === "bot" && turn !== 0);
 
-  return <AppFrame back="/dashboard"><main style={{ ...page, background: p.bg, "--accent": p.accent } as React.CSSProperties}>
-    <header style={top}><div><div style={eyebrow}>LIVE MATCH · DEMO</div><h1 style={title}>{BOARD_NAMES[theme] || "Ludo Board"}</h1><p style={sub}>Standard Ludo movement</p></div><div style={playersBadge}>{mode === "4p" ? "4 PLAYERS" : mode === "2p" ? "2 PLAYERS" : "YOU VS BOT"}</div></header>
-    <div style={modeBar}><button type="button" onClick={() => resetDemo("bot")} style={mode === "bot" ? activeMode : modeBtn}>Player vs Bot</button><button type="button" onClick={() => resetDemo("2p")} style={mode === "2p" ? activeMode : modeBtn}>2 Players</button><button type="button" onClick={() => resetDemo("4p")} style={mode === "4p" ? activeMode : modeBtn}>4 Players</button></div>
-    <div style={demoBar}><span>🎯 {turn === 0 ? <b>Your turn</b> : `${players[turn]?.name || "Player"}'s turn`}</span><span>{teamLabel}</span><button type="button" onClick={() => resetDemo()}>New Game</button></div>
+  return <main style={{ ...page, background: p.bg, "--accent": p.accent } as React.CSSProperties}>
+    <div className="liveMatch"><span className="liveDot" />LIVE MATCH</div>
     <section style={boardWrap}><div style={boardShell}><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken} /></div></section>
-    <section style={controls}><div style={{ minWidth: 0 }}><div style={turnLabel}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "PLAYER"} TURN`}</div><b style={{ fontSize: 20 }}>Roll the dice</b><p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p></div><DemoDice value={roll} onRoll={handleHumanRoll} disabled={diceDisabled} botRolling={botRolling} /></section>
-    <div style={status}><span>🔴 Red · 🟡 Yellow — You</span><span>🟢 Green · 🔵 Blue — Bot</span><span>⭐ Safe squares cannot be captured</span><span>🧱 2+ same-team tokens form a block</span><span>💥 Single opponent tokens can be captured</span></div>
-  </main></AppFrame>;
+    <section style={controls} aria-label="Dice and turn controls">
+      <div style={{ minWidth: 0 }}>
+        <div style={turnLabel}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "PLAYER"} TURN`}</div>
+        <b style={{ fontSize: 20 }}>Roll the dice</b>
+        <p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p>
+      </div>
+      <DemoDice value={roll} onRoll={handleHumanRoll} disabled={diceDisabled} botRolling={botRolling} />
+    </section>
+    <style jsx>{`
+      .liveMatch{display:flex;align-items:center;justify-content:center;gap:9px;margin:4px 0 14px;color:#fff;font-size:12px;font-weight:950;letter-spacing:3px;text-transform:uppercase}
+      .liveDot{width:9px;height:9px;border-radius:50%;background:#ff304f;box-shadow:0 0 0 0 rgba(255,48,79,.65);animation:livePulse 1.5s infinite}
+      @keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(255,48,79,.65)}70%{box-shadow:0 0 0 9px rgba(255,48,79,0)}100%{box-shadow:0 0 0 0 rgba(255,48,79,0)}}
+    `}</style>
+  </main>;
 }
-const page: React.CSSProperties = { width: "100%", minHeight: "calc(100vh - 40px)", padding: "18px", boxSizing: "border-box", borderRadius: 22 };
-const top: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, flexWrap: "wrap" };
-const eyebrow: React.CSSProperties = { fontSize: 11, letterSpacing: 2, color: "var(--accent)", fontWeight: 950 };
-const title: React.CSSProperties = { fontSize: "clamp(28px,6vw,42px)", margin: "5px 0", fontWeight: 950 };
-const sub: React.CSSProperties = { color: "#9fb5d8", margin: 0 };
-const playersBadge: React.CSSProperties = { padding: "10px 14px", borderRadius: 12, background: "#071a36", border: "1px solid #284b7b", fontWeight: 900 };
-const modeBar: React.CSSProperties = { display: "flex", gap: 8, flexWrap: "wrap", marginTop: 14 };
-const modeBtn: React.CSSProperties = { padding: "9px 12px", borderRadius: 10, border: "1px solid #cbd5e1", background: "#fff", fontWeight: 800, cursor: "pointer" };
-const activeMode: React.CSSProperties = { ...modeBtn, background: "#071a36", color: "#fff", borderColor: "#071a36" };
-const demoBar: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 10, padding: "10px 12px", borderRadius: 14, background: "#f5f7fa", border: "1px solid #d8dee7", color: "#172033", fontSize: 13 };
-const boardWrap: React.CSSProperties = { display: "grid", placeItems: "center", marginTop: 18 };
+const page: React.CSSProperties = { width: "100%", minHeight: "100vh", padding: "14px", boxSizing: "border-box", borderRadius: 22 };
+const boardWrap: React.CSSProperties = { display: "grid", placeItems: "center", marginTop: 0 };
 const boardShell: React.CSSProperties = { width: "100%", maxWidth: 620, position: "relative" };
-const controls: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginTop: 16, padding: 16, borderRadius: 18, background: "#071a36", border: "1px solid #284b7b" };
+const controls: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginTop: 14, padding: 16, borderRadius: 18, background: "#071a36", border: "1px solid #284b7b" };
 const turnLabel: React.CSSProperties = { fontSize: 10, letterSpacing: 2, color: "#60a5fa", fontWeight: 900 };
-const status: React.CSSProperties = { display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12, padding: 13, borderRadius: 14, background: "#071a36", color: "#cbd5e1", fontSize: 12 };
