@@ -1,42 +1,41 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { pool, ensureAuthSchema } from "../../auth/_db";
+import { currentUser } from "../../../../lib/auth-session";
 
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const reference = url.searchParams.get("reference") || "";
-  const shopUrl = new URL("/shop", request.url);
-  if (!reference) {
-    shopUrl.searchParams.set("payment", "failed");
-    return NextResponse.redirect(shopUrl);
-  }
-
+export async function GET(request: NextRequest) {
+  const url = new URL(request.url); const reference = url.searchParams.get("reference") || ""; const shopUrl = new URL("/shop", request.url);
+  if (!reference) { shopUrl.searchParams.set("payment", "failed"); return NextResponse.redirect(shopUrl); }
   const secret = process.env.PAYSTACK_SECRET_KEY;
-  if (!secret) {
-    shopUrl.searchParams.set("payment", "failed");
-    shopUrl.searchParams.set("reason", "payment_not_configured");
-    return NextResponse.redirect(shopUrl);
-  }
+  if (!secret) { shopUrl.searchParams.set("payment", "failed"); shopUrl.searchParams.set("reason", "payment_not_configured"); return NextResponse.redirect(shopUrl); }
 
   try {
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-      headers: { Authorization: `Bearer ${secret}` },
-      cache: "no-store",
-    });
-    const result = await response.json();
-    const payment = result?.data;
-    const gems = Number(payment?.metadata?.gems || 0);
-    const expectedAmount = Number(payment?.metadata?.amountNaira || 0) * 100;
-    const successful = response.ok && result?.status === true && payment?.status === "success" && payment?.currency === "NGN" && Number(payment?.amount) === expectedAmount && gems > 0;
+    await ensureAuthSchema();
+    const paymentRow = await pool.query<any>("SELECT reference,user_id,package_id,gems,amount_kobo,status FROM ludo_shop_payments WHERE reference=$1 LIMIT 1", [reference]);
+    const pending = paymentRow.rows[0];
+    if (!pending) { shopUrl.searchParams.set("payment", "failed"); shopUrl.searchParams.set("reason", "unknown_reference"); return NextResponse.redirect(shopUrl); }
 
-    if (successful) {
-      shopUrl.searchParams.set("payment", "success");
-      shopUrl.searchParams.set("gems", String(gems));
-      shopUrl.searchParams.set("reference", reference);
-    } else {
-      shopUrl.searchParams.set("payment", "failed");
-    }
-  } catch {
-    shopUrl.searchParams.set("payment", "failed");
-  }
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, { headers: { Authorization: `Bearer ${secret}` }, cache: "no-store" });
+    const result = await response.json(); const payment = result?.data;
+    const successful = response.ok && result?.status === true && payment?.status === "success" && payment?.currency === "NGN" && Number(payment?.amount) === Number(pending.amount_kobo);
+    if (!successful) { shopUrl.searchParams.set("payment", "failed"); return NextResponse.redirect(shopUrl); }
 
+    const client = await pool.connect(); let tx=false;
+    try {
+      await client.query("BEGIN"); tx=true;
+      const locked = await client.query<any>("SELECT status,user_id,gems FROM ludo_shop_payments WHERE reference=$1 FOR UPDATE", [reference]);
+      const row = locked.rows[0];
+      if (!row) throw new Error("Payment record disappeared.");
+      if (row.status !== "credited") {
+        const user = await client.query<any>("SELECT gems FROM ludo_users WHERE id=$1 FOR UPDATE", [row.user_id]);
+        if (!user.rows[0]) throw new Error("Account not found.");
+        const before = Number(user.rows[0].gems) || 0; const after = before + Number(row.gems);
+        await client.query("UPDATE ludo_users SET gems=$1 WHERE id=$2", [after, row.user_id]);
+        await client.query("UPDATE ludo_shop_payments SET status='credited',credited_at=NOW() WHERE reference=$1", [reference]);
+        await client.query("INSERT INTO ludo_admin_ledger(user_id,currency,amount,balance_before,balance_after,reason,source) VALUES($1,'gems',$2,$3,$4,$5,'paystack')", [row.user_id, row.gems, before, after, `Purchased ${row.gems} gems`]);
+      }
+      await client.query("COMMIT"); tx=false;
+    } catch (e) { if(tx) await client.query("ROLLBACK").catch(()=>{}); throw e; } finally { client.release(); }
+    shopUrl.searchParams.set("payment", "success"); shopUrl.searchParams.set("gems", String(pending.gems)); shopUrl.searchParams.set("reference", reference);
+  } catch (e) { console.error(e); shopUrl.searchParams.set("payment", "failed"); }
   return NextResponse.redirect(shopUrl);
 }
