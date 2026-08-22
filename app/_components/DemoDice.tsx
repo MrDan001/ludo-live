@@ -78,7 +78,7 @@ export default function DemoDice({ value, onRoll, disabled = false }: Props) {
 
     previousValue.current = value;
     if (!rolling) setShown(value);
-  }, [value, disabled, rolling]);
+  }, [value, disabled]);
 
   const roll = () => {
     if (rolling || disabled) return;
