@@ -11,12 +11,11 @@
 }
 
 /* On phones, fit the complete board inside the viewport and keep it centered.
-   Do not use a viewport-based translate here: the board lives inside the
-   game's content column, and translating it can push half the board off-screen. */
+   Make it larger while preserving the mobile fit. */
 @media (max-width: 650px) {
   .shared-ludo-board {
-    width: min(100%, calc(100vw - 24px)) !important;
-    max-width: calc(100vw - 24px) !important;
+    width: min(100%, calc(100vw - 8px)) !important;
+    max-width: calc(100vw - 8px) !important;
     min-width: 0 !important;
     margin-left: auto !important;
     margin-right: auto !important;
