@@ -1,0 +1,33 @@
+name: Fix Midnight Live shop preview
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: !contains(github.event.head_commit.message, 'Fix Midnight Live shop preview rendering')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix preview-only pattern
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p = Path('app/_components/LudoBoard.tsx')
+          s = p.read_text()
+          old = 'const previewPatternOpacity = preview && theme === "arabian" ? 0 : 0.34;'
+          new = 'const previewPatternOpacity = preview && theme === "night" ? 0 : 0.34;'
+          if old not in s:
+              raise SystemExit('Expected preview opacity line not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          rm -f .github/workflows/fix-midnight-shop-preview.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/_components/LudoBoard.tsx .github/workflows/fix-midnight-shop-preview.yml
+          git commit -m 'Fix Midnight Live shop preview rendering'
+          git push
