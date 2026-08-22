@@ -25,8 +25,20 @@ function dayKey(date = new Date()) {
   }).format(date);
 }
 
-function dateValue(v: unknown) {
-  return v ? new Date(String(v) + "T00:00:00.000Z") : null;
+// PostgreSQL DATE values are commonly returned by node-postgres as Date objects.
+// Never use String(date).slice(0, 10): that produces values such as "Sat Aug 22"
+// rather than the ISO calendar date and makes an already-claimed reward look open.
+function dbDateKey(value: unknown) {
+  if (!value) return null;
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value);
+  const match = text.match(/^\d{4}-\d{2}-\d{2}/);
+  return match ? match[0] : null;
+}
+
+function dateValue(value: unknown) {
+  const key = dbDateKey(value);
+  return key ? new Date(key + "T00:00:00.000Z") : null;
 }
 
 function dayDiff(a: Date, b: Date) {
@@ -61,8 +73,10 @@ export async function GET(request: NextRequest) {
     let row = r.rows[0];
     const today = dayKey();
     const td = new Date(today + "T00:00:00.000Z");
+    const lastClaimKey = dbDateKey(row?.last_claim_date);
+    const lastClaimDate = dateValue(row?.last_claim_date);
 
-    if (row?.last_claim_date && dayDiff(td, dateValue(row.last_claim_date)!) > 1) {
+    if (lastClaimDate && dayDiff(td, lastClaimDate) > 1) {
       await pool.query(
         "UPDATE ludo_daily_rewards SET streak=0,claimed_days='{}' WHERE user_id=$1",
         [id]
@@ -70,7 +84,7 @@ export async function GET(request: NextRequest) {
       row = { ...row, streak: 0, claimed_days: [] };
     }
 
-    const claimed = !!row?.last_claim_date && String(row.last_claim_date).slice(0, 10) === today;
+    const claimed = lastClaimKey === today;
     return NextResponse.json({
       claimed,
       streak: row?.streak ?? 0,
@@ -96,9 +110,8 @@ export async function POST(request: NextRequest) {
     const today = dayKey();
     const td = new Date(today + "T00:00:00.000Z");
 
-    // Create the user's reward row before locking it. SELECT ... FOR UPDATE
-    // cannot lock a row that does not exist, so without this initialization two
-    // simultaneous first claims could both pass the duplicate-claim check.
+    // Initialize before locking. This makes the row lockable even on a player's
+    // first-ever claim, preventing two simultaneous first claims from both winning.
     await client.query(
       "INSERT INTO ludo_daily_rewards(user_id,streak,claimed_days) VALUES($1,0,'{}') ON CONFLICT(user_id) DO NOTHING",
       [id]
@@ -109,10 +122,12 @@ export async function POST(request: NextRequest) {
       [id]
     );
     const row = r.rows[0];
+    const lastClaimKey = dbDateKey(row?.last_claim_date);
+    const lastClaimDate = dateValue(row?.last_claim_date);
 
-    // This row is now locked, so only one request for this player can reach
-    // the reward transaction at a time.
-    if (row?.last_claim_date && String(row.last_claim_date).slice(0, 10) === today) {
+    // The row is locked and the DATE is normalized correctly. A player can now
+    // successfully claim at most once for each Africa/Lagos calendar day.
+    if (lastClaimKey === today) {
       await client.query("ROLLBACK");
       return NextResponse.json({ error: "Daily reward already claimed." }, { status: 409 });
     }
@@ -120,8 +135,8 @@ export async function POST(request: NextRequest) {
     let streak = 1;
     let claimedDays: number[] = [];
 
-    if (row?.last_claim_date) {
-      const diff = dayDiff(td, dateValue(row.last_claim_date)!);
+    if (lastClaimDate) {
+      const diff = dayDiff(td, lastClaimDate);
       if (diff === 1 && row.streak < 7) {
         streak = row.streak + 1;
         claimedDays = Array.isArray(row.claimed_days) ? row.claimed_days : [];
