@@ -1,4 +1,5 @@
 "use client";
+// Token movement is intentionally removed here; the fresh movement engine will be rebuilt next.
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import AppFrame from "../_components/AppFrame";
