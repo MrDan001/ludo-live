@@ -3,9 +3,10 @@
 import { useEffect } from "react";
 
 /**
- * Keeps the Board and Dice collections as separate Store tabs without
- * touching the board/game engine. The existing Shop page owns the tab state;
- * this component only presents the two collection sections one at a time.
+ * Keeps Board and Dice collections on their own tabs.
+ * The Shop page owns the real tab state; this component only synchronizes
+ * visibility for the existing collection sections and never touches the game
+ * board geometry or movement engine.
  */
 export default function ShopTabsLock() {
   useEffect(() => {
@@ -14,24 +15,29 @@ export default function ShopTabsLock() {
       if (!root) return;
 
       const active = root.querySelector<HTMLElement>(".category-tabs button.active");
-      const activeLabel = active?.textContent?.trim() || "";
+      const activeLabel = active?.querySelector("span")?.textContent?.trim() || "";
       const sections = Array.from(root.querySelectorAll<HTMLElement>(".collection-section"));
 
-      sections.forEach((section, index) => {
-        if (activeLabel === "Boards") {
-          section.style.display = index === 0 ? "block" : "none";
-        } else if (activeLabel === "Dice") {
-          section.style.display = index === 1 ? "block" : "none";
-        } else {
-          section.style.display = "none";
-        }
+      sections.forEach((section) => {
+        const isDiceSection = section.classList.contains("dice-section");
+        const visible = activeLabel === "Boards"
+          ? !isDiceSection
+          : activeLabel === "Dice"
+            ? isDiceSection
+            : false;
+        section.style.display = visible ? "block" : "none";
       });
     };
 
     sync();
     const observer = new MutationObserver(sync);
     const root = document.querySelector(".shop-page");
-    if (root) observer.observe(root, { subtree: true, childList: true, attributes: true, attributeFilter: ["class"] });
+    if (root) observer.observe(root, {
+      subtree: true,
+      childList: true,
+      attributes: true,
+      attributeFilter: ["class"],
+    });
 
     return () => observer.disconnect();
   }, []);
