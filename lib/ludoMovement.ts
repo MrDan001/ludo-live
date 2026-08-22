@@ -54,26 +54,31 @@ export function moveToken(token: LudoToken, diceValue: number, allTokens: LudoTo
     return { moved: false, token, captured: [] };
   }
 
-  if (token.state === "yard") {
-    token.state = "track";
-    token.steps = 0;
+  // Never mutate the token object held in React state. The board animation
+  // compares the previous state with the new state; mutating the old object
+  // makes both positions identical and causes the token to appear to jump.
+  const movedToken: LudoToken = { ...token };
+
+  if (movedToken.state === "yard") {
+    movedToken.state = "track";
+    movedToken.steps = 0;
   } else {
-    token.steps += diceValue;
-    if (token.steps >= TRACK_LENGTH) token.state = "home";
-    if (token.steps === STEPS_TO_FINISH) {
-      token.state = "finished";
-      return { moved: true, token, captured: [] };
+    movedToken.steps += diceValue;
+    if (movedToken.steps >= TRACK_LENGTH) movedToken.state = "home";
+    if (movedToken.steps === STEPS_TO_FINISH) {
+      movedToken.state = "finished";
+      return { moved: true, token: movedToken, captured: [] };
     }
   }
 
   const captured: LudoToken[] = [];
-  const pos = getBoardPosition(token);
+  const pos = getBoardPosition(movedToken);
 
   // Only shared-track squares can capture. Home lanes are color-owned.
   if (pos && pos.zone === "track" && !isSafeSquare(pos.index)) {
     for (const other of allTokens) {
       if (other === token) continue;
-      if (other.color === token.color) continue;
+      if (other.color === movedToken.color) continue;
       if (other.state !== "track") continue;
 
       const otherPos = getBoardPosition(other);
@@ -85,7 +90,7 @@ export function moveToken(token: LudoToken, diceValue: number, allTokens: LudoTo
     }
   }
 
-  return { moved: true, token, captured };
+  return { moved: true, token: movedToken, captured };
 }
 
 export function hasLegalMove(colorTokens: LudoToken[], diceValue: number): boolean {
