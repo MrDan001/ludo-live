@@ -21,9 +21,6 @@ export default function GamePage() {
         const saved = localStorage.getItem("ludo-match-board");
         if (saved && (saved === "midnight-live" || saved in BOARD_PALETTES)) {
           if (active) setTheme(resolveTheme(saved));
-          // Do not return here — localStorage may be stale (e.g. left over
-          // from a previous match or an old equipped skin). Always confirm
-          // against the live customization API below, same as LudoBoardGame does.
         }
       } catch {}
       try {
@@ -117,7 +114,7 @@ export default function GamePage() {
           max-width: 620px;
           min-height: 100dvh;
           margin: 0 auto;
-          padding: 10px 10px 28px;
+          padding: 180px 10px 28px;
         }
         .boardHost {
           position: relative;
@@ -138,7 +135,7 @@ export default function GamePage() {
           color: color-mix(in srgb, var(--skin-accent) 25%, white 75%) !important;
         }
         @media (max-width: 430px) {
-          .gameContent { padding: 8px 7px 22px; }
+          .gameContent { padding: 150px 7px 22px; }
         }
       `}</style>
     </main>
