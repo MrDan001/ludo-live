@@ -106,6 +106,12 @@ export default function GameBoardContent({ themeOverride }: Props) {
       const opponents = occupants.filter(t => !currentColors.includes(t.color));
       if (opponents.length >= 2) return false;
     }
+
+    // STEP_COUNT is the finished state and intentionally has no board cell.
+    // Reaching it exactly is therefore a legal move even though getTokenCell(56)
+    // returns null. Any roll that overshoots STEP_COUNT remains illegal above.
+    if (target === STEP_COUNT) return true;
+
     const targetCell = getTokenCell(token.color, target);
     if (!targetCell) return false;
     const occupants = tokens.filter(t => t.state !== "yard" && t.state !== "finished" && sameCell(getTokenCell(t.color, t.position), targetCell));
