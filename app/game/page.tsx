@@ -77,7 +77,6 @@ export default function GamePage() {
           position: relative;
           width: 100%;
           min-height: 100dvh;
-          min-height: 100svh;
           color: #fff;
           overflow-x: hidden;
           isolation: isolate;
@@ -114,16 +113,14 @@ export default function GamePage() {
           max-width: 620px;
           min-height: 100dvh;
           margin: 0 auto;
-          padding: 180px 10px 28px;
+          padding: 10px 10px 28px;
         }
         .boardHost {
           position: relative;
           z-index: 1;
           width: 100%;
         }
-        .boardHost > section {
-          width: 100%;
-        }
+        .boardHost > section { width: 100%; }
         .boardHost section[aria-label="Dice and turn controls"] {
           margin-top: 12px !important;
           border-radius: 24px !important;
@@ -133,9 +130,6 @@ export default function GamePage() {
         }
         .boardHost section[aria-label="Dice and turn controls"] p {
           color: color-mix(in srgb, var(--skin-accent) 25%, white 75%) !important;
-        }
-        @media (max-width: 430px) {
-          .gameContent { padding: 150px 7px 22px; }
         }
       `}</style>
     </main>
