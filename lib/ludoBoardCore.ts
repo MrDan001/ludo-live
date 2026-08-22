@@ -7,6 +7,7 @@ export type BoardCell = readonly [number, number];
 
 export const TRACK_LENGTH = 52;
 export const HOME_STRETCH = 5;
+export const HOME_ENTRY_STEP = TRACK_LENGTH - 2;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
@@ -47,17 +48,17 @@ export const SAFE_CELLS = [
 ] as const;
 
 export function getTrackCell(color: LudoColor, steps: number): BoardCell | null {
-  if (steps < 0 || steps >= TRACK_LENGTH) return null;
+  if (steps < 0 || steps >= HOME_ENTRY_STEP) return null;
   return MAIN_PATH[(START_INDEX[color] + steps) % TRACK_LENGTH] ?? null;
 }
 
 export function getHomeCell(color: LudoColor, steps: number): BoardCell | null {
-  const index = steps - TRACK_LENGTH;
+  const index = steps - HOME_ENTRY_STEP;
   return index >= 0 && index < HOME_STRETCH ? HOME_LANES[color][index] ?? null : null;
 }
 
 export function getTokenCell(color: LudoColor, steps: number): BoardCell | null {
-  return steps < TRACK_LENGTH ? getTrackCell(color, steps) : getHomeCell(color, steps);
+  return steps < HOME_ENTRY_STEP ? getTrackCell(color, steps) : getHomeCell(color, steps);
 }
 
 // Development-time invariant checks. If geometry is accidentally changed,
