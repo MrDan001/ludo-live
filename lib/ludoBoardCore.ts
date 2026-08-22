@@ -7,7 +7,7 @@ export type BoardCell = readonly [number, number];
 
 export const TRACK_LENGTH = 52;
 export const HOME_STRETCH = 5;
-export const HOME_ENTRY_STEP = TRACK_LENGTH - 2;
+export const HOME_ENTRY_STEP = TRACK_LENGTH;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
@@ -61,8 +61,6 @@ export function getTokenCell(color: LudoColor, steps: number): BoardCell | null 
   return steps < HOME_ENTRY_STEP ? getTrackCell(color, steps) : getHomeCell(color, steps);
 }
 
-// Development-time invariant checks. If geometry is accidentally changed,
-// the application fails loudly instead of silently scattering movement.
 if (MAIN_PATH.length !== TRACK_LENGTH) {
   throw new Error(`Ludo board invariant failed: expected ${TRACK_LENGTH} track cells, got ${MAIN_PATH.length}.`);
 }
