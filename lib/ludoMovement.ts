@@ -9,8 +9,11 @@ export type TokenState = "yard" | "track" | "home" | "finished";
 // These are re-exported for existing callers; the values are owned by the board core.
 export { SAFE_SQUARES, START_INDEX, TRACK_LENGTH, HOME_STRETCH };
 
-// A token starts at step 0, travels the shared track, then crosses 5 home-lane squares.
-export const STEPS_TO_FINISH = TRACK_LENGTH + HOME_STRETCH - 1; // 56
+// The 52nd physical ring square is the player's entry/start square. A token
+// starts on that square at step 0, so it completes 51 shared-track positions
+// (0..50) before turning into its 5-square private home lane (51..55).
+export const SHARED_TRACK_STEPS = TRACK_LENGTH - 1; // 51
+export const STEPS_TO_FINISH = SHARED_TRACK_STEPS + HOME_STRETCH; // 56
 
 export type LudoToken = {
   color: LudoColor;
@@ -26,16 +29,18 @@ export function createPlayerTokens(color: LudoColor, count = 4): LudoToken[] {
   return Array.from({ length: count }, () => createToken(color));
 }
 
-// Convert a token's steps into the authoritative board coordinate.
+// Convert a token's relative progress into the authoritative board coordinate.
+// Step 0 is the player's coloured start square. Steps 0..50 are the shared
+// track; steps 51..55 are the five home-lane squares; 56 is the goal.
 export function getBoardPosition(token: LudoToken): { zone: "track" | "home"; index: number } | null {
   if (token.state !== "track" && token.state !== "home") return null;
 
   const entry = START_INDEX[token.color];
-  if (token.steps < TRACK_LENGTH) {
+  if (token.steps < SHARED_TRACK_STEPS) {
     return { zone: "track", index: (entry + token.steps) % TRACK_LENGTH };
   }
 
-  return { zone: "home", index: token.steps - TRACK_LENGTH };
+  return { zone: "home", index: token.steps - SHARED_TRACK_STEPS };
 }
 
 export function isSafeSquare(trackIndex: number): boolean {
@@ -64,7 +69,7 @@ export function moveToken(token: LudoToken, diceValue: number, allTokens: LudoTo
     movedToken.steps = 0;
   } else {
     movedToken.steps += diceValue;
-    if (movedToken.steps >= TRACK_LENGTH) movedToken.state = "home";
+    if (movedToken.steps >= SHARED_TRACK_STEPS) movedToken.state = "home";
     if (movedToken.steps === STEPS_TO_FINISH) {
       movedToken.state = "finished";
       return { moved: true, token: movedToken, captured: [] };
