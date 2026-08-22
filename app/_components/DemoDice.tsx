@@ -15,7 +15,21 @@ const pips: Record<DiceFace, number[]> = {
   6: [0, 2, 3, 5, 6, 8],
 };
 
-const validSkins: DiceSkinId[] = ["classic", "golden", "crystal", "fire", "rainbow", "diamond", "skull", "sports"];
+// Keep this list in sync with DiceSkinId/DICE_STYLES so every shop skin
+// can also be rendered by the live-game dice presentation layer.
+const validSkins: DiceSkinId[] = [
+  "classic",
+  "golden",
+  "crystal",
+  "fire",
+  "rainbow",
+  "diamond",
+  "skull",
+  "sports",
+  "neon",
+  "galaxy",
+  "love",
+];
 
 function Face({ value, className = "", skin }: { value: DiceFace; className?: string; skin: DiceSkinId }) {
   return (
