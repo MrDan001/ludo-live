@@ -1,5 +1,5 @@
-import BoardPage from "../page";
+import MultiplayerGame from "./MultiplayerGame";
 
 export default function GamePage(){
-  return <BoardPage />;
+  return <MultiplayerGame />;
 }
