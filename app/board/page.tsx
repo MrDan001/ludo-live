@@ -15,7 +15,7 @@ const modePlayers = (mode: Mode) => mode === "4p"
   : [{ name: "You", colors: ["green", "blue"] as TokenColor[] }, { name: mode === "bot" ? "Bot" : "Player 2", colors: ["red", "yellow"] as TokenColor[] }];
 const initialTokens = (): DemoToken[] => colors.flatMap(color => Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const })));
 
-// Fresh movement geometry: 51 shared-track positions + 5 home-lane positions = 56.
+// Locked movement geometry: 51 shared-track positions + 5 home-lane positions = 56.
 const STEP_COUNT = 56;
 const HOME_ENTRY = 51;
 
@@ -59,7 +59,11 @@ export default function BoardPage() {
   };
 
   const finishTurn = (rolled: DiceFace, actorName: string) => {
-    if (rolled === 6) { setNotice(`${actorName} rolled 6 — bonus roll. Roll again.`); if (mode === "bot" && turn !== 0) setBotRollKey(k => k + 1); return; }
+    if (rolled === 6) {
+      setNotice(`${actorName} rolled 6 — bonus roll. Roll again.`);
+      if (mode === "bot" && turn !== 0) setBotRollKey(k => k + 1);
+      return;
+    }
     const nextTurn = (turn + 1) % playerCount;
     setNotice(`${actorName} rolled ${rolled}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
     setTurn(nextTurn);
@@ -102,7 +106,6 @@ export default function BoardPage() {
     animateToken(candidate.color, candidate.id, n, players[turn]?.name || "Bot");
   };
 
-  // Existing turn behavior preserved: bot waits one second before every roll.
   useEffect(() => {
     if (turn === 0 || mode !== "bot") return;
     setBotThinking(true); setBotRolling(false); setNotice(`${players[turn]?.name || "Bot"}'s turn.`);
@@ -122,12 +125,16 @@ export default function BoardPage() {
     if (mode === "bot" && turn !== 0) return;
     setRoll(n); setPendingRoll(n);
     const legal = tokens.some(t => currentColors.includes(t.color) && t.state !== "finished" && ((t.state === "yard" && n === 6) || (t.state !== "yard" && t.position + n <= STEP_COUNT)));
-    if (!legal) { setPendingRoll(null); finishTurn(n, players[turn]?.name || "Player"); return; }
+    if (!legal) {
+      setPendingRoll(null);
+      finishTurn(n, players[turn]?.name || "Player");
+      return;
+    }
     setNotice(`${players[turn]?.name || "Player"} rolled ${n}. Select a token to move.`);
   };
 
   const teamLabel = mode === "4p" ? "Green · Yellow · Red · Blue" : `You: ${teamText(humanColors)} · ${players[1].name}: ${teamText(players[1].colors)}`;
-  const diceDisabled = botThinking || animating || (mode === "bot" && turn !== 0);
+  const diceDisabled = botThinking || animating || pendingRoll !== null || (mode === "bot" && turn !== 0);
 
   return <AppFrame back="/dashboard"><main style={{ ...page, background: p.bg, "--accent": p.accent } as React.CSSProperties}>
     <header style={top}><div><div style={eyebrow}>LIVE MATCH · DEMO</div><h1 style={title}>{BOARD_NAMES[theme] || "Ludo Board"}</h1><p style={sub}>Standard Ludo movement</p></div><div style={playersBadge}>{mode === "4p" ? "4 PLAYERS" : mode === "2p" ? "2 PLAYERS" : "YOU VS BOT"}</div></header>
