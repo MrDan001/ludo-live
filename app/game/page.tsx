@@ -10,9 +10,37 @@ const resolveTheme = (value: unknown): BoardThemeId => {
   return id in BOARD_PALETTES ? (id as BoardThemeId) : "classic";
 };
 
+type SkinHeader = { icon: string; title: string; subtitle: string; eyebrow: string };
+
+const SKIN_HEADERS: Record<string, SkinHeader> = {
+  classic: { icon: "👑", eyebrow: "TIMELESS CLASSIC", title: "CLASSIC LUDO", subtitle: "The original board • Pure Ludo tradition" },
+  golden: { icon: "🏆", eyebrow: "ROYAL COLLECTION", title: "GOLDEN ROYAL", subtitle: "Luxury gold • Play like a champion" },
+  neon: { icon: "⚡", eyebrow: "AFTER DARK", title: "NEON GLOW", subtitle: "Electric lights • Neon energy" },
+  beach: { icon: "🌴", eyebrow: "TROPICAL ESCAPE", title: "BEACH VIBES", subtitle: "Sun • Sand • Sea • Let the game begin" },
+  galaxy: { icon: "🌌", eyebrow: "DEEP SPACE", title: "GALAXY SPACE", subtitle: "Starlight journey • Beyond the board" },
+  wood: { icon: "🪵", eyebrow: "NATURAL COLLECTION", title: "WOOD CLASSIC", subtitle: "Warm timber • Crafted for the table" },
+  dragon: { icon: "🐉", eyebrow: "LEGENDARY REALM", title: "DRAGON", subtitle: "Ancient power • Enter the realm" },
+  christmas: { icon: "🎄", eyebrow: "HOLIDAY EDITION", title: "CHRISTMAS", subtitle: "Festive lights • Merry moves" },
+  football: { icon: "⚽", eyebrow: "MATCH DAY", title: "FOOTBALL", subtitle: "Kick off • Every move counts" },
+  candy: { icon: "🍭", eyebrow: "SWEET WORLD", title: "CANDY LAND", subtitle: "Sugar rush • Colorful fun" },
+  marble: { icon: "💎", eyebrow: "LUXE COLLECTION", title: "MARBLE LUXE", subtitle: "Polished style • Premium play" },
+  nature: { icon: "🌿", eyebrow: "WILD & NATURAL", title: "NATURE WOOD", subtitle: "Forest calm • Natural strategy" },
+  space: { icon: "🚀", eyebrow: "COSMIC FLIGHT", title: "SPACE GALAXY", subtitle: "Launch into orbit • Own the stars" },
+  crystal: { icon: "❄️", eyebrow: "FROZEN COLLECTION", title: "CRYSTAL ICE", subtitle: "Frozen brilliance • Cool precision" },
+  fireice: { icon: "🔥❄️", eyebrow: "ELEMENTAL", title: "FIRE & ICE", subtitle: "Two forces • One battlefield" },
+  jungle: { icon: "🌿", eyebrow: "WILD ADVENTURE", title: "JUNGLE QUEST", subtitle: "Untamed paths • Hunt for victory" },
+  love: { icon: "💗", eyebrow: "HEART COLLECTION", title: "LOVE EDITION", subtitle: "Hearts • Romance • Play with feeling" },
+  night: { icon: "🌃", eyebrow: "CITY AFTER DARK", title: "NIGHT CITY", subtitle: "Midnight lights • Own the night" },
+  arabian: { icon: "🏜️", eyebrow: "ROYAL DESERT", title: "ARABIAN PALACE", subtitle: "Golden sands • Palace of strategy" },
+  "midnight-live": { icon: "🌙", eyebrow: "LUDO LIVE EXCLUSIVE", title: "MIDNIGHT LIVE", subtitle: "Live after dark • Your game, your night" },
+};
+
+const getHeader = (theme: BoardThemeId): SkinHeader => SKIN_HEADERS[theme] || SKIN_HEADERS.classic;
+
 export default function GamePage() {
   const [theme, setTheme] = useState<BoardThemeId>("classic");
   const palette = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
+  const header = getHeader(theme);
 
   useEffect(() => {
     let active = true;
@@ -52,128 +80,46 @@ export default function GamePage() {
   }, [palette.bg]);
 
   return (
-    <main
-      className="game-shell"
-      data-game-theme={theme}
-      style={{
-        "--skin-accent": palette.accent,
-        "--skin-bg": palette.bg,
-        "--skin-pattern": palette.pattern,
-        "--skin-shadow": palette.shadow,
-      } as React.CSSProperties}
-    >
+    <main className="game-shell" data-game-theme={theme} style={{ "--skin-accent": palette.accent, "--skin-bg": palette.bg, "--skin-pattern": palette.pattern, "--skin-shadow": palette.shadow } as React.CSSProperties}>
       <div className="skin-page-pattern" aria-hidden="true" />
       <div className="skin-page-glow" aria-hidden="true" />
-
       <div className="game-content">
         <header className="skin-header">
-          <div className="skin-header-icon" aria-hidden="true">🎲</div>
+          <div className="skin-header-icon" aria-hidden="true">{header.icon}</div>
           <div className="skin-header-copy">
-            <div className="skin-title">BOT VS HUMAN</div>
-            <div className="skin-subtitle">Equipped board skin · ready to play</div>
+            <div className="skin-eyebrow">{header.eyebrow}</div>
+            <div className="skin-title">{header.title}</div>
+            <div className="skin-subtitle">{header.subtitle}</div>
           </div>
           <div className="live-pill"><span /> LIVE</div>
         </header>
-
         <div className="live-match"><span /> LIVE MATCH</div>
-
-        <section className="board-host" aria-label="Ludo game">
-          <GameBoardContent themeOverride={theme} />
-        </section>
+        <section className="board-host" aria-label="Ludo game"><GameBoardContent themeOverride={theme} /></section>
       </div>
-
       <style jsx global>{`
         * { box-sizing: border-box; }
         html, body { min-height: 100%; margin: 0; }
         body { overflow-x: hidden; }
-        .game-shell {
-          position: relative;
-          width: 100%;
-          min-height: 100dvh;
-          color: #fff;
-          overflow-x: hidden;
-          isolation: isolate;
-          background: var(--skin-bg);
-          transition: background .35s ease;
-        }
-        .skin-page-pattern {
-          position: fixed;
-          inset: 0;
-          z-index: 0;
-          pointer-events: none;
-          background-image: var(--skin-pattern);
-          background-size: 520px 520px;
-          background-repeat: repeat;
-          opacity: .34;
-        }
-        .skin-page-glow {
-          position: fixed;
-          left: 50%;
-          top: -160px;
-          width: min(900px, 170vw);
-          height: 440px;
-          transform: translateX(-50%);
-          border-radius: 50%;
-          background: var(--skin-accent);
-          opacity: .24;
-          filter: blur(100px);
-          pointer-events: none;
-          z-index: 0;
-        }
-        .game-content {
-          position: relative;
-          z-index: 1;
-          width: 100%;
-          max-width: 720px;
-          min-height: 100dvh;
-          margin: 0 auto;
-          padding: 12px 24px 32px;
-        }
-        .skin-header {
-          width: 100%;
-          min-height: 112px;
-          display: flex;
-          align-items: center;
-          gap: 18px;
-          padding: 18px 20px;
-          border: 1px solid color-mix(in srgb, var(--skin-accent) 55%, white 45%);
-          border-radius: 28px;
-          background: color-mix(in srgb, var(--skin-bg) 62%, white 38%);
-          box-shadow: var(--skin-shadow), 0 18px 40px rgba(0,0,0,.14);
-          backdrop-filter: blur(18px);
-          color: #142238;
-        }
-        .skin-header-icon {
-          width: 68px;
-          height: 68px;
-          flex: 0 0 68px;
-          display: grid;
-          place-items: center;
-          border-radius: 20px;
-          border: 2px solid color-mix(in srgb, var(--skin-accent) 65%, #26384d 35%);
-          background: rgba(255,255,255,.48);
-          font-size: 38px;
-          box-shadow: inset 0 2px 10px rgba(255,255,255,.5);
-        }
-        .skin-header-copy { min-width: 0; flex: 1; }
-        .skin-title { font-size: 16px; font-weight: 900; letter-spacing: 3px; color: color-mix(in srgb, var(--skin-accent) 48%, #6f8097 52%); }
-        .skin-subtitle { margin-top: 14px; font-size: 15px; color: #9aabc0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .live-pill { display: flex; align-items: center; gap: 9px; padding: 12px 17px; border-radius: 999px; border: 1px solid #8a8f97; background: rgba(255,255,255,.38); font-weight: 900; letter-spacing: 1px; color: #707780; }
-        .live-pill span, .live-match span { width: 12px; height: 12px; display: inline-block; border-radius: 50%; background: #ff3156; box-shadow: 0 0 14px rgba(255,49,86,.35); }
-        .live-match { display: flex; justify-content: center; align-items: center; gap: 10px; margin: 18px 0 16px; font-weight: 900; letter-spacing: 4px; font-size: 15px; color: rgba(255,255,255,.84); text-shadow: 0 2px 12px rgba(0,0,0,.25); }
-        .board-host { position: relative; z-index: 1; width: 100%; }
-        .board-host section { width: 100%; }
-        .board-host section[aria-label="Dice and turn controls"] { margin-top: 14px !important; }
-        @media (max-width: 560px) {
-          .game-content { padding: 10px 12px 28px; }
-          .skin-header { min-height: 104px; padding: 14px; gap: 12px; border-radius: 24px; }
-          .skin-header-icon { width: 60px; height: 60px; flex-basis: 60px; font-size: 32px; border-radius: 18px; }
-          .skin-title { font-size: 13px; letter-spacing: 2.5px; }
-          .skin-subtitle { margin-top: 10px; font-size: 13px; }
-          .live-pill { padding: 10px 12px; font-size: 12px; }
-          .live-pill span { width: 10px; height: 10px; }
-          .live-match { margin: 16px 0 14px; font-size: 13px; letter-spacing: 3px; }
-        }
+        .game-shell { position:relative; width:100%; min-height:100dvh; color:#fff; overflow-x:hidden; isolation:isolate; background:var(--skin-bg); transition:background .35s ease; }
+        .skin-page-pattern { position:fixed; inset:0; z-index:0; pointer-events:none; background-image:var(--skin-pattern); background-size:520px 520px; background-repeat:repeat; opacity:.34; }
+        .skin-page-glow { position:fixed; left:50%; top:-160px; width:min(900px,170vw); height:440px; transform:translateX(-50%); border-radius:50%; background:var(--skin-accent); opacity:.24; filter:blur(100px); pointer-events:none; z-index:0; }
+        .game-content { position:relative; z-index:1; width:100%; max-width:720px; min-height:100dvh; margin:0 auto; padding:12px 24px 32px; }
+        .skin-header { position:relative; overflow:hidden; width:100%; min-height:124px; display:flex; align-items:center; gap:18px; padding:18px 20px; border:1px solid color-mix(in srgb,var(--skin-accent) 65%,white 35%); border-radius:28px; background:linear-gradient(135deg,color-mix(in srgb,var(--skin-bg) 70%,white 30%),color-mix(in srgb,var(--skin-accent) 12%,var(--skin-bg) 88%)); box-shadow:var(--skin-shadow),0 18px 40px rgba(0,0,0,.18); backdrop-filter:blur(18px); color:#fff; }
+        .skin-header::before { content:""; position:absolute; inset:0; pointer-events:none; background:linear-gradient(120deg,transparent 20%,rgba(255,255,255,.14) 48%,transparent 65%); transform:translateX(-100%); animation:header-shimmer 5s ease-in-out infinite; }
+        .skin-header::after { content:""; position:absolute; right:-80px; top:-100px; width:220px; height:220px; border-radius:50%; background:var(--skin-accent); opacity:.18; filter:blur(20px); }
+        .skin-header-icon { position:relative; z-index:1; width:72px; height:72px; flex:0 0 72px; display:grid; place-items:center; border-radius:22px; border:2px solid color-mix(in srgb,var(--skin-accent) 75%,white 25%); background:rgba(255,255,255,.16); font-size:36px; box-shadow:inset 0 2px 10px rgba(255,255,255,.3),0 8px 22px rgba(0,0,0,.16); }
+        .skin-header-copy { position:relative; z-index:1; min-width:0; flex:1; }
+        .skin-eyebrow { font-size:9px; font-weight:950; letter-spacing:2.6px; color:color-mix(in srgb,var(--skin-accent) 75%,white 25%); }
+        .skin-title { margin-top:4px; font-size:22px; line-height:1.05; font-weight:1000; letter-spacing:1.5px; text-shadow:0 3px 18px rgba(0,0,0,.22); }
+        .skin-subtitle { margin-top:8px; font-size:12px; color:rgba(255,255,255,.78); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+        .live-pill { position:relative; z-index:2; display:flex; align-items:center; gap:8px; padding:10px 13px; border-radius:999px; border:1px solid rgba(255,255,255,.35); background:rgba(0,0,0,.16); font-weight:950; letter-spacing:1px; font-size:11px; }
+        .live-pill span,.live-match span { width:10px; height:10px; display:inline-block; border-radius:50%; background:#ff3156; box-shadow:0 0 14px rgba(255,49,86,.55); }
+        .live-match { display:flex; justify-content:center; align-items:center; gap:10px; margin:18px 0 16px; font-weight:950; letter-spacing:4px; font-size:15px; color:rgba(255,255,255,.84); text-shadow:0 2px 12px rgba(0,0,0,.25); }
+        .board-host { position:relative; z-index:1; width:100%; }
+        .board-host section { width:100%; }
+        .board-host section[aria-label="Dice and turn controls"] { margin-top:14px !important; }
+        @keyframes header-shimmer { 0%,55%,100%{transform:translateX(-100%)} 72%{transform:translateX(100%)} }
+        @media (max-width:560px) { .game-content{padding:10px 12px 28px}.skin-header{min-height:116px;padding:14px;gap:12px;border-radius:24px}.skin-header-icon{width:60px;height:60px;flex-basis:60px;font-size:29px;border-radius:18px}.skin-eyebrow{font-size:7px;letter-spacing:2px}.skin-title{font-size:17px;letter-spacing:1px}.skin-subtitle{margin-top:6px;font-size:11px}.live-pill{padding:9px 10px;font-size:10px}.live-pill span{width:8px;height:8px}.live-match{margin:16px 0 14px;font-size:13px;letter-spacing:3px} }
       `}</style>
     </main>
   );
