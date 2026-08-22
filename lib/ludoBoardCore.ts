@@ -7,7 +7,8 @@ export type BoardCell = readonly [number, number];
 
 export const TRACK_LENGTH = 52;
 export const HOME_STRETCH = 5;
-export const HOME_ENTRY_STEP = TRACK_LENGTH;
+// Each color enters its home lane after the final two shared-track boxes.
+export const HOME_ENTRY_STEP = TRACK_LENGTH - 2;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
