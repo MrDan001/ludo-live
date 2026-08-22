@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
-import LudoBoard, { BOARD_PALETTES, BoardThemeId, DemoToken } from "../_components/LudoBoardGame";
+import LudoBoard, { BOARD_NAMES, BOARD_PALETTES, BoardThemeId, DemoToken } from "../_components/LudoBoardGame";
 import DemoDice from "../_components/DemoDice";
 import { getTokenCell, SAFE_CELLS } from "../../lib/ludoBoardCore";
 
@@ -9,6 +9,7 @@ type TokenColor = "green" | "yellow" | "red" | "blue";
 type DiceFace = 1 | 2 | 3 | 4 | 5 | 6;
 type Mode = "bot" | "2p" | "4p";
 const colors: TokenColor[] = ["green", "yellow", "red", "blue"];
+const skinIcons: Record<BoardThemeId,string> = { classic:"🎲",golden:"👑",neon:"⚡",beach:"🏖️",galaxy:"🌌",wood:"🪵",dragon:"🐉",christmas:"🎄",football:"⚽",candy:"🍬",marble:"💎",nature:"🌿",space:"🚀",crystal:"❄️",fireice:"🔥",jungle:"🌴",love:"💖",night:"🌃",arabian:"🕌" };
 const modePlayers = (mode: Mode) => mode === "4p"
   ? [{ name: "You", colors: ["red"] as TokenColor[] }, { name: "Player 2", colors: ["yellow"] as TokenColor[] }, { name: "Player 3", colors: ["green"] as TokenColor[] }, { name: "Player 4", colors: ["blue"] as TokenColor[] }]
   : [{ name: "You", colors: ["red", "yellow"] as TokenColor[] }, { name: mode === "bot" ? "Bot" : "Player 2", colors: ["green", "blue"] as TokenColor[] }];
@@ -172,27 +173,50 @@ export default function BoardPage() {
   };
 
   const diceDisabled = botThinking || animating || pendingRoll !== null || (mode === "bot" && turn !== 0);
+  const skinName = BOARD_NAMES[theme] || "Classic Ludo";
+  const skinIcon = skinIcons[theme] || "🎲";
 
-  return <main style={{ ...page, background: p.bg, "--accent": p.accent } as React.CSSProperties}>
+  return <main style={{ ...page, background: p.bg, "--accent": p.accent, "--pattern": p.pattern } as React.CSSProperties}>
+    <header style={{ ...skinHeader, borderColor: p.accent, background: p.bg, boxShadow: p.shadow }}>
+      <div style={{ ...skinHeaderGlow, background: p.pattern }} />
+      <div style={skinIdentity}>
+        <div style={{ ...skinBadge, borderColor: p.accent, color: p.accent }}>{skinIcon}</div>
+        <div style={{ minWidth: 0 }}>
+          <div style={skinEyebrow}>BOT VS HUMAN</div>
+          <h1 style={skinTitle}>{skinName}</h1>
+          <div style={skinSubtitle}>Equipped board skin · ready to play</div>
+        </div>
+      </div>
+      <div style={{ ...livePill, borderColor: p.accent }}><span className="liveDot" /> LIVE</div>
+    </header>
+
     <div className="liveMatch"><span className="liveDot" />LIVE MATCH</div>
     <section style={boardWrap}><div style={boardShell}><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken} /></div></section>
-    <section style={controls} aria-label="Dice and turn controls">
+    <section style={{ ...controls, borderColor: p.accent, background: "rgba(3,14,31,.78)", boxShadow: p.shadow }} aria-label="Dice and turn controls">
       <div style={{ minWidth: 0 }}>
-        <div style={turnLabel}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "PLAYER"} TURN`}</div>
+        <div style={{ ...turnLabel, color: p.accent }}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "PLAYER"} TURN`}</div>
         <b style={{ fontSize: 20 }}>Roll the dice</b>
         <p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p>
       </div>
       <DemoDice value={roll} onRoll={handleHumanRoll} disabled={diceDisabled} botRolling={botRolling} />
     </section>
     <style jsx>{`
-      .liveMatch{display:flex;align-items:center;justify-content:center;gap:9px;margin:4px 0 14px;color:#fff;font-size:12px;font-weight:950;letter-spacing:3px;text-transform:uppercase}
-      .liveDot{width:9px;height:9px;border-radius:50%;background:#ff304f;box-shadow:0 0 0 0 rgba(255,48,79,.65);animation:livePulse 1.5s infinite}
+      .liveMatch{display:flex;align-items:center;justify-content:center;gap:9px;margin:4px 0 12px;color:#fff;font-size:11px;font-weight:950;letter-spacing:3px;text-transform:uppercase;opacity:.9}
+      .liveDot{width:9px;height:9px;border-radius:50%;background:#ff304f;box-shadow:0 0 0 0 rgba(255,48,79,.65);animation:livePulse 1.5s infinite;display:inline-block}
       @keyframes livePulse{0%{box-shadow:0 0 0 0 rgba(255,48,79,.65)}70%{box-shadow:0 0 0 9px rgba(255,48,79,0)}100%{box-shadow:0 0 0 0 rgba(255,48,79,0)}}
     `}</style>
   </main>;
 }
-const page: React.CSSProperties = { width: "100%", minHeight: "100vh", padding: "14px", boxSizing: "border-box", borderRadius: 22 };
+const page: React.CSSProperties = { width: "100%", minHeight: "100vh", padding: "14px", boxSizing: "border-box", borderRadius: 22, color: "#fff", overflowX: "hidden" };
+const skinHeader: React.CSSProperties = { position: "relative", overflow: "hidden", maxWidth: 620, width: "100%", margin: "0 auto 10px", padding: "13px 14px", border: "1px solid", borderRadius: 20, boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12 };
+const skinHeaderGlow: React.CSSProperties = { position: "absolute", inset: 0, opacity: .24, backgroundSize: "cover", pointerEvents: "none" };
+const skinIdentity: React.CSSProperties = { position: "relative", zIndex: 1, display: "flex", alignItems: "center", gap: 11, minWidth: 0 };
+const skinBadge: React.CSSProperties = { width: 48, height: 48, flex: "0 0 48px", border: "2px solid", borderRadius: 15, display: "grid", placeItems: "center", background: "rgba(0,0,0,.26)", fontSize: 25, boxShadow: "inset 0 0 18px rgba(255,255,255,.08)" };
+const skinEyebrow: React.CSSProperties = { fontSize: 9, letterSpacing: 2.2, fontWeight: 950, color: "#9fb5d8" };
+const skinTitle: React.CSSProperties = { margin: "2px 0 0", fontSize: 20, lineHeight: 1.05, fontWeight: 950, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" };
+const skinSubtitle: React.CSSProperties = { marginTop: 4, color: "#9fb5d8", fontSize: 10 };
+const livePill: React.CSSProperties = { position: "relative", zIndex: 1, flex: "0 0 auto", display: "inline-flex", alignItems: "center", gap: 6, padding: "7px 9px", border: "1px solid", borderRadius: 999, background: "rgba(0,0,0,.28)", fontSize: 9, fontWeight: 950, letterSpacing: 1.2 };
 const boardWrap: React.CSSProperties = { display: "grid", placeItems: "center", marginTop: 0 };
 const boardShell: React.CSSProperties = { width: "100%", maxWidth: 620, position: "relative" };
-const controls: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginTop: 14, padding: 16, borderRadius: 18, background: "#071a36", border: "1px solid #284b7b" };
-const turnLabel: React.CSSProperties = { fontSize: 10, letterSpacing: 2, color: "#60a5fa", fontWeight: 900 };
+const controls: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, margin: "14px auto 0", width: "100%", maxWidth: 620, padding: 16, borderRadius: 18, border: "1px solid", boxSizing: "border-box", backdropFilter: "blur(12px)" };
+const turnLabel: React.CSSProperties = { fontSize: 10, letterSpacing: 2, fontWeight: 900 };
