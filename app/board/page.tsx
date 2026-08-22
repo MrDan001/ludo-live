@@ -16,8 +16,8 @@ const modePlayers = (mode: Mode) => mode === "4p"
   ? [{ name: "You", colors: ["green"] as TokenColor[] }, { name: "Player 2", colors: ["yellow"] as TokenColor[] }, { name: "Player 3", colors: ["red"] as TokenColor[] }, { name: "Player 4", colors: ["blue"] as TokenColor[] }]
   : [{ name: "You", colors: ["green", "blue"] as TokenColor[] }, { name: mode === "bot" ? "Bot" : "Player 2", colors: ["red", "yellow"] as TokenColor[] }];
 
-// Movement is intentionally removed. Tokens remain in the yard until the new
-// path-based movement system is built and explicitly added later.
+// Token movement/counting and player-vs-bot turn handling are removed.
+// This is the clean base for the new movement and turn systems.
 const initialTokens = (): StaticToken[] => colors.flatMap(color =>
   Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const }))
 );
@@ -26,10 +26,7 @@ export default function BoardPage() {
   const [theme, setTheme] = useState<BoardThemeId>("classic");
   const [mode, setMode] = useState<Mode>("bot");
   const [roll, setRoll] = useState<DiceFace>(1);
-  const [turn, setTurn] = useState(0);
   const [notice, setNotice] = useState("Roll the dice to play.");
-  const [botThinking, setBotThinking] = useState(false);
-  const [botRolling, setBotRolling] = useState(false);
   const [tokens] = useState<StaticToken[]>(initialTokens);
   const p = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
   const players = modePlayers(mode);
@@ -40,10 +37,7 @@ export default function BoardPage() {
     const loadEquippedBoard = async () => {
       try {
         const saved = localStorage.getItem("ludo-match-board");
-        if (saved && saved in BOARD_PALETTES) {
-          if (active) setTheme(saved as BoardThemeId);
-          return;
-        }
+        if (saved && saved in BOARD_PALETTES) { if (active) setTheme(saved as BoardThemeId); return; }
       } catch {}
       try {
         const c = await fetch("/api/customization", { cache: "no-store" }).then(r => r.ok ? r.json() : null);
@@ -70,43 +64,17 @@ export default function BoardPage() {
 
   const resetDemo = (nextMode: Mode = mode) => {
     setMode(nextMode);
-    setTurn(0);
     setRoll(1);
     setNotice("Roll the dice to play.");
-    setBotThinking(false);
-    setBotRolling(false);
   };
 
-  // Bot turn is deliberately retained only as turn/dice behavior. It does not
-  // move, count, animate, or change any token position.
-  useEffect(() => {
-    if (turn <= 0 || botThinking) return;
-    setBotThinking(true);
-    setBotRolling(true);
-    // DemoDice's existing CSS animation is 0.9s. Keep botRolling alive
-    // slightly longer so React cannot clear the animation at the same instant
-    // it starts. No dice component/animation code is changed here.
-    const timer = window.setTimeout(() => {
-      const n = (Math.floor(Math.random() * 6) + 1) as DiceFace;
-      setRoll(n);
-      setBotRolling(false);
-      setNotice(`${players[turn]?.name || "Bot"} rolled ${n}. Token movement is disabled pending rebuild.`);
-      setBotThinking(false);
-      if (n !== 6) setTurn((turn + 1) % players.length);
-    }, 1000);
-    return () => window.clearTimeout(timer);
-  }, [turn, players.length, players]);
-
+  // Dice remains available for testing; no player/bot turn is enforced.
   const handleHumanRoll = (n: DiceFace) => {
-    if (turn !== 0 || botThinking) return;
     setRoll(n);
     setNotice(`You rolled ${n}. Token movement is currently disabled pending rebuild.`);
-    if (n !== 6) setTurn(players.length > 1 ? 1 : 0);
   };
 
-  const moveTokenFromBoard = () => {
-    setNotice("Token movement is disabled pending the new movement-system rebuild.");
-  };
+  const moveTokenFromBoard = () => setNotice("Token movement is disabled pending the new movement-system rebuild.");
 
   const teamLabel = mode === "4p"
     ? "Green · Yellow · Red · Blue"
@@ -123,11 +91,11 @@ export default function BoardPage() {
         <button type="button" onClick={() => resetDemo("2p")} style={mode === "2p" ? activeMode : modeBtn}>2 Players</button>
         <button type="button" onClick={() => resetDemo("4p")} style={mode === "4p" ? activeMode : modeBtn}>4 Players</button>
       </div>
-      <div style={demoBar}><span>🟢 {turn === 0 ? <b>Your turn</b> : "Bot turn"}</span><span>{teamLabel}</span><button type="button" onClick={() => resetDemo()}>New Game</button></div>
+      <div style={demoBar}><span>🎲 Turn system removed for rebuild</span><span>{teamLabel}</span><button type="button" onClick={() => resetDemo()}>New Game</button></div>
       <section style={boardWrap}><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={moveTokenFromBoard} /></section>
       <section style={controls}>
-        <div style={{ minWidth: 0 }}><div style={turnLabel}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "BOT"} TURN`}</div><b style={{ fontSize: 20 }}>Roll the dice</b><p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p></div>
-        <DemoDice value={roll} onRoll={handleHumanRoll} disabled={turn !== 0 || botThinking} botRolling={botRolling} />
+        <div style={{ minWidth: 0 }}><div style={turnLabel}>DICE TEST</div><b style={{ fontSize: 20 }}>Roll the dice</b><p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p></div>
+        <DemoDice value={roll} onRoll={handleHumanRoll} />
       </section>
       <div style={status}><span>🟢 Green</span><span>🔵 Blue</span><span>🔴 Red</span><span>🟡 Yellow</span><span>⭐ Safe squares cannot be captured</span><span>💥 Unsafe landing captures opponents</span></div>
     </main>
