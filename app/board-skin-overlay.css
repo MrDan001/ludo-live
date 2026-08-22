@@ -10,14 +10,18 @@
   --skin-frame: #222;
 }
 
-/* On phones, let the complete board use the available viewport width. */
+/* On phones, fit the complete board inside the viewport and keep it centered.
+   Do not use a viewport-based translate here: the board lives inside the
+   game's content column, and translating it can push half the board off-screen. */
 @media (max-width: 650px) {
   .shared-ludo-board {
-    width: calc(100vw - 24px) !important;
+    width: min(100%, calc(100vw - 24px)) !important;
     max-width: calc(100vw - 24px) !important;
-    margin-left: 50% !important;
-    margin-right: 0 !important;
-    transform: translateX(-50%);
+    min-width: 0 !important;
+    margin-left: auto !important;
+    margin-right: auto !important;
+    transform: none !important;
+    box-sizing: border-box !important;
   }
 }
 
