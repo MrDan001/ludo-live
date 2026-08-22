@@ -80,32 +80,38 @@ export default function BoardPage() {
     setBotRollKey(0);
   };
 
-  // Turn rules: players proceed in fixed order. A six grants the same player
-  // another roll; any other result advances to the next player. The bot timer
-  // is keyed only to the actual bot turn (and an explicit bonus-roll key), so
-  // changing botThinking cannot cancel its own timer before it fires.
+  // Bot turns have a deliberate 1-second pause after the human hands over the
+  // turn. Only after that pause does the existing dice rolling animation begin.
   useEffect(() => {
     if (turn === 0 || mode !== "bot") return;
     setBotThinking(true);
-    setBotRolling(true);
-    setNotice(`${players[turn]?.name || "Bot"} is rolling…`);
+    setBotRolling(false);
+    setNotice(`${players[turn]?.name || "Bot"}'s turn.`);
 
-    const timer = window.setTimeout(() => {
-      const n = (Math.floor(Math.random() * 6) + 1) as DiceFace;
-      setRoll(n);
-      setBotRolling(false);
-      setBotThinking(false);
-      if (n === 6) {
-        setNotice(`${players[turn]?.name || "Bot"} rolled 6 — bonus roll.`);
-        setBotRollKey(k => k + 1);
-      } else {
-        const nextTurn = (turn + 1) % playerCount;
-        setNotice(`${players[turn]?.name || "Bot"} rolled ${n}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
-        setTurn(nextTurn);
-      }
+    let rollTimer: number | undefined;
+    const gapTimer = window.setTimeout(() => {
+      setBotRolling(true);
+      setNotice(`${players[turn]?.name || "Bot"} is rolling…`);
+      rollTimer = window.setTimeout(() => {
+        const n = (Math.floor(Math.random() * 6) + 1) as DiceFace;
+        setRoll(n);
+        setBotRolling(false);
+        setBotThinking(false);
+        if (n === 6) {
+          setNotice(`${players[turn]?.name || "Bot"} rolled 6 — bonus roll.`);
+          setBotRollKey(k => k + 1);
+        } else {
+          const nextTurn = (turn + 1) % playerCount;
+          setNotice(`${players[turn]?.name || "Bot"} rolled ${n}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
+          setTurn(nextTurn);
+        }
+      }, 1000);
     }, 1000);
 
-    return () => window.clearTimeout(timer);
+    return () => {
+      window.clearTimeout(gapTimer);
+      if (rollTimer !== undefined) window.clearTimeout(rollTimer);
+    };
   }, [turn, mode, playerCount, botRollKey]);
 
   const handleHumanRoll = (n: DiceFace) => {
