@@ -18,6 +18,7 @@ export const BOARDS = [
   { id: "love", name: "Love Edition", currency: "coins", price: 800, rarity: "EPIC" },
   { id: "night", name: "Night City", currency: "coins", price: 1000, rarity: "LEGENDARY" },
   { id: "arabian", name: "Arabian Palace", currency: "coins", price: 1300, rarity: "LEGENDARY" },
+  { id: "midnight-live", name: "Midnight Live", currency: "gems", price: 130, rarity: "LEGENDARY" },
 ];
 
 export const DICE = [
