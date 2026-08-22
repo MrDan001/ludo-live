@@ -2,13 +2,13 @@
 import { useEffect, useState } from "react";
 import { io } from "socket.io-client";
 import AppFrame from "../_components/AppFrame";
-import LudoBoard, { BOARD_NAMES, BOARD_PALETTES, BoardThemeId } from "../_components/LudoBoardFixed";
+import LudoBoard, { BOARD_NAMES, BOARD_PALETTES, BoardThemeId, DemoToken } from "../_components/LudoBoardFixed";
 import DemoDice from "../_components/DemoDice";
+import { isTokenMoveLegal, nextTokenPosition, tokenKey } from "../../lib/demoTokenMovement";
 
 type TokenColor = "green" | "yellow" | "red" | "blue";
 type DiceFace = 1 | 2 | 3 | 4 | 5 | 6;
 type Mode = "bot" | "2p" | "4p";
-type StaticToken = { color: TokenColor; id: number; position: number; state: "yard" };
 
 const colors: TokenColor[] = ["green", "yellow", "red", "blue"];
 const teamText = (c: TokenColor[]) => c.map(x => x[0].toUpperCase() + x.slice(1)).join(" + ");
@@ -16,11 +16,10 @@ const modePlayers = (mode: Mode) => mode === "4p"
   ? [{ name: "You", colors: ["green"] as TokenColor[] }, { name: "Player 2", colors: ["yellow"] as TokenColor[] }, { name: "Player 3", colors: ["red"] as TokenColor[] }, { name: "Player 4", colors: ["blue"] as TokenColor[] }]
   : [{ name: "You", colors: ["green", "blue"] as TokenColor[] }, { name: mode === "bot" ? "Bot" : "Player 2", colors: ["red", "yellow"] as TokenColor[] }];
 
-// Movement is intentionally removed. Tokens remain in the yard until the new
-// path-based movement system is built and explicitly added later.
-const initialTokens = (): StaticToken[] => colors.flatMap(color =>
+const initialTokens = (): DemoToken[] => colors.flatMap(color =>
   Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const }))
 );
+const sleep = (ms: number) => new Promise<void>(resolve => window.setTimeout(resolve, ms));
 
 export default function BoardPage() {
   const [theme, setTheme] = useState<BoardThemeId>("classic");
@@ -31,7 +30,9 @@ export default function BoardPage() {
   const [botThinking, setBotThinking] = useState(false);
   const [botRolling, setBotRolling] = useState(false);
   const [botRollKey, setBotRollKey] = useState(0);
-  const [tokens] = useState<StaticToken[]>(initialTokens);
+  const [tokens, setTokens] = useState<DemoToken[]>(initialTokens);
+  const [pendingRoll, setPendingRoll] = useState<DiceFace | null>(null);
+  const [movingTokenKey, setMovingTokenKey] = useState<string | null>(null);
   const p = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
   const players = modePlayers(mode);
   const playerCount = players.length;
@@ -71,72 +72,111 @@ export default function BoardPage() {
   }, []);
 
   const resetDemo = (nextMode: Mode = mode) => {
-    setMode(nextMode);
-    setTurn(0);
-    setRoll(1);
-    setNotice("Your turn — roll the dice.");
-    setBotThinking(false);
-    setBotRolling(false);
-    setBotRollKey(0);
+    setMode(nextMode); setTurn(0); setRoll(1); setNotice("Your turn — roll the dice.");
+    setBotThinking(false); setBotRolling(false); setBotRollKey(0); setTokens(initialTokens());
+    setPendingRoll(null); setMovingTokenKey(null);
   };
 
-  // Bot turns have a deliberate 1-second pause after the human hands over the
-  // turn. Only after that pause does the existing dice rolling animation begin.
-  useEffect(() => {
-    if (turn === 0 || mode !== "bot") return;
-    setBotThinking(true);
-    setBotRolling(false);
-    setNotice(`${players[turn]?.name || "Bot"}'s turn.`);
+  const finishTurnAfterMove = (currentTurn: number, dice: DiceFace) => {
+    setPendingRoll(null); setMovingTokenKey(null);
+    if (dice === 6) {
+      setNotice(`${players[currentTurn]?.name || "Player"} rolled 6 — bonus roll. Roll again.`);
+      return;
+    }
+    const nextTurn = (currentTurn + 1) % playerCount;
+    setNotice(`${players[currentTurn]?.name || "Player"}'s move is complete. ${players[nextTurn]?.name || "Next player"}'s turn.`);
+    setTurn(nextTurn);
+  };
 
+  const animateTokenMove = async (token: DemoToken, dice: DiceFace, currentTurn: number) => {
+    const key = tokenKey(token);
+    setMovingTokenKey(key);
+    const target = nextTokenPosition(token, dice);
+    const start = token.state === "yard" ? 0 : token.position;
+    for (let step = start + 1; step <= target; step += 1) {
+      await sleep(180);
+      setTokens(prev => prev.map(t => tokenKey(t) === key ? {
+        ...t,
+        position: step,
+        state: step === 57 ? "finished" : step >= 53 ? "home" : "track",
+      } : t));
+    }
+    await sleep(80);
+    finishTurnAfterMove(currentTurn, dice);
+  };
+
+  const chooseBotToken = (dice: DiceFace): DemoToken | null => {
+    const botColors = players[1]?.colors || [];
+    const legal = tokens.filter(t => botColors.includes(t.color) && isTokenMoveLegal(t, dice));
+    if (!legal.length) return null;
+    return legal.find(t => t.state === "yard") || legal[0];
+  };
+
+  // Preserve the working turn rhythm and its 1-second gap before every bot roll.
+  useEffect(() => {
+    if (turn === 0 || mode !== "bot" || pendingRoll !== null || movingTokenKey !== null) return;
+    setBotThinking(true); setBotRolling(false);
+    setNotice(`${players[turn]?.name || "Bot"}'s turn.`);
     let rollTimer: number | undefined;
     const gapTimer = window.setTimeout(() => {
       setBotRolling(true);
       setNotice(`${players[turn]?.name || "Bot"} is rolling…`);
-      rollTimer = window.setTimeout(() => {
+      rollTimer = window.setTimeout(async () => {
         const n = (Math.floor(Math.random() * 6) + 1) as DiceFace;
-        setRoll(n);
-        setBotRolling(false);
-        setBotThinking(false);
-        if (n === 6) {
-          setNotice(`${players[turn]?.name || "Bot"} rolled 6 — bonus roll.`);
-          setBotRollKey(k => k + 1);
-        } else {
-          const nextTurn = (turn + 1) % playerCount;
-          setNotice(`${players[turn]?.name || "Bot"} rolled ${n}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
-          setTurn(nextTurn);
+        setRoll(n); setBotRolling(false);
+        const chosen = chooseBotToken(n);
+        if (!chosen) {
+          setBotThinking(false);
+          if (n === 6) {
+            setNotice(`${players[turn]?.name || "Bot"} rolled 6 — bonus roll.`);
+            setBotRollKey(k => k + 1);
+          } else {
+            const nextTurn = (turn + 1) % playerCount;
+            setNotice(`${players[turn]?.name || "Bot"} rolled ${n}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
+            setTurn(nextTurn);
+          }
+          return;
         }
+        setNotice(`${players[turn]?.name || "Bot"} moved ${chosen.color} token ${chosen.id + 1}.`);
+        await animateTokenMove(chosen, n, turn);
+        setBotThinking(false);
+        if (n === 6) setBotRollKey(k => k + 1);
       }, 1000);
     }, 1000);
-
-    return () => {
-      window.clearTimeout(gapTimer);
-      if (rollTimer !== undefined) window.clearTimeout(rollTimer);
-    };
+    return () => { window.clearTimeout(gapTimer); if (rollTimer !== undefined) window.clearTimeout(rollTimer); };
   }, [turn, mode, playerCount, botRollKey]);
 
   const handleHumanRoll = (n: DiceFace) => {
-    if (botThinking) return;
+    if (botThinking || pendingRoll !== null || movingTokenKey !== null) return;
     if (mode === "bot" && turn !== 0) return;
     setRoll(n);
     const currentPlayer = players[turn]?.name || "Player";
-    if (n === 6) {
-      setNotice(`${currentPlayer} rolled 6 — bonus roll. Roll again.`);
-      return;
+    const legal = tokens.filter(t => players[turn]?.colors.includes(t.color) && isTokenMoveLegal(t, n));
+    if (!legal.length) {
+      if (n === 6) {
+        setNotice(`${currentPlayer} rolled 6 — bonus roll. Roll again.`);
+        return;
+      }
+      const nextTurn = (turn + 1) % playerCount;
+      setNotice(`${currentPlayer} rolled ${n}, but no token can move. ${players[nextTurn]?.name || "Next player"}'s turn.`);
+      setTurn(nextTurn); return;
     }
-    const nextTurn = (turn + 1) % playerCount;
-    setNotice(`${currentPlayer} rolled ${n}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
-    setTurn(nextTurn);
+    setPendingRoll(n);
+    setNotice(`${currentPlayer} rolled ${n}. Tap a legal token to move it ${n} square${n === 1 ? "" : "s"}.`);
   };
 
-  const moveTokenFromBoard = () => {
-    setNotice("Token movement is disabled pending the new movement-system rebuild.");
+  const moveTokenFromBoard = async (color: TokenColor, id: number) => {
+    if (pendingRoll === null || movingTokenKey !== null) return;
+    if (!players[turn]?.colors.includes(color)) return;
+    const token = tokens.find(t => t.color === color && t.id === id);
+    if (!token || !isTokenMoveLegal(token, pendingRoll)) return;
+    setNotice(`${players[turn]?.name || "Player"} is moving ${color} token ${id + 1}…`);
+    await animateTokenMove(token, pendingRoll, turn);
   };
 
-  const teamLabel = mode === "4p"
-    ? "Green · Yellow · Red · Blue"
-    : `You: ${teamText(humanColors)} · ${players[1].name}: ${teamText(players[1].colors)}`;
-
-  const diceDisabled = botThinking || (mode === "bot" && turn !== 0);
+  const teamLabel = mode === "4p" ? "Green · Yellow · Red · Blue" : `You: ${teamText(humanColors)} · ${players[1].name}: ${teamText(players[1].colors)}`;
+  const finishedByColor = colors.map(color => ({ color, tokens: tokens.filter(t => t.color === color && t.state === "finished") }));
+  const diceDisabled = botThinking || pendingRoll !== null || movingTokenKey !== null || (mode === "bot" && turn !== 0);
 
   return <AppFrame back="/dashboard">
     <main style={{ ...page, background: p.bg, "--accent": p.accent } as React.CSSProperties}>
@@ -150,7 +190,16 @@ export default function BoardPage() {
         <button type="button" onClick={() => resetDemo("4p")} style={mode === "4p" ? activeMode : modeBtn}>4 Players</button>
       </div>
       <div style={demoBar}><span>🟢 {turn === 0 ? <b>Your turn</b> : `${players[turn]?.name || "Player"}'s turn`}</span><span>{teamLabel}</span><button type="button" onClick={() => resetDemo()}>New Game</button></div>
-      <section style={boardWrap}><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={moveTokenFromBoard} /></section>
+      <section style={boardWrap}>
+        <div style={boardShell}>
+          <LudoBoard theme={theme} demoTokens={tokens} onTokenClick={moveTokenFromBoard} />
+          <div aria-label="Finished tokens" style={finishOverlay}>
+            {finishedByColor.map(group => <div key={group.color} style={finishGroup}>
+              {group.tokens.map(t => <span key={`${t.color}-${t.id}`} style={{ ...finishDot, background: p[group.color] }} aria-label={`${group.color} token ${t.id + 1} finished`} />)}
+            </div>)}
+          </div>
+        </div>
+      </section>
       <section style={controls}>
         <div style={{ minWidth: 0 }}><div style={turnLabel}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "PLAYER"} TURN`}</div><b style={{ fontSize: 20 }}>Roll the dice</b><p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p></div>
         <DemoDice value={roll} onRoll={handleHumanRoll} disabled={diceDisabled} botRolling={botRolling} />
@@ -171,6 +220,10 @@ const modeBtn: React.CSSProperties = { padding: "9px 12px", borderRadius: 10, bo
 const activeMode: React.CSSProperties = { ...modeBtn, background: "#071a36", color: "#fff", borderColor: "#071a36" };
 const demoBar: React.CSSProperties = { display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap", marginTop: 10, padding: "10px 12px", borderRadius: 14, background: "#f5f7fa", border: "1px solid #d8dee7", color: "#172033", fontSize: 13 };
 const boardWrap: React.CSSProperties = { display: "grid", placeItems: "center", marginTop: 18 };
+const boardShell: React.CSSProperties = { width: "100%", maxWidth: 620, position: "relative" };
+const finishOverlay: React.CSSProperties = { position: "absolute", left: "40%", top: "40%", width: "20%", height: "20%", display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", padding: "4%", boxSizing: "border-box", gap: "2%", zIndex: 30, pointerEvents: "none" };
+const finishGroup: React.CSSProperties = { display: "grid", gridTemplateColumns: "1fr 1fr", gridTemplateRows: "1fr 1fr", placeItems: "center", minWidth: 0, minHeight: 0 };
+const finishDot: React.CSSProperties = { width: "55%", aspectRatio: 1, borderRadius: "50%", border: "1.5px solid #222", boxShadow: "0 1px 2px rgba(0,0,0,.25)" };
 const controls: React.CSSProperties = { display: "flex", justifyContent: "space-between", alignItems: "center", gap: 18, marginTop: 16, padding: 16, borderRadius: 18, background: "#071a36", border: "1px solid #284b7b" };
 const turnLabel: React.CSSProperties = { fontSize: 10, letterSpacing: 2, color: "#60a5fa", fontWeight: 900 };
 const status: React.CSSProperties = { display: "flex", gap: 12, flexWrap: "wrap", marginTop: 12, padding: 13, borderRadius: 14, background: "#071a36", color: "#cbd5e1", fontSize: 12 };
