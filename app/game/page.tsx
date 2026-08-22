@@ -21,7 +21,9 @@ export default function GamePage() {
         const saved = localStorage.getItem("ludo-match-board");
         if (saved && (saved === "midnight-live" || saved in BOARD_PALETTES)) {
           if (active) setTheme(resolveTheme(saved));
-          return;
+          // Do not return here — localStorage may be stale (e.g. left over
+          // from a previous match or an old equipped skin). Always confirm
+          // against the live customization API below, same as LudoBoardGame does.
         }
       } catch {}
       try {
