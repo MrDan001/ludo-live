@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import BoardPage from "../board/page";
+import GameBoardContent from "./GameBoardContent";
 import { BOARD_PALETTES, type BoardThemeId } from "../_components/LudoBoardGame";
 
 const resolveTheme = (value: unknown): BoardThemeId => {
@@ -16,7 +16,6 @@ export default function GamePage() {
 
   useEffect(() => {
     let active = true;
-
     const loadEquippedSkin = async () => {
       try {
         const saved = localStorage.getItem("ludo-match-board");
@@ -25,7 +24,6 @@ export default function GamePage() {
           return;
         }
       } catch {}
-
       try {
         const response = await fetch("/api/customization", { cache: "no-store" });
         if (!response.ok) return;
@@ -37,7 +35,6 @@ export default function GamePage() {
         try { localStorage.setItem("ludo-match-board", resolved); } catch {}
       } catch {}
     };
-
     loadEquippedSkin();
     return () => { active = false; };
   }, []);
@@ -70,7 +67,7 @@ export default function GamePage() {
 
       <div className="gameContent">
         <section className="boardHost" aria-label="Ludo game">
-          <BoardPage />
+          <GameBoardContent themeOverride={theme} />
         </section>
       </div>
 
@@ -95,7 +92,7 @@ export default function GamePage() {
           background-image: var(--skin-pattern);
           background-size: 520px 520px;
           background-repeat: repeat;
-          opacity: .22;
+          opacity: .3;
         }
         .skinPageGlow {
           position: absolute;
@@ -106,7 +103,7 @@ export default function GamePage() {
           transform: translateX(-50%);
           border-radius: 50%;
           background: var(--skin-accent);
-          opacity: .18;
+          opacity: .2;
           filter: blur(90px);
           pointer-events: none;
           z-index: 0;
@@ -125,26 +122,17 @@ export default function GamePage() {
           z-index: 1;
           width: 100%;
         }
-        .boardHost > main > header { display: none !important; }
-        .boardHost > main {
-          min-height: auto !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          background: transparent !important;
-          border-radius: 0 !important;
+        .boardHost > section {
+          width: 100%;
         }
-        .boardHost > main .liveMatch {
-          margin: 7px 0 12px !important;
-          color: color-mix(in srgb, var(--skin-accent) 78%, white 22%) !important;
-        }
-        .boardHost > main section[aria-label="Dice and turn controls"] {
+        .boardHost section[aria-label="Dice and turn controls"] {
           margin-top: 12px !important;
           border-radius: 24px !important;
           border-color: color-mix(in srgb, var(--skin-accent) 70%, white 10%) !important;
           background: color-mix(in srgb, var(--skin-bg) 78%, #061426 22%) !important;
           box-shadow: var(--skin-shadow), 0 14px 34px color-mix(in srgb, var(--skin-accent) 18%, transparent) !important;
         }
-        .boardHost > main section[aria-label="Dice and turn controls"] p {
+        .boardHost section[aria-label="Dice and turn controls"] p {
           color: color-mix(in srgb, var(--skin-accent) 25%, white 75%) !important;
         }
         @media (max-width: 430px) {
