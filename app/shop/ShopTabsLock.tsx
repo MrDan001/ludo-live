@@ -42,7 +42,7 @@ export default function ShopTabsLock() {
         const visible = label === "Boards" ? !isDiceSection : label === "Dice" ? isDiceSection : false;
         section.style.display = visible ? "block" : "none";
       });
-      setTarget(sections.find(section => !section.classList.contains("dice-section")) || null);
+      setTarget(root.querySelector<HTMLElement>(".board-grid"));
     };
     sync();
     load();
@@ -72,8 +72,8 @@ export default function ShopTabsLock() {
 
   if (!target || active !== "Boards") return null;
   return createPortal(
-    <article className="shop-card midnight-live-card" style={{ marginTop: 18, border: "1px solid #2b7cff", background: "linear-gradient(145deg,#06122a,#0b2550)", boxShadow: "0 0 26px rgba(35,126,255,.28)" }}>
-      <div className="card-art board-art" style={{ background: "#06122a", padding: 8, borderRadius: 14 }}><LudoBoard theme="night" preview /></div>
+    <article className="shop-card midnight-live-card" style={{ marginTop: 0, border: "1px solid #2b7cff", background: "linear-gradient(145deg,#06122a,#0b2550)", boxShadow: "0 0 26px rgba(35,126,255,.28)" }}>
+      <div className="card-art board-art"><LudoBoard theme="night" preview /></div>
       <div className="rarity" style={{ color: "#66b8ff" }}>LEGENDARY</div>
       <h3 style={{ color: "#fff" }}>Midnight Live</h3>
       <div className="price" style={{ color: "#8bc5ff" }}>💎 130</div>
