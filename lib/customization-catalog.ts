@@ -35,7 +35,25 @@ export const DICE = [
   { id: "love", name: "Love Dice", currency: "coins", price: 600, rarity: "EPIC" },
 ];
 
+export const AVATARS = [
+  { id: "avatar-1", name: "Avatar 1", icon: "🧑🏽‍🎮", currency: "gems", price: 500, rarity: "RARE" },
+  { id: "avatar-2", name: "Avatar 2", icon: "👩🏽‍🎤", currency: "gems", price: 700, rarity: "RARE" },
+  { id: "avatar-3", name: "Avatar 3", icon: "🧔🏾‍♂️", currency: "gems", price: 1000, rarity: "EPIC" },
+  { id: "avatar-4", name: "Avatar 4", icon: "👨🏽‍🚀", currency: "gems", price: 1200, rarity: "EPIC" },
+  { id: "avatar-5", name: "Avatar 5", icon: "👩🏾‍🚀", currency: "gems", price: 1300, rarity: "EPIC" },
+  { id: "avatar-6", name: "Avatar 6", icon: "🧙🏽‍♂️", currency: "gems", price: 2000, rarity: "LEGENDARY" },
+] as const;
+
+export const ITEMS = [
+  { id: "golden-dice", name: "Golden Dice", description: "Lucky dice skin", icon: "🎲", currency: "gems", price: 500, rarity: "EPIC" },
+  { id: "shield", name: "Shield", description: "Animated profile frame", icon: "🛡️", currency: "gems", price: 500, rarity: "EPIC" },
+  { id: "trail", name: "Trail", description: "Token movement effect", icon: "🔥", currency: "gems", price: 500, rarity: "EPIC" },
+  { id: "crown", name: "Crown", description: "Winner celebration", icon: "👑", currency: "gems", price: 500, rarity: "LEGENDARY" },
+] as const;
+
 export const CATALOG = [
   ...BOARDS.map((x) => ({ ...x, type: "board" as const })),
   ...DICE.map((x) => ({ ...x, type: "dice" as const })),
+  ...AVATARS.map((x) => ({ ...x, type: "avatar" as const })),
+  ...ITEMS.map((x) => ({ ...x, type: "item" as const })),
 ];
