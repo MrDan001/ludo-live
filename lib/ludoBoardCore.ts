@@ -61,8 +61,9 @@ const SKIPPED_APPROACH_CELL: Record<LudoColor, BoardCell> = {
 export function getTrackCell(color: LudoColor, steps: number): BoardCell | null {
   if (steps < 0 || steps >= PLAYABLE_TRACK_LENGTH) return null;
   const skipped = SKIPPED_APPROACH_CELL[color];
-  const playable = MAIN_PATH.filter(([row, col]) => row !== skipped[0] || col !== skipped[1]);
-  return playable[(START_INDEX[color] + steps) % playable.length] ?? null;
+  const rotatedPath = [...MAIN_PATH.slice(START_INDEX[color]), ...MAIN_PATH.slice(0, START_INDEX[color])];
+  const playable = rotatedPath.filter(([row, col]) => row !== skipped[0] || col !== skipped[1]);
+  return playable[steps] ?? null;
 }
 
 export function getHomeCell(color: LudoColor, steps: number): BoardCell | null {
