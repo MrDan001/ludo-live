@@ -9,7 +9,7 @@ type Color = "red"|"yellow"|"green"|"blue";
 type Face = 1|2|3|4|5|6;
 type ServerPlayer = { playerId:string; name:string; seat:number };
 type ServerTokenMap = Record<string,Record<string,{position:number}>>;
-type GameState = { status:string; currentPlayerId:string|null; dice:Face|null; pendingMove:Face|null; sixStreak:number; players:ServerPlayer[]; tokens:ServerTokenMap };
+type GameState = { status:string; currentPlayerId:string|null; dice:Face|null; pendingMove:Face|null; sixStreak:number; players:ServerPlayer[]; tokens:ServerTokenMap; winnerId?:string|null };
 const COLORS:Color[]=["red","yellow","green","blue"];
 const STEP_COUNT=56;
 const initialTokens=():DemoToken[]=>COLORS.flatMap(color=>Array.from({length:4},(_,id)=>({color,id,position:0,state:"yard" as const})));
@@ -41,9 +41,15 @@ export default function MultiplayerGame(){
   (async()=>{
    let pid="";try{const a=await fetch("/api/auth",{cache:"no-store"}).then(x=>x.json());pid=String(a?.user?.id||"")}catch{}
    if(!alive)return;setMe(pid);
+   const params=new URLSearchParams(location.search);
+   const roomCode=params.get("room")||"";
+   const queryName=params.get("name")||"";
+   let roomName=queryName;
+   let roomSize=4;
+   try{const saved=JSON.parse(localStorage.getItem("ludo-room")||"null");if(!roomName)roomName=String(saved?.name||"Player");roomSize=Number(saved?.players)===2?2:4}catch{if(!roomName)roomName="Player"}
    const s=io(location.origin,{transports:["websocket","polling"]});setSocket(s);
-   s.on("connect",()=>setNotice("LIVE MATCH"));
-   s.on("game-state",(g:GameState)=>{if(!alive)return;setGame(g);applyServerTokens(g.tokens||{});setPending(g.currentPlayerId===pid?g.pendingMove:null);setRoll(g.dice||1);setNotice(g.currentPlayerId===pid?(g.pendingMove?`You rolled ${g.pendingMove}. Pick a token.`:"Your turn — roll the dice."):`${g.players.find(p=>p.playerId===g.currentPlayerId)?.name||"Player"}'s turn.`)});
+   s.on("connect",()=>{setNotice("LIVE MATCH");if(roomCode&&pid)s.emit("join-room",{roomCode,name:roomName,roomSize,playerId:pid,board:"classic",dice:"classic"})});
+   s.on("game-state",(g:GameState)=>{if(!alive)return;setGame(g);applyServerTokens(g.tokens||{});setPending(g.currentPlayerId===pid?g.pendingMove:null);setRoll(g.dice||1);setNotice(g.status==="finished"?"Match finished.":g.status==="paused"?"Match paused — waiting for the player to reconnect.":g.currentPlayerId===pid?(g.pendingMove?`You rolled ${g.pendingMove}. Pick a token.`:"Your turn — roll the dice."):`${g.players.find(p=>p.playerId===g.currentPlayerId)?.name||"Player"}'s turn.`)});
    s.on("game-dice",({playerId,value}:{playerId:string;value:Face})=>{setRoll(value);if(playerId===pid){setPending(value);setNotice(`You rolled ${value}. Pick a token.`)}else{setRemoteRolling(true);setNotice("Opponent is rolling…");window.setTimeout(()=>setRemoteRolling(false),950)}});
    s.on("game-moved",({tokenId,to}:{playerId:string;tokenId:string;to:number})=>{if(tokenId!=="__skip__"){const [colorRaw,idRaw]=String(tokenId).split(":");const color=colorRaw as Color;const tokenIdNum=Number(idRaw);setAnimating(true);setTokens(prev=>prev.map(t=>t.color===color&&t.id===tokenIdNum?{...t,position:to,state:to===STEP_COUNT?"finished":to>51?"home":to===0?"yard":"track"}:t));window.setTimeout(()=>setAnimating(false),350)}setPending(null)});
    s.on("disconnect",()=>setNotice("Reconnecting…"));return()=>{alive=false;s.disconnect()};
@@ -57,8 +63,8 @@ export default function MultiplayerGame(){
    <header style={top}><div style={liveTitle}>LIVE MATCH</div></header>
    <section style={boardWrap}><div style={boardShell}><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken}/></div></section>
    <section style={controls}>
-    <div style={controlCopy}><div style={turnLabel}>{myTurn?"YOUR TURN":currentId?`${players.find(pl=>pl.playerId===currentId)?.name||"PLAYER"} TURN`:"MATCH"}</div><b style={headline}>{pending!==null?"Pick a token":"Roll the dice"}</b><p style={sub}>{notice}</p></div>
-    <DemoDice value={roll} onRoll={handleRoll} disabled={!myTurn||pending!==null||animating||!game} botRolling={remoteRolling}/>
+    <div style={controlCopy}><div style={turnLabel}>{game?.status==="finished"?"MATCH FINISHED":myTurn?"YOUR TURN":currentId?`${players.find(pl=>pl.playerId===currentId)?.name||"PLAYER"} TURN`:"MATCH"}</div><b style={headline}>{pending!==null?"Pick a token":"Roll the dice"}</b><p style={sub}>{game?.winnerId?`Winner: ${players.find(pl=>pl.playerId===game.winnerId)?.name||"Player"}`:notice}</p></div>
+    <DemoDice value={roll} onRoll={handleRoll} disabled={!myTurn||pending!==null||animating||!game||game.status!=="playing"} botRolling={remoteRolling}/>
    </section>
   </main></AppFrame>;
 }
