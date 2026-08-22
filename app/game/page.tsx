@@ -26,35 +26,44 @@ export default function GamePage() {
     let active = true;
 
     const loadEquippedSkin = async () => {
-      // The customization API is the source of truth. localStorage is only a
-      // fallback so an old cached board skin can never override the equipped skin.
+      // Match the board's existing equipped-skin source: the equipped board
+      // stored by the customization flow is used first. The API is fallback.
       try {
-        const response = await fetch("/api/customization", { cache: "no-store" });
-        if (response.ok) {
-          const data = await response.json();
-          const equipped = String(data?.equippedBoard || "");
-          if (equipped && (equipped === "midnight-live" || equipped in BOARD_PALETTES)) {
-            const resolved = resolveTheme(equipped);
-            if (active) setTheme(resolved);
-            try { localStorage.setItem("ludo-match-board", resolved); } catch {}
-            return;
-          }
+        const saved = localStorage.getItem("ludo-match-board");
+        if (saved && (saved === "midnight-live" || saved in BOARD_PALETTES)) {
+          if (active) setTheme(resolveTheme(saved));
+          return;
         }
       } catch {}
 
-      // Only use the cached value when the authoritative customization request
-      // is unavailable or does not contain a valid equipped board.
       try {
-        const saved = localStorage.getItem("ludo-match-board");
-        if (saved && (saved === "midnight-live" || saved in BOARD_PALETTES) && active) {
-          setTheme(resolveTheme(saved));
-        }
+        const response = await fetch("/api/customization", { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        const equipped = String(data?.equippedBoard || "");
+        if (!active || !equipped || !(equipped === "midnight-live" || equipped in BOARD_PALETTES)) return;
+        const resolved = resolveTheme(equipped);
+        setTheme(resolved);
+        try { localStorage.setItem("ludo-match-board", resolved); } catch {}
       } catch {}
     };
 
     loadEquippedSkin();
     return () => { active = false; };
   }, []);
+
+  // Make the selected skin the page background too. This covers the document
+  // area outside the centered game shell without changing global game logic.
+  useEffect(() => {
+    const previousBody = document.body.style.background;
+    const previousHtml = document.documentElement.style.background;
+    document.body.style.background = palette.bg;
+    document.documentElement.style.background = palette.bg;
+    return () => {
+      document.body.style.background = previousBody;
+      document.documentElement.style.background = previousHtml;
+    };
+  }, [palette.bg]);
 
   return (
     <main
@@ -98,6 +107,7 @@ export default function GamePage() {
 
       <style jsx global>{`
         * { box-sizing: border-box; }
+        html, body { min-height: 100%; }
         .game-shell {
           position: relative;
           width: 100%;
@@ -151,8 +161,7 @@ export default function GamePage() {
           display: flex;
           align-items: center;
           gap: 10px;
-          background:
-            linear-gradient(135deg, color-mix(in srgb, var(--skin-bg) 82%, #000 18%), color-mix(in srgb, var(--skin-accent) 18%, #07172e 82%));
+          background: linear-gradient(135deg, color-mix(in srgb, var(--skin-bg) 82%, #000 18%), color-mix(in srgb, var(--skin-accent) 18%, #07172e 82%));
           box-shadow: var(--skin-shadow), 0 16px 42px color-mix(in srgb, var(--skin-accent) 22%, transparent);
         }
         .skinHeader::before {
@@ -179,125 +188,23 @@ export default function GamePage() {
           border: 1px solid color-mix(in srgb, var(--skin-accent) 65%, transparent);
           backdrop-filter: blur(8px);
         }
-        .skinIdentity {
-          position: relative;
-          z-index: 2;
-          display: flex;
-          align-items: center;
-          gap: 12px;
-          min-width: 0;
-          width: 100%;
-          padding-top: 18px;
-        }
-        .skinIcon {
-          width: 62px;
-          height: 62px;
-          flex: 0 0 62px;
-          display: grid;
-          place-items: center;
-          border-radius: 19px;
-          font-size: 31px;
-          background: rgba(255,255,255,.12);
-          border: 2px solid var(--skin-accent);
-          box-shadow: 0 0 25px color-mix(in srgb, var(--skin-accent) 35%, transparent), inset 0 0 18px rgba(255,255,255,.08);
-        }
+        .skinIdentity { position: relative; z-index: 2; display: flex; align-items: center; gap: 12px; min-width: 0; width: 100%; padding-top: 18px; }
+        .skinIcon { width: 62px; height: 62px; flex: 0 0 62px; display: grid; place-items: center; border-radius: 19px; font-size: 31px; background: rgba(255,255,255,.12); border: 2px solid var(--skin-accent); box-shadow: 0 0 25px color-mix(in srgb, var(--skin-accent) 35%, transparent), inset 0 0 18px rgba(255,255,255,.08); }
         .skinCopy { min-width: 0; }
-        .eyebrow {
-          color: var(--skin-accent);
-          font-size: 9px;
-          font-weight: 950;
-          letter-spacing: 2.4px;
-        }
-        .skinCopy h1 {
-          margin: 3px 0 2px;
-          font-size: clamp(23px, 7vw, 34px);
-          line-height: 1;
-          font-weight: 950;
-          letter-spacing: -.7px;
-          white-space: nowrap;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-        .skinCopy p {
-          margin: 0;
-          color: color-mix(in srgb, var(--skin-accent) 24%, white 76%);
-          font-size: 11px;
-          font-weight: 700;
-        }
-        .liveBadge {
-          position: relative;
-          z-index: 2;
-          flex: 0 0 auto;
-          align-self: flex-end;
-          display: inline-flex;
-          align-items: center;
-          gap: 6px;
-          padding: 7px 10px;
-          border-radius: 999px;
-          background: rgba(0,0,0,.34);
-          border: 1px solid var(--skin-accent);
-          font-size: 10px;
-          font-weight: 950;
-          letter-spacing: 1.1px;
-        }
-        .liveBadge span, .skinRibbon span {
-          width: 7px;
-          height: 7px;
-          border-radius: 50%;
-          display: inline-block;
-          background: #ff3158;
-          box-shadow: 0 0 12px #ff3158;
-          animation: ludoLivePulse 1.35s ease-in-out infinite;
-        }
-        .skinRibbon {
-          position: relative;
-          z-index: 1;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          gap: 9px;
-          margin: 10px 0 2px;
-          color: color-mix(in srgb, var(--skin-accent) 78%, white 22%);
-          font-size: 9px;
-          letter-spacing: 2.2px;
-          font-weight: 950;
-        }
+        .eyebrow { color: var(--skin-accent); font-size: 9px; font-weight: 950; letter-spacing: 2.4px; }
+        .skinCopy h1 { margin: 3px 0 2px; font-size: clamp(23px, 7vw, 34px); line-height: 1; font-weight: 950; letter-spacing: -.7px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .skinCopy p { margin: 0; color: color-mix(in srgb, var(--skin-accent) 24%, white 76%); font-size: 11px; font-weight: 700; }
+        .liveBadge { position: relative; z-index: 2; flex: 0 0 auto; align-self: flex-end; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border-radius: 999px; background: rgba(0,0,0,.34); border: 1px solid var(--skin-accent); font-size: 10px; font-weight: 950; letter-spacing: 1.1px; }
+        .liveBadge span, .skinRibbon span { width: 7px; height: 7px; border-radius: 50%; display: inline-block; background: #ff3158; box-shadow: 0 0 12px #ff3158; animation: ludoLivePulse 1.35s ease-in-out infinite; }
+        .skinRibbon { position: relative; z-index: 1; display: flex; align-items: center; justify-content: center; gap: 9px; margin: 10px 0 2px; color: color-mix(in srgb, var(--skin-accent) 78%, white 22%); font-size: 9px; letter-spacing: 2.2px; font-weight: 950; }
         .skinRibbon span { width: 5px; height: 5px; }
-
-        /* The board component keeps its game mechanics intact; its outer page
-           chrome is made transparent so the selected skin belongs to /game as
-           a whole instead of appearing as a board-only background. */
-        .boardHost {
-          position: relative;
-          z-index: 1;
-          width: 100%;
-        }
+        .boardHost { position: relative; z-index: 1; width: 100%; }
         .boardHost > main > header { display: none !important; }
-        .boardHost > main {
-          min-height: auto !important;
-          padding: 0 !important;
-          margin: 0 !important;
-          background: transparent !important;
-          border-radius: 0 !important;
-        }
-        .boardHost > main .liveMatch {
-          margin: 7px 0 12px !important;
-          color: color-mix(in srgb, var(--skin-accent) 78%, white 22%) !important;
-        }
-        .boardHost > main section[aria-label="Dice and turn controls"] {
-          margin-top: 12px !important;
-          border-radius: 24px !important;
-          border-color: color-mix(in srgb, var(--skin-accent) 70%, white 10%) !important;
-          background: color-mix(in srgb, var(--skin-bg) 78%, #061426 22%) !important;
-          box-shadow: var(--skin-shadow), 0 14px 34px color-mix(in srgb, var(--skin-accent) 18%, transparent) !important;
-        }
-        .boardHost > main section[aria-label="Dice and turn controls"] p {
-          color: color-mix(in srgb, var(--skin-accent) 25%, white 75%) !important;
-        }
-        @keyframes ludoLivePulse {
-          0%,100% { transform: scale(1); opacity: 1; }
-          50% { transform: scale(.72); opacity: .42; }
-        }
+        .boardHost > main { min-height: auto !important; padding: 0 !important; margin: 0 !important; background: transparent !important; border-radius: 0 !important; }
+        .boardHost > main .liveMatch { margin: 7px 0 12px !important; color: color-mix(in srgb, var(--skin-accent) 78%, white 22%) !important; }
+        .boardHost > main section[aria-label="Dice and turn controls"] { margin-top: 12px !important; border-radius: 24px !important; border-color: color-mix(in srgb, var(--skin-accent) 70%, white 10%) !important; background: color-mix(in srgb, var(--skin-bg) 78%, #061426 22%) !important; box-shadow: var(--skin-shadow), 0 14px 34px color-mix(in srgb, var(--skin-accent) 18%, transparent) !important; }
+        .boardHost > main section[aria-label="Dice and turn controls"] p { color: color-mix(in srgb, var(--skin-accent) 25%, white 75%) !important; }
+        @keyframes ludoLivePulse { 0%,100% { transform: scale(1); opacity: 1; } 50% { transform: scale(.72); opacity: .42; } }
         @media (max-width: 430px) {
           .gameContent { padding: 8px 7px 22px; }
           .skinHeader { min-height: 108px; border-radius: 21px; padding-left: 10px; }
