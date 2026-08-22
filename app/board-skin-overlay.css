@@ -1,0 +1,64 @@
+/*
+ * Board skin overlay only.
+ * The classic Ludo cells, lanes, yards, center, tokens, movement and dice
+ * remain owned by the existing renderer. This layer only decorates the
+ * parent board surface/frame using the already-equipped Shop theme.
+ */
+.shared-ludo-board {
+  --skin-accent: #222;
+  --skin-glow: rgba(0,0,0,.18);
+  --skin-frame: #222;
+}
+
+.shared-ludo-board::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  border: 7px solid var(--skin-frame);
+  border-radius: inherit;
+  box-shadow:
+    inset 0 0 0 2px rgba(255,255,255,.34),
+    inset 0 0 22px var(--skin-glow),
+    0 0 0 1px rgba(0,0,0,.12);
+}
+
+.shared-ludo-board::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  z-index: 91;
+  pointer-events: none;
+  border-radius: inherit;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.28);
+}
+
+/* The classic board keeps its exact original appearance. */
+.shared-ludo-board.theme-classic {
+  --skin-frame: #222;
+  --skin-glow: rgba(0,0,0,.18);
+}
+
+.shared-ludo-board.theme-golden { --skin-frame:#8a5a12; --skin-glow:rgba(221,170,44,.42); }
+.shared-ludo-board.theme-neon { --skin-frame:#7cf7ff; --skin-glow:rgba(0,229,255,.38); }
+.shared-ludo-board.theme-beach { --skin-frame:#2c7080; --skin-glow:rgba(65,145,170,.28); }
+.shared-ludo-board.theme-galaxy { --skin-frame:#a9c9ff; --skin-glow:rgba(86,84,255,.48); }
+.shared-ludo-board.theme-wood { --skin-frame:#5b321b; --skin-glow:rgba(64,28,9,.50); }
+.shared-ludo-board.theme-dragon { --skin-frame:#dcae4d; --skin-glow:rgba(190,46,28,.42); }
+.shared-ludo-board.theme-christmas { --skin-frame:#d9b74c; --skin-glow:rgba(15,90,55,.40); }
+.shared-ludo-board.theme-football { --skin-frame:#74d68a; --skin-glow:rgba(0,80,40,.45); }
+.shared-ludo-board.theme-candy { --skin-frame:#9a4d9e; --skin-glow:rgba(182,90,177,.32); }
+.shared-ludo-board.theme-marble { --skin-frame:#b08a3c; --skin-glow:rgba(90,100,115,.28); }
+.shared-ludo-board.theme-nature { --skin-frame:#8bb65b; --skin-glow:rgba(26,80,37,.48); }
+.shared-ludo-board.theme-space { --skin-frame:#6bdcff; --skin-glow:rgba(57,157,255,.50); }
+.shared-ludo-board.theme-crystal { --skin-frame:#7bc9ee; --skin-glow:rgba(90,190,235,.38); }
+.shared-ludo-board.theme-fireice { --skin-frame:#f2b94b; --skin-glow:rgba(230,85,45,.40); }
+.shared-ludo-board.theme-jungle { --skin-frame:#6e9f45; --skin-glow:rgba(20,80,28,.46); }
+.shared-ludo-board.theme-love { --skin-frame:#d84b86; --skin-glow:rgba(216,75,134,.32); }
+.shared-ludo-board.theme-night { --skin-frame:#4e76a8; --skin-glow:rgba(0,0,0,.60); }
+.shared-ludo-board.theme-arabian { --skin-frame:#d7ad4d; --skin-glow:rgba(150,92,25,.46); }
+
+@media (max-width:380px) {
+  .shared-ludo-board::before { border-width:5px; }
+}
