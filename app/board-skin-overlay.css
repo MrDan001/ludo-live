@@ -78,7 +78,8 @@
   ) !important;
 }
 
-/* TOKEN VISUALS ONLY — slightly reduced from 150%, centered in its existing square. */
+/* TOKEN VISUALS ONLY — slightly reduced from 150%, centered in its existing square.
+   Token numbers are intentionally hidden so every token is a plain colored piece. */
 .shared-ludo-board [style*="border-radius:50%"],
 .shared-ludo-board [style*="border-radius: 50%"],
 .shared-ludo-board [style*="border-radius:50% !important"],
@@ -88,6 +89,8 @@
   z-index: 120;
   transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
   filter: drop-shadow(0 2px 2px rgba(0,0,0,.28));
+  font-size: 0 !important;
+  line-height: 0 !important;
 }
 
 .shared-ludo-board [style*="border-radius:50%"]:hover,
