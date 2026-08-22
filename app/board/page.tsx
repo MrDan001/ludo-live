@@ -79,8 +79,8 @@ export default function BoardPage() {
   };
 
   // Turn rules: players proceed in fixed order. A six grants the same player
-  // another roll; any other result advances to the next player. This matches
-  // the requested behavior for bot, 2-player, and 4-player modes.
+  // another roll; any other result advances to the next player. This is the
+  // requested behavior for bot, 2-player, and 4-player modes.
   useEffect(() => {
     if (turn === 0 || botThinking || mode !== "bot") return;
     setBotThinking(true);
@@ -103,14 +103,16 @@ export default function BoardPage() {
   }, [turn, botThinking, mode, playerCount]);
 
   const handleHumanRoll = (n: DiceFace) => {
-    if (turn !== 0 || botThinking) return;
+    if (botThinking) return;
+    if (mode === "bot" && turn !== 0) return;
     setRoll(n);
+    const currentPlayer = players[turn]?.name || "Player";
     if (n === 6) {
-      setNotice("You rolled 6 — bonus roll. Roll again.");
+      setNotice(`${currentPlayer} rolled 6 — bonus roll. Roll again.`);
       return;
     }
-    const nextTurn = playerCount > 1 ? 1 : 0;
-    setNotice(`${players[0].name} rolled ${n}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
+    const nextTurn = (turn + 1) % playerCount;
+    setNotice(`${currentPlayer} rolled ${n}. ${players[nextTurn]?.name || "Next player"}'s turn.`);
     setTurn(nextTurn);
   };
 
@@ -121,6 +123,8 @@ export default function BoardPage() {
   const teamLabel = mode === "4p"
     ? "Green · Yellow · Red · Blue"
     : `You: ${teamText(humanColors)} · ${players[1].name}: ${teamText(players[1].colors)}`;
+
+  const diceDisabled = botThinking || (mode === "bot" && turn !== 0);
 
   return <AppFrame back="/dashboard">
     <main style={{ ...page, background: p.bg, "--accent": p.accent } as React.CSSProperties}>
@@ -137,7 +141,7 @@ export default function BoardPage() {
       <section style={boardWrap}><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={moveTokenFromBoard} /></section>
       <section style={controls}>
         <div style={{ minWidth: 0 }}><div style={turnLabel}>{turn === 0 ? "YOUR TURN" : `${players[turn]?.name || "PLAYER"} TURN`}</div><b style={{ fontSize: 20 }}>Roll the dice</b><p style={{ margin: "4px 0", color: "#9fb5d8" }}>{notice}</p></div>
-        <DemoDice value={roll} onRoll={handleHumanRoll} disabled={turn !== 0 || botThinking} botRolling={botRolling} />
+        <DemoDice value={roll} onRoll={handleHumanRoll} disabled={diceDisabled} botRolling={botRolling} />
       </section>
       <div style={status}><span>🟢 Green</span><span>🔵 Blue</span><span>🔴 Red</span><span>🟡 Yellow</span><span>⭐ Safe squares cannot be captured</span><span>💥 Unsafe landing captures opponents</span></div>
     </main>
