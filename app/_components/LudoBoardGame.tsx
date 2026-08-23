@@ -40,13 +40,13 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         style={{
           position: "absolute", left: "40%", top: "40%", width: "20%", height: "20%",
           display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gridTemplateRows: "repeat(3, 1fr)",
-          gap: "2%", padding: "7%", boxSizing: "border-box", placeItems: "center",
+          gap: "1%", padding: "5%", boxSizing: "border-box", placeItems: "center",
           pointerEvents: "none", zIndex: 20, overflow: "hidden",
         }}
       >
         {finished.map(t => (
           <div key={`${t.color}-${t.id}`} style={{
-            width: "78%", height: "78%", minWidth: 0, minHeight: 0,
+            width: "90%", height: "90%", minWidth: 0, minHeight: 0,
             borderRadius: "50%", background: t.color,
             border: "1px solid rgba(255,255,255,.95)",
             boxShadow: "0 2px 5px rgba(0,0,0,.35)",
