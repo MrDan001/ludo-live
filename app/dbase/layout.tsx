@@ -1,2 +1,26 @@
+"use client";
+import {useEffect,useState} from "react";
+import {usePathname,useRouter} from "next/navigation";
 import TournamentAdmin from "./TournamentAdmin";
-export default function DbaseLayout({children}:{children:React.ReactNode}){return <div className="dbase-mobile-shell"><style dangerouslySetInnerHTML={{__html:`*{box-sizing:border-box}@media(max-width:700px){.dbase-mobile-shell main{width:100%;overflow-x:hidden;padding-left:12px!important;padding-right:12px!important}.dbase-mobile-shell main>header{flex-direction:column!important;align-items:flex-start!important;gap:10px!important}.dbase-mobile-shell main>header>div:last-child{text-align:left!important}.dbase-mobile-shell nav{width:100%;max-width:100vw;overflow-x:auto!important;scrollbar-width:none;padding-top:12px!important}.dbase-mobile-shell nav::-webkit-scrollbar{display:none}.dbase-mobile-shell nav button{flex:0 0 auto;white-space:nowrap}.dbase-mobile-shell main>section[style*="repeat(auto-fit,minmax(150px"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}.dbase-mobile-shell section{max-width:100%}.dbase-mobile-shell section[style*="grid-template-columns:repeat(auto-fit,minmax(300px"]{grid-template-columns:1fr!important}.dbase-mobile-shell [style*="grid-template-columns:2fr 1fr 0.8fr 3fr"],.dbase-mobile-shell [style*="grid-template-columns:2fr 1fr .8fr 3fr"]{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;align-items:stretch!important}.dbase-mobile-shell [style*="grid-template-columns:2fr 1fr 1fr 2fr"]{display:none!important}.dbase-mobile-shell [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr 1fr!important}.dbase-mobile-shell [style*="display:flex"][style*="flex-wrap:wrap"]{width:100%}.dbase-mobile-shell input,.dbase-mobile-shell select{max-width:100%;min-width:0!important}.dbase-mobile-shell [style*="width:75px"],.dbase-mobile-shell [style*="width:120px"]{width:100%!important}.dbase-mobile-shell [style*="grid-template-columns:repeat(4,1fr)"]{grid-template-columns:repeat(2,1fr)!important}.dbase-mobile-shell [style*="max-height:620px"]{overflow-x:auto!important}.dbase-mobile-shell h1{font-size:30px!important;margin:4px 0!important}.dbase-mobile-shell h2{font-size:21px!important}.dbase-mobile-shell p{overflow-wrap:anywhere}.dbase-mobile-shell [style*="position:fixed"]{padding:12px!important}.dbase-mobile-shell [style*="width:min(520px,100%)"]{max-height:90vh;overflow:auto;padding:18px!important}}`}}/>{children}<TournamentAdmin/></div>}
+
+export default function DbaseLayout({children}:{children:React.ReactNode}){
+  const pathname=usePathname();
+  const router=useRouter();
+  const isLogin=pathname==="/dbase/login";
+  const [checking,setChecking]=useState(!isLogin);
+  useEffect(()=>{
+    if(isLogin){setChecking(false);return;}
+    let alive=true;
+    fetch("/api/admin",{cache:"no-store"}).then(r=>{
+      if(!alive)return;
+      if(r.status===401||r.status===403){router.replace(`/dbase/login?next=${encodeURIComponent(pathname||"/dbase")}`);return;}
+      setChecking(false);
+    }).catch(()=>{if(alive)setChecking(false)});
+    return()=>{alive=false};
+  },[isLogin,pathname,router]);
+  return <div className="dbase-mobile-shell">
+    <style dangerouslySetInnerHTML={{__html:`*{box-sizing:border-box}@media(max-width:700px){.dbase-mobile-shell main{width:100%;overflow-x:hidden;padding-left:12px!important;padding-right:12px!important}.dbase-mobile-shell main>header{flex-direction:column!important;align-items:flex-start!important;gap:10px!important}.dbase-mobile-shell main>header>div:last-child{text-align:left!important}.dbase-mobile-shell nav{width:100%;max-width:100vw;overflow-x:auto!important;scrollbar-width:none;padding-top:12px!important}.dbase-mobile-shell nav::-webkit-scrollbar{display:none}.dbase-mobile-shell nav button{flex:0 0 auto;white-space:nowrap}.dbase-mobile-shell main>section[style*="repeat(auto-fit,minmax(150px"]{grid-template-columns:repeat(2,minmax(0,1fr))!important}.dbase-mobile-shell section{max-width:100%}.dbase-mobile-shell section[style*="grid-template-columns:repeat(auto-fit,minmax(300px"]{grid-template-columns:1fr!important}.dbase-mobile-shell [style*="grid-template-columns:2fr 1fr 0.8fr 3fr"],.dbase-mobile-shell [style*="grid-template-columns:2fr 1fr .8fr 3fr"]{display:grid!important;grid-template-columns:1fr!important;gap:10px!important;align-items:stretch!important}.dbase-mobile-shell [style*="grid-template-columns:2fr 1fr 1fr 2fr"]{display:none!important}.dbase-mobile-shell [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr 1fr!important}.dbase-mobile-shell [style*="display:flex"][style*="flex-wrap:wrap"]{width:100%}.dbase-mobile-shell input,.dbase-mobile-shell select{max-width:100%;min-width:0!important}.dbase-mobile-shell [style*="width:75px"],.dbase-mobile-shell [style*="width:120px"]{width:100%!important}.dbase-mobile-shell [style*="grid-template-columns:repeat(4,1fr)"]{grid-template-columns:repeat(2,1fr)!important}.dbase-mobile-shell [style*="max-height:620px"]{overflow-x:auto!important}.dbase-mobile-shell h1{font-size:30px!important;margin:4px 0!important}.dbase-mobile-shell h2{font-size:21px!important}.dbase-mobile-shell p{overflow-wrap:anywhere}.dbase-mobile-shell [style*="position:fixed"]{padding:12px!important}.dbase-mobile-shell [style*="width:min(520px,100%)"]{max-height:90vh;overflow:auto;padding:18px!important}}`}}/>
+    {isLogin||checking?children:null}
+    {!isLogin&&!checking?<>{children}<TournamentAdmin/></>:null}
+  </div>
+}
