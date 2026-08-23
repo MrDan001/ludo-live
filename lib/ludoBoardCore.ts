@@ -6,11 +6,10 @@ import type { LudoColor } from "./ludoMovement";
 export type BoardCell = readonly [number, number];
 
 export const TRACK_LENGTH = 52;
-export const PLAYABLE_TRACK_LENGTH = 51;
+export const PLAYABLE_TRACK_LENGTH = TRACK_LENGTH;
 export const HOME_STRETCH = 5;
-// The outer corner/approach box immediately before each colour's home lane
-// is not a token position on this board. Tokens use the final valid shared
-// track box and then enter the first home-lane box on the next step.
+// A token traverses all 52 shared-track cells, then enters its five coloured
+// home-lane cells. The sixth finishing position is the centre finish box.
 export const HOME_ENTRY_STEP = PLAYABLE_TRACK_LENGTH;
 
 export const START_INDEX: Record<LudoColor, number> = {
@@ -51,19 +50,10 @@ export const SAFE_CELLS = [
   { row: 8, col: 13, color: "blue" },
 ] as const;
 
-const SKIPPED_APPROACH_CELL: Record<LudoColor, BoardCell> = {
-  green: [6, 0],
-  yellow: [0, 8],
-  blue: [8, 14],
-  red: [14, 6],
-};
-
 export function getTrackCell(color: LudoColor, steps: number): BoardCell | null {
   if (steps < 0 || steps >= PLAYABLE_TRACK_LENGTH) return null;
-  const skipped = SKIPPED_APPROACH_CELL[color];
   const rotatedPath = [...MAIN_PATH.slice(START_INDEX[color]), ...MAIN_PATH.slice(0, START_INDEX[color])];
-  const playable = rotatedPath.filter(([row, col]) => row !== skipped[0] || col !== skipped[1]);
-  return playable[steps] ?? null;
+  return rotatedPath[steps] ?? null;
 }
 
 export function getHomeCell(color: LudoColor, steps: number): BoardCell | null {
