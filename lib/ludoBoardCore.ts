@@ -11,8 +11,8 @@ export const TRACK_LENGTH = 52;
 export const HOME_STRETCH = 5;
 export const YARD_PROGRESS = 0;
 export const TRACK_START_PROGRESS = 1;
-export const HOME_START_PROGRESS = TRACK_LENGTH + 1; // 53
-export const FINISH_PROGRESS = TRACK_LENGTH + HOME_STRETCH + 1; // 58
+export const HOME_START_PROGRESS = TRACK_LENGTH + 1;
+export const FINISH_PROGRESS = TRACK_LENGTH + HOME_STRETCH + 1;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
@@ -20,6 +20,8 @@ export const START_INDEX: Record<LudoColor, number> = {
   blue: 26,
   red: 39,
 };
+
+export const SAFE_SQUARES = [0, 8, 13, 21, 26, 34, 39, 47] as const;
 
 export const MAIN_PATH: readonly BoardCell[] = [
   ...Array.from({ length: 5 }, (_, i) => [6, i + 1] as const),
@@ -43,7 +45,6 @@ export const HOME_LANES: Record<LudoColor, readonly BoardCell[]> = {
   blue: [[7, 13], [7, 12], [7, 11], [7, 10], [7, 9]],
 };
 
-// The four starred coloured entry/start squares on the supplied master board.
 export const SAFE_CELLS = [
   { row: 6, col: 1, color: "green" },
   { row: 1, col: 8, color: "yellow" },
