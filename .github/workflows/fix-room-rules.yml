@@ -1,0 +1,57 @@
+name: Fix room rules
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  patch:
+    if: ${{ !contains(github.event.head_commit.message, '[room-rules-patched]') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch server room rules
+        run: |
+          python3 <<'PY'
+          from pathlib import Path
+          p=Path('server.js')
+          s=p.read_text()
+          marker='/* ROOM_RULES_PATCHED */'
+          if marker in s:
+              raise SystemExit('room rules already patched')
+
+          helper='''\n/* ROOM_RULES_PATCHED */\nfunction findRoomMembership(pid){for(const [code,room] of rooms){for(const [sid,m] of room.members){if((m.playerId||m.id)===pid)return{code,room,sid,member:m}}}return null}\nfunction kickRoomMembers(room,reason){for(const m of room.members.values()){const ts=io?.sockets?.sockets?.get(m.id);if(ts){ts.emit("room-null",{roomCode:room.code,reason});ts.emit("kicked",{roomCode:room.code,reason});ts.leave(room.code);ts.data.roomCode=null;}}}\n'''
+          needle='function history(a,b){return privateMessages.get(pmKey(a,b))||[]}\n'
+          if needle not in s: raise SystemExit('history helper anchor not found')
+          s=s.replace(needle,needle+helper,1)
+
+          old="socket.on('join-room',({roomCode,name,roomSize,playerId,board,dice,host}={})=>{if(!roomCode||!name)return;const code=String(roomCode).trim().toUpperCase();const pid=String(playerId||'').trim();let room=rooms.get(code);if(!room)room={code,hostId:socket.id,hostPlayerId:host?pid:null,roomSize:Number(roomSize)||4,members:new Map(),game:null};const existingEntry=[...room.members.entries()].find(([,m])=>m.playerId===pid);if(room.members.size>=room.roomSize&&!existingEntry)return socket.emit('room-error','Room is full');"
+          new="socket.on('join-room',({roomCode,name,roomSize,playerId,board,dice,host}={})=>{if(!roomCode||!name)return;const code=String(roomCode).trim().toUpperCase();const pid=String(playerId||'').trim();const active=findRoomMembership(pid);if(active&&active.code!==code)return socket.emit('room-error','You are already in a room. Leave that room before creating or joining another.');let room=rooms.get(code);if(!room&&!host)return socket.emit('room-error','Room no longer exists. Please create or join a fresh room.');if(room?.hostPending&&!room.hostEligible&&room.hostPlayerId!==pid)return socket.emit('room-error','The host has 5 seconds to reconnect. Please wait or choose another room.');if(!room)room={code,hostId:socket.id,hostPlayerId:host?pid:null,roomSize:Number(roomSize)||4,members:new Map(),game:null,hostPending:false,hostEligible:false,hostTimer:null};const existingEntry=[...room.members.entries()].find(([,m])=>m.playerId===pid);if(room.members.size>=room.roomSize&&!existingEntry)return socket.emit('room-error','Room is full');"
+          if old not in s: raise SystemExit('join anchor not found')
+          s=s.replace(old,new,1)
+
+          old2="if(existingEntry){const[oldSocketId,member]=existingEntry;room.members.delete(oldSocketId);member.id=socket.id;member.socketId=socket.id;member.cookie=socket.handshake.headers.cookie||member.cookie||'';member.name=String(name).slice(0,24);member.board=String(board||member.board||'classic');member.dice=String(dice||member.dice||'classic');if(host&&pid){member.host=true;member.ready=true;room.hostPlayerId=pid;room.hostId=socket.id}else if(member.host){room.hostId=socket.id}room.members.set(socket.id,member)}else{room.members.set(socket.id,{id:socket.id,playerId:pid,name:String(name).slice(0,24),host:!!host||socket.id===room.hostId,ready:!!host||socket.id===room.hostId,peerId:null,board:String(board||'classic'),dice:String(dice||'classic'),socketId:socket.id,cookie:socket.handshake.headers.cookie||''});if(host&&pid){room.hostPlayerId=pid;room.hostId=socket.id}}"
+          new2="if(existingEntry){const[oldSocketId,member]=existingEntry;const oldSocket=io.sockets.sockets.get(oldSocketId);if(oldSocket)oldSocket.leave(code);room.members.delete(oldSocketId);member.id=socket.id;member.socketId=socket.id;member.cookie=socket.handshake.headers.cookie||member.cookie||'';member.name=String(name).slice(0,24);member.board=String(board||member.board||'classic');member.dice=String(dice||member.dice||'classic');if(room.hostPending&&room.hostPlayerId===pid&&!room.hostEligible){clearTimeout(room.hostTimer);room.hostTimer=null;room.hostPending=false;room.hostEligible=false;member.host=true;member.ready=true;room.hostPlayerId=pid;room.hostId=socket.id}else if(host&&pid){member.host=true;member.ready=true;room.hostPlayerId=pid;room.hostId=socket.id}else if(member.host){room.hostId=socket.id}room.members.set(socket.id,member)}else{const takePendingHost=room.hostPending&&room.hostEligible&&!host;room.members.set(socket.id,{id:socket.id,playerId:pid,name:String(name).slice(0,24),host:!!host||socket.id===room.hostId||takePendingHost,ready:!!host||socket.id===room.hostId||takePendingHost,peerId:null,board:String(board||'classic'),dice:String(dice||'classic'),socketId:socket.id,cookie:socket.handshake.headers.cookie||''});if(host&&pid){room.hostPlayerId=pid;room.hostId=socket.id}else if(takePendingHost){room.hostPending=false;room.hostEligible=false;room.hostPlayerId=pid;room.hostId=socket.id}}"
+          if old2 not in s: raise SystemExit('membership anchor not found')
+          s=s.replace(old2,new2,1)
+
+          # Insert a server-side disconnect rule before the first room action handler.
+          anchor=" socket.on('set-peer-id',peerId=>"
+          disconnect=''' socket.on('disconnect',()=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room)return;const member=room.members.get(socket.id);if(!member)return;const pid=member.playerId||member.id;const wasHost=room.hostId===socket.id||room.hostPlayerId===pid;room.members.delete(socket.id);if(wasHost){if(room.roomSize===2){rooms.delete(code);kickRoomMembers(room,'The host left a 2-player room. The room has been closed.');broadcastRooms();return}room.hostId=null;room.hostPlayerId=pid;room.hostPending=true;room.hostEligible=false;clearTimeout(room.hostTimer);room.hostTimer=setTimeout(()=>{const current=rooms.get(code);if(current===room&&room.hostPending&&current.hostId===null){current.hostEligible=true;io.to(code).emit('host-replacement-pending',{roomCode:code,reason:'The host did not return within 5 seconds. The next player to join becomes host.'});broadcastRooms()}},5000)}io.to(code).emit('roster',publicMembers(room));broadcastRooms()});\n'''
+          if anchor not in s: raise SystemExit('disconnect anchor not found')
+          s=s.replace(anchor,disconnect+anchor,1)
+
+          p.write_text(s)
+          PY
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add server.js
+          git commit -m 'Enforce room membership and host failover [room-rules-patched]'
+          git push
+      - name: Remove one-shot patch workflow
+        if: success()
+        run: |
+          rm -f .github/workflows/fix-room-rules.yml
+          git add .github/workflows/fix-room-rules.yml
+          git commit -m 'Remove one-shot room rules patch workflow [room-rules-patched]'
+          git push
