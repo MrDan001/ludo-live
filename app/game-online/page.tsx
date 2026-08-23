@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import MultiplayerGame from "../game/MultiplayerGame";
+import MultiplayerGame from "../game/MultiplayerGameCanonical";
 
 export default function OnlineGamePage(){
   const params=useSearchParams();
