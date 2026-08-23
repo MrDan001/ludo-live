@@ -22,27 +22,25 @@ function installForfeitHandler(socket) {
     return originalOnevent(packet);
   };
 
-  socket.on('game-forfeit', ({ reason = 'player-forfeit' } = {}) => {
-    const pid = String(socket.data.playerId || socket.data.__ludoPid || '').trim();
-    const code = String(socket.data.roomCode || '').trim().toUpperCase();
+  socket.on('game-forfeit', ({ roomCode, playerId, reason = 'player-forfeit' } = {}) => {
+    const pid = String(playerId || socket.data.playerId || socket.data.__ludoPid || '').trim();
+    const code = String(roomCode || socket.data.roomCode || '').trim().toUpperCase();
     if (!pid || !code || endedRooms.has(code)) return;
 
-    let winnerId = null;
     const peers = [];
     for (const [, peer] of socket.nsp.sockets) {
       if (peer.id === socket.id) continue;
       if (String(peer.data.roomCode || '').trim().toUpperCase() !== code) continue;
       const peerPid = String(peer.data.playerId || peer.data.__ludoPid || '').trim();
-      if (peerPid) { winnerId = peerPid; peers.push(peer); }
+      if (peerPid) peers.push({ socket: peer, playerId: peerPid });
     }
-    if (!winnerId) return socket.emit('game-forfeit-error', { message: 'No opponent is available to receive the win.' });
+    const winner = peers[0];
+    if (!winner) return socket.emit('game-forfeit-error', { message: 'No opponent is available to receive the win.' });
 
-    const result = { status: 'forfeited', loserId: pid, winnerId, roomCode: code, reason: String(reason).slice(0,120) };
+    const result = { status: 'forfeited', loserId: pid, winnerId: winner.playerId, roomCode: code, reason: String(reason).slice(0,120) };
     endedRooms.set(code, result);
-    socket.emit('game-forfeited', result);
-    for (const peer of peers) peer.emit('game-forfeit-result', result);
+    socket.nsp.to(code).emit('game-forfeit-result', result);
+    socket.nsp.to(code).emit('game-state', { status:'finished', currentPlayerId:null, dice:null, pendingMove:null, sixStreak:0, winnerId:winner.playerId, result:'forfeit' });
     socket.emit('game-forfeit-result', result);
-    socket.emit('game-state', { status:'finished', currentPlayerId:null, dice:null, pendingMove:null, sixStreak:0, winnerId, result:'forfeit' });
-    for (const peer of peers) peer.emit('game-state', { status:'finished', currentPlayerId:null, dice:null, pendingMove:null, sixStreak:0, winnerId, result:'forfeit' });
   });
 }
