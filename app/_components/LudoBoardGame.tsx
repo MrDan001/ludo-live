@@ -12,6 +12,7 @@ type Props = {
   style?: React.CSSProperties;
   demoTokens?: DemoToken[];
   onTokenClick?: (color: DemoToken["color"], id: number) => void;
+  snapOnUpdate?: boolean;
 };
 
 const finishedOrder = ["green", "yellow", "red", "blue"] as const;
@@ -35,7 +36,7 @@ function emitAudio(kind: "move" | "capture") {
   }
 }
 
-export default function LudoBoardGame({ theme = "classic", preview = false, className = "", style, demoTokens = [], onTokenClick }: Props) {
+export default function LudoBoardGame({ theme = "classic", preview = false, className = "", style, demoTokens = [], onTokenClick, snapOnUpdate = false }: Props) {
   const [displayTokens, setDisplayTokens] = useState<DemoToken[]>(demoTokens);
   const displayRef = useRef<DemoToken[]>(demoTokens);
   const timersRef = useRef<Record<string, number>>({});
@@ -52,6 +53,15 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
       mountedRef.current = true;
       displayRef.current = demoTokens;
       setDisplayTokens(demoTokens);
+      return;
+    }
+
+    if (snapOnUpdate) {
+      Object.values(timersRef.current).forEach(timer => window.clearTimeout(timer));
+      timersRef.current = {};
+      const snapped = Array.from(incoming.values());
+      displayRef.current = snapped;
+      setDisplayTokens(snapped);
       return;
     }
 
@@ -87,6 +97,16 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         continue;
       }
 
+      // A captured token must snap straight back to its yard. Never animate it
+      // backwards through every square it occupied.
+      if (captureKeys.has(key)) {
+        current.set(key, targetToken);
+        displayRef.current = Array.from(current.values());
+        setDisplayTokens(displayRef.current);
+        emitAudio("capture");
+        continue;
+      }
+
       const direction = to > from ? 1 : -1;
       const advance = () => {
         const live = displayRef.current.find(token => tokenKey(token) === key);
@@ -105,11 +125,11 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         displayRef.current = nextTokens;
         setDisplayTokens(nextTokens);
 
-        // Audio is deliberately emitted after the visual state update so the
-        // player hears the move when the token has actually moved on screen.
         if (reached) {
-          if (captureKeys.has(key)) emitAudio("capture");
-          else emitAudio("move");
+          // One normal move sound when the token reaches its destination.
+          // Tournament win audio is handled by the game and is intentionally
+          // not emitted here, preventing a second overlapping sound.
+          emitAudio("move");
           delete timersRef.current[key];
           return;
         }
@@ -128,7 +148,7 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
     }
     displayRef.current = reconciled;
     setDisplayTokens(reconciled);
-  }, [demoTokens]);
+  }, [demoTokens, snapOnUpdate]);
 
   useEffect(() => () => {
     Object.values(timersRef.current).forEach(timer => window.clearTimeout(timer));
@@ -157,14 +177,14 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         aria-label={`Finished tokens: ${finished.length}`}
         style={{
           position: "absolute", left: "40%", top: "40%", width: "20%", height: "20%",
-          display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gridTemplateRows: "repeat(3, 1fr)",
-          gap: "1%", padding: "5%", boxSizing: "border-box", placeItems: "center",
-          pointerEvents: "none", zIndex: 20, overflow: "hidden",
+          display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gridTemplateRows: "repeat(4, 1fr)",
+          gap: "2%", padding: "4%", boxSizing: "border-box", placeItems: "center",
+          pointerEvents: "none", zIndex: 100, overflow: "visible",
         }}
       >
         {finished.map(t => (
           <div key={`${t.color}-${t.id}`} style={{
-            width: "90%", height: "90%", minWidth: 0, minHeight: 0,
+            width: "92%", height: "92%", minWidth: 0, minHeight: 0,
             borderRadius: "50%", background: t.color,
             border: "1px solid rgba(255,255,255,.95)",
             boxShadow: "0 2px 5px rgba(0,0,0,.35)",
