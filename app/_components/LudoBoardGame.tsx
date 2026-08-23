@@ -13,6 +13,7 @@ type Props = {
   demoTokens?: DemoToken[];
   onTokenClick?: (color: DemoToken["color"], id: number) => void;
   snapOnUpdate?: boolean;
+  finishSound?: boolean;
 };
 
 const finishedOrder = ["green", "yellow", "red", "blue"] as const;
@@ -30,13 +31,13 @@ function tokenState(position: number): DemoToken["state"] {
   return "track";
 }
 
-function emitAudio(kind: "move" | "capture") {
+function emitAudio(kind: "move" | "capture" | "finish") {
   if (typeof window !== "undefined") {
     window.setTimeout(() => window.dispatchEvent(new CustomEvent("ludo-audio", { detail: kind })), AUDIO_AFTER_RENDER_MS);
   }
 }
 
-export default function LudoBoardGame({ theme = "classic", preview = false, className = "", style, demoTokens = [], onTokenClick, snapOnUpdate = false }: Props) {
+export default function LudoBoardGame({ theme = "classic", preview = false, className = "", style, demoTokens = [], onTokenClick, snapOnUpdate = false, finishSound = false }: Props) {
   const [displayTokens, setDisplayTokens] = useState<DemoToken[]>(demoTokens);
   const displayRef = useRef<DemoToken[]>(demoTokens);
   const timersRef = useRef<Record<string, number>>({});
@@ -97,13 +98,23 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         continue;
       }
 
-      // A captured token must snap straight back to its yard. Never animate it
-      // backwards through every square it occupied.
       if (captureKeys.has(key)) {
         current.set(key, targetToken);
         displayRef.current = Array.from(current.values());
         setDisplayTokens(displayRef.current);
         emitAudio("capture");
+        continue;
+      }
+
+      // A finished token must appear in the centre immediately. Do not make
+      // the player wait for one more animation step just to reveal it.
+      if (targetToken.state === "finished" || to === 56) {
+        current.set(key, targetToken);
+        displayRef.current = Array.from(current.values());
+        setDisplayTokens(displayRef.current);
+        if (finishSound) emitAudio("finish");
+        else emitAudio("move");
+        delete timersRef.current[key];
         continue;
       }
 
@@ -126,9 +137,6 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         setDisplayTokens(nextTokens);
 
         if (reached) {
-          // One normal move sound when the token reaches its destination.
-          // Tournament win audio is handled by the game and is intentionally
-          // not emitted here, preventing a second overlapping sound.
           emitAudio("move");
           delete timersRef.current[key];
           return;
@@ -148,7 +156,7 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
     }
     displayRef.current = reconciled;
     setDisplayTokens(reconciled);
-  }, [demoTokens, snapOnUpdate]);
+  }, [demoTokens, snapOnUpdate, finishSound]);
 
   useEffect(() => () => {
     Object.values(timersRef.current).forEach(timer => window.clearTimeout(timer));
