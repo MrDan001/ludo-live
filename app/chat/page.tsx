@@ -2,6 +2,7 @@
 import { useEffect, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import { getAccount } from "../../lib/account";
+import ChatVoice from "../_components/ChatVoice";
 
 type Profile={id:string;name:string;level:number;rank:string;badges:string[];streak:number};
 type Member=Profile&{role:"owner"|"admin"|"member";online:boolean};
@@ -98,7 +99,7 @@ export default function Chat(){
     <div className="chat-history">{messages.map((m,i)=><div className="bubble" key={m.id||i}><b>{m.name}</b><p>{m.text}</p><small>{new Date(m.at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"})}</small></div>)}</div>
     {memberOpen&&<div style={panel}><h3 style={{margin:"0 0 8px"}}>Room members</h3>{ordered(members).map(m=><div key={m.id} style={row}><button onClick={()=>m.id!==playerId&&setProfile(m)} style={nameBtn}>{m.name} {m.role==="owner"?"👑":m.role==="admin"?"🛡️":""}</button><div style={{display:"flex",gap:10,flexWrap:"wrap",justifyContent:"flex-end",maxWidth:"58%"}}>{m.id!==playerId&&<button style={mini} onClick={()=>addFriend(m.id)}>＋ Friend</button>}{me?.role==="owner"&&m.id!==playerId&&<><button style={mini} onClick={()=>m.role==="admin"?demote(m.id):promote(m.id)}>{m.role==="admin"?"Demote":"Admin"}</button><button style={mini} onClick={()=>kick(m.id)}>Kick</button></>}{me?.role==="admin"&&m.id!==playerId&&m.role==="member"&&<button style={mini} onClick={()=>kick(m.id)}>Kick</button>}</div></div>)}</div>}
     {profile&&<div style={{...panel,top:12,bottom:"auto"}}><button onClick={()=>setProfile(null)} style={close}>×</button><h2>{profile.name}</h2><p>Rank: <b>{profile.rank}</b></p><p>Level: <b>{profile.level}</b></p><p>🏅 {profile.badges.length?profile.badges.join(" · "):"No badges yet"}</p><p>🔥 Streak: <b>{profile.streak}</b></p><button className="big-primary" onClick={()=>{addFriend(profile.id);setProfile(null)}}>＋ ADD FRIEND</button></div>}
-    <div className="chat-compose"><button style={mini} onClick={()=>setMemberOpen(v=>!v)}>👥</button><input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} placeholder={`Chat as ${name}…`}/><button onClick={()=>setText(v=>v+" ❤️")}>❤️</button><button onClick={send}>➤</button></div>
+    <div className="chat-compose"><button style={mini} onClick={()=>setMemberOpen(v=>!v)}>👥</button><input value={text} onChange={e=>setText(e.target.value)} onKeyDown={e=>e.key==="Enter"&&send()} placeholder={`Chat as ${name}…`}/><button onClick={()=>setText(v=>v+" ❤️")}>❤️</button><ChatVoice roomCode={room.code} playerId={playerId} members={members}/><button onClick={send}>➤</button></div>
    </section>
   </main>;
  }
