@@ -1,9 +1,9 @@
 "use client";
 import LudoBoard,{BOARD_NAMES,BOARD_PALETTES,type BoardThemeId,type DemoToken} from "./LudoBoard";
 import {getTokenCell} from "../../lib/canonicalLudoBoard";
+export type {BoardThemeId,DemoToken};
 
 type Props={theme?:BoardThemeId;demoTokens?:DemoToken[];onTokenClick?:(color:DemoToken["color"],id:number)=>void};
-
 export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onTokenClick}:Props){
  const moving=demoTokens.filter(t=>t.state!=="yard"&&t.state!=="finished").map(t=>{const cell=getTokenCell(t.color,t.position);return cell?{...t,row:cell[0],col:cell[1]}:null}).filter(Boolean) as Array<DemoToken&{row:number;col:number}>;
  const finished=demoTokens.filter(t=>t.state==="finished");
