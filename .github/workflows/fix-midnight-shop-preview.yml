@@ -1,4 +1,4 @@
-name: Fix Midnight Live shop preview
+name: Wire live match history
 
 on:
   push:
@@ -9,25 +9,53 @@ permissions:
 
 jobs:
   fix:
-    if: !contains(github.event.head_commit.message, 'Fix Midnight Live shop preview rendering')
+    if: !contains(github.event.head_commit.message, 'Wire live match history')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fix preview-only pattern
+      - name: Wire Socket.IO match completion to persistent history
         run: |
           python - <<'PY'
           from pathlib import Path
-          p = Path('app/_components/LudoBoard.tsx')
+          p = Path('server.js')
           s = p.read_text()
-          old = 'const previewPatternOpacity = preview && theme === "arabian" ? 0 : 0.34;'
-          new = 'const previewPatternOpacity = preview && theme === "night" ? 0 : 0.34;'
+          marker = '/* LIVE_MATCH_HISTORY_WIRED */'
+          if marker in s:
+              raise SystemExit('History hook already wired')
+          helper = '''/* LIVE_MATCH_HISTORY_WIRED */
+          async function recordMatchHistory(room,winnerId){
+            try{
+              const members=[...room.members.values()].filter(m=>m.playerId||m.id);
+              const base=`${room.code}:${room.game?.startedAt||Date.now()}`;
+              const requests=[];
+              for(const member of members){
+                const pid=member.playerId||member.id;
+                const opponents=pid===winnerId?members.filter(m=>(m.playerId||m.id)!==pid):members.filter(m=>(m.playerId||m.id)===winnerId);
+                for(const opponent of opponents){
+                  const opponentId=opponent.playerId||opponent.id;
+                  if(!member.cookie||!opponentId)continue;
+                  requests.push(fetch(`http://127.0.0.1:${port}/api/history`,{method:'POST',headers:{'Content-Type':'application/json','Cookie':member.cookie},body:JSON.stringify({opponentId,opponentName:String(opponent.name||'Player').slice(0,24),result:pid===winnerId?'win':'loss',mode:'Online',roomCode:room.code,matchKey:`${base}:${pid}:${opponentId}`,xp:0})}).catch(()=>null));
+                }
+              }
+              await Promise.all(requests);
+            }catch(e){console.error('match history hook',e)}
+          }
+          '''
+          s=s.replace('function gameSnapshot(room)',helper+'function gameSnapshot(room)',1)
+          s=s.replace("return g?{status:g.status,currentPlayerId:g.currentPlayerId,dice:g.dice,pendingMove:g.pendingMove,sixStreak:g.sixStreak,players:g.players,tokens:g.tokens}:null","return g?{status:g.status,currentPlayerId:g.currentPlayerId,dice:g.dice,pendingMove:g.pendingMove,sixStreak:g.sixStreak,players:g.players,tokens:g.tokens,winnerId:g.winnerId||null}:null",1)
+          s=s.replace("room.game={status:'playing',currentPlayerId:members[0]?.playerId||members[0]?.id||null,dice:null,pendingMove:null,sixStreak:0,players:members.map((m,i)=>({playerId:m.playerId||m.id,name:m.name,seat:i})),tokens:{}}","room.game={status:'playing',startedAt:Date.now(),currentPlayerId:members[0]?.playerId||members[0]?.id||null,dice:null,pendingMove:null,sixStreak:0,winnerId:null,players:members.map((m,i)=>({playerId:m.playerId||m.id,name:m.name,seat:i})),tokens:{}}",1)
+          s=s.replace("member.id=socket.id;member.socketId=socket.id;member.name=String(name).slice(0,24);","member.id=socket.id;member.socketId=socket.id;member.cookie=socket.handshake.headers.cookie||member.cookie||'';member.name=String(name).slice(0,24);",1)
+          s=s.replace("dice:String(dice||'classic'),socketId:socket.id});","dice:String(dice||'classic'),socketId:socket.id,cookie:socket.handshake.headers.cookie||''});",1)
+          old="g.tokens[pid][String(tokenId)]={position:to};const rolled=g.pendingMove;"
+          new="g.tokens[pid][String(tokenId)]={position:to};const winner=Object.values(g.tokens[pid]||{}).filter(x=>Number(x.position)>=56).length>=4;if(winner){g.status='finished';g.winnerId=pid;g.currentPlayerId=null;g.pendingMove=null;g.dice=null;io.to(room.code).emit('game-moved',{playerId:pid,tokenId,to});emitGame(room);void recordMatchHistory(room,pid);return}const rolled=g.pendingMove;"
           if old not in s:
-              raise SystemExit('Expected preview opacity line not found')
-          p.write_text(s.replace(old, new, 1))
+              raise SystemExit('Expected game-move insertion point not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
           PY
           rm -f .github/workflows/fix-midnight-shop-preview.yml
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/_components/LudoBoard.tsx .github/workflows/fix-midnight-shop-preview.yml
-          git commit -m 'Fix Midnight Live shop preview rendering'
+          git add server.js .github/workflows/fix-midnight-shop-preview.yml
+          git commit -m 'Wire live match history recording'
           git push
