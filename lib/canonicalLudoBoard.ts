@@ -3,17 +3,17 @@ import type { LudoColor as MovementLudoColor } from "./ludoMovement";
 export type LudoColor = MovementLudoColor;
 export type BoardCell = readonly [number, number];
 
-// Canonical tournament movement: 50 shared-path positions, then the first
-// coloured home-lane position is progress 51. The centre finish is progress 56.
-// The physical board has 52 shared cells; each colour's route intentionally
-// uses the first 50 cells from its start and skips the final two approach cells
-// before entering that colour's home lane, matching the board layout.
-export const TRACK_LENGTH = 50;
+// Canonical tournament movement: 51 shared-path positions, then the first
+// coloured home-lane position is progress 52. The centre finish is progress 57.
+// The physical board has 52 shared cells; each colour's route uses 51 of them
+// from its start and skips the final physical approach cell before entering
+// that colour's home lane, matching the board layout shown by the reference.
+export const TRACK_LENGTH = 51;
 export const HOME_STRETCH = 5;
 export const YARD_PROGRESS = 0;
 export const TRACK_START_PROGRESS = 1;
-export const HOME_START_PROGRESS = 51;
-export const FINISH_PROGRESS = 56;
+export const HOME_START_PROGRESS = 52;
+export const FINISH_PROGRESS = 57;
 export const PHYSICAL_TRACK_LENGTH = 52;
 
 export const START_INDEX: Record<LudoColor, number> = {
@@ -54,9 +54,6 @@ export const SAFE_CELLS = [
 
 export function getTrackCell(color: LudoColor, progress: number): BoardCell | null {
   if (progress < TRACK_START_PROGRESS || progress > TRACK_LENGTH) return null;
-  // Use the real 52-cell physical track for coordinate lookup. The movement
-  // rule still stops at progress 50, so the final two physical approach cells
-  // are skipped and progress 51 enters the colour's home lane.
   const index = (START_INDEX[color] + progress - 1) % PHYSICAL_TRACK_LENGTH;
   return MAIN_PATH[index] ?? null;
 }
