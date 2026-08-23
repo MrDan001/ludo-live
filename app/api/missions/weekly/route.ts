@@ -7,11 +7,19 @@ type Kind="play_games"|"win_games"|"roll_dice"|"move_tokens"|"send_messages"|"jo
 type Difficulty="easy"|"hard"|"very_hard";
 type Seed={id:string;title:string;description:string;target:number;kind:Kind;difficulty:Difficulty;rewardCoins:number;rewardGems:number};
 
-const KINDS:Kind[]=["play_games","win_games","roll_dice","move_tokens","send_messages","join_rooms","create_rooms","roll_sixes","move_home","complete_games"];
 const templates=[
-  ["Play {n} Ludo games","Play {n} Ludo games this week.","play_games","Play",[5,8,12,18,25]],["Win {n} Ludo games","Win {n} Ludo games this week.","win_games","Win",[2,3,5,8,12]],["Roll {n} dice times","Make {n} dice rolls this week.","roll_dice","Roll",[25,40,60,100,200]],["Make {n} token moves","Make {n} legal token moves this week.","move_tokens","Make",[20,35,50,90,200]],["Send {n} room messages","Send {n} messages in Ludo rooms this week.","send_messages","Send",[10,20,30,50,100]],["Join {n} online rooms","Join {n} online Ludo rooms this week.","join_rooms","Join",[3,5,8,10,20]],["Create {n} game rooms","Create {n} Ludo game rooms this week.","create_rooms","Create",[2,3,5,6,12]],["Roll {n} sixes","Roll a 6 {n} times this week.","roll_sixes","Roll",[3,5,7,10,20]],["Bring {n} tokens home","Bring {n} tokens all the way home this week.","move_home","Bring",[5,8,10,16,25]],["Finish {n} Ludo games","Finish {n} Ludo games this week.","complete_games","Finish",[2,3,5,8,12]]
+ ["Play {n} Ludo games","Play {n} Ludo games this week.","play_games",[5,8,12,18,25]],
+ ["Win {n} Ludo games","Win {n} Ludo games this week.","win_games",[2,3,5,8,12]],
+ ["Roll {n} dice times","Make {n} dice rolls this week.","roll_dice",[25,40,60,100,200]],
+ ["Make {n} token moves","Make {n} legal token moves this week.","move_tokens",[20,35,50,90,200]],
+ ["Send {n} room messages","Send {n} messages in Ludo rooms this week.","send_messages",[10,20,30,50,100]],
+ ["Join {n} online rooms","Join {n} online Ludo rooms this week.","join_rooms",[3,5,8,10,20]],
+ ["Create {n} game rooms","Create {n} Ludo game rooms this week.","create_rooms",[2,3,5,6,12]],
+ ["Roll {n} sixes","Roll a 6 {n} times this week.","roll_sixes",[3,5,7,10,20]],
+ ["Bring {n} tokens home","Bring {n} tokens all the way home this week.","move_home",[5,8,10,16,25]],
+ ["Finish {n} Ludo games","Finish {n} Ludo games this week.","complete_games",[2,3,5,8,12]]
 ] as const;
-const CATALOG:Seed[]=templates.flatMap((t,i)=>t[4].map((target,j)=>{const difficulty:Difficulty=j<3?"easy":j===3?"hard":"very_hard";const coins=[5000,6500,8000,14000,22000][j];const gems=[5,10,10,20,30][j];const id=`weekly-${i*5+j+1}`;return{id,title:t[0].replace("{n}",String(target)),description:t[1].replace("{n}",String(target)),target,kind:t[2],difficulty,rewardCoins:coins,rewardGems:gems}}));
+const CATALOG:Seed[]=templates.flatMap((t,i)=>t[3].map((target,j)=>({id:`weekly-${i*5+j+1}`,title:t[0].replace("{n}",String(target)),description:t[1].replace("{n}",String(target)),target,kind:t[2] as Kind,difficulty:(j<3?"easy":j===3?"hard":"very_hard") as Difficulty,rewardCoins:[5000,6500,8000,14000,22000][j],rewardGems:[5,10,10,20,30][j]})));
 const DEFAULT_BONUS={coins:50000,gems:100};
 const weekStart=()=>{const d=new Date();const day=d.getUTCDay();d.setUTCDate(d.getUTCDate()+(day===0?-6:1-day));return d.toISOString().slice(0,10)};
 const weekEnd=(start:string)=>{const d=new Date(`${start}T00:00:00Z`);d.setUTCDate(d.getUTCDate()+7);return d.toISOString().slice(0,10)};
@@ -29,13 +37,40 @@ async function assign(uid:string){
  const week=weekStart();
  const existing=await pool.query(`SELECT wm.slot,wm.mission_id,wm.completed,wm.claimed,md.title,md.description,md.target,md.reward_coins,md.reward_gems,md.kind,md.difficulty,md.admin_created FROM ludo_weekly_missions wm JOIN ludo_weekly_mission_definitions md ON md.id=wm.mission_id WHERE wm.user_id=$1 AND wm.week_start=$2 ORDER BY wm.slot`,[uid,week]);
  if((existing.rowCount||0)>=10)return existing.rows.slice(0,10);
- const admin=await pool.query(`SELECT * FROM ludo_weekly_mission_definitions WHERE active=TRUE AND admin_created=TRUE AND scheduled_week=$1 ORDER BY created_at ASC`,[week]);
  const selected:any[]=[];const used=new Set<string>();
- for(const difficulty of ["easy","hard","very_hard"] as Difficulty[]){const need=difficulty==="easy"?5:difficulty==="hard"?3:2;for(const row of admin.rows.filter((x:any)=>x.difficulty===difficulty)){if(selected.filter(x=>x.difficulty===difficulty).length>=need)break;if(!used.has(row.id)){selected.push({id:row.id,title:row.title,description:row.description,target:Number(row.target),kind:row.kind,difficulty,row.rewardCoins:Number(row.reward_coins),rewardGems:Number(row.reward_gems)});used.add(row.id);}}}
- for(const difficulty of ["easy","hard","very_hard"] as Difficulty[]){const need=difficulty==="easy"?5:difficulty==="hard"?3:2;const poolRows=CATALOG.filter(x=>x.difficulty===difficulty);const start=hash(`${uid}:${week}:${difficulty}`)%poolRows.length;for(let i=0;selected.filter(x=>x.difficulty===difficulty).length<need&&i<poolRows.length*3;i++){const c=poolRows[(start+i)%poolRows.length];if(!used.has(c.id)){selected.push(c);used.add(c.id);}}}
+ const admin=await pool.query(`SELECT * FROM ludo_weekly_mission_definitions WHERE active=TRUE AND admin_created=TRUE AND scheduled_week=$1 ORDER BY created_at ASC`,[week]);
+ for(const difficulty of ["easy","hard","very_hard"] as Difficulty[]){
+  const need=difficulty==="easy"?5:difficulty==="hard"?3:2;
+  for(const row of admin.rows.filter((x:any)=>x.difficulty===difficulty)){
+   if(selected.filter(x=>x.difficulty===difficulty).length>=need)break;
+   if(used.has(row.id))continue;
+   selected.push({id:row.id,title:row.title,description:row.description,target:Number(row.target),kind:row.kind as Kind,difficulty,rewardCoins:Number(row.reward_coins),rewardGems:Number(row.reward_gems)});
+   used.add(row.id);
+  }
+ }
+ for(const difficulty of ["easy","hard","very_hard"] as Difficulty[]){
+  const need=difficulty==="easy"?5:difficulty==="hard"?3:2;
+  const poolRows=CATALOG.filter(x=>x.difficulty===difficulty);
+  const start=hash(`${uid}:${week}:${difficulty}`)%poolRows.length;
+  for(let i=0;selected.filter(x=>x.difficulty===difficulty).length<need&&i<poolRows.length*3;i++){
+   const c=poolRows[(start+i)%poolRows.length];
+   if(!used.has(c.id)){selected.push(c);used.add(c.id);}
+  }
+ }
  let ordered=selected.slice(0,10);let signature=ordered.map(x=>x.id).sort().join(",");
- for(let salt=0;salt<100;){const ok=await pool.query(`INSERT INTO ludo_weekly_assignment_bundles(user_id,week_start,signature) VALUES($1,$2,$3) ON CONFLICT(week_start,signature) DO NOTHING RETURNING signature`,[uid,week,signature]);if(ok.rowCount)break;salt++;ordered=[];for(const difficulty of ["easy","hard","very_hard"] as Difficulty[]){const need=difficulty==="easy"?5:difficulty==="hard"?3:2;const poolRows=CATALOG.filter(x=>x.difficulty===difficulty);const start=(hash(`${uid}:${week}:${difficulty}`)+salt)%poolRows.length;let n=0;for(let i=0;n<need&&i<poolRows.length*2;i++){const c=poolRows[(start+i)%poolRows.length];if(!ordered.some(x=>x.id===c.id)){ordered.push(c);n++;}}}signature=ordered.map(x=>x.id).sort().join(",");}
- const existingIds=new Set(existing.rows.map((x:any)=>x.mission_id));let slot=1;for(const m of ordered){if(existingIds.has(m.id))continue;await pool.query(`INSERT INTO ludo_weekly_missions(user_id,week_start,slot,mission_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,[uid,week,slot++,m.id]);if(slot>10)break;}
+ for(let salt=0;salt<100;salt++){
+  const ok=await pool.query(`INSERT INTO ludo_weekly_assignment_bundles(user_id,week_start,signature) VALUES($1,$2,$3) ON CONFLICT(week_start,signature) DO NOTHING RETURNING signature`,[uid,week,signature]);
+  if(ok.rowCount)break;
+  ordered=[];
+  for(const difficulty of ["easy","hard","very_hard"] as Difficulty[]){
+   const need=difficulty==="easy"?5:difficulty==="hard"?3:2;
+   const poolRows=CATALOG.filter(x=>x.difficulty===difficulty);const start=(hash(`${uid}:${week}:${difficulty}`)+salt+1)%poolRows.length;
+   for(let i=0,n=0;n<need&&i<poolRows.length*2;i++){const c=poolRows[(start+i)%poolRows.length];if(!ordered.some(x=>x.id===c.id)){ordered.push(c);n++;}}
+  }
+  signature=ordered.map(x=>x.id).sort().join(",");
+ }
+ const existingIds=new Set(existing.rows.map((x:any)=>x.mission_id));let slot=1;
+ for(const m of ordered){if(existingIds.has(m.id))continue;await pool.query(`INSERT INTO ludo_weekly_missions(user_id,week_start,slot,mission_id) VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,[uid,week,slot++,m.id]);if(slot>10)break;}
  return (await pool.query(`SELECT wm.slot,wm.mission_id,wm.completed,wm.claimed,md.title,md.description,md.target,md.reward_coins,md.reward_gems,md.kind,md.difficulty,md.admin_created FROM ludo_weekly_missions wm JOIN ludo_weekly_mission_definitions md ON md.id=wm.mission_id WHERE wm.user_id=$1 AND wm.week_start=$2 ORDER BY wm.slot`,[uid,week])).rows.slice(0,10);
 }
 async function refreshCompletion(uid:string,week:string){const p=await progressFor(uid,week);const rows=await pool.query(`SELECT wm.mission_id,wm.completed,md.kind,md.target FROM ludo_weekly_missions wm JOIN ludo_weekly_mission_definitions md ON md.id=wm.mission_id WHERE wm.user_id=$1 AND wm.week_start=$2`,[uid,week]);for(const m of rows.rows)if(!m.completed&&Number(p[m.kind]||0)>=Number(m.target))await pool.query(`UPDATE ludo_weekly_missions SET completed=TRUE WHERE user_id=$1 AND week_start=$2 AND mission_id=$3`,[uid,week,m.mission_id]);const done=await pool.query(`SELECT COUNT(*)::int n FROM ludo_weekly_missions WHERE user_id=$1 AND week_start=$2 AND completed=TRUE`,[uid,week]);if(Number(done.rows[0]?.n||0)>=10)await pool.query(`INSERT INTO ludo_weekly_mission_bonus(user_id,week_start,unlocked) VALUES($1,$2,TRUE) ON CONFLICT(user_id,week_start) DO UPDATE SET unlocked=TRUE`,[uid,week]);}
