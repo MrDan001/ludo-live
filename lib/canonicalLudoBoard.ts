@@ -1,5 +1,6 @@
-import type { LudoColor } from "./ludoMovement";
+import type { LudoColor as MovementLudoColor } from "./ludoMovement";
 
+export type LudoColor = MovementLudoColor;
 export type BoardCell = readonly [number, number];
 
 export const TRACK_LENGTH = 52;
