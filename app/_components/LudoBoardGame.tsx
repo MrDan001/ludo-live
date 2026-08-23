@@ -16,6 +16,7 @@ type Props = {
 
 const finishedOrder = ["green", "yellow", "red", "blue"] as const;
 const MOVE_STEP_MS = 220;
+const AUDIO_AFTER_RENDER_MS = 55;
 
 function tokenKey(token: DemoToken) {
   return `${token.color}:${token.id}`;
@@ -26,6 +27,12 @@ function tokenState(position: number): DemoToken["state"] {
   if (position === 56) return "finished";
   if (position > 51) return "home";
   return "track";
+}
+
+function emitAudio(kind: "move" | "capture") {
+  if (typeof window !== "undefined") {
+    window.setTimeout(() => window.dispatchEvent(new CustomEvent("ludo-audio", { detail: kind })), AUDIO_AFTER_RENDER_MS);
+  }
 }
 
 export default function LudoBoardGame({ theme = "classic", preview = false, className = "", style, demoTokens = [], onTokenClick }: Props) {
@@ -48,9 +55,17 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
       return;
     }
 
-    // Remove tokens that no longer exist, while preserving the currently
-    // animated position of tokens that are still moving.
     const current = new Map(displayRef.current.map(token => [tokenKey(token), token]));
+    const captureKeys = new Set<string>();
+
+    for (const [key, targetToken] of incoming) {
+      const currentToken = current.get(key);
+      if (!currentToken) continue;
+      if (currentToken.state !== "yard" && targetToken.state === "yard" && currentToken.position > 0) {
+        captureKeys.add(key);
+      }
+    }
+
     for (const key of Object.keys(timersRef.current)) {
       if (!incoming.has(key)) {
         window.clearTimeout(timersRef.current[key]);
@@ -72,9 +87,6 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         continue;
       }
 
-      // Walk exactly one board position at a time. This prevents a remote
-      // game-state update from teleporting a token from its old square to the
-      // final square in one render.
       const direction = to > from ? 1 : -1;
       const advance = () => {
         const live = displayRef.current.find(token => tokenKey(token) === key);
@@ -93,18 +105,21 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         displayRef.current = nextTokens;
         setDisplayTokens(nextTokens);
 
+        // Audio is deliberately emitted after the visual state update so the
+        // player hears the move when the token has actually moved on screen.
         if (reached) {
+          if (captureKeys.has(key)) emitAudio("capture");
+          else emitAudio("move");
           delete timersRef.current[key];
           return;
         }
+        emitAudio("move");
         timersRef.current[key] = window.setTimeout(advance, MOVE_STEP_MS);
       };
 
       timersRef.current[key] = window.setTimeout(advance, MOVE_STEP_MS);
     }
 
-    // Reconcile unchanged tokens and add/remove tokens without interrupting
-    // active step-by-step animations.
     const reconciled = displayRef.current.filter(token => incoming.has(tokenKey(token)));
     for (const token of incoming.values()) {
       if (!reconciled.some(existing => tokenKey(existing) === tokenKey(token))) {
