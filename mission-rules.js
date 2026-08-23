@@ -40,20 +40,14 @@ async function record(pid,kind,amount=1,eventId){
         JOIN ludo_mission_definitions md ON md.id=dm.mission_id WHERE dm.user_id=$1 AND dm.mission_day=$2`,[pid,d]);
       const values=await pool.query(`SELECT kind,progress FROM ludo_daily_mission_progress WHERE user_id=$1 AND mission_day=$2`,[pid,d]);
       const progress=Object.fromEntries(values.rows.map(x=>[x.kind,Number(x.progress)]));
-      for(const m of assigned.rows)if(!m.completed&&Number(progress[m.kind]||0)>=Number(m.target))
-        await pool.query(`UPDATE ludo_daily_missions SET completed=TRUE WHERE user_id=$1 AND mission_day=$2 AND mission_id=$3`,[pid,d,m.mission_id]);
+      for(const m of assigned.rows)if(!m.completed&&Number(progress[m.kind]||0)>=Number(m.target))await pool.query(`UPDATE ludo_daily_missions SET completed=TRUE WHERE user_id=$1 AND mission_day=$2 AND mission_id=$3`,[pid,d,m.mission_id]);
       const done=await pool.query(`SELECT COUNT(*)::int n FROM ludo_daily_missions WHERE user_id=$1 AND mission_day=$2 AND completed=TRUE`,[pid,d]);
-      if(Number(done.rows[0]?.n)>=6)await pool.query(`INSERT INTO ludo_daily_mission_bonus(user_id,mission_day,unlocked)
-        VALUES($1,$2,TRUE) ON CONFLICT(user_id,mission_day) DO UPDATE SET unlocked=TRUE`,[pid,d]);
+      if(Number(done.rows[0]?.n)>=6)await pool.query(`INSERT INTO ludo_daily_mission_bonus(user_id,mission_day,unlocked) VALUES($1,$2,TRUE) ON CONFLICT(user_id,mission_day) DO UPDATE SET unlocked=TRUE`,[pid,d]);
     }
   }catch(e){console.error("[missions]",e.message)}
 }
-const {Server}=require("socket.io");
-const originalOn=Server.prototype.on;
-if(!Server.prototype.__ludoMissionPatched){
-  Server.prototype.__ludoMissionPatched=true;
-  Server.prototype.on=function(event,listener){if(event!=="connection")return originalOn.call(this,event,listener);const wrapped=(socket)=>{listener(socket);install(socket)};return originalOn.call(this,event,wrapped)};
-}
+const {Server}=require("socket.io");const originalOn=Server.prototype.on;
+if(!Server.prototype.__ludoMissionPatched){Server.prototype.__ludoMissionPatched=true;Server.prototype.on=function(event,listener){if(event!=="connection")return originalOn.call(this,event,listener);const wrapped=(socket)=>{listener(socket);install(socket)};return originalOn.call(this,event,wrapped)}}
 function install(socket){
   const pid=()=>String(socket.data.playerId||socket.data.__ludoPid||"").trim();
   socket.on("join-room",payload=>{const kind=payload?.host?"create_rooms":"join_rooms";record(String(payload?.playerId||pid()),kind,1,`${kind}-${day()}-${String(payload?.roomCode||"")}-${String(payload?.playerId||pid())}`)});
@@ -63,8 +57,8 @@ function install(socket){
   socket.on("chat",()=>{const p=pid();if(p)record(p,"send_messages",1,`chat-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`)});
   const originalEmit=socket.emit.bind(socket);
   socket.emit=function(event,...args){try{
-    if(event==="game-dice"){const value=Number(args[0]?.value||0),p=String(args[0]?.playerId||"");if(p&&value===6)record(p,"roll_sixes",1,`six-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`)}
-    if(event==="game-moved"){const p=String(args[0]?.playerId||""),to=Number(args[0]?.to||0);if(p&&to===56)record(p,"move_home",1,`home-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`)}
-    if(event==="game-state"){const state=args[0]||{};if(state.status==="finished"&&state.winnerId){const p=String(state.winnerId);record(p,"win_games",1,`win-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`);record(p,"complete_games",1,`finish-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`)}}
+    if(event==="game-dice"){const value=Number(args[0]?.value||0),p=String(args[0]?.playerId||"");if(p&&p===pid()&&value===6)record(p,"roll_sixes",1,`six-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`)}
+    if(event==="game-moved"){const p=String(args[0]?.playerId||""),to=Number(args[0]?.to||0);if(p&&p===pid()&&to===56)record(p,"move_home",1,`home-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`)}
+    if(event==="game-state"){const state=args[0]||{};if(state.status==="finished"&&state.winnerId&&String(state.winnerId)===pid()){const p=String(state.winnerId);record(p,"win_games",1,`win-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`);record(p,"complete_games",1,`finish-${String(socket.data.roomCode||"")}-${p}-${Date.now()}`)}}
   }catch{}return originalEmit(event,...args)};
 }
