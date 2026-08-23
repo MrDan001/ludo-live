@@ -39,14 +39,17 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         aria-label={`Finished tokens: ${finished.length}`}
         style={{
           position: "absolute", left: "40%", top: "40%", width: "20%", height: "20%",
-          display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gridTemplateRows: "repeat(2, 1fr)",
-          gap: 5, placeItems: "center", pointerEvents: "none", zIndex: 20,
+          display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gridTemplateRows: "repeat(3, 1fr)",
+          gap: "2%", padding: "7%", boxSizing: "border-box", placeItems: "center",
+          pointerEvents: "none", zIndex: 20, overflow: "hidden",
         }}
       >
         {finished.map(t => (
           <div key={`${t.color}-${t.id}`} style={{
-            width: "34%", aspectRatio: "1", borderRadius: "50%", background: t.color,
-            border: "2px solid rgba(255,255,255,.92)", boxShadow: "0 3px 9px rgba(0,0,0,.35)",
+            width: "78%", height: "78%", minWidth: 0, minHeight: 0,
+            borderRadius: "50%", background: t.color,
+            border: "1px solid rgba(255,255,255,.95)",
+            boxShadow: "0 2px 5px rgba(0,0,0,.35)",
           }} />
         ))}
       </div>
