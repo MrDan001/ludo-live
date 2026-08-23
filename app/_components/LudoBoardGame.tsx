@@ -1,6 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import BaseBoard, { BOARD_NAMES, BOARD_PALETTES, type BoardThemeId, type DemoToken } from "./LudoBoardFixed";
+import { FINISH_PROGRESS, getTokenCell, tokenState as canonicalTokenState } from "../../lib/canonicalLudoBoard";
 
 export type { BoardThemeId, DemoToken };
 export { BOARD_NAMES, BOARD_PALETTES };
@@ -26,10 +27,7 @@ function tokenKey(token: DemoToken) {
 }
 
 function tokenState(position: number): DemoToken["state"] {
-  if (position === 0) return "yard";
-  if (position === 56) return "finished";
-  if (position > 52) return "home";
-  return "track";
+  return canonicalTokenState(position);
 }
 
 function emitAudio(kind: "move" | "capture" | "finish") {
@@ -38,7 +36,17 @@ function emitAudio(kind: "move" | "capture" | "finish") {
   }
 }
 
-export default function LudoBoardGame({ theme = "classic", preview = false, className = "", style, demoTokens = [], onTokenClick, snapOnUpdate = false, finishSound = false, animateUpdates = true }: Props) {
+export default function LudoBoardGame({
+  theme = "classic",
+  preview = false,
+  className = "",
+  style,
+  demoTokens = [],
+  onTokenClick,
+  snapOnUpdate = false,
+  finishSound = false,
+  animateUpdates = true,
+}: Props) {
   const [displayTokens, setDisplayTokens] = useState<DemoToken[]>(demoTokens);
   const displayRef = useRef<DemoToken[]>(demoTokens);
   const timersRef = useRef<Record<string, number>>({});
@@ -73,9 +81,7 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
     for (const [key, targetToken] of incoming) {
       const currentToken = current.get(key);
       if (!currentToken) continue;
-      if (currentToken.state !== "yard" && targetToken.state === "yard" && currentToken.position > 0) {
-        captureKeys.add(key);
-      }
+      if (currentToken.state !== "yard" && targetToken.state === "yard" && currentToken.position > 0) captureKeys.add(key);
     }
 
     for (const key of Object.keys(timersRef.current)) {
@@ -107,8 +113,8 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         continue;
       }
 
-      if (targetToken.state === "finished" || to === 56) {
-        current.set(key, targetToken);
+      if (targetToken.state === "finished" || to === FINISH_PROGRESS) {
+        current.set(key, { ...targetToken, position: FINISH_PROGRESS, state: "finished" });
         displayRef.current = Array.from(current.values());
         setDisplayTokens(displayRef.current);
         if (finishSound) emitAudio("finish");
@@ -128,10 +134,7 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         const reached = direction > 0 ? nextPosition >= to : nextPosition <= to;
         const position = reached ? to : nextPosition;
         const nextState = reached ? targetToken.state : tokenState(position);
-
-        const nextTokens = displayRef.current.map(token =>
-          tokenKey(token) === key ? { ...token, position, state: nextState } : token
-        );
+        const nextTokens = displayRef.current.map(token => tokenKey(token) === key ? { ...token, position, state: nextState } : token);
         displayRef.current = nextTokens;
         setDisplayTokens(nextTokens);
 
@@ -149,9 +152,7 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
 
     const reconciled = displayRef.current.filter(token => incoming.has(tokenKey(token)));
     for (const token of incoming.values()) {
-      if (!reconciled.some(existing => tokenKey(existing) === tokenKey(token))) {
-        reconciled.push(token);
-      }
+      if (!reconciled.some(existing => tokenKey(existing) === tokenKey(token))) reconciled.push(token);
     }
     displayRef.current = reconciled;
     setDisplayTokens(reconciled);
@@ -164,22 +165,55 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
 
   const finished = finishedOrder.flatMap(color =>
     displayTokens
-      .filter(t => t.color === color && t.state === "finished")
+      .filter(t => t.color === color && (t.state === "finished" || Number(t.position) >= FINISH_PROGRESS))
       .sort((a, b) => a.id - b.id)
-      .map(t => ({ ...t, color }))
+      .map(t => ({ ...t, color, position: FINISH_PROGRESS, state: "finished" as const }))
   );
 
-  const boardTokens = displayTokens.filter(t => t.state !== "finished");
+  const moving = displayTokens.filter(t => t.state !== "yard" && t.state !== "finished" && Number(t.position) > 0 && Number(t.position) < FINISH_PROGRESS);
+  const yard = displayTokens.filter(t => t.state === "yard" || Number(t.position) === 0);
 
   return (
     <div style={{ position: "relative", width: "100%", aspectRatio: "1", ...style }} className={className}>
       <BaseBoard
         theme={theme}
         preview={preview}
-        demoTokens={boardTokens}
+        demoTokens={yard}
         onTokenClick={onTokenClick}
         style={{ width: "100%", height: "100%" }}
       />
+
+      {moving.map(t => {
+        const cell = getTokenCell(t.color, Number(t.position));
+        if (!cell) return null;
+        const [row, col] = cell;
+        return (
+          <button
+            key={tokenKey(t)}
+            type="button"
+            onClick={() => onTokenClick?.(t.color, t.id)}
+            aria-label={`${t.color} token ${t.id + 1}`}
+            style={{
+              position: "absolute",
+              left: `${((col + 0.5) * 100) / 15}%`,
+              top: `${((row + 0.5) * 100) / 15}%`,
+              transform: "translate(-50%,-50%)",
+              width: "5.1%",
+              aspectRatio: 1,
+              borderRadius: "50%",
+              border: "2px solid #222",
+              background: BOARD_PALETTES[theme][t.color],
+              boxShadow: "0 2px 5px rgba(0,0,0,.35)",
+              zIndex: 30,
+              padding: 0,
+              color: "transparent",
+              fontSize: 0,
+              cursor: onTokenClick ? "pointer" : "default",
+            }}
+          />
+        );
+      })}
+
       <div
         aria-label={`Finished tokens: ${finished.length}`}
         style={{
@@ -190,9 +224,9 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         }}
       >
         {finished.map(t => (
-          <div key={`${t.color}-${t.id}`} style={{
+          <div key={tokenKey(t)} style={{
             width: "92%", height: "92%", minWidth: 0, minHeight: 0,
-            borderRadius: "50%", background: t.color,
+            borderRadius: "50%", background: BOARD_PALETTES[theme][t.color],
             border: "1px solid rgba(255,255,255,.95)",
             boxShadow: "0 2px 5px rgba(0,0,0,.35)",
           }} />
