@@ -28,6 +28,16 @@ function saveAccount(account:PlayerAccount){
  return account;
 }
 
+function clearLocalSession(){
+ localStorage.removeItem(KEY);
+ localStorage.removeItem("ludo-guest");
+ localStorage.removeItem("ludo-account-created");
+ ["ludo-player-id","ludo-player-name","ludo-level","ludo-xp","ludo-wallet"].forEach(k=>localStorage.removeItem(k));
+ window.dispatchEvent(new Event("ludo-profile-updated"));
+ window.dispatchEvent(new Event("ludo-wallet-updated"));
+ window.dispatchEvent(new Event("ludo-progression-updated"));
+}
+
 async function authRequest(action:string,payload:Record<string,unknown>={}){
  const response=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload})});
  const data=await response.json().catch(()=>({}));
@@ -64,21 +74,19 @@ export async function restoreSession(){
  if(typeof window==="undefined")return null;
  try{
   const response=await fetch("/api/auth",{cache:"no-store"});
-  if(!response.ok)return null;
+  if(!response.ok){clearLocalSession();return null;}
   const data=await response.json();
-  if(!data?.user)return null;
+  if(!data?.user){clearLocalSession();return null;}
   return saveAccount(data.user as PlayerAccount);
- }catch{return null}
+ }catch{
+  return null;
+ }
 }
 
 export async function logoutAccount(){
  if(typeof window==="undefined")return;
  try{await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"logout"})});}catch{}
- localStorage.removeItem(KEY);
- localStorage.removeItem("ludo-guest");
- localStorage.removeItem("ludo-account-created");
- ["ludo-player-id","ludo-player-name","ludo-level","ludo-xp","ludo-wallet"].forEach(k=>localStorage.removeItem(k));
- window.dispatchEvent(new Event("ludo-profile-updated"));
+ clearLocalSession();
 }
 
 export function syncLegacyProfile(account:PlayerAccount){
