@@ -4,6 +4,7 @@ import "./globals.css";
 import "./home.css";
 import "./board-skin-overlay.css";
 import GameSocialOverlay from "./_components/GameSocialOverlay";
+import LudoAudio from "./_components/LudoAudio";
 import SessionResume from "./_components/SessionResume";
 import AppShell from "./AppShell";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
@@ -22,5 +23,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({children}:{children:React.ReactNode}){
-  return <html lang="en"><body><ServiceWorkerRegistration /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense></body></html>;
+  return <html lang="en"><body><ServiceWorkerRegistration /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense><Suspense fallback={null}><LudoAudio /></Suspense></body></html>;
 }
