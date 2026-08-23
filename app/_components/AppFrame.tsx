@@ -1,5 +1,7 @@
 "use client";
 
+import WinnerCelebration from "./WinnerCelebration";
+
 export default function AppFrame({ children, back = "/home" }: { children: React.ReactNode; back?: string }) {
   const goBack = () => {
     if (window.history.length > 1) {
@@ -15,22 +17,13 @@ export default function AppFrame({ children, back = "/home" }: { children: React
         <button
           type="button"
           onClick={goBack}
-          style={{
-            color: "#93c5fd",
-            background: "transparent",
-            border: 0,
-            padding: 0,
-            fontSize: 16,
-            fontWeight: 700,
-            display: "inline-block",
-            marginBottom: 16,
-            cursor: "pointer",
-          }}
+          style={{ color: "#93c5fd", background: "transparent", border: 0, padding: 0, fontSize: 16, fontWeight: 700, display: "inline-block", marginBottom: 16, cursor: "pointer" }}
         >
           ← Back
         </button>
         {children}
       </div>
+      <WinnerCelebration />
     </main>
   );
 }
