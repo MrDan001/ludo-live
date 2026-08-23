@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import AppFrame from "../_components/AppFrame";
-import LudoBoard, { BOARD_PALETTES, type BoardThemeId, type DemoToken } from "../_components/LudoBoardGame";
+import LudoBoard, { BOARD_PALETTES, type BoardThemeId, type DemoToken } from "../_components/LudoBoardMultiplayer";
 import DemoDice from "../_components/DemoDice";
 import { FINISH_PROGRESS, TRACK_LENGTH, HOME_START_PROGRESS, tokenState } from "../../lib/canonicalLudoBoard";
 
@@ -112,7 +112,13 @@ export default function MultiplayerGameCanonical() {
         if (playerId === pid) setNotice(hasLegalMove(value) ? `You rolled ${value}. Pick a token.` : `You rolled ${value}. No legal move.`);
         else { setRemoteRolling(true); setNotice("Opponent is rolling…"); window.setTimeout(() => setRemoteRolling(false), 450); }
       });
-      s.on("game-moved", ({ tokenId }: { tokenId: string }) => { if (tokenId !== "__skip__") setAnimating(true); setPending(null); window.setTimeout(() => setAnimating(false), 360); });
+      s.on("game-moved", ({ tokenId }: { tokenId: string }) => {
+        if (tokenId !== "__skip__") {
+          setAnimating(true);
+          window.setTimeout(() => setAnimating(false), 1600);
+        }
+        setPending(null);
+      });
       s.on("disconnect", () => setNotice("Reconnecting…"));
       return () => { alive = false; s.disconnect(); };
     })();
@@ -136,20 +142,22 @@ export default function MultiplayerGameCanonical() {
   };
 
   const p = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
+  const pageBg = skinId === "classic" ? "#071426" : p.bg;
+  const pageAccent = skinId === "classic" ? "#5ea7ff" : p.accent;
   const headerMap: Record<string, [string, string, string]> = {
     classic: ["👑", "TIMELESS CLASSIC", "CLASSIC LUDO"], love: ["💗", "HEART COLLECTION", "LOVE EDITION"], night: ["🌃", "CITY AFTER DARK", "NIGHT CITY"], golden: ["🏆", "ROYAL COLLECTION", "GOLDEN ROYAL"]
   };
   const header = headerMap[skinId] || headerMap[theme] || headerMap.classic;
 
   return <AppFrame back="/lobby">
-    <main className="mp-canonical" style={{ "--accent": p.accent, "--bg": p.bg } as React.CSSProperties}>
+    <main className="mp-canonical" style={{ "--accent": pageAccent, "--bg": pageBg } as React.CSSProperties}>
       <div className="mp-wrap">
         <header className="mp-head"><div className="mp-icon">{header[0]}</div><div><div className="mp-eyebrow">{header[1]}</div><h1>{header[2]}</h1><div className="mp-sub">Live multiplayer • canonical board engine</div></div><div className="mp-live"><span/> LIVE</div></header>
         <div className="mp-label"><span/> LIVE MATCH</div>
         <section className="mp-board"><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken}/></section>
         <section className="mp-controls"><div><div className="mp-turn">{game?.status === "finished" ? "MATCH FINISHED" : myTurn ? "YOUR TURN" : currentId ? `${players.find(pl => pl.playerId === currentId)?.name || "PLAYER"} TURN` : "MATCH"}</div><b>{game?.winnerId === me ? "🏆 MATCH WON" : pending !== null ? "Pick a token" : "Roll the dice"}</b><p>{notice}</p></div><DemoDice value={roll} onRoll={handleRoll} disabled={!myTurn || pending !== null || animating || !game || game.status !== "playing"} botRolling={remoteRolling}/></section>
       </div>
-      <style jsx global>{`.mp-canonical{min-height:100dvh;background:var(--bg);color:#fff}.mp-wrap{width:100%;max-width:720px;margin:0 auto;padding:12px 24px 36px}.mp-head{display:flex;align-items:center;gap:14px;padding:18px 16px;border-radius:24px;background:color-mix(in srgb,var(--bg) 75%,white 25%);border:1px solid color-mix(in srgb,var(--accent) 65%,white 35%)}.mp-icon{font-size:38px}.mp-eyebrow{font-size:9px;letter-spacing:2px;font-weight:900;opacity:.75}.mp-head h1{margin:3px 0;font-size:24px}.mp-sub{font-size:11px;opacity:.7}.mp-live{margin-left:auto;white-space:nowrap;font-weight:900;font-size:12px}.mp-live span,.mp-label span{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);margin-right:7px}.mp-label{padding:22px 0 12px;font-size:12px;letter-spacing:3px;font-weight:900}.mp-board{width:100%}.mp-controls{margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:14px;padding:16px;border-radius:20px;border:1px solid color-mix(in srgb,var(--accent) 75%,white 25%);background:color-mix(in srgb,var(--bg) 88%,white 12%)}.mp-turn{font-size:11px;letter-spacing:2px;font-weight:900;opacity:.7}.mp-controls b{display:block;margin-top:7px;font-size:19px}.mp-controls p{margin:5px 0 0;font-size:13px;opacity:.78}`}</style>
+      <style jsx global>{`.mp-canonical{min-height:100dvh;background:var(--bg);color:#fff}.mp-wrap{width:100%;max-width:720px;margin:0 auto;padding:12px 24px 36px}.mp-head{display:flex;align-items:center;gap:14px;padding:18px 16px;border-radius:24px;background:color-mix(in srgb,var(--bg) 75%,white 25%);border:1px solid color-mix(in srgb,var(--accent) 65%,white 35%);box-shadow:0 18px 45px rgba(0,0,0,.22)}.mp-icon{font-size:38px}.mp-eyebrow{font-size:9px;letter-spacing:2px;font-weight:900;opacity:.75}.mp-head h1{margin:3px 0;font-size:24px}.mp-sub{font-size:11px;opacity:.7}.mp-live{margin-left:auto;white-space:nowrap;font-weight:900;font-size:12px}.mp-live span,.mp-label span{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--accent);margin-right:7px;box-shadow:0 0 12px var(--accent)}.mp-label{padding:22px 0 12px;font-size:12px;letter-spacing:3px;font-weight:900}.mp-board{width:100%;padding:8px;border-radius:28px;background:linear-gradient(145deg,color-mix(in srgb,var(--bg) 78%,white 22%),color-mix(in srgb,var(--bg) 94%,black 6%));box-shadow:0 22px 55px rgba(0,0,0,.28)}.mp-controls{margin-top:16px;display:flex;justify-content:space-between;align-items:center;gap:14px;padding:18px;border-radius:24px;border:1px solid color-mix(in srgb,var(--accent) 75%,white 25%);background:color-mix(in srgb,var(--bg) 82%,white 18%);box-shadow:0 18px 45px rgba(0,0,0,.2)}.mp-turn{font-size:11px;letter-spacing:2px;font-weight:900;opacity:.72}.mp-controls b{display:block;margin-top:7px;font-size:19px}.mp-controls p{margin:5px 0 0;font-size:13px;opacity:.82}`}</style>
     </main>
   </AppFrame>;
 }
