@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
-import CanonicalLudoBoard, { BOARD_PALETTES, type BoardThemeId, type DemoToken } from "../_components/CanonicalLudoBoard";
+import CanonicalLudoBoard, { type BoardThemeId, type DemoToken } from "../_components/CanonicalLudoBoard";
+import { BOARD_PALETTES } from "../_components/LudoBoard";
 import DemoDice from "../_components/DemoDice";
 import { getTokenCell, SAFE_CELLS, FINISH_PROGRESS, HOME_START_PROGRESS } from "../../lib/canonicalLudoBoard";
 type TokenColor="green"|"yellow"|"red"|"blue"; type DiceFace=1|2|3|4|5|6; type Mode="bot"|"2p"|"4p";
