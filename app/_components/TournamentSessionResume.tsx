@@ -5,8 +5,9 @@ import { usePathname } from "next/navigation";
 
 /**
  * Reconnects a player to an unfinished tournament match after a hard refresh.
- * The tournament API remains authoritative; this component only restores the
- * navigation context when the server says the player still has a live match.
+ * When more than one tournament match is active, the dashboard must not guess
+ * which board to resume. The player chooses the exact match, preserving
+ * tournament/match isolation.
  */
 export default function TournamentSessionResume() {
   const pathname = usePathname();
@@ -20,14 +21,13 @@ export default function TournamentSessionResume() {
         const response = await fetch("/api/tournaments", { cache: "no-store" });
         if (!response.ok) return;
         const data = await response.json();
-        const matches = Array.isArray(data?.matches) ? data.matches : [];
-        const active = matches.find(
+        const matches = (Array.isArray(data?.matches) ? data.matches : []).filter(
           (match: any) => match && match.status !== "finished" && match.room_code && match.tournament_id && match.id,
         );
-        if (!active || cancelled) return;
+        if (cancelled || matches.length !== 1) return;
 
+        const active = matches[0];
         const current = new URL(window.location.href);
-        // Don't redirect if the browser is already carrying this match context.
         if (
           current.searchParams.get("tournament") === String(active.tournament_id) &&
           current.searchParams.get("match") === String(active.id)
@@ -42,7 +42,7 @@ export default function TournamentSessionResume() {
           players = Math.ceil(players / 4);
           rounds += 1;
         }
-        const size = active.round_no === Math.max(1, rounds) ? 2 : 4;
+        const size = Number(active.round_no) === Math.max(1, rounds) ? 2 : 4;
         window.location.replace(
           `/game?room=${encodeURIComponent(active.room_code)}&tournament=${encodeURIComponent(active.tournament_id)}&match=${encodeURIComponent(active.id)}&size=${size}`,
         );
