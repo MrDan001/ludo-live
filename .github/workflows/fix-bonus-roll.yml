@@ -1,0 +1,35 @@
+name: Fix Multiplayer bonus roll
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  fix:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch no-legal-move six handling
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/game/MultiplayerGame.tsx')
+          s = p.read_text()
+          old = 's.on("game-dice",({playerId,value}:{playerId:string;value:Face})=>{setRoll(value);if(playerId===pid){setPending(value);setNotice(`You rolled ${value}. Pick a token.`)}else{setRemoteRolling(true);setNotice("Opponent is rolling…");window.setTimeout(()=>setRemoteRolling(false),950)}});'
+          new = 's.on("game-dice",({playerId,value}:{playerId:string;value:Face})=>{setRoll(value);if(playerId===pid){if(hasLegalMove(value)){setPending(value);setNotice(`You rolled ${value}. Pick a token.`)}else{setPending(null);bonusRollAfterSkip.current=value===6;setNotice(value===6?"No legal move — bonus roll queued.":"No legal move — turn passes.");s.emit("game-move",{tokenId:"__skip__",to:0})}}else{setRemoteRolling(true);setNotice("Opponent is rolling…");window.setTimeout(()=>setRemoteRolling(false),950)}});'
+          if old not in s:
+              print('Patch already applied or source changed; nothing to do.')
+              raise SystemExit(0)
+          p.write_text(s.replace(old, new, 1))
+          PY
+      - name: Commit patch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/game/MultiplayerGame.tsx
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Fix multiplayer bonus roll when no token can move'
+          git push
