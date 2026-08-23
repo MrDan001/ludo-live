@@ -5,12 +5,16 @@ export type BoardCell = readonly [number, number];
 
 // Canonical tournament movement: 50 shared-path positions, then the first
 // coloured home-lane position is progress 51. The centre finish is progress 56.
+// The physical board has 52 shared cells; each colour's route intentionally
+// uses the first 50 cells from its start and skips the final two approach cells
+// before entering that colour's home lane, matching the board layout.
 export const TRACK_LENGTH = 50;
 export const HOME_STRETCH = 5;
 export const YARD_PROGRESS = 0;
 export const TRACK_START_PROGRESS = 1;
 export const HOME_START_PROGRESS = 51;
 export const FINISH_PROGRESS = 56;
+export const PHYSICAL_TRACK_LENGTH = 52;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
@@ -34,9 +38,6 @@ export const MAIN_PATH: readonly BoardCell[] = [
   [7, 0], [6, 0],
 ];
 
-// The physical board contains the full path, but the canonical movement
-// model uses the first 50 shared positions. Keeping the geometry intact lets
-// the renderer preserve the board while movement rules stop at progress 50.
 export const HOME_LANES: Record<LudoColor, readonly BoardCell[]> = {
   green: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
   yellow: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]],
@@ -53,7 +54,10 @@ export const SAFE_CELLS = [
 
 export function getTrackCell(color: LudoColor, progress: number): BoardCell | null {
   if (progress < TRACK_START_PROGRESS || progress > TRACK_LENGTH) return null;
-  const index = (START_INDEX[color] + progress - 1) % TRACK_LENGTH;
+  // Use the real 52-cell physical track for coordinate lookup. The movement
+  // rule still stops at progress 50, so the final two physical approach cells
+  // are skipped and progress 51 enters the colour's home lane.
+  const index = (START_INDEX[color] + progress - 1) % PHYSICAL_TRACK_LENGTH;
   return MAIN_PATH[index] ?? null;
 }
 
@@ -75,6 +79,6 @@ export function tokenState(progress: number): "yard" | "track" | "home" | "finis
   return "finished";
 }
 
-if (MAIN_PATH.length < TRACK_LENGTH) {
-  throw new Error(`Canonical Ludo invariant failed: board path must contain at least ${TRACK_LENGTH} cells.`);
+if (MAIN_PATH.length !== PHYSICAL_TRACK_LENGTH || new Set(MAIN_PATH.map(([r, c]) => `${r}:${c}`)).size !== PHYSICAL_TRACK_LENGTH) {
+  throw new Error(`Canonical Ludo invariant failed: expected ${PHYSICAL_TRACK_LENGTH} unique physical shared cells.`);
 }
