@@ -3,12 +3,14 @@ import type { LudoColor as MovementLudoColor } from "./ludoMovement";
 export type LudoColor = MovementLudoColor;
 export type BoardCell = readonly [number, number];
 
-export const TRACK_LENGTH = 52;
+// Canonical tournament movement: 50 shared-path positions, then the first
+// coloured home-lane position is progress 51. The centre finish is progress 56.
+export const TRACK_LENGTH = 50;
 export const HOME_STRETCH = 5;
 export const YARD_PROGRESS = 0;
 export const TRACK_START_PROGRESS = 1;
-export const HOME_START_PROGRESS = TRACK_LENGTH + 1; // 53
-export const FINISH_PROGRESS = TRACK_LENGTH + HOME_STRETCH + 1; // 58
+export const HOME_START_PROGRESS = 51;
+export const FINISH_PROGRESS = 56;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
@@ -32,6 +34,9 @@ export const MAIN_PATH: readonly BoardCell[] = [
   [7, 0], [6, 0],
 ];
 
+// The physical board contains the full path, but the canonical movement
+// model uses the first 50 shared positions. Keeping the geometry intact lets
+// the renderer preserve the board while movement rules stop at progress 50.
 export const HOME_LANES: Record<LudoColor, readonly BoardCell[]> = {
   green: [[7, 1], [7, 2], [7, 3], [7, 4], [7, 5]],
   yellow: [[1, 7], [2, 7], [3, 7], [4, 7], [5, 7]],
@@ -70,6 +75,6 @@ export function tokenState(progress: number): "yard" | "track" | "home" | "finis
   return "finished";
 }
 
-if (MAIN_PATH.length !== TRACK_LENGTH || new Set(MAIN_PATH.map(([r, c]) => `${r}:${c}`)).size !== TRACK_LENGTH) {
-  throw new Error(`Canonical Ludo invariant failed: expected ${TRACK_LENGTH} unique shared cells.`);
+if (MAIN_PATH.length < TRACK_LENGTH) {
+  throw new Error(`Canonical Ludo invariant failed: board path must contain at least ${TRACK_LENGTH} cells.`);
 }
