@@ -1,6 +1,7 @@
 "use client";
 
 import WinnerCelebration from "./WinnerCelebration";
+import ForfeitControl from "./ForfeitControl";
 
 export default function AppFrame({ children, back = "/home" }: { children: React.ReactNode; back?: string }) {
   const goBack = () => {
@@ -24,6 +25,7 @@ export default function AppFrame({ children, back = "/home" }: { children: React
         {children}
       </div>
       <WinnerCelebration />
+      <ForfeitControl />
     </main>
   );
 }
