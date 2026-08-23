@@ -1,18 +1,14 @@
-// Canonical Ludo board geometry. Every game mode should use this model.
-// Progress semantics are deliberately explicit:
-// 0 = yard, 1..52 = shared path, 53..57 = five home-lane cells,
-// 58 = finished in the centre. Thus the visual home stretch contains
-// five coloured cells plus the centre finish as the sixth finishing position.
+// Existing shared board geometry API kept stable for the other game modes.
+// The new canonical master engine lives in lib/canonicalLudoBoard.ts.
 
-export type LudoColor = "green" | "yellow" | "red" | "blue";
+import type { LudoColor } from "./ludoMovement";
+
 export type BoardCell = readonly [number, number];
 
 export const TRACK_LENGTH = 52;
+export const PLAYABLE_TRACK_LENGTH = TRACK_LENGTH;
 export const HOME_STRETCH = 5;
-export const YARD_PROGRESS = 0;
-export const TRACK_START_PROGRESS = 1;
-export const HOME_START_PROGRESS = TRACK_LENGTH + 1;
-export const FINISH_PROGRESS = TRACK_LENGTH + HOME_STRETCH + 1;
+export const HOME_ENTRY_STEP = PLAYABLE_TRACK_LENGTH;
 
 export const START_INDEX: Record<LudoColor, number> = {
   green: 0,
@@ -52,35 +48,21 @@ export const SAFE_CELLS = [
   { row: 8, col: 13, color: "blue" },
 ] as const;
 
-export function getTrackCell(color: LudoColor, progress: number): BoardCell | null {
-  if (progress < TRACK_START_PROGRESS || progress > TRACK_LENGTH) return null;
-  const index = (START_INDEX[color] + progress - 1) % TRACK_LENGTH;
-  return MAIN_PATH[index] ?? null;
+export function getTrackCell(color: LudoColor, steps: number): BoardCell | null {
+  if (steps < 0 || steps >= PLAYABLE_TRACK_LENGTH) return null;
+  const rotatedPath = [...MAIN_PATH.slice(START_INDEX[color]), ...MAIN_PATH.slice(0, START_INDEX[color])];
+  return rotatedPath[steps] ?? null;
 }
 
-export function getHomeCell(color: LudoColor, progress: number): BoardCell | null {
-  const index = progress - HOME_START_PROGRESS;
+export function getHomeCell(color: LudoColor, steps: number): BoardCell | null {
+  const index = steps - HOME_ENTRY_STEP;
   return index >= 0 && index < HOME_STRETCH ? HOME_LANES[color][index] ?? null : null;
 }
 
-export function getTokenCell(color: LudoColor, progress: number): BoardCell | null {
-  if (progress >= TRACK_START_PROGRESS && progress <= TRACK_LENGTH) return getTrackCell(color, progress);
-  if (progress >= HOME_START_PROGRESS && progress < FINISH_PROGRESS) return getHomeCell(color, progress);
-  return null;
+export function getTokenCell(color: LudoColor, steps: number): BoardCell | null {
+  return steps < HOME_ENTRY_STEP ? getTrackCell(color, steps) : getHomeCell(color, steps);
 }
 
-export function tokenState(progress: number): "yard" | "track" | "home" | "finished" {
-  if (progress <= YARD_PROGRESS) return "yard";
-  if (progress <= TRACK_LENGTH) return "track";
-  if (progress < FINISH_PROGRESS) return "home";
-  return "finished";
-}
-
-if (MAIN_PATH.length !== TRACK_LENGTH || new Set(MAIN_PATH.map(([r, c]) => `${r}:${c}`)).size !== TRACK_LENGTH) {
-  throw new Error(`Ludo board invariant failed: expected ${TRACK_LENGTH} unique shared-path cells.`);
-}
-for (const color of ["green", "yellow", "red", "blue"] as LudoColor[]) {
-  if (HOME_LANES[color].length !== HOME_STRETCH) {
-    throw new Error(`Ludo board invariant failed: ${color} home lane must contain ${HOME_STRETCH} cells.`);
-  }
+if (MAIN_PATH.length !== TRACK_LENGTH) {
+  throw new Error(`Ludo board invariant failed: expected ${TRACK_LENGTH} track cells, got ${MAIN_PATH.length}.`);
 }
