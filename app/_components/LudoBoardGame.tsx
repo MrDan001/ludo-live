@@ -14,6 +14,7 @@ type Props = {
   onTokenClick?: (color: DemoToken["color"], id: number) => void;
   snapOnUpdate?: boolean;
   finishSound?: boolean;
+  animateUpdates?: boolean;
 };
 
 const finishedOrder = ["green", "yellow", "red", "blue"] as const;
@@ -27,7 +28,7 @@ function tokenKey(token: DemoToken) {
 function tokenState(position: number): DemoToken["state"] {
   if (position === 0) return "yard";
   if (position === 56) return "finished";
-  if (position > 51) return "home";
+  if (position > 52) return "home";
   return "track";
 }
 
@@ -37,7 +38,7 @@ function emitAudio(kind: "move" | "capture" | "finish") {
   }
 }
 
-export default function LudoBoardGame({ theme = "classic", preview = false, className = "", style, demoTokens = [], onTokenClick, snapOnUpdate = false, finishSound = false }: Props) {
+export default function LudoBoardGame({ theme = "classic", preview = false, className = "", style, demoTokens = [], onTokenClick, snapOnUpdate = false, finishSound = false, animateUpdates = true }: Props) {
   const [displayTokens, setDisplayTokens] = useState<DemoToken[]>(demoTokens);
   const displayRef = useRef<DemoToken[]>(demoTokens);
   const timersRef = useRef<Record<string, number>>({});
@@ -57,7 +58,7 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
       return;
     }
 
-    if (snapOnUpdate) {
+    if (snapOnUpdate || !animateUpdates) {
       Object.values(timersRef.current).forEach(timer => window.clearTimeout(timer));
       timersRef.current = {};
       const snapped = Array.from(incoming.values());
@@ -106,8 +107,6 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
         continue;
       }
 
-      // A finished token must appear in the centre immediately. Do not make
-      // the player wait for one more animation step just to reveal it.
       if (targetToken.state === "finished" || to === 56) {
         current.set(key, targetToken);
         displayRef.current = Array.from(current.values());
@@ -156,7 +155,7 @@ export default function LudoBoardGame({ theme = "classic", preview = false, clas
     }
     displayRef.current = reconciled;
     setDisplayTokens(reconciled);
-  }, [demoTokens, snapOnUpdate, finishSound]);
+  }, [demoTokens, snapOnUpdate, finishSound, animateUpdates]);
 
   useEffect(() => () => {
     Object.values(timersRef.current).forEach(timer => window.clearTimeout(timer));
