@@ -1,4 +1,5 @@
 import {FINISH_PROGRESS,getTokenCell,SAFE_CELLS,tokenState,type LudoColor} from "./canonicalLudoBoard";
+import "./canonicalLudoBoard.invariants";
 export type DiceValue=1|2|3|4|5|6;
 export type TokenLike={color:LudoColor;id:number;position:number;state?:"yard"|"track"|"home"|"finished"};
 export const HUMAN_COLORS:readonly LudoColor[]=["red","yellow"];
