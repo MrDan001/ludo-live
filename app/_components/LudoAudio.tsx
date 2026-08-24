@@ -1,12 +1,80 @@
 "use client";
 
-/**
- * Audio is intentionally disabled for now.
- *
- * Keep this component mounted so existing game components do not need to be
- * changed while the new sound set is being selected. No Web Audio context,
- * sound effect, music loop, or browser audio listener is created here.
- */
+import { useEffect, useRef } from "react";
+
+type SoundKind = "dice" | "move" | "capture" | "safe" | "home" | "win";
+
+/** Lightweight synthesized game SFX. No external audio assets are required. */
 export default function LudoAudio(){
+  const ctxRef = useRef<AudioContext | null>(null);
+
+  useEffect(() => {
+    const play = (kind: SoundKind) => {
+      try {
+        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = ctxRef.current || new AudioCtx();
+        ctxRef.current = ctx;
+        if (ctx.state === "suspended") void ctx.resume();
+
+        const now = ctx.currentTime;
+        const master = ctx.createGain();
+        master.gain.setValueAtTime(0.0001, now);
+        master.connect(ctx.destination);
+
+        const tone = (freq:number, duration:number, start:number, gain:number, type:OscillatorType="sine", endFreq?:number) => {
+          const osc = ctx.createOscillator();
+          const g = ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, now + start);
+          if (endFreq) osc.frequency.exponentialRampToValueAtTime(Math.max(30,endFreq), now + start + duration);
+          g.gain.setValueAtTime(0.0001, now + start);
+          g.gain.exponentialRampToValueAtTime(gain, now + start + 0.008);
+          g.gain.exponentialRampToValueAtTime(0.0001, now + start + duration);
+          osc.connect(g); g.connect(master);
+          osc.start(now + start); osc.stop(now + start + duration + 0.015);
+        };
+
+        if (kind === "dice") {
+          tone(190, .10, 0, .16, "triangle", 105);
+          tone(285, .08, .08, .12, "triangle", 150);
+          tone(410, .06, .15, .10, "triangle", 220);
+        } else if (kind === "move") {
+          tone(520, .045, 0, .075, "square", 430);
+        } else if (kind === "capture") {
+          tone(150, .12, 0, .18, "sawtooth", 75);
+          tone(620, .10, .045, .13, "triangle", 310);
+        } else if (kind === "safe") {
+          tone(880, .12, 0, .11, "sine", 1040);
+          tone(1320, .18, .08, .085, "sine", 1580);
+        } else if (kind === "home") {
+          tone(660, .13, 0, .105, "sine", 740);
+          tone(880, .13, .10, .105, "sine", 990);
+          tone(1100, .22, .20, .11, "sine", 1320);
+        } else if (kind === "win") {
+          tone(523, .18, 0, .12, "sine", 659);
+          tone(659, .18, .16, .12, "sine", 784);
+          tone(784, .22, .32, .13, "sine", 1047);
+          tone(1047, .42, .50, .15, "sine", 1319);
+        }
+        master.gain.setValueAtTime(0.0001, now);
+        master.gain.linearRampToValueAtTime(1, now + 0.008);
+        master.gain.setValueAtTime(1, now + .02);
+        master.gain.linearRampToValueAtTime(0.0001, now + (kind === "win" ? 1.05 : .55));
+      } catch {}
+    };
+
+    const onAudio = (event: Event) => {
+      const value = String((event as CustomEvent).detail || "");
+      if (["dice","move","capture","safe","home","win"].includes(value)) play(value as SoundKind);
+    };
+    window.addEventListener("ludo-audio", onAudio);
+    return () => {
+      window.removeEventListener("ludo-audio", onAudio);
+      try { void ctxRef.current?.close(); } catch {}
+      ctxRef.current = null;
+    };
+  }, []);
+
   return null;
 }
