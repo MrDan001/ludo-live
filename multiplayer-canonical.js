@@ -299,6 +299,7 @@ if (!Server.prototype.__ludoCanonical) {
             if (name === "join-room") {
               attach(socket, payload[0] || {});
               if (!socket.data.ludoCanonical) fn(...payload);
+              else fn(...payload);
               return;
             }
             if (name === "ready") {
@@ -322,7 +323,7 @@ if (!Server.prototype.__ludoCanonical) {
               return;
             }
             if (name === "disconnect") {
-              if (socket.data.ludoCanonical) { disconnect(socket); return; }
+              if (socket.data.ludoCanonical) { disconnect(socket); }
               fn(...payload);
             }
           });
