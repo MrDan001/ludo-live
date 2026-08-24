@@ -148,3 +148,22 @@
 .shared-ludo-board.theme-love { --skin-frame:#d84b86; --skin-glow:rgba(216,75,134,.32); }
 .shared-ludo-board.theme-night { --skin-frame:#4e76a8; --skin-glow:rgba(0,0,0,.60); }
 .shared-ludo-board.theme-arabian { --skin-frame:#d7ad4d; --skin-glow:rgba(150,92,25,.46); }
+
+/* Final outer-frame treatment: replace the old pseudo-element frame with a
+   clean, continuous decorative outline. It never changes the 15x15 board,
+   cells, center, or token coordinates. */
+.shared-ludo-board::before {
+  display: none !important;
+}
+
+.shared-ludo-board {
+  outline: 2px solid var(--skin-frame);
+  outline-offset: 5px;
+}
+
+@media (max-width: 650px) {
+  .shared-ludo-board {
+    outline-width: 2px;
+    outline-offset: 4px;
+  }
+}
