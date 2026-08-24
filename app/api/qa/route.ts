@@ -13,7 +13,8 @@ function run(name: string, fn: () => boolean) {
   try { return { name, passed: !!fn() }; } catch (error) { return { name, passed: false, error: error instanceof Error ? error.message : "test error" }; }
 }
 
-function makeToken(color: string, id: number, position: number) { return { color, id, position, state: rules.tokenState(position) }; }
+type RuleColor = Parameters<typeof rules.playerColorsForSeats>[1] extends never ? never : "red" | "green" | "yellow" | "blue";
+function makeToken(color: RuleColor, id: number, position: number) { return { color, id, position, state: rules.tokenState(position) }; }
 
 function tests() {
   const out = [
