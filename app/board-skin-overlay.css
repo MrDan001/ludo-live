@@ -8,6 +8,7 @@
   --skin-accent: #222;
   --skin-glow: rgba(0,0,0,.18);
   --skin-frame: #222;
+  overflow: visible !important;
 }
 
 /* On phones, fit the complete board inside the viewport and keep it centered.
@@ -24,10 +25,15 @@
   }
 }
 
+/*
+ * The decorative frame must live OUTSIDE the 15x15 playing grid.
+ * The old inset:0 frame was painted directly over the outer track cells.
+ * Moving it outward is intentional; token coordinates and token styling are untouched.
+ */
 .shared-ludo-board::before {
   content: "";
   position: absolute;
-  inset: 0;
+  inset: -7px;
   z-index: 90;
   pointer-events: none;
   border: 7px solid var(--skin-frame);
@@ -38,14 +44,29 @@
     0 0 0 1px rgba(0,0,0,.12);
 }
 
+/*
+ * Dedicated center-home overlay. Using a centered 20% square matches
+ * exactly 3 cells of the 15x15 board, so the four Ludo colors stay intact
+ * regardless of how many token elements are rendered after the grid.
+ */
 .shared-ludo-board::after {
   content: "";
   position: absolute;
-  inset: 4px;
+  inset: 0;
   z-index: 91;
   pointer-events: none;
   border-radius: inherit;
-  box-shadow: inset 0 0 0 1px rgba(255,255,255,.28);
+  background:
+    conic-gradient(
+      from -45deg,
+      #f5b800 0deg 90deg,
+      #2f6be5 90deg 180deg,
+      #f02d43 180deg 270deg,
+      #18a84b 270deg 360deg
+    );
+  background-size: 20% 20%;
+  background-position: center;
+  background-repeat: no-repeat;
 }
 
 /* CLASSIC BOARD COLORS — OUTER YARDS ONLY. */
@@ -67,7 +88,7 @@
 .shared-ludo-board > :nth-child(203) { background: #f02d43; }
 .shared-ludo-board > :nth-child(135) { background: #2f6be5; }
 
-/* CENTER HOME BOX ONLY. */
+/* Legacy center selector retained harmlessly for compatibility with older board DOM. */
 .shared-ludo-board > :nth-child(231) {
   background: conic-gradient(
     from -45deg,
@@ -78,8 +99,7 @@
   ) !important;
 }
 
-/* TOKEN VISUALS ONLY — slightly reduced from 150%, centered in its existing square.
-   Token numbers are intentionally hidden so every token is a plain colored piece. */
+/* TOKEN VISUALS ONLY — unchanged. */
 .shared-ludo-board [style*="border-radius:50%"],
 .shared-ludo-board [style*="border-radius: 50%"],
 .shared-ludo-board [style*="border-radius:50% !important"],
@@ -124,5 +144,8 @@
 .shared-ludo-board.theme-arabian { --skin-frame:#d7ad4d; --skin-glow:rgba(150,92,25,.46); }
 
 @media (max-width:380px) {
-  .shared-ludo-board::before { border-width:5px; }
+  .shared-ludo-board::before {
+    inset: -5px;
+    border-width: 5px;
+  }
 }
