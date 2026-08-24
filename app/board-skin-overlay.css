@@ -1,169 +1,17 @@
 /*
- * Board skin overlay only.
- * The classic Ludo cells, lanes, yards, center, tokens, movement and dice
- * remain owned by the existing renderer. This layer only decorates the
- * parent board surface/frame using the already-equipped Shop theme.
+ * Legacy board-skin overlay intentionally neutral.
+ *
+ * Theme rendering belongs to the active LudoBoard renderer. This stylesheet
+ * must never paint, frame, recolor, or transform the shared board because
+ * doing so can override the selected shop skin/theme.
  */
 .shared-ludo-board {
-  --skin-accent: #222;
-  --skin-glow: rgba(0,0,0,.18);
-  --skin-frame: #222;
-  overflow: visible !important;
+  outline: none !important;
+  overflow: hidden !important;
 }
 
-/* Fancy outer board frame. It sits outside the 15x15 grid and never
-   participates in layout or token positioning. */
-.shared-ludo-board::before {
-  content: "";
-  position: absolute;
-  inset: -11px;
-  z-index: 0;
-  pointer-events: none;
-  border: 3px solid var(--skin-frame);
-  border-radius: calc(14px + 11px);
-  box-shadow:
-    0 0 0 1px rgba(255,255,255,.48),
-    0 0 0 4px rgba(255,255,255,.12),
-    0 7px 18px var(--skin-glow);
-  background:
-    linear-gradient(135deg, rgba(255,255,255,.55), transparent 18%, transparent 82%, rgba(255,255,255,.3));
-  background-origin: border-box;
-}
-
-/* On phones, fit the complete board inside the viewport and keep it centered.
-   Make it larger while preserving the mobile fit. */
-@media (max-width: 650px) {
-  .shared-ludo-board {
-    width: min(100%, calc(100vw - 8px)) !important;
-    max-width: calc(100vw - 8px) !important;
-    min-width: 0 !important;
-    margin-left: auto !important;
-    margin-right: auto !important;
-    transform: none !important;
-    box-sizing: border-box !important;
-  }
-
-  .shared-ludo-board::before {
-    inset: -8px;
-    border-width: 2px;
-    border-radius: 22px;
-  }
-}
-
-/*
- * Dedicated center-home overlay. Using a centered 20% square matches
- * exactly 3 cells of the 15x15 board, so the four Ludo colors stay intact
- * regardless of how many token elements are rendered after the grid.
- */
+.shared-ludo-board::before,
 .shared-ludo-board::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: 91;
-  pointer-events: none;
-  border-radius: inherit;
-  background:
-    conic-gradient(
-      from -45deg,
-      #f5b800 0deg 90deg,
-      #2f6be5 90deg 180deg,
-      #f02d43 180deg 270deg,
-      #18a84b 270deg 360deg
-    );
-  background-size: 20% 20%;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-/* CLASSIC BOARD COLORS — OUTER YARDS ONLY. */
-.shared-ludo-board > :nth-child(227) { background: #18a84b; }
-.shared-ludo-board > :nth-child(228) { background: #f5b800; }
-.shared-ludo-board > :nth-child(229) { background: #f02d43; }
-.shared-ludo-board > :nth-child(230) { background: #2f6be5; }
-
-.shared-ludo-board > :nth-child(227) > div,
-.shared-ludo-board > :nth-child(228) > div,
-.shared-ludo-board > :nth-child(229) > div,
-.shared-ludo-board > :nth-child(230) > div {
-  background: rgba(255,255,255,.94) !important;
-}
-
-/* FOUR START/EXIT SQUARES. */
-.shared-ludo-board > :nth-child(93) { background: #18a84b; }
-.shared-ludo-board > :nth-child(25) { background: #f5b800; }
-.shared-ludo-board > :nth-child(203) { background: #f02d43; }
-.shared-ludo-board > :nth-child(135) { background: #2f6be5; }
-
-/* Legacy center selector retained harmlessly for compatibility with older board DOM. */
-.shared-ludo-board > :nth-child(231) {
-  background: conic-gradient(
-    from -45deg,
-    #f5b800 0deg 90deg,
-    #2f6be5 90deg 180deg,
-    #f02d43 180deg 270deg,
-    #18a84b 270deg 360deg
-  ) !important;
-}
-
-/* TOKEN VISUALS ONLY — unchanged. */
-.shared-ludo-board [style*="border-radius:50%"],
-.shared-ludo-board [style*="border-radius: 50%"],
-.shared-ludo-board [style*="border-radius:50% !important"],
-.shared-ludo-board [style*="border-radius: 50% !important"] {
-  transform: scale(1.35);
-  transform-origin: center center;
-  z-index: 120;
-  transition: transform 160ms ease, filter 160ms ease, box-shadow 160ms ease;
-  filter: drop-shadow(0 2px 2px rgba(0,0,0,.28));
-  font-size: 0 !important;
-  line-height: 0 !important;
-}
-
-.shared-ludo-board [style*="border-radius:50%"]:hover,
-.shared-ludo-board [style*="border-radius: 50%"]:hover {
-  filter: drop-shadow(0 3px 4px rgba(0,0,0,.34));
-}
-
-/* The classic board keeps its exact original appearance. */
-.shared-ludo-board.theme-classic {
-  --skin-frame: #222;
-  --skin-glow: rgba(0,0,0,.18);
-}
-
-.shared-ludo-board.theme-golden { --skin-frame:#8a5a12; --skin-glow:rgba(221,170,44,.42); }
-.shared-ludo-board.theme-neon { --skin-frame:#7cf7ff; --skin-glow:rgba(0,229,255,.38); }
-.shared-ludo-board.theme-beach { --skin-frame:#2c7080; --skin-glow:rgba(65,145,170,.28); }
-.shared-ludo-board.theme-galaxy { --skin-frame:#a9c9ff; --skin-glow:rgba(86,84,255,.48); }
-.shared-ludo-board.theme-wood { --skin-frame:#5b321b; --skin-glow:rgba(64,28,9,.50); }
-.shared-ludo-board.theme-dragon { --skin-frame:#dcae4d; --skin-glow:rgba(190,46,28,.42); }
-.shared-ludo-board.theme-christmas { --skin-frame:#d9b74c; --skin-glow:rgba(15,90,55,.40); }
-.shared-ludo-board.theme-football { --skin-frame:#74d68a; --skin-glow:rgba(0,80,40,.45); }
-.shared-ludo-board.theme-candy { --skin-frame:#9a4d9e; --skin-glow:rgba(182,90,177,.32); }
-.shared-ludo-board.theme-marble { --skin-frame:#b08a3c; --skin-glow:rgba(90,100,115,.28); }
-.shared-ludo-board.theme-nature { --skin-frame:#8bb65b; --skin-glow:rgba(26,80,37,.48); }
-.shared-ludo-board.theme-space { --skin-frame:#6bdcff; --skin-glow:rgba(57,157,255,.50); }
-.shared-ludo-board.theme-crystal { --skin-frame:#7bc9ee; --skin-glow:rgba(90,190,235,.38); }
-.shared-ludo-board.theme-fireice { --skin-frame:#f2b94b; --skin-glow:rgba(230,85,45,.40); }
-.shared-ludo-board.theme-jungle { --skin-frame:#6e9f45; --skin-glow:rgba(20,80,28,.46); }
-.shared-ludo-board.theme-love { --skin-frame:#d84b86; --skin-glow:rgba(216,75,134,.32); }
-.shared-ludo-board.theme-night { --skin-frame:#4e76a8; --skin-glow:rgba(0,0,0,.60); }
-.shared-ludo-board.theme-arabian { --skin-frame:#d7ad4d; --skin-glow:rgba(150,92,25,.46); }
-
-/* Final outer-frame treatment: replace the old pseudo-element frame with a
-   clean, continuous decorative outline. It never changes the 15x15 board,
-   cells, center, or token coordinates. */
-.shared-ludo-board::before {
+  content: none !important;
   display: none !important;
-}
-
-.shared-ludo-board {
-  outline: 2px solid var(--skin-frame);
-  outline-offset: 5px;
-}
-
-@media (max-width: 650px) {
-  .shared-ludo-board {
-    outline-width: 2px;
-    outline-offset: 4px;
-  }
 }
