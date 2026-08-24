@@ -1,17 +1,27 @@
-import {FINISH_PROGRESS,getTokenCell,SAFE_CELLS,tokenState,type LudoColor} from "./canonicalLudoBoard";
-import "./canonicalLudoBoard.invariants";
+import * as rules from "./ludoRules";
+import type { LudoColor } from "./ludoRules";
 export type DiceValue=1|2|3|4|5|6;
-export type TokenLike={color:LudoColor;id:number;position:number;state?:"yard"|"track"|"home"|"finished"};
+export type TokenLike=rules.TokenLike;
 export const HUMAN_COLORS:readonly LudoColor[]=["red","yellow"];
 export const BOT_COLORS:readonly LudoColor[]=["green","blue"];
-const same=(a:readonly number[]|null,b:readonly number[]|null)=>!!a&&!!b&&a[0]===b[0]&&a[1]===b[1];
-export function isSafeProgress(color:LudoColor,progress:number){const cell=getTokenCell(color,progress);return SAFE_CELLS.some(s=>same(cell,[s.row,s.col]));}
-export function nextProgress(position:number,dice:DiceValue){if(position===0)return dice===6?1:null;const next=position+dice;return next<=FINISH_PROGRESS?next:null;}
-function opponentsAt(tokens:readonly TokenLike[],color:LudoColor,progress:number){const cell=getTokenCell(color,progress);if(!cell)return [];return tokens.filter(t=>t.position>0&&t.position<FINISH_PROGRESS&&t.color!==color&&same(getTokenCell(t.color,t.position),cell));}
-export function canMove(tokens:readonly TokenLike[],token:TokenLike,dice:DiceValue){if(token.state==="finished"||token.position>=FINISH_PROGRESS)return false;const target=nextProgress(token.position,dice);if(target===null)return false;if(target===FINISH_PROGRESS)return true;return opponentsAt(tokens,token.color,target).length<2;}
-export function legalMoves(tokens:readonly TokenLike[],colors:readonly LudoColor[],dice:DiceValue){return tokens.filter(t=>colors.includes(t.color)&&canMove(tokens,t,dice));}
-export function hasLegalMove(tokens:readonly TokenLike[],colors:readonly LudoColor[],dice:DiceValue){return legalMoves(tokens,colors,dice).length>0;}
-export function applyMove(tokens:readonly TokenLike[],token:TokenLike,dice:DiceValue){if(!canMove(tokens,token,dice))return null;const target=nextProgress(token.position,dice);if(target===null)return null;const moved=tokens.map(item=>item.color===token.color&&item.id===token.id?{...item,position:target,state:tokenState(target)}:{...item});if(target!==FINISH_PROGRESS&&!isSafeProgress(token.color,target)){const opponents=opponentsAt(moved,token.color,target);if(opponents.length===1){const captured=opponents[0];return moved.map(item=>item.color===captured.color&&item.id===captured.id?{...item,position:0,state:"yard" as const}:item);}}return moved;}
-export function hasWon(tokens:readonly TokenLike[],colors:readonly LudoColor[]){const owned=tokens.filter(t=>colors.includes(t.color));return owned.length>0&&owned.every(t=>t.position>=FINISH_PROGRESS||t.state==="finished");}
-export function winner(tokens:readonly TokenLike[]){if(hasWon(tokens,HUMAN_COLORS))return "human" as const;if(hasWon(tokens,BOT_COLORS))return "bot" as const;return null;}
-export function isDice(value:number):value is DiceValue{return Number.isInteger(value)&&value>=1&&value<=6;}
+export const COLORS=rules.COLORS;
+export const SAFE_CELLS=rules.SAFE_CELLS;
+export const START_INDEX=rules.START_INDEX;
+export const TRACK_LENGTH=rules.TRACK_LENGTH;
+export const HOME_STRETCH=rules.HOME_STRETCH;
+export const HOME_ENTRY_STEP=rules.HOME_START;
+export const STEPS_TO_FINISH=rules.FINISH;
+export const FINISH_PROGRESS=rules.FINISH;
+export const getBoardPosition=(token:TokenLike)=>{if(token.position<=0||token.position>=rules.FINISH)return null;const cell=rules.getTokenCell(token.color,token.position);return cell?{zone:token.position>=rules.HOME_START?"home":"track",index:token.position}:null};
+export const isSafeSquare=(trackIndex:number)=>rules.SAFE_CELLS.some(s=>s.row===Math.floor(trackIndex/15)&&s.col===trackIndex%15);
+export const canMove=rules.canMove;
+export const legalMoves=rules.legalMoves;
+export const moveToken=(token:TokenLike,dice:DiceValue,allTokens:TokenLike[])=>{const result=rules.applyMove(allTokens,token,dice);return result?{moved:true,token:result.tokens.find(t=>t.color===token.color&&t.id===token.id)||token,captured:result.captured?[result.captured]:[]}:{moved:false,token,captured:[]};};
+export const hasLegalMove=rules.hasLegalMove;
+export const nextProgress=rules.nextProgress;
+export const applyMove=(tokens:readonly TokenLike[],token:TokenLike,dice:DiceValue)=>{const result=rules.applyMove(tokens,token,dice);return result?.tokens||null;};
+export const hasWon=rules.hasWon;
+export const winner=(tokens:readonly TokenLike[])=>rules.winner(tokens,HUMAN_COLORS,BOT_COLORS);
+export const isDice=(value:number):value is DiceValue=>Number.isInteger(value)&&value>=1&&value<=6;
+export const rollDice=()=>((Math.floor(Math.random()*6)+1) as DiceValue);
+export const playerColorsForSeats=rules.playerColorsForSeats;
