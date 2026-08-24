@@ -57,7 +57,7 @@ export default function LudoBoardFixed({ theme = "classic", className = "", ...p
           justify-content: center;
           border-radius: 18px;
           isolation: isolate;
-          box-shadow: 0 0 0 3px var(--board-accent), var(--board-shadow);
+          box-shadow: var(--board-shadow);
         }
         .ludo-board-frame > .ludo-board-inner.shared-ludo-board {
           width: 100% !important;
