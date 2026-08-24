@@ -1,4 +1,5 @@
 "use client";
+import React from "react";
 import LudoBoard,{BOARD_NAMES,BOARD_PALETTES,type BoardThemeId,type DemoToken} from "./LudoBoard";
 import {getTokenCell} from "../../lib/canonicalLudoBoard";
 export type {BoardThemeId,DemoToken};
