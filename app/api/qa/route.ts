@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { currentUser } from "../../../lib/auth-session";
-import rules = require("../../../lib/ludoRules");
+import * as rules from "../../../lib/ludoRules";
 
 async function qaAdmin(request: NextRequest) {
   const user = await currentUser(request);
