@@ -1,16 +1,23 @@
 "use client";
 
+import {useEffect,useState} from "react";
+
 export default function MoodPage(){
+  const [ready,setReady]=useState(false);
+  useEffect(()=>{
+    const timer=window.setTimeout(()=>{setReady(true);window.location.replace("/game")},650);
+    return()=>window.clearTimeout(timer);
+  },[]);
+
   return (
-    <main style={{minHeight:"100vh",background:"#06162f",color:"#fff",padding:"28px 18px",boxSizing:"border-box",display:"grid",placeItems:"center"}}>
-      <section style={{width:"100%",maxWidth:520,textAlign:"center"}}>
-        <div style={{fontSize:12,fontWeight:950,letterSpacing:4,color:"#62b4ff",marginBottom:10}}>GAME MODE</div>
-        <h1 style={{fontSize:"clamp(30px,8vw,48px)",margin:"0 0 28px",fontWeight:950}}>Choose your game</h1>
-        <a href="/game" style={{display:"block",padding:"22px 18px",borderRadius:20,background:"linear-gradient(135deg,#0b2b55,#0a1d3b)",border:"1px solid #2d78dc",color:"#fff",textDecoration:"none",boxShadow:"0 12px 30px rgba(0,0,0,.25)"}}>
-          <strong style={{display:"block",fontSize:24}}>Player vs Bot</strong>
-          <span style={{display:"block",marginTop:6,color:"#a9c0e5"}}>Play a local game against the bot</span>
-        </a>
+    <main style={{minHeight:"100dvh",background:"radial-gradient(circle at 50% 42%,#123b73 0%,#06162f 42%,#020b1d 100%)",color:"#fff",display:"grid",placeItems:"center",overflow:"hidden",fontFamily:"Arial,Helvetica,sans-serif"}}>
+      <section style={{textAlign:"center",width:"100%",maxWidth:420,padding:"24px",boxSizing:"border-box"}} aria-live="polite">
+        <div style={{width:62,height:62,margin:"0 auto 20px",borderRadius:"50%",border:"3px solid rgba(98,180,255,.25)",borderTopColor:"#62b4ff",animation:"spin 0.85s linear infinite",boxShadow:"0 0 28px rgba(98,180,255,.25)"}} />
+        <div style={{fontSize:11,fontWeight:950,letterSpacing:4,color:"#62b4ff",marginBottom:9}}>LUDO LIVE</div>
+        <h1 style={{margin:0,fontSize:"clamp(24px,7vw,34px)",fontWeight:950}}>{ready?"Starting game…":"Loading game…"}</h1>
+        <p style={{margin:"9px 0 0",color:"#9fb9df",fontSize:14}}>Getting your board ready</p>
       </section>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </main>
   );
 }
