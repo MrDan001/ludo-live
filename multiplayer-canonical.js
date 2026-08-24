@@ -1,0 +1,54 @@
+const { Server } = require("socket.io");
+const originalServerOn = Server.prototype.on;
+const games = new Map();
+const rules = require("./lib/ludoRules.js");
+const { COLORS, FINISH, canMove, hasLegalMove, applyMove, hasWon, playerColorsForSeats } = rules;
+const RECONNECT_MS = 30000;
+const canonicalTokens = () => Object.fromEntries(COLORS.map(color => [color, Object.fromEntries([0,1,2,3].map(id => [String(id), { position: 0 }]))]));
+const pid = socket => String(socket.data.playerId || "").trim();
+const code = socket => String(socket.data.roomCode || "").trim().toUpperCase();
+const snapshot = g => ({
+  status:g.status,stateRevision:g.stateRevision,dice:g.dice,pendingMove:g.pendingMove,sixStreak:g.sixStreak,currentPlayerId:g.currentPlayerId,
+  players:g.players.map(p=>({playerId:p.playerId,name:p.name,seat:p.seat,colors:p.colors,ready:!!p.ready,connected:!!p.socket})),
+  tokens:g.tokens,winnerId:g.winnerId||null,reconnectDeadline:g.reconnectDeadline||null
+});
+function emit(g,event,payload){for(const p of g.players)if(p.socket?.connected)p.socket.emit(event,payload)}
+function state(g){g.stateRevision=(g.stateRevision||0)+1;emit(g,"game-state",snapshot(g))}
+function init(g){g.status="playing";g.currentPlayerId=g.players[0]?.playerId||null;g.dice=null;g.pendingMove=null;g.sixStreak=0;g.winnerId=null;g.reconnectDeadline=null;g.tokens=canonicalTokens();g.stateRevision=0}
+function nextConnected(g){const i=g.players.findIndex(p=>p.playerId===g.currentPlayerId);if(i<0)return null;for(let n=1;n<=g.players.length;n++){const p=g.players[(i+n)%g.players.length];if(p.socket?.connected)return p}return null}
+function advanceAfterRoll(g,rolled){if(rolled===6){g.sixStreak+=1;if(g.sixStreak>=3){g.sixStreak=0;const n=nextConnected(g);g.currentPlayerId=n?.playerId||null}return}g.sixStreak=0;const n=nextConnected(g);g.currentPlayerId=n?.playerId||null}
+function tokenList(g){return COLORS.flatMap(color=>[0,1,2,3].map(id=>({color,id,position:Number(g.tokens[color]?.[String(id)]?.position||0)})))}
+function findPlayer(g,playerId){return g.players.find(p=>p.playerId===playerId)}
+function attach(socket,payload){
+  const room=String(payload?.roomCode||"").trim().toUpperCase(),playerId=String(payload?.playerId||"").trim(),roomSize=Number(payload?.roomSize||4);
+  if(!room||!playerId||![2,4].includes(roomSize))return;
+  socket.data.ludoCanonical=true;socket.data.roomCode=room;socket.data.playerId=playerId;
+  let g=games.get(room);if(!g){g={code:room,roomSize,players:[],status:"waiting",currentPlayerId:null,dice:null,pendingMove:null,sixStreak:0,tokens:canonicalTokens(),winnerId:null,reconnectDeadline:null,stateRevision:0};games.set(room,g)}
+  if(g.roomSize!==roomSize)return socket.emit("room-error","This room's player count does not match the match mode.");
+  let p=g.players.find(x=>x.playerId===playerId);
+  if(!p){if(g.players.length>=g.roomSize)return socket.emit("room-error","Game is full.");const seat=g.players.length;p={playerId,name:String(payload?.name||"Player").slice(0,24),seat,colors:playerColorsForSeats(g.roomSize,seat),socket,ready:seat===0};g.players.push(p)}
+  else{p.socket=socket;p.name=String(payload?.name||p.name||"Player").slice(0,24);if(g.status==="paused"&&g.currentPlayerId===playerId){g.status="playing";g.reconnectDeadline=null}}
+  socket.data.ludoCanonicalStarted=g.status==="playing";socket.emit("game-state",snapshot(g));if(g.status==="playing")state(g);
+}
+function ready(socket,payload){if(!socket.data.ludoCanonical)return;const g=games.get(code(socket)),p=g?.players.find(x=>x.playerId===pid(socket));if(p)p.ready=!!payload?.ready;if(g)state(g)}
+function start(socket){if(!socket.data.ludoCanonical)return;const g=games.get(code(socket));if(!g||g.status==="playing")return;if(g.players[0]?.playerId!==pid(socket))return socket.emit("start-error","Only the room host can start the game.");if(g.players.length!==g.roomSize)return socket.emit("start-error",`Waiting for all players (${g.players.length}/${g.roomSize}).`);if(!g.players.every(p=>p.ready&&p.socket?.connected))return socket.emit("start-error","All players must be ready and connected.");init(g);for(const p of g.players)if(p.socket?.connected){p.socket.data.ludoCanonicalStarted=true;p.socket.emit("start-game",{roomCode:g.code,playerCount:g.roomSize})}state(g)}
+function roll(socket){if(!socket.data.ludoCanonical)return;const g=games.get(code(socket)),id=pid(socket);if(!g||g.status!=="playing"||g.currentPlayerId!==id||g.pendingMove!==null)return;const value=1+Math.floor(Math.random()*6);g.dice=value;g.pendingMove=value;emit(g,"game-dice",{playerId:id,value,stateRevision:g.stateRevision+1});state(g)}
+function finishMove(g,rolled){g.pendingMove=null;g.dice=null;advanceAfterRoll(g,rolled)}
+function move(socket,payload){
+  if(!socket.data.ludoCanonical)return;const g=games.get(code(socket)),id=pid(socket);if(!g||g.status!=="playing"||g.currentPlayerId!==id||g.pendingMove===null)return;
+  const rolled=g.pendingMove,tokenId=String(payload?.tokenId||""),p=findPlayer(g,id);
+  if(tokenId==="__skip__"){if(hasLegalMove(tokenList(g),p?.colors||[],rolled))return;finishMove(g,rolled);emit(g,"game-moved",{playerId:id,tokenId:"__skip__",to:0});state(g);return}
+  const [color,raw]=tokenId.split(":"),tokenIdNum=Number(raw);if(!p||!COLORS.includes(color)||!Number.isInteger(tokenIdNum)||tokenIdNum<0||tokenIdNum>3||!p.colors.includes(color))return;
+  const before=tokenList(g),token=before.find(t=>t.color===color&&t.id===tokenIdNum);if(!token||!canMove(before,token,rolled))return;const result=applyMove(before,token,rolled);if(!result)return;
+  for(const t of result.tokens)g.tokens[t.color][String(t.id)].position=t.position;
+  emit(g,"game-moved",{playerId:id,tokenId,to:result.target,captured:result.captured?[`${result.captured.color}:${result.captured.id}`]:[]});
+  if(hasWon(result.tokens,p.colors)){g.status="finished";g.winnerId=id;g.currentPlayerId=null;g.pendingMove=null;g.dice=null;state(g);return}
+  finishMove(g,rolled);state(g);
+}
+function disconnect(socket){if(!socket.data.ludoCanonical)return;const g=games.get(code(socket));if(!g)return;const p=g.players.find(x=>x.playerId===pid(socket));if(!p||p.socket!==socket)return;p.socket=null;if(g.status==="playing"&&g.currentPlayerId===p.playerId){g.status="paused";g.pendingMove=null;g.dice=null;g.reconnectDeadline=Date.now()+RECONNECT_MS;state(g);setTimeout(()=>{const current=games.get(g.code);if(current===g&&g.status==="paused"&&current.reconnectDeadline&&Date.now()>=current.reconnectDeadline){g.status="finished";g.winnerId=null;state(g)}},RECONNECT_MS+50)}else state(g)}
+if(!Server.prototype.__ludoCanonical){
+  Server.prototype.__ludoCanonical=true;
+  Server.prototype.on=function(event,listener){
+    if(event!=="connection")return originalServerOn.call(this,event,listener);
+    const wrapped=socket=>{const original=socket.on.bind(socket);let boot=true;socket.on=(name,...args)=>{const canonicalEvents=["join-room","ready","start-game","game-roll","game-move","disconnect"];if(boot&&canonicalEvents.includes(name)){const fn=args[0];return original(name,(...payload)=>{if(name==="join-room"){attach(socket,payload[0]||{});return fn(...payload)}if(name==="ready"){if(socket.data.ludoCanonical){ready(socket,payload[0]||{});return}return fn(...payload)}if(name==="start-game"){if(socket.data.ludoCanonical){start(socket);return}return fn(...payload)}if(name==="game-roll"){if(socket.data.ludoCanonical){roll(socket);return}return fn(...payload)}if(name==="game-move"){if(socket.data.ludoCanonical){move(socket,payload[0]||{});return}return fn(...payload)}if(name==="disconnect"){if(socket.data.ludoCanonical){disconnect(socket);return fn(...payload)}return fn(...payload)})}return original(name,...args)};listener(socket);boot=false;socket.on=original};return originalServerOn.call(this,event,wrapped)};
+}
