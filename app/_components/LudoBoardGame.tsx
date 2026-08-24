@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
 import BaseBoard, { BOARD_NAMES, BOARD_PALETTES, type BoardThemeId, type DemoToken } from "./LudoBoardFixed";
-import { FINISH_PROGRESS, getTokenCell, tokenState as canonicalTokenState } from "../../lib/canonicalLudoBoard";
+import { FINISH_PROGRESS, tokenState as canonicalTokenState } from "../../lib/canonicalLudoBoard";
 
 export type { BoardThemeId, DemoToken };
 export { BOARD_NAMES, BOARD_PALETTES };
@@ -170,49 +170,19 @@ export default function LudoBoardGame({
       .map(t => ({ ...t, color, position: FINISH_PROGRESS, state: "finished" as const }))
   );
 
-  const moving = displayTokens.filter(t => t.state !== "yard" && t.state !== "finished" && Number(t.position) > 0 && Number(t.position) < FINISH_PROGRESS);
-  const yard = displayTokens.filter(t => t.state === "yard" || Number(t.position) === 0);
+  // Keep active tokens inside the locked board renderer so yard and
+  // track/home tokens share the exact same size, finish and theme styling.
+  const activeTokens = displayTokens.filter(t => t.state !== "finished" && Number(t.position) < FINISH_PROGRESS);
 
   return (
     <div style={{ position: "relative", width: "100%", aspectRatio: "1", ...style }} className={className}>
       <BaseBoard
         theme={theme}
         preview={preview}
-        demoTokens={yard}
+        demoTokens={activeTokens}
         onTokenClick={onTokenClick}
         style={{ width: "100%", height: "100%" }}
       />
-
-      {moving.map(t => {
-        const cell = getTokenCell(t.color, Number(t.position));
-        if (!cell) return null;
-        const [row, col] = cell;
-        return (
-          <button
-            key={tokenKey(t)}
-            type="button"
-            onClick={() => onTokenClick?.(t.color, t.id)}
-            aria-label={`${t.color} token ${t.id + 1}`}
-            style={{
-              position: "absolute",
-              left: `${((col + 0.5) * 100) / 15}%`,
-              top: `${((row + 0.5) * 100) / 15}%`,
-              transform: "translate(-50%,-50%)",
-              width: "5.1%",
-              aspectRatio: 1,
-              borderRadius: "50%",
-              border: "2px solid #222",
-              background: BOARD_PALETTES[theme][t.color],
-              boxShadow: "0 2px 5px rgba(0,0,0,.35)",
-              zIndex: 30,
-              padding: 0,
-              color: "transparent",
-              fontSize: 0,
-              cursor: onTokenClick ? "pointer" : "default",
-            }}
-          />
-        );
-      })}
 
       <div
         aria-label={`Finished tokens: ${finished.length}`}
