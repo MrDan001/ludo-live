@@ -26,24 +26,6 @@
 }
 
 /*
- * The decorative frame must live OUTSIDE the 15x15 playing grid.
- * The old inset:0 frame was painted directly over the outer track cells.
- * Moving it outward is intentional; token coordinates and token styling are untouched.
- */
-.shared-ludo-board::before {
-  content: "";
-  position: absolute;
-  inset: -7px;
-  z-index: 90;
-  pointer-events: none;
-  border: 7px solid var(--skin-frame);
-  border-radius: inherit;
-  box-shadow:
-    inset 0 0 0 2px rgba(255,255,255,.34),
-    inset 0 0 22px var(--skin-glow);
-}
-
-/*
  * Dedicated center-home overlay. Using a centered 20% square matches
  * exactly 3 cells of the 15x15 board, so the four Ludo colors stay intact
  * regardless of how many token elements are rendered after the grid.
@@ -141,10 +123,3 @@
 .shared-ludo-board.theme-love { --skin-frame:#d84b86; --skin-glow:rgba(216,75,134,.32); }
 .shared-ludo-board.theme-night { --skin-frame:#4e76a8; --skin-glow:rgba(0,0,0,.60); }
 .shared-ludo-board.theme-arabian { --skin-frame:#d7ad4d; --skin-glow:rgba(150,92,25,.46); }
-
-@media (max-width:380px) {
-  .shared-ludo-board::before {
-    inset: -5px;
-    border-width: 5px;
-  }
-}
