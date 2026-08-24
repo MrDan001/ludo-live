@@ -10,7 +10,7 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
  return <div className="canonical-ludo-frame" style={{position:"relative",width:"100%",aspectRatio:"1"} as React.CSSProperties} aria-label={`${BOARD_NAMES[theme]} canonical Ludo board`}>
   <style>{`
     .canonical-ludo-frame{isolation:isolate}
-    .canonical-ludo-frame .shared-ludo-board{box-shadow:none!important;position:relative;z-index:1}
+    .canonical-ludo-frame .shared-ludo-board{box-shadow:none!important;border:0!important;outline:none!important;filter:none!important;position:relative;z-index:1}
   `}</style>
   <LudoBoard theme={theme} demoTokens={demoTokens.filter(t=>t.state==="yard")} onTokenClick={onTokenClick} style={{width:"100%",height:"100%"}}/>
   {moving.map(t=><button key={`${t.color}-${t.id}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${t.color} token`} style={{position:"absolute",left:`${(t.col+.5)*100/15}%`,top:`${(t.row+.5)*100/15}%`,transform:"translate(-50%,-50%)",width:"5.1%",aspectRatio:1,borderRadius:"50%",border:"2px solid #222",background:BOARD_PALETTES[theme][t.color],zIndex:30,fontWeight:900,padding:0,color:"transparent",fontSize:0}} />)}
