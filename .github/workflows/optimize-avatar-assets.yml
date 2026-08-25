@@ -1,17 +1,17 @@
-name: Optimize Ludo Live avatar assets
+name: Build Ludo Live avatar assets
 
 on:
   workflow_dispatch:
   push:
     paths:
-      - "public/avatars/premium-elite-atlas.jpg"
+      - "public/avatars/premium-elite-atlas.svg"
       - ".github/workflows/optimize-avatar-assets.yml"
 
 permissions:
   contents: write
 
 jobs:
-  optimize:
+  build-avatar-atlas:
     if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
@@ -20,86 +20,48 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install image and Vulkan dependencies
+      - name: Install SVG rasterizer
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y imagemagick unzip libvulkan1 mesa-vulkan-drivers
+          sudo apt-get install -y librsvg2-bin imagemagick
 
-      - name: Restore clean source atlas
+      - name: Validate vector atlas source
         run: |
           set -e
-          SOURCE_COMMIT="bd890aa84f5d70b7dd8f0b731714d0d6035e9987"
-          git fetch --no-tags --depth=1 origin "$SOURCE_COMMIT"
-          git show "$SOURCE_COMMIT:public/avatars/premium-elite-atlas.jpg" > /tmp/source-atlas.jpg
-          identify /tmp/source-atlas.jpg
-          width=$(identify -format '%w' /tmp/source-atlas.jpg)
-          height=$(identify -format '%h' /tmp/source-atlas.jpg)
-          test "$width" -eq 1200
-          test "$height" -eq 1440
+          test -s public/avatars/premium-elite-atlas.svg
+          grep -q 'width="1200" height="1440" viewBox="0 0 1200 1440"' public/avatars/premium-elite-atlas.svg
+          test "$(grep -o '<g transform="translate(' public/avatars/premium-elite-atlas.svg | wc -l)" -eq 30
 
-      - name: Download Real-ESRGAN
+      - name: Render clean high-resolution raster atlas
         run: |
           set -e
-          mkdir -p /tmp/realesrgan
-          curl -L --fail --retry 3 -o /tmp/realesrgan/realesrgan.zip \
-            https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip
-          unzip -q /tmp/realesrgan/realesrgan.zip -d /tmp/realesrgan/bin
-          chmod +x /tmp/realesrgan/bin/realesrgan-ncnn-vulkan
+          rsvg-convert \
+            --width=4800 \
+            --height=5760 \
+            --format=png \
+            --output=/tmp/premium-elite-atlas.png \
+            public/avatars/premium-elite-atlas.svg
 
-      - name: Prepare individual avatar crops
-        run: |
-          set -e
-          rm -rf /tmp/avatar-crops /tmp/avatar-upscaled /tmp/avatar-atlas
-          mkdir -p /tmp/avatar-crops /tmp/avatar-upscaled /tmp/avatar-atlas
-          for row in 0 1 2 3 4 5; do
-            for col in 0 1 2 3 4; do
-              index=$((row * 5 + col + 1))
-              x=$((col * 240))
-              y=$((row * 240))
-              printf -v id '%02d' "$index"
-              convert /tmp/source-atlas.jpg \
-                -crop 240x240+${x}+${y} +repage \
-                -strip -sampling-factor 4:4:4 -quality 100 \
-                /tmp/avatar-crops/avatar-${id}.png
-            done
-          done
-          test "$(find /tmp/avatar-crops -type f -name 'avatar-*.png' | wc -l)" -eq 30
+          identify /tmp/premium-elite-atlas.png
+          width=$(identify -format '%w' /tmp/premium-elite-atlas.png)
+          height=$(identify -format '%h' /tmp/premium-elite-atlas.png)
+          test "$width" -eq 4800
+          test "$height" -eq 5760
 
-      - name: AI upscale each avatar to 960x960
-        run: |
-          set -e
-          /tmp/realesrgan/bin/realesrgan-ncnn-vulkan \
-            -i /tmp/avatar-crops \
-            -o /tmp/avatar-upscaled \
-            -n realesrgan-x4plus \
-            -s 4 \
-            -t 128
-          test "$(find /tmp/avatar-upscaled -type f -name 'avatar-*.png' | wc -l)" -eq 30
-
-      - name: Rebuild one high-resolution atlas
-        run: |
-          set -e
-          for row in 0 1 2 3 4 5; do
-            rm -f "/tmp/avatar-atlas/row-${row}.png"
-            files=()
-            for col in 0 1 2 3 4; do
-              index=$((row * 5 + col + 1))
-              printf -v id '%02d' "$index"
-              files+=("/tmp/avatar-upscaled/avatar-${id}.png")
-            done
-            convert "${files[@]}" +append "/tmp/avatar-atlas/row-${row}.png"
-          done
-          convert /tmp/avatar-atlas/row-{0,1,2,3,4,5}.png -append \
-            -sampling-factor 4:4:4 -interlace Plane -quality 96 \
+          convert /tmp/premium-elite-atlas.png \
+            -sampling-factor 4:4:4 \
+            -interlace Plane \
+            -quality 96 \
             public/avatars/premium-elite-atlas.jpg
+
           identify public/avatars/premium-elite-atlas.jpg
           width=$(identify -format '%w' public/avatars/premium-elite-atlas.jpg)
           height=$(identify -format '%h' public/avatars/premium-elite-atlas.jpg)
           test "$width" -eq 4800
           test "$height" -eq 5760
 
-      - name: Commit optimized high-resolution atlas
+      - name: Commit high-resolution raster atlas
         run: |
           set -e
           git config user.name "github-actions[bot]"
@@ -109,5 +71,5 @@ jobs:
             echo "No avatar asset changes to commit."
             exit 0
           fi
-          git commit -m "Replace avatar atlas with AI-upscaled high-resolution artwork"
+          git commit -m "Build high-resolution avatar atlas from vector source"
           git push
