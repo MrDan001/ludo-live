@@ -58,7 +58,9 @@ Mission achievement/reward history remains a separate history surface and is not
 
 ## Hierarchy
 
-Hierarchy is **independent of Level and Prestige**. It measures verified active app/game time from `ludo_spin_state.total_active_seconds` plus the current accumulated active interval.
+Hierarchy is **independent of Level and Prestige**. It measures verified active game-session time from `ludo_spin_state.total_active_seconds` plus the current accumulated active interval.
+
+Only eligible game-session surfaces count toward this time: `/room`, `/game`, `/game-online`, and `/tournament/game`.
 
 The hierarchy ladder is:
 
@@ -85,18 +87,17 @@ Hierarchy is selected by the highest threshold reached. It does not reset when P
 
 **Level** is the XP progression system and is scalable beyond Level 10.
 
-**Prestige is separate from hierarchy.** The current Prestige cycle is one Prestige for every 100 completed levels:
+**Prestige is separate from hierarchy.** The agreed Prestige cycle is one Prestige for every 10 completed levels:
 
-`Prestige = floor((Level - 1) / 100)`
+`Prestige = floor((Level - 1) / 10)`
 
 Therefore:
 
-- Levels 1–100 → Prestige 0
-- Levels 101–200 → Prestige 1
-- Levels 201–300 → Prestige 2
+- Levels 1–10 → Prestige 0
+- Levels 11–20 → Prestige 1
+- Levels 21–30 → Prestige 2
+- Levels 31–40 → Prestige 3
 - and so on indefinitely.
-
-A player can therefore be, for example, `Legend · Level 103 · Prestige 1` without the three systems being conflated.
 
 ## Active-time rewards
 
@@ -104,7 +105,9 @@ The same server-authoritative active-time tracker powers engagement rewards:
 
 - Every completed 30 minutes of active time → **1 free spin + 5 XP**.
 - During **17:00–20:00 Africa/Lagos time** → **3 free spins + 15 XP** per completed 30-minute interval.
-- The server caps heartbeat elapsed time and only counts visible active app time; the client cannot directly award spins or XP.
+- The client sends periodic heartbeats only while the eligible game-session surface is visible.
+- The server caps heartbeat elapsed time and persists `total_active_seconds`; the client cannot directly award spins, XP, or hierarchy hours.
+- Active-time XP flows through the canonical server progression/reward path, so level-ups and milestone rewards remain server-authoritative and idempotent.
 - Unused free spins persist until consumed.
 
 ## Design rule
