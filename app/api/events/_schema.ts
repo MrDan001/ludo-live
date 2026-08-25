@@ -8,41 +8,27 @@ export function ensureEventsSchema() {
       await ensureAuthSchema();
       await pool.query(`
         CREATE TABLE IF NOT EXISTS ludo_events (
-          id TEXT PRIMARY KEY,
-          title TEXT NOT NULL,
-          description TEXT NOT NULL DEFAULT '',
-          icon TEXT NOT NULL DEFAULT '🎉',
-          color TEXT NOT NULL DEFAULT 'purple',
-          reward TEXT NOT NULL DEFAULT '🎁',
-          reward_coins INTEGER NOT NULL DEFAULT 0,
-          reward_gems INTEGER NOT NULL DEFAULT 0,
-          event_type TEXT NOT NULL DEFAULT 'challenge',
-          mission_kind TEXT NOT NULL DEFAULT 'win_games',
-          mission_target INTEGER NOT NULL DEFAULT 1 CHECK (mission_target > 0),
-          modes JSONB NOT NULL DEFAULT '["bot","2p","4p","tournament"]'::jsonb,
-          boards JSONB NOT NULL DEFAULT '["classic"]'::jsonb,
-          starts_at TIMESTAMPTZ NOT NULL,
-          ends_at TIMESTAMPTZ NOT NULL,
-          status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('draft','published','cancelled','ended')),
-          created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          CHECK (ends_at > starts_at)
+          id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',icon TEXT NOT NULL DEFAULT '🎉',color TEXT NOT NULL DEFAULT 'purple',
+          reward TEXT NOT NULL DEFAULT '🎁',reward_coins INTEGER NOT NULL DEFAULT 0,reward_gems INTEGER NOT NULL DEFAULT 0,event_type TEXT NOT NULL DEFAULT 'challenge',
+          mission_kind TEXT NOT NULL DEFAULT 'win_games',mission_target INTEGER NOT NULL DEFAULT 1 CHECK (mission_target > 0),
+          modes JSONB NOT NULL DEFAULT '["bot","2p","4p","tournament"]'::jsonb,boards JSONB NOT NULL DEFAULT '["classic"]'::jsonb,
+          starts_at TIMESTAMPTZ NOT NULL,ends_at TIMESTAMPTZ NOT NULL,status TEXT NOT NULL DEFAULT 'published' CHECK (status IN ('draft','published','cancelled','ended')),
+          settled_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),CHECK (ends_at > starts_at)
         );
-        CREATE INDEX IF NOT EXISTS ludo_events_window_idx ON ludo_events(starts_at, ends_at);
+        ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
+        CREATE INDEX IF NOT EXISTS ludo_events_window_idx ON ludo_events(starts_at,ends_at);
         CREATE INDEX IF NOT EXISTS ludo_events_status_idx ON ludo_events(status);
-
         CREATE TABLE IF NOT EXISTS ludo_event_entries (
-          event_id TEXT NOT NULL REFERENCES ludo_events(id) ON DELETE CASCADE,
-          user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE,
-          joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-          progress INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0),
-          completed BOOLEAN NOT NULL DEFAULT FALSE,
-          reward_claimed BOOLEAN NOT NULL DEFAULT FALSE,
-          completed_at TIMESTAMPTZ,
-          PRIMARY KEY(event_id, user_id)
+          event_id TEXT NOT NULL REFERENCES ludo_events(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE,
+          joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),progress INTEGER NOT NULL DEFAULT 0 CHECK (progress >= 0),completed BOOLEAN NOT NULL DEFAULT FALSE,
+          reward_claimed BOOLEAN NOT NULL DEFAULT FALSE,completed_at TIMESTAMPTZ,PRIMARY KEY(event_id,user_id)
         );
-        CREATE INDEX IF NOT EXISTS ludo_event_entries_user_idx ON ludo_event_entries(user_id, joined_at DESC);
-
+        CREATE INDEX IF NOT EXISTS ludo_event_entries_user_idx ON ludo_event_entries(user_id,joined_at DESC);
+        CREATE TABLE IF NOT EXISTS ludo_event_rewards (
+          event_id TEXT NOT NULL REFERENCES ludo_events(id) ON DELETE CASCADE,user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE,
+          coins INTEGER NOT NULL DEFAULT 0 CHECK (coins >= 0),gems INTEGER NOT NULL DEFAULT 0 CHECK (gems >= 0),settled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(event_id,user_id)
+        );
+        CREATE INDEX IF NOT EXISTS ludo_event_rewards_user_idx ON ludo_event_rewards(user_id,settled_at DESC);
         INSERT INTO ludo_events(id,title,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status)
         SELECT * FROM (VALUES
           ('daily-domination','Daily Domination','Win matches across the Ludo Live game modes.','🏆','purple','🪙 2,500',2500,0,'challenge','win_games',3,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '30 minutes',NOW()+INTERVAL '2 hours 30 minutes','published'),
@@ -53,20 +39,13 @@ export function ensureEventsSchema() {
         ) AS seed(id,title,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status)
         WHERE NOT EXISTS (SELECT 1 FROM ludo_events)
       `);
-    })().catch((error) => {
-      ready = null;
-      throw error;
-    });
+    })().catch((error) => { ready = null; throw error; });
   }
   return ready;
 }
 
 export function eventState(startsAt: string | Date, endsAt: string | Date, status: string) {
   if (status === "cancelled" || status === "draft") return status;
-  const now = Date.now();
-  const start = new Date(startsAt).getTime();
-  const end = new Date(endsAt).getTime();
-  if (now < start) return "upcoming";
-  if (now >= end) return "expired";
-  return "live";
+  const now=Date.now(),start=new Date(startsAt).getTime(),end=new Date(endsAt).getTime();
+  if(now<start)return "upcoming"; if(now>=end)return "expired"; return "live";
 }
