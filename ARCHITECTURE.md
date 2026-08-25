@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the production technical map. Read it before changing gameplay, board rendering, authentication, customization, XP/levels, Shop, Inventory, Award Room, admin, finance, tournaments, free spins, or deployment. **Do not infer product rules from screenshots or previous conversations.** If a rule changes, update this document and `DEVELOPER_HANDOFF.md` in the same change.
+This is the production technical map. Read it before changing gameplay, board rendering, authentication, customization, XP/levels, Shop, Inventory, Award Room, admin, finance, tournaments, free spins, voice, or deployment. **Do not infer product rules from screenshots or previous conversations.** If a rule changes, update this document and `DEVELOPER_HANDOFF.md` in the same change.
 
 ## Runtime / source of truth
 
@@ -42,11 +42,23 @@ Current team model: Human = `red` + `yellow`; Bot = `green` + `blue`. Teammates 
 - Audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
 - Exactly one player `dice` event occurs at roll start. Do not add another when the result appears. Bot paths may emit their own start-of-roll event because bots do not click `DemoDice`.
 
+## Voice / room microphone
+
+- `app/_components/ChatVoice.tsx` is the shared microphone/voice component used by room surfaces.
+- Voice transport is browser WebRTC through PeerJS (`peerjs@1.5.4`) with PeerJS signaling. It is separate from the Socket.IO gameplay state.
+- The room owner acts as the roster hub: non-owner peers announce themselves to the owner's peer id, and the owner distributes the discovered peer ids so participants can establish direct audio calls.
+- A microphone stream is obtained only after the player presses the Mic button and grants browser permission. The component checks that the page is running in a secure context (`HTTPS`) and that `getUserMedia` is available.
+- **Important call lifecycle rule:** a remote WebRTC call can arrive before the local player has enabled the microphone. `ChatVoice` stores that pending call and answers it as soon as the local microphone is enabled. This prevents the common race where one player turns on the mic before the other and the first audio call is permanently unanswered.
+- Remote streams are attached to hidden autoplay/playsinline audio elements. The component also attempts `audio.play()` after receiving a stream so remote audio is actually rendered by the browser.
+- Mic off stops the local audio tracks; room teardown closes peer connections and removes remote audio elements.
+- Voice failures are reported in the mic control rather than silently failing.
+- Do not create separate voice implementations for individual rooms. Fix shared voice lifecycle issues in `ChatVoice.tsx` unless a room has a demonstrably different voice contract.
+- Browser permission, HTTPS, network/NAT restrictions, and autoplay policies remain external prerequisites for WebRTC. Do not treat the mic button's green state alone as proof that another player received audio.
+
 ## Authentication / profile / customization
 
 - `app/api/auth/route.ts` — registration, login, guest, logout, username changes and current user.
 - `lib/auth-session.ts` — server session lookup.
-- `app/api/auth/_db.ts` — auth DB schema/pool.
 - `app/api/customization/route.ts` — authoritative owned/equipped board, dice, avatar and item state.
 
 The profile exposes `username`, wallet and progression/customization data. Multiplayer should use the real profile username rather than generic player labels when available.
@@ -244,6 +256,8 @@ PostgreSQL is authoritative for accounts, wallets, customization ownership, tour
 - Do not trust client-only XP, wallet, tournament points, ownership, payment state or free-spin balance.
 - Do not calculate the 17:00–20:00 reward window using local device time; use Nigeria time on the server.
 - Do not claim Railway deployment success until the platform reports success.
+- Do not treat a successful `getUserMedia()` call or a green Mic button as proof that remote peers received audio. WebRTC call/stream state must be considered separately.
+- Do not answer an incoming WebRTC call with `undefined` just because the player has not enabled their mic yet; preserve the call and answer when the local audio stream becomes available.
 
 ## Do not guess
 
