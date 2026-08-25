@@ -47,6 +47,19 @@ Supported audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
 - Seat/color mapping comes from the canonical engine.
 - 2-player and 4-player views are designed to fit the device viewport without document scrolling.
 
+## Shared room voice / microphone
+
+- `app/_components/ChatVoice.tsx` is the shared microphone/voice component. Do not create separate mic implementations per room unless a room has a proven different contract.
+- Voice uses browser WebRTC through PeerJS `1.5.4`; Socket.IO remains the gameplay/room-state transport.
+- The room owner is the voice roster hub. Non-owner peers announce themselves to the owner; the owner distributes discovered peer ids so direct audio calls can be established.
+- Microphone access starts only from the player's Mic button and requires browser `getUserMedia()` permission. The component requires a secure context (`HTTPS`).
+- A critical lifecycle rule is implemented: if a WebRTC call arrives before the local player enables the microphone, the call is stored as pending and answered when the local stream becomes available. Do not regress this by answering an incoming call with no stream.
+- Remote streams are attached to hidden autoplay/playsinline audio elements and `play()` is attempted after the stream arrives.
+- Turning the mic off stops local audio tracks. Component teardown closes connections, pending calls, the peer and remote audio elements.
+- Mic/voice failures must surface a useful message instead of silently doing nothing.
+- A green Mic button only means the local stream was acquired. It is **not** proof that a remote peer received audio; WebRTC/network/autoplay conditions are separate.
+- Browser permission, HTTPS, NAT/firewall and autoplay policy can still prevent voice. Do not change gameplay code to compensate for a voice transport problem without tracing the actual voice path first.
+
 ## Tournament contracts
 
 - Tournament intentionally uses the `classic` board skin unless explicitly changed by product requirements.
@@ -240,6 +253,8 @@ Before reporting a release as complete:
 - Do not calculate the 17:00–20:00 reward window using local device time; use Nigeria time on the server.
 - Do not claim deployment success while Railway is building, queued, failed, or otherwise not successful.
 - Do not fix one TypeScript error by suppressing type checking; fix the type at its source.
+- Do not treat a green Mic button as proof of remote audio delivery.
+- Do not discard an incoming WebRTC call because the microphone is currently off; queue it and answer once the local stream exists.
 
 ## Handoff rule
 
