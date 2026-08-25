@@ -49,11 +49,15 @@ PostgreSQL is authoritative. `localStorage` may mirror XP for UI continuity, but
 
 ## Level formula
 
+Ludo Live progression **starts at Level 1**. Level 0 is not a player-facing gameplay level and must not be rendered in Profile, Showcase or the Level Journey.
+
 The required XP to advance from level `N` is:
 
 `10 + (N × 5)`
 
-There is no hard-coded maximum level.
+Therefore Level 1 → Level 2 requires 15 XP. There is no hard-coded maximum level.
+
+Legacy records that contain `level=0` are normalized to Level 1 at the API/UI boundary and are prevented from remaining the canonical client progression state. New registered and guest accounts are created at Level 1.
 
 ## Reward ladder
 
@@ -87,7 +91,7 @@ The Player Showcase contains a vertical **Level Journey** track. It is a continu
 - The visible journey starts at **Level 1**. Level 0 is never rendered as a public journey node.
 - For players below Level 5, the visible journey begins at Level 1 and continues forward so the player's current visible position can be marked.
 - For players at Level 5 or above, the journey begins at Level 5 and continues through the current level plus a short look-ahead.
-- If a legacy Level 0 record is encountered, the Showcase normalizes its visible journey position to **Level 1** rather than displaying Level 0.
+- If a legacy Level 0 record is encountered, Level 1 is treated as the player's canonical visible starting position rather than displaying Level 0.
 - Every level is rendered in order, with the shared `getLevelRewardPlan(level)` determining the reward shown for that level.
 - The inspected player's current visible level receives a prominent **CURRENT LEVEL** marker and 📍 node. The separate `YOU ARE HERE` label is intentionally not rendered.
 - The Level Journey does not include an explanatory paragraph above the road; the section title and track are the complete presentation.
@@ -193,6 +197,7 @@ Level milestone -> server entitlement -> target feature server check -> UI unloc
 - [ ] Keep the waiting-room avatar sourced from the inspected player's real equipped avatar and preserve it through game-state merges.
 - [ ] Keep the showcase avatar resolved from the same authoritative catalogue and use the same default-avatar representation as Profile.
 - [ ] Keep the Level Journey starting at Level 1; never render Level 0 publicly; mark the current visible level and show current-level XP plus remaining XP to the next level.
+- [ ] Keep new accounts anchored at Level 1 and normalize legacy Level 0 records at the API/UI boundary.
 - [ ] Do not expose wallet, email, password, session or other private data in public showcases.
 - [ ] Update this document and the architecture/handoff documentation whenever progression or player identity rules change.
 - [ ] Build/test affected code before release.
