@@ -34,7 +34,7 @@ The implementation selects the highest threshold reached. The ladder can be exte
 Only eligible game-session surfaces count toward the clock:
 
 - `/room`
-- `/game`
+- `/game` — **Human vs Bot** (canonical Bot-vs-Human game)
 - `/game-online`
 - `/tournament/game`
 
@@ -53,6 +53,6 @@ The reward endpoint is `/api/spin/activity`.
 
 - **Hierarchy** = verified active time.
 - **Level** = XP progression, scalable beyond Level 10.
-- **Prestige** = `floor((Level - 1) / 100)`.
+- **Prestige** = `floor((Level - 1) / 10)`.
 
 Increasing Prestige does not reset hierarchy. Hierarchy does not reset when a player levels up or prestiges.
