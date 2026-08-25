@@ -10,7 +10,7 @@ export type Badge = {
   source: "spin" | "store" | "game" | "tournament";
 };
 
-export const PROGRESSION_VERSION = 2;
+export const PROGRESSION_VERSION = 3;
 export const STARTING_COINS = 1000;
 export const STARTING_GEMS = 10;
 
@@ -23,13 +23,6 @@ export function xpRequiredForLevel(level: number): number {
 export function readProgress(): PlayerProgress {
   if (typeof window === "undefined") return { level: 0, xp: 0 };
   try {
-    const version = Number(localStorage.getItem("ludo-progression-version") || 0);
-    if (version !== PROGRESSION_VERSION) {
-      const fresh = { level: 0, xp: 0 };
-      localStorage.setItem("ludo-progression", JSON.stringify(fresh));
-      localStorage.setItem("ludo-progression-version", String(PROGRESSION_VERSION));
-      return fresh;
-    }
     const stored = JSON.parse(localStorage.getItem("ludo-progression") || "null");
     return {
       level: Math.max(0, Number(stored?.level) || 0),
@@ -42,6 +35,7 @@ export function readProgress(): PlayerProgress {
 
 export function writeProgress(progress: PlayerProgress) {
   if (typeof window === "undefined") return;
+  const previous = readProgress();
   const next = {
     level: Math.max(0, Math.floor(progress.level)),
     xp: Math.max(0, Math.floor(progress.xp)),
@@ -49,6 +43,11 @@ export function writeProgress(progress: PlayerProgress) {
   localStorage.setItem("ludo-progression", JSON.stringify(next));
   localStorage.setItem("ludo-progression-version", String(PROGRESSION_VERSION));
   window.dispatchEvent(new CustomEvent("ludo-progression-updated", { detail: next }));
+  if (next.level > previous.level) {
+    window.dispatchEvent(new CustomEvent("ludo-progression-levelup", {
+      detail: { fromLevel: previous.level, toLevel: next.level, progress: next },
+    }));
+  }
 }
 
 export function addXP(amount: number): PlayerProgress {
@@ -69,6 +68,41 @@ export function addXP(amount: number): PlayerProgress {
   return next;
 }
 
+export async function awardServerXP(amount: number, source: "game_win" | "diamond_purchase" | "other"): Promise<PlayerProgress | null> {
+  try {
+    const response = await fetch("/api/progress", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ amount, source }),
+      cache: "no-store",
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || !Number.isFinite(Number(data?.xp)) || !Number.isFinite(Number(data?.level))) return null;
+    const progress = { level: Number(data.level), xp: Number(data.xp) };
+    writeProgress(progress);
+    return progress;
+  } catch {
+    return null;
+  }
+}
+
+export function awardGameWinXP() {
+  return addXP(7);
+}
+
+export function awardTournamentWinXP() {
+  return addXP(7);
+}
+
+export function awardGemPurchaseXP() {
+  return addXP(15);
+}
+
+export function syncProgressFromUser(user: { level?: number; xp?: number } | null | undefined) {
+  if (!user) return;
+  writeProgress({ level: Number(user.level) || 0, xp: Number(user.xp) || 0 });
+}
+
 export function readBadges(): Badge[] {
   if (typeof window === "undefined") return [];
   try {
@@ -85,16 +119,4 @@ export function addBadge(badge: Badge): Badge[] {
   localStorage.setItem("ludo-badges", JSON.stringify(badges));
   window.dispatchEvent(new CustomEvent("ludo-badges-updated", { detail: badges }));
   return badges;
-}
-
-export function awardGameWinXP() {
-  return addXP(10);
-}
-
-export function awardTournamentWinXP() {
-  return addXP(20);
-}
-
-export function awardGemPurchaseXP() {
-  return addXP(5);
 }
