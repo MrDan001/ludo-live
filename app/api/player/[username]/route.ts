@@ -1,11 +1,11 @@
 import {NextRequest,NextResponse} from "next/server";
 import {pool,ensureAuthSchema} from "../../auth/_db";
 import {currentUser} from "../../../lib/auth-session";
-import {LEVEL_REWARDS} from "../../../../lib/levelRewards";
+import {getLevelRewardPlan} from "../../../../lib/levelRewards";
 
 export const dynamic="force-dynamic";
 
-function titleFor(level:number, wins:number, tournamentWins:number){
+function titleFor(level:number,wins:number,tournamentWins:number){
   if(tournamentWins>=1)return {id:"tournament-champion",label:"Tournament Champion",icon:"👑"};
   if(wins>=500)return {id:"unstoppable",label:"Unstoppable",icon:"🔥"};
   if(level>=100)return {id:"legend",label:"Legend",icon:"⚡"};
@@ -34,21 +34,16 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{username:str
       pool.query(`SELECT level,title,badge_id,coins,gems,claimed_at FROM ludo_level_rewards WHERE user_id=$1 ORDER BY level DESC`,[u.id])
     ]);
     const stats=games.rows[0]||{};
-    const wins=Number(stats.wins||0), tournamentWins=Number(tournaments.rows[0]?.wins||0);
+    const wins=Number(stats.wins||0),tournamentWins=Number(tournaments.rows[0]?.wins||0),level=Number(u.level||0);
     const milestoneRewards=rewards.rows.map((r:any)=>({level:Number(r.level),title:r.title,badgeId:r.badge_id,coins:Number(r.coins||0),gems:Number(r.gems||0),claimedAt:r.claimed_at}));
-    const achievementCount=milestoneRewards.length + wins + tournamentWins;
-    const prestige=Number(u.level||0)*25 + wins*5 + tournamentWins*100 + milestoneRewards.length*20;
-    const title=titleFor(Number(u.level||0),wins,tournamentWins);
+    const achievementCount=milestoneRewards.length+wins+tournamentWins;
+    const prestige=level*25+wins*5+tournamentWins*100+milestoneRewards.length*20;
+    const title=titleFor(level,wins,tournamentWins);
     const ownedBoards=Array.isArray(u.owned_boards)?u.owned_boards:[];
     const ownedDice=Array.isArray(u.owned_dice)?u.owned_dice:[];
     const ownedAvatars=Array.isArray(u.owned_avatars)?u.owned_avatars:[];
     const visibleRewards=milestoneRewards.slice(0,12);
-    return NextResponse.json({
-      player:{id:u.id,username:u.username,level:Number(u.level||0),xp:Number(u.xp||0),equipped:{board:u.equipped_board,dice:u.equipped_dice,avatar:u.equipped_avatar},ownedCounts:{boards:ownedBoards.length,dice:ownedDice.length,avatars:ownedAvatars.length}},
-      title,prestige,stats:{games:Number(stats.total||0),wins,losses:Number(stats.losses||0),tournamentWins,achievements:achievementCount},
-      trophyRoom:{levelRewards:visibleRewards,totalLevelRewards:milestoneRewards.length,earnedMilestones:milestoneRewards.map(r=>r.level)},
-      isSelf:viewer.id===u.id,
-      nextMilestones:LEVEL_REWARDS.filter((r:any)=>Number(r.level)>Number(u.level||0)).slice(0,5).map((r:any)=>({level:r.level,title:r.title,unlocks:r.unlocks||[]}))
-    });
+    const nextMilestones=Array.from({length:5},(_,i)=>Math.floor(level/10)*10+10+i*10).map(l=>({level:l,title:`Level ${l} Milestone`,unlocks:[getLevelRewardPlan(l).unlock].filter(Boolean).map(u=>({name:u!.name,type:u!.type,icon:u!.icon}))}));
+    return NextResponse.json({player:{id:u.id,username:u.username,level,xp:Number(u.xp||0),equipped:{board:u.equipped_board,dice:u.equipped_dice,avatar:u.equipped_avatar},ownedCounts:{boards:ownedBoards.length,dice:ownedDice.length,avatars:ownedAvatars.length}},title,prestige,stats:{games:Number(stats.total||0),wins,losses:Number(stats.losses||0),tournamentWins,achievements:achievementCount},trophyRoom:{levelRewards:visibleRewards,totalLevelRewards:milestoneRewards.length,earnedMilestones:milestoneRewards.map(r=>r.level)},isSelf:viewer.id===u.id,nextMilestones});
   }catch(e){console.error("player showcase GET",e);return NextResponse.json({error:"Player showcase unavailable."},{status:500});}
 }
