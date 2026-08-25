@@ -53,28 +53,77 @@ The required XP to advance from level `N` is:
 
 `10 + (N × 5)`
 
-Examples:
-
-- Level 0 → 1: 10 XP
-- Level 1 → 2: 15 XP
-- Level 2 → 3: 20 XP
-- Level 10 → 11: 60 XP
-
-There is no hard-coded maximum level. Milestone cosmetics cycle after the tenth configured milestone, so levels 110, 120, 130, etc. continue to work.
+There is no hard-coded maximum level.
 
 ## Reward ladder
 
-Every level grants coins:
+Every level grants coins. Every fifth level also grants gems. Every tenth level grants a milestone badge and a real usable catalogue item.
 
-`250 + ((level - 1) × 50)`
+## Trophy Room and player identity
 
-Every fifth level also grants gems:
+The Achievements page is the player's **Trophy Room**. It is not only a history ledger. It surfaces:
 
-`10 + floor(level / 10) × 5`
+- lifetime earned awards from missions, games, store activity and level rewards;
+- level milestone journey for Levels 10–100;
+- current equipped board, dice and avatar;
+- a prestige score derived from server-recorded progression and accomplishments;
+- the player's current title tier;
+- a link to the player's public Player Showcase.
 
-Every tenth level grants a milestone badge and a **real, usable Shop catalogue item**.
+The Trophy Room is intentionally a pride/identity surface. Cosmetics are presentation only and never modify Ludo odds or rules.
 
-### Milestones 10–100
+### Public Player Showcase
+
+`app/player/[username]/page.tsx` is the public-facing player card. Its data comes from `GET /api/player/[username]` and is server-derived from PostgreSQL.
+
+The showcase exposes:
+
+- username;
+- level and XP;
+- current title;
+- prestige score;
+- games, wins, losses and tournament wins;
+- achievement count;
+- equipped board, dice and avatar;
+- owned cosmetic counts;
+- earned level milestones;
+- upcoming level milestones.
+
+The showcase is intentionally designed so that another player can inspect someone's experience and collection instead of seeing only a username.
+
+### Title hierarchy
+
+The current derived title rules are:
+
+- Rookie — default;
+- Contender — Level 25+;
+- Elite — Level 50+;
+- Veteran — Level 75+;
+- Legend — Level 100+;
+- Tournament Champion — any recorded tournament win;
+- Unstoppable — 500+ recorded game wins (unless a higher-priority tournament title applies).
+
+Titles are reputation/status signals, not gameplay buffs.
+
+### Prestige
+
+Prestige is a presentation score, not a second XP currency. The current calculation is:
+
+`level × 25 + game wins × 5 + tournament wins × 100 + recorded level rewards × 20`
+
+It must only be calculated from server-recorded data. Clients must never submit their own prestige value.
+
+### Player inspection
+
+The canonical route is:
+
+`/player/<username>`
+
+The API requires an authenticated viewer but does not expose private credentials, wallet balances, email or other sensitive account data. Banned users are not publicly resolvable.
+
+Future lobby/matchmaking integrations should link player names/avatars to this route instead of duplicating profile logic. If a game surface adds an inspect action, it must pass the username to the existing showcase route/API rather than creating a second player-profile implementation.
+
+## Milestones 10–100
 
 | Level | Type | Item | Already-owned compensation |
 |---:|---|---|---:|
@@ -89,124 +138,44 @@ Every tenth level grants a milestone badge and a **real, usable Shop catalogue i
 | 90 | Dice | Rainbow Dice (`rainbow`) | 35 gems |
 | 100 | Board | Neon Glow (`neon`) | 50 gems |
 
-These IDs are intentionally taken from `lib/customization-catalog.ts`. A developer must not put an arbitrary/mock ID into `lib/levelRewards.ts`.
+Milestone item IDs must exist in `lib/customization-catalog.ts`.
 
 ## Already-owned rule
 
-A player must never receive a duplicate owned cosmetic.
-
-At the moment the level reward is created, the server locks the player row and checks the authoritative ownership arrays:
-
-- `owned_boards`
-- `owned_dice`
-- `owned_avatars`
-- `owned_items`
-
-If the milestone item is not owned:
-
-1. Add its ID to the correct ownership array.
-2. Return it in `reward.unlocks`.
-3. The player can equip it through the existing `/api/customization` endpoint.
-
-If the milestone item is already owned:
-
-1. Do not append another copy.
-2. Add the configured `fallbackGems` to the reward transaction.
-3. Record the amount in `ludo_level_rewards.compensation_gems`.
-4. Return the item in `reward.compensations` so the UI explains exactly why gems were awarded.
-
-The compensation is deliberately **not** the original shop price. It is a configured milestone fallback value, preventing the level system from becoming an unintended shop-refund exploit.
+A player must never receive a duplicate owned cosmetic. If the milestone item is already owned, the server grants the configured fallback gems instead and records that compensation with the level reward. The fallback is not the original shop price.
 
 ## Idempotency
 
-`ludo_level_rewards` has:
-
-`PRIMARY KEY(user_id, level)`
-
-The server inserts with `ON CONFLICT(user_id, level) DO NOTHING`.
-
-Therefore a repeated request cannot grant the same level reward twice. Wallet and ownership changes are performed in the same transaction as the reward ledger insertion.
+`ludo_level_rewards` uses `PRIMARY KEY(user_id,level)`. Repeated requests cannot grant the same level reward twice. Wallet and ownership mutations occur transactionally with the reward ledger.
 
 ## UI behavior
 
-### Level-up celebration
-
-`app/_components/XPLevelCelebration.tsx` listens for:
-
-- `ludo-progression-levelup`
-- `ludo-level-reward`
-
-The celebration displays:
-
-- coins received
-- gems received
-- milestone badge
-- newly unlocked usable item
-- already-owned item + exact gem compensation
-
-When a new cosmetic is unlocked, the message tells the player to open **Inventory → My Items** to equip it.
-
-### Profile milestone preview
-
-`app/profile/page.tsx` uses `getNextMilestone()` from `lib/levelRewards.ts` to show the next meaningful milestone and the XP remaining to reach it.
-
-This is a preview only. It does not grant anything. The server remains the authority when the level is actually reached.
+`XPLevelCelebration.tsx` displays the level reward, usable unlock, or already-owned compensation. The Profile page shows the next meaningful milestone. The Achievements page shows the lifetime Trophy Room and current loadout.
 
 ## Shared reward definition
 
-`lib/levelRewards.ts` is the canonical client/server-safe definition of the milestone ladder.
-
-It exports:
-
-- `MILESTONE_UNLOCKS`
-- `getLevelRewardPlan(level)`
-- `getNextMilestone(level)`
-
-Do not duplicate the milestone table in React components or API routes. If a reward changes, update `lib/levelRewards.ts` and this document in the same change.
+`lib/levelRewards.ts` is the canonical milestone definition. Do not duplicate the milestone table in React or API routes.
 
 ## Customization integration
 
-The actual equip/purchase authority remains:
+The actual equip/purchase authority remains `app/api/customization/route.ts`. Level rewards grant ownership; they do not bypass the equip system. The Shop catalogue remains `lib/customization-catalog.ts`.
 
-`app/api/customization/route.ts`
+## Access rewards
 
-It checks ownership before allowing `action=equip`. Level rewards only grant ownership; they do not bypass or duplicate the equip system.
-
-The Shop catalogue remains:
-
-`lib/customization-catalog.ts`
-
-If an item is removed from the catalogue, its level milestone must be changed before deployment. Never leave a level reward pointing at a non-existent item.
-
-## What is intentionally NOT implemented as a fake reward
-
-The level system does **not** claim to unlock Ranked, VIP rooms, Elite rooms, tournament qualification or other access unless the corresponding feature has a real server-side entitlement check.
-
-This is deliberate. A future access reward must follow this pattern:
+Do not claim that a level unlocks Ranked, VIP rooms, Elite rooms, tournament qualification or another capability unless the target feature has a real server-side entitlement check. A future access reward must be:
 
 ```text
-Level milestone
-    -> server entitlement/permission record
-    -> target feature checks entitlement on the server
-    -> UI displays the unlocked feature
+Level milestone -> server entitlement -> target feature server check -> UI unlock
 ```
-
-Adding only a badge saying `VIP UNLOCKED` without enforcing VIP access is prohibited.
 
 ## Developer checklist
 
-Before changing the level reward system:
-
-- [ ] Inspect `lib/levelRewards.ts`.
-- [ ] Inspect `app/api/progress/route.ts`.
-- [ ] Inspect `lib/customization-catalog.ts`.
-- [ ] Inspect `app/api/customization/route.ts`.
-- [ ] Keep reward grants inside the PostgreSQL transaction.
-- [ ] Preserve `(user_id, level)` idempotency.
-- [ ] Verify every cosmetic ID exists in the Shop catalogue.
-- [ ] Preserve already-owned gem compensation.
-- [ ] Update `XPLevelCelebration.tsx` if the reward payload changes.
-- [ ] Update the profile milestone preview if the reward ladder changes.
-- [ ] Update this file and the main architecture/handoff documentation for product-rule changes.
-- [ ] Build/test the affected code before calling the release complete.
-- [ ] Confirm Railway reports `SUCCESS` before saying the feature is live.
+- [ ] Inspect `lib/levelRewards.ts` and `app/api/progress/route.ts`.
+- [ ] Verify every cosmetic ID against `lib/customization-catalog.ts`.
+- [ ] Preserve `(user_id, level)` idempotency and already-owned compensation.
+- [ ] Keep prestige/title calculations server-derived.
+- [ ] Reuse `/api/player/[username]` for public player inspection.
+- [ ] Do not expose wallet, email, password, session or other private data in public showcases.
+- [ ] Update this document and the architecture/handoff documentation whenever progression or player identity rules change.
+- [ ] Build/test affected code before release.
+- [ ] Confirm Railway reports `SUCCESS` before calling the release live.
