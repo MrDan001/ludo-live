@@ -24,6 +24,19 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y imagemagick unzip libvulkan1 mesa-vulkan-drivers
 
+      - name: Restore clean source atlas
+        run: |
+          set -e
+          # The previous optimization accidentally overwrote the source atlas with an incorrectly
+          # assembled 816x1936 image. Restore the known-good 30-character atlas from the commit
+          # that introduced the artwork, then use that immutable source for all processing.
+          git show bd890aa:public/avatars/premium-elite-atlas.jpg > /tmp/source-atlas.jpg
+          identify /tmp/source-atlas.jpg
+          width=$(identify -format '%w' /tmp/source-atlas.jpg)
+          height=$(identify -format '%h' /tmp/source-atlas.jpg)
+          test "$width" -eq 1200
+          test "$height" -eq 1440
+
       - name: Download Real-ESRGAN
         run: |
           set -e
@@ -38,20 +51,19 @@ jobs:
           set -e
           rm -rf /tmp/avatar-crops /tmp/avatar-upscaled /tmp/avatar-atlas
           mkdir -p /tmp/avatar-crops /tmp/avatar-upscaled /tmp/avatar-atlas
-          # Ubuntu 24.04 ships ImageMagick 6 where the executable is `convert`, not `magick`.
-          # The source atlas is 5 columns x 6 rows, 240x240 per cell.
           for row in 0 1 2 3 4 5; do
             for col in 0 1 2 3 4; do
               index=$((row * 5 + col + 1))
               x=$((col * 240))
               y=$((row * 240))
               printf -v id '%02d' "$index"
-              convert public/avatars/premium-elite-atlas.jpg \
+              convert /tmp/source-atlas.jpg \
                 -crop 240x240+${x}+${y} +repage \
                 -strip -sampling-factor 4:4:4 -quality 100 \
                 /tmp/avatar-crops/avatar-${id}.png
             done
           done
+          test "$(find /tmp/avatar-crops -type f -name 'avatar-*.png' | wc -l)" -eq 30
 
       - name: AI upscale each avatar to 960x960
         run: |
@@ -62,6 +74,7 @@ jobs:
             -n realesrgan-x4plus \
             -s 4 \
             -t 128
+          test "$(find /tmp/avatar-upscaled -type f -name 'avatar-*.png' | wc -l)" -eq 30
 
       - name: Rebuild one high-resolution atlas
         run: |
@@ -80,6 +93,10 @@ jobs:
             -sampling-factor 4:4:4 -interlace Plane -quality 96 \
             public/avatars/premium-elite-atlas.jpg
           identify public/avatars/premium-elite-atlas.jpg
+          width=$(identify -format '%w' public/avatars/premium-elite-atlas.jpg)
+          height=$(identify -format '%h' public/avatars/premium-elite-atlas.jpg)
+          test "$width" -eq 4800
+          test "$height" -eq 5760
 
       - name: Commit optimized high-resolution atlas
         run: |
