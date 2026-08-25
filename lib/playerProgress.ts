@@ -3,11 +3,19 @@ export type PlayerProgress = {
   xp: number;
 };
 
+export type LevelRewardUnlock = {
+  type: "board" | "dice" | "avatar" | "item";
+  id: string;
+  name: string;
+  icon?: string;
+};
+
 export type LevelReward = {
   coins: number;
   gems: number;
   badges: string[];
   levels: number[];
+  unlocks: LevelRewardUnlock[];
 };
 
 export type Badge = {
@@ -17,7 +25,7 @@ export type Badge = {
   source: "spin" | "store" | "game" | "tournament";
 };
 
-export const PROGRESSION_VERSION = 4;
+export const PROGRESSION_VERSION = 5;
 export const STARTING_COINS = 1000;
 export const STARTING_GEMS = 10;
 
