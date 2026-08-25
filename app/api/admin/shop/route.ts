@@ -29,12 +29,17 @@ async function ensureShopTable() {
   )`);
 }
 
+async function pricingUpdatedAt() {
+  const r = await pool.query<{ updated_at: string | null }>(`SELECT MAX(updated_at) AS updated_at FROM ludo_shop_catalog_overrides`);
+  return r.rows[0]?.updated_at || null;
+}
+
 export async function GET(q: NextRequest) {
   try {
     const a = await admin(q);
     if (!a) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
     await ensureShopTable();
-    return NextResponse.json({ ok: true, items: await getShopCatalog() });
+    return NextResponse.json({ ok: true, items: await getShopCatalog(), lastUpdated: await pricingUpdatedAt() }, { headers: { "Cache-Control": "no-store, no-cache, must-revalidate", "Pragma": "no-cache", "Expires": "0" } });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Unable to load shop pricing." }, { status: 500 });
@@ -60,7 +65,7 @@ export async function POST(q: NextRequest) {
     await pool.query(`INSERT INTO ludo_shop_catalog_overrides(item_type,item_id,currency,price,updated_by,updated_at)
       VALUES($1,$2,$3,$4,$5,NOW()) ON CONFLICT(item_type,item_id) DO UPDATE SET currency=EXCLUDED.currency,price=EXCLUDED.price,updated_by=EXCLUDED.updated_by,updated_at=NOW()`, [type,id,currency,price,a.id]);
     await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'shop_price_update',NULL,$2)`, [a.id, JSON.stringify({type,id,currency,price,previousCurrency:item.currency,previousPrice:item.price})]);
-    return NextResponse.json({ ok: true, item: { ...item, currency, price } });
+    return NextResponse.json({ ok: true, item: { ...item, currency, price }, lastUpdated: await pricingUpdatedAt() });
   } catch (e) {
     console.error(e);
     return NextResponse.json({ error: "Unable to save shop price." }, { status: 500 });
