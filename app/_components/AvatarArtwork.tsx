@@ -45,14 +45,10 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         minWidth: 0,
         minHeight: 0,
         lineHeight: 0,
-        backgroundImage: `url(${ATLAS})`,
-        backgroundRepeat: "no-repeat",
-        backgroundSize,
-        backgroundPosition,
         backgroundColor: "#061226",
         ...style,
-        // Keep the atlas geometry authoritative even if a caller supplies
-        // conflicting background sizing or positioning in its style prop.
+        // Keep the approved atlas geometry authoritative even if a caller
+        // supplies conflicting background styling in its style prop.
         backgroundImage: `url(${ATLAS})`,
         backgroundRepeat: "no-repeat",
         backgroundSize,
