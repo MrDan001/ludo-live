@@ -46,13 +46,14 @@ export default function XPLevelCelebration() {
           <div className="xp-old-bar" />
           <div className="xp-new-bar" style={{ "--next": `${nextPercent}%` } as React.CSSProperties} />
         </div>
-        {reward && (reward.coins > 0 || reward.gems > 0 || reward.badges.length > 0) && (
+        {reward && (reward.coins > 0 || reward.gems > 0 || reward.badges.length > 0 || reward.unlocks.length > 0) && (
           <div className="xp-reward">
             <div className="xp-reward-title">🎁 LEVEL REWARD</div>
             <div className="xp-reward-items">
               {reward.coins > 0 && <span>🪙 +{reward.coins.toLocaleString()}</span>}
               {reward.gems > 0 && <span>💎 +{reward.gems.toLocaleString()}</span>}
               {reward.badges.length > 0 && <span>🏆 Milestone Badge</span>}
+              {reward.unlocks.map(item => <span key={`${item.type}:${item.id}`}>{item.icon || (item.type === "board" ? "🎨" : item.type === "dice" ? "🎲" : item.type === "avatar" ? "👤" : "✨")} {item.name} UNLOCKED</span>)}
             </div>
           </div>
         )}
@@ -60,7 +61,7 @@ export default function XPLevelCelebration() {
       </div>
       <style jsx>{`
         .xp-celebration{position:fixed;inset:0;z-index:100000;display:grid;place-items:center;background:rgba(1,5,18,.78);backdrop-filter:blur(8px);animation:xp-screen 4.2s both;pointer-events:none;overflow:hidden}
-        .xp-card{position:relative;width:min(92vw,440px);padding:28px 24px 24px;text-align:center;border:2px solid #facc15;border-radius:28px;background:linear-gradient(160deg,rgba(10,30,72,.98),rgba(10,8,35,.98));box-shadow:0 0 70px rgba(250,204,21,.35),0 24px 80px rgba(0,0,0,.55);animation:xp-card 4.2s both}
+        .xp-card{position:relative;width:min(92vw,460px);padding:28px 24px 24px;text-align:center;border:2px solid #facc15;border-radius:28px;background:linear-gradient(160deg,rgba(10,30,72,.98),rgba(10,8,35,.98));box-shadow:0 0 70px rgba(250,204,21,.35),0 24px 80px rgba(0,0,0,.55);animation:xp-card 4.2s both}
         .xp-emojis{font-size:34px;letter-spacing:5px;animation:xp-pop .65s .15s both}
         .xp-small{margin-top:8px;font-size:10px;letter-spacing:3px;font-weight:950;color:#facc15}
         h2{margin:4px 0 10px;font-size:40px;line-height:1;font-weight:1000;background:linear-gradient(90deg,#fff,#facc15,#fff);-webkit-background-clip:text;color:transparent}
