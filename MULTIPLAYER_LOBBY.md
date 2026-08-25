@@ -12,17 +12,32 @@ The Start Game control remains host-only and requires the full room, every playe
 
 ## Voice chat
 
-Voice chat uses `public/live-social.js` with PeerJS/WebRTC. The profile microphone preference does not itself grant browser hardware permission. The first use of Mic On must call `navigator.mediaDevices.getUserMedia({ audio: ... })`; browsers require explicit permission and secure HTTPS context. The UI now reports when voice is still connecting or when microphone permission is unavailable.
+Room voice uses the existing canonical `ChatVoice.tsx` implementation with PeerJS/WebRTC. `LiveSocial.tsx` must not create a second room voice transport. The profile microphone preference does not itself grant browser hardware permission. The first use of Mic On must call `navigator.mediaDevices.getUserMedia({ audio: ... })`; browsers require explicit permission and secure HTTPS context.
 
-Peer connections wait until the PeerJS peer is open before attempting voice calls. Voice streams are re-synchronized when the roster changes and when a microphone is enabled.
+`ChatVoice` preserves incoming WebRTC calls when the receiving player has not enabled their microphone yet, then answers those pending calls when the local microphone stream becomes available. Remote streams are attached to autoplay/playsinline audio elements.
+
+## Room-to-game handoff
+
+There are two related server responsibilities:
+
+- `server.js` maintains the legacy room/lobby roster and room discovery.
+- `multiplayer-canonical.js` is preloaded by the production start command and owns canonical multiplayer readiness, start, dice, movement and reconnect state.
+
+A room socket disconnects when the player navigates from `/room` to `/game-online`. Once the canonical match has started, the canonical socket disconnect handler must own that lifecycle and must not forward the disconnect into the legacy room handler. The legacy 2-player room handler closes the room and emits `kicked` when it believes the host permanently left; forwarding the normal navigation disconnect during a game transition therefore incorrectly kicked the other player back to `/lobby`.
+
+`multiplayer-canonical.js` now returns after handling a canonical disconnect, preventing the legacy room teardown from firing during the room-to-game transition.
 
 ## Files
 
-- `app/room/page.tsx` — authenticated room/player naming.
-- `app/_components/LiveSocial.tsx` — roster/readiness synchronization and mic controls.
-- `public/live-social.js` — PeerJS/WebRTC voice transport.
-- `multiplayer-canonical.js` — authoritative game readiness/start rules.
+- `app/room/page.tsx` — authenticated room/player naming and navigation to the online game.
+- `app/_components/LiveSocial.tsx` — roster/readiness synchronization, chat and integration with `ChatVoice`.
+- `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport and pending-call handling.
+- `multiplayer-canonical.js` — authoritative multiplayer readiness/start/game/reconnect rules and canonical disconnect ownership.
+- `app/game-online/page.tsx` — online game entry.
+- `app/game/MultiplayerGameCanonical.tsx` — canonical multiplayer board client.
 
 ## Do not regress
 
-Do not restore hard-coded `Player 1` defaults for authenticated players, and do not bypass the canonical readiness handler with a second competing readiness state. Keep the server/canonical game state authoritative.
+Do not restore hard-coded `Player 1` defaults for authenticated players, create a second voice implementation, or bypass the canonical readiness handler with a competing readiness state. Keep the server/canonical game state authoritative.
+
+Do not forward a canonical multiplayer disconnect to the legacy lobby disconnect handler after a match has started; doing so can trigger the legacy 2-player host-left cleanup and kick the remaining player during navigation.
