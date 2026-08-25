@@ -45,7 +45,7 @@ Default packages are only fallbacks. Admin overrides replace their price/currenc
 
 ## Player Shop
 
-`app/shop/page.tsx` now loads the effective server catalogue through `/api/customization` and `/api/shop/catalog` and renders the returned price/currency for:
+`app/shop/page.tsx` loads the effective server catalogue through `/api/customization` and `/api/shop/catalog` and renders the returned price/currency for:
 
 - Coins
 - Gems
@@ -55,6 +55,17 @@ Default packages are only fallbacks. Admin overrides replace their price/currenc
 - Dice
 
 The player Shop must never use a hard-coded product price as the final displayed price after the server catalogue has loaded.
+
+## Premium and Elite Avatars
+
+The avatar catalogue now includes 10 `PREMIUM` avatars and 20 `ELITE` avatars in addition to the original six avatars.
+
+- Premium IDs: `premium-01` through `premium-10`.
+- Elite IDs: `elite-01` through `elite-20`.
+- All 30 new avatars use Gems by default and have deliberately higher demo prices than the existing avatar tier.
+- Artwork is stored in `public/avatars/premium-elite-atlas.svg` and referenced by `atlas:01` through `atlas:30` catalog icons.
+- The atlas is presentation-only; ownership, equipping and purchase authority remain the existing customization system.
+- Admin can change the price **and payment currency** of every avatar from `/dbase` → Shop Pricing. No avatar price is hard-coded as the final purchase price.
 
 ## Purchase authority
 
