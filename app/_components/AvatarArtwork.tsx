@@ -1,9 +1,9 @@
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// User-supplied Premium + Elite artwork: 30 characters in a 6-column x 5-row image atlas.
-const ATLAS = "/avatars/ludo-live-avatar-atlas.webp?v=20260826-3";
+const CHUNKS = Array.from({ length: 8 }, (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-4`);
 
 function atlasCell(id: string) {
   const match = id.match(/^(premium|elite)-(\d{2})$/);
@@ -19,7 +19,24 @@ function atlasCell(id: string) {
 
 export default function AvatarArtwork({ id, className, style, size }: Props) {
   const cell = atlasCell(id || "");
-  if (!cell) return null;
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(CHUNKS.map((url) => fetch(url, { cache: "no-store" }).then((r) => {
+      if (!r.ok) throw new Error(`Avatar asset failed: ${r.status}`);
+      return r.text();
+    })))
+      .then((parts) => {
+        if (!cancelled) setSrc(`data:image/webp;base64,${parts.join("")}`);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(null);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  if (!cell || !src) return null;
 
   return (
     <span
@@ -32,10 +49,11 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
-        backgroundImage: `url(${ATLAS})`,
+        backgroundImage: `url(${src})`,
         backgroundRepeat: "no-repeat",
         backgroundSize: "600% 500%",
         backgroundPosition: `${cell.col * 20}% ${cell.row * 25}%`,
+        backgroundColor: "transparent",
         ...style,
       }}
     />
