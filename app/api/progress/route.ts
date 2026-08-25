@@ -6,7 +6,7 @@ import { getLevelRewardPlan, type MilestoneUnlock } from "../../../lib/levelRewa
 const XP_PER_GAME_WIN = 7;
 const XP_PER_DIAMOND_PURCHASE = 15;
 
-function requiredForLevel(level: number) { return 10 + Math.max(0, level) * 5; }
+function requiredForLevel(level: number) { return 10 + Math.max(1, Math.floor(Number(level) || 1)) * 5; }
 
 type Unlock = MilestoneUnlock;
 
@@ -48,8 +48,8 @@ export async function POST(request: NextRequest) {
       const locked = await client.query<any>("SELECT xp,level,coins,gems,owned_boards,owned_dice,owned_avatars,owned_items FROM ludo_users WHERE id=$1 FOR UPDATE", [user.id]);
       const row = locked.rows[0];
       if (!row) throw new Error("Account not found.");
-      let xp = Math.max(0, Number(row.xp) || 0) + amount;
-      let level = Math.max(0, Number(row.level) || 0);
+      let xp = Math.max(0, Number(row.xp) || 0);
+      let level = Math.max(1, Number(row.level) || 1);
       const oldLevel = level;
       let levelsGained = 0;
       let rewardCoins = 0;
