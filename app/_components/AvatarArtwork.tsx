@@ -2,8 +2,8 @@ import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// Approved 30-character artwork atlas: 6 columns x 5 rows, square cells.
-const ATLAS = "/avatars/premium-elite-atlas.webp?v=20260825-5";
+// Approved 30-character artwork atlas.
+const ATLAS = "/avatars/premium-elite-atlas.webp?v=20260825-4";
 
 function atlasCell(id: string) {
   const match = id.match(/^(premium|elite)-(\d{2})$/);
@@ -19,10 +19,9 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
   const avatarId = id || "";
   const cell = atlasCell(avatarId);
   if (!cell) return null;
-
   const width = size ?? "100%";
   const backgroundSize = "auto 500%";
-  const backgroundPosition = `${cell.col * 20}% ${cell.row * 25}%`;
+  const backgroundPosition = `${cell.col * 18.76}% ${cell.row * 25}%`;
 
   return (
     <span
@@ -36,11 +35,11 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         minHeight: 0,
         lineHeight: 0,
         backgroundColor: "#061226",
+        ...style,
         backgroundImage: `url(${ATLAS})`,
         backgroundRepeat: "no-repeat",
         backgroundSize,
         backgroundPosition,
-        ...style,
       }}
     />
   );
