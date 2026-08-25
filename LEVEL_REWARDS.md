@@ -70,7 +70,7 @@ The Achievements page is the player's **Trophy Room**. It is not only a history 
 - the player's current title tier;
 - a link to the player's public Player Showcase.
 
-The Trophy Room is intentionally a pride/identity surface. Cosmetics are presentation only and never modify Ludo odds or rules.
+The Trophy Room is intentionally designed as a pride/identity surface. Cosmetics are presentation only and never modify Ludo odds or rules.
 
 ### Public Player Showcase
 
@@ -90,6 +90,24 @@ The showcase exposes:
 - upcoming level milestones.
 
 The showcase is intentionally designed so that another player can inspect someone's experience and collection instead of seeing only a username.
+
+### Canonical navigation contract
+
+`app/_components/PlayerIdentityLink.tsx` is the shared identity link. It routes a player's displayed username/avatar to:
+
+`/player/<encoded username>`
+
+Current wired surfaces:
+
+- **Friends** — friend/request identities and the open private-chat header.
+- **Multiplayer room / live social overlay** — roster player names and chat sender names.
+- **Tournament standings** — eligible Top-10 players and participant rows.
+
+These surfaces must reuse `PlayerIdentityLink`; do not create a second profile modal or duplicate showcase implementation.
+
+For a player's own identity, the destination may still be the public showcase when the surface is explicitly an inspection surface. Settings/profile navigation remains separate.
+
+The canonical showcase requires an authenticated viewer, is server-derived, and does not expose wallet balances, email, password, sessions or other private account data.
 
 ### Title hierarchy
 
@@ -112,16 +130,6 @@ Prestige is a presentation score, not a second XP currency. The current calculat
 `level × 25 + game wins × 5 + tournament wins × 100 + recorded level rewards × 20`
 
 It must only be calculated from server-recorded data. Clients must never submit their own prestige value.
-
-### Player inspection
-
-The canonical route is:
-
-`/player/<username>`
-
-The API requires an authenticated viewer but does not expose private credentials, wallet balances, email or other sensitive account data. Banned users are not publicly resolvable.
-
-Future lobby/matchmaking integrations should link player names/avatars to this route instead of duplicating profile logic. If a game surface adds an inspect action, it must pass the username to the existing showcase route/API rather than creating a second player-profile implementation.
 
 ## Milestones 10–100
 
@@ -175,6 +183,7 @@ Level milestone -> server entitlement -> target feature server check -> UI unloc
 - [ ] Preserve `(user_id, level)` idempotency and already-owned compensation.
 - [ ] Keep prestige/title calculations server-derived.
 - [ ] Reuse `/api/player/[username]` for public player inspection.
+- [ ] Reuse `PlayerIdentityLink` on new player-name/avatar surfaces.
 - [ ] Do not expose wallet, email, password, session or other private data in public showcases.
 - [ ] Update this document and the architecture/handoff documentation whenever progression or player identity rules change.
 - [ ] Build/test affected code before release.
