@@ -2,41 +2,50 @@
 
 ## Purpose
 
-Prestige is a long-term reputation layer above normal level progression. It does not replace, reset, or cap the player's level.
+Prestige is a long-term reputation layer above normal level progression. It does not replace, reset, or cap the player's level, and it is completely separate from the hours-based Hierarchy system.
 
 ## Canonical calculation
 
 Prestige is derived from the authoritative current level:
 
-`prestige = floor((level - 1) / 100)`
+`prestige = floor((level - 1) / 10)`
 
 The player's position inside the current prestige cycle is:
 
-`prestigeLevel = ((level - 1) % 100) + 1`
+`prestigeLevel = ((level - 1) % 10) + 1`
 
 Examples:
 
 | Level | Prestige | Prestige Level |
 |---:|---:|---:|
 | 1 | 0 | 1 |
-| 99 | 0 | 99 |
-| 100 | 0 | 100 |
-| 101 | 1 | 1 |
-| 137 | 1 | 37 |
-| 199 | 1 | 99 |
-| 200 | 1 | 100 |
-| 201 | 2 | 1 |
-| 1001 | 10 | 1 |
+| 9 | 0 | 9 |
+| 10 | 0 | 10 |
+| 11 | 1 | 1 |
+| 17 | 1 | 7 |
+| 20 | 1 | 10 |
+| 21 | 2 | 1 |
+| 101 | 10 | 1 |
 
 ## Important boundary rule
 
-Prestige increases **after completing each 100-level cycle**. Therefore Level 100 is the final level of Prestige 0, Level 101 starts Prestige 1, and Level 201 starts Prestige 2.
+Prestige increases **after completing each 10-level cycle**. Therefore Level 10 is the final level of Prestige 0, Level 11 starts Prestige 1, and Level 21 starts Prestige 2.
 
-This avoids a discontinuity where the player would appear to have completed Prestige 1 before actually completing the first 100-level cycle.
+This keeps the player's Level intact while making Prestige a visible long-term progression layer.
 
 ## Authority
 
 Prestige must never be submitted by the client. The server derives it from the canonical level returned from PostgreSQL. It is presentation/reputation state, not a wallet currency and not a gameplay advantage.
+
+## Relationship to Hierarchy
+
+Prestige and Hierarchy are intentionally different:
+
+- **Level** = XP progression.
+- **Prestige** = completed 10-level progression cycles.
+- **Hierarchy** = verified active game-session hours.
+
+Hierarchy does not reset when Prestige increases, and Prestige does not depend on hours, wins, tournament wins, or cosmetic ownership.
 
 ## UI
 
