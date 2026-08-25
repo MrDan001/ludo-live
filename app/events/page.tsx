@@ -53,7 +53,7 @@ export default function EventsPage() {
     finally { setBusy(""); }
   };
 
-  return <AppFrame back=""><main style={page}>
+  return <AppFrame hideBack><main style={page}>
     <header style={header}><button onClick={() => history.back()} style={back}>←</button><div style={headerTitle}>Events</div><div/></header>
     <div style={tabs}>{["Live Events","Upcoming"].map(t => <button key={t} onClick={() => setTab(t as any)} style={{...tabStyle,...(tab===t?tabActive:{})}}>{t}<span style={count}>{t === "Live Events" ? live.length : upcoming.length}</span></button>)}</div>
     {msg && <div style={notice}>{msg}</div>}
