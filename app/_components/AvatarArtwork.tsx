@@ -28,11 +28,9 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
 
   const width = size ?? "100%";
 
-  // Render the atlas as a real image layer instead of relying on CSS
-  // background-image cropping. This gives the browser an actual <img> load
-  // target and lets us detect/contain the asset consistently in the shop.
-  const backgroundPosition = `${cell.col * 20}% ${cell.row * 25}%`;
-
+  // Use a real <img> so the browser has a normal image request and decoding
+  // path. The 6 x 5 atlas is enlarged to six container widths by five heights;
+  // left/top then move the requested cell into the visible viewport exactly.
   return (
     <span
       aria-hidden="true"
@@ -56,19 +54,18 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         draggable={false}
         style={{
           position: "absolute",
-          inset: 0,
+          left: `${-cell.col * 100}%`,
+          top: `${-cell.row * 100}%`,
           width: "600%",
           height: "500%",
           maxWidth: "none",
+          maxHeight: "none",
           objectFit: "fill",
-          objectPosition: "0 0",
-          transform: `translate(${-cell.col * (100 / 6)}%, ${-cell.row * 20}%)`,
-          transformOrigin: "top left",
+          display: "block",
           userSelect: "none",
           pointerEvents: "none",
         }}
         onError={(event) => {
-          // Keep the shop card intact if the asset cannot be loaded.
           event.currentTarget.style.display = "none";
         }}
       />
