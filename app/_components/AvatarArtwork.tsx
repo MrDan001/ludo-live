@@ -2,9 +2,9 @@ import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// The premium/elite atlas is a 6 x 5 image. Keep the URL versioned so browsers
-// and the deployed CDN don't keep an older cached atlas after an asset update.
-const ATLAS = "/avatars/premium-elite-atlas.webp?v=20260825-6";
+// Original 30-avatar vector atlas: 5 columns x 6 rows.
+// We use the vector source directly because the committed WebP atlas is not a valid WebP file.
+const ATLAS = "/avatars/premium-elite-atlas.svg?v=20260826-1";
 
 function atlasCell(id: string) {
   const match = id.match(/^(premium|elite)-(\d{2})$/);
@@ -16,21 +16,18 @@ function atlasCell(id: string) {
 
   const zero = index - 1;
   return {
-    col: zero % 6,
-    row: Math.floor(zero / 6),
+    col: zero % 5,
+    row: Math.floor(zero / 5),
   };
 }
 
 export default function AvatarArtwork({ id, className, style, size }: Props) {
-  const avatarId = id || "";
-  const cell = atlasCell(avatarId);
+  const cell = atlasCell(id || "");
   if (!cell) return null;
 
   const width = size ?? "100%";
+  const backgroundPosition = `${cell.col * 25}% ${cell.row * 20}%`;
 
-  // Use a real <img> so the browser has a normal image request and decoding
-  // path. The 6 x 5 atlas is enlarged to six container widths by five heights;
-  // left/top then move the requested cell into the visible viewport exactly.
   return (
     <span
       aria-hidden="true"
@@ -44,31 +41,14 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         lineHeight: 0,
         overflow: "hidden",
         position: "relative",
-        backgroundColor: "#061226",
+        backgroundColor: "transparent",
+        backgroundImage: `url(${ATLAS})`,
+        backgroundRepeat: "no-repeat",
+        backgroundSize: "500% 600%",
+        backgroundPosition,
+        backgroundClip: "padding-box",
         ...style,
       }}
-    >
-      <img
-        src={ATLAS}
-        alt=""
-        draggable={false}
-        style={{
-          position: "absolute",
-          left: `${-cell.col * 100}%`,
-          top: `${-cell.row * 100}%`,
-          width: "600%",
-          height: "500%",
-          maxWidth: "none",
-          maxHeight: "none",
-          objectFit: "fill",
-          display: "block",
-          userSelect: "none",
-          pointerEvents: "none",
-        }}
-        onError={(event) => {
-          event.currentTarget.style.display = "none";
-        }}
-      />
-    </span>
+    />
   );
 }
