@@ -84,6 +84,7 @@ The showcase renders the **real equipped avatar icon** from `lib/customization-c
 
 The Player Showcase contains a vertical **Level Journey** track. It is a continuous level-by-level road rather than a single `Level 10` label.
 
+- For players at **Level 0**, the visible journey temporarily includes Level 0 so the exact current level can be marked. This is required because the canonical progression starts new players at Level 0 and Level 0 → 1 requires 10 XP.
 - For players below Level 5, the visible journey begins at Level 1 so their current level can still be marked exactly.
 - From Level 5 onward, the journey begins at Level 5 and continues through the current level plus a short look-ahead.
 - Every level is rendered in order (5, 6, 7, 8, ...), with the shared `getLevelRewardPlan(level)` determining the reward shown for that level.
@@ -157,7 +158,7 @@ A player must never receive a duplicate owned cosmetic. If the milestone item is
 
 ## UI behavior
 
-`XPLevelCelebration.tsx` displays the level reward, usable unlock, or already-owned compensation. The Profile page shows the next meaningful milestone. The Achievements page shows the lifetime Trophy Room and current loadout. The Player Showcase shows only the next milestone after the inspected player's current level and a progressive current-level journey marker with exact XP remaining to the next level.
+`XPLevelCelebration.tsx` displays the level reward, usable unlock, or already-owned compensation. The Profile page shows the next meaningful milestone. The Achievements page shows the lifetime Trophy Room and current loadout. The Player Showcase shows only the next milestone after the inspected player's current level and a progressive current-level journey marker with exact XP remaining to the next level. For a canonical Level 0 player, the journey includes a Level 0 row so the current-level marker is never missing.
 
 ## Shared reward definition
 
@@ -185,7 +186,7 @@ Level milestone -> server entitlement -> target feature server check -> UI unloc
 - [ ] Reuse `PlayerIdentityLink` on new player-name/avatar surfaces.
 - [ ] Keep the waiting-room avatar sourced from the inspected player's real equipped avatar and preserve it through game-state merges.
 - [ ] Keep the showcase avatar resolved from the same authoritative catalogue and use the same default-avatar representation as Profile.
-- [ ] Keep the Level Journey continuous and mark the exact current level; show current-level XP and remaining XP to the next level on that same row.
+- [ ] Keep the Level Journey continuous and mark the exact current level; include Level 0 for new canonical players; show current-level XP and remaining XP to the next level on that same row.
 - [ ] Do not expose wallet, email, password, session or other private data in public showcases.
 - [ ] Update this document and the architecture/handoff documentation whenever progression or player identity rules change.
 - [ ] Build/test affected code before release.
