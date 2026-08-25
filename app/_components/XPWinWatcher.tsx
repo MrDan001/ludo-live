@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
-import { awardServerXP } from "../../lib/playerProgress";
+import { awardServerXP, syncProgressFromUser } from "../../lib/playerProgress";
 
 export default function XPWinWatcher() {
   const initialized = useRef(false);
@@ -12,10 +12,15 @@ export default function XPWinWatcher() {
     let cancelled = false;
     const scan = async () => {
       if (cancelled) return;
+      try {
+        const auth = await fetch("/api/auth", { cache: "no-store" }).then(r => r.json());
+        if (auth?.user) syncProgressFromUser(auth.user);
+      } catch {}
+
       let botWon = false;
       try {
         const raw = localStorage.getItem("ludo-bot-match-v1");
-        if (raw) botWon = Boolean(JSON.parse(raw)?.matchOver && JSON.parse(raw)?.winnerIsHuman);
+        if (raw) { const state = JSON.parse(raw); botWon = Boolean(state?.matchOver && state?.winnerIsHuman); }
       } catch {}
 
       const tournamentNow: Record<string, boolean> = {};
@@ -41,7 +46,7 @@ export default function XPWinWatcher() {
       botWasWon.current = botWon;
       tournamentWins.current = tournamentNow;
     };
-    const timer = window.setInterval(() => { void scan(); }, 600);
+    const timer = window.setInterval(() => { void scan(); }, 3000);
     void scan();
     return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
