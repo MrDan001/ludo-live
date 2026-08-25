@@ -179,6 +179,44 @@ Bottom navigation stays:
 
 Quick-access row stays Daily Reward / Shop / Events / Spin Wheel unless explicitly redesigned. Inventory is accessed through its full-width card instead of adding another bottom-nav item.
 
+## Event contract
+
+The Event system is server-authoritative. See `EVENTS.md` for the full lifecycle and implementation details.
+
+### Player Event page
+
+The player Event page intentionally has only:
+
+- **Live Events**
+- **Upcoming**
+
+It must not expose History or Expired tabs unless product requirements explicitly change. Expired events remain server-side for Admin settlement/history but are not shown to players.
+
+The page owns its single top Back button and passes `hideBack` to `AppFrame` so the shared shell does not render a duplicate Back control.
+
+### Event lifecycle and authority
+
+Admin-defined `startsAt` and `endsAt` are authoritative. Client countdowns are presentation only.
+
+- Upcoming: start time is in the future.
+- Live: start time has arrived and end time has not passed.
+- Ended/settled: end time has passed and server settlement has completed.
+- Cancelled: Admin cancelled the event.
+
+Players may join only while the server evaluates the event as live.
+
+### Event progress and rewards
+
+Joined gameplay activity is evaluated server-side against the event's `mission_kind` and `mission_target`. Progress is capped at the target. Reaching the target records completion and `completed_at`.
+
+At expiry, the settlement path locks the event, marks it ended, finds completed entries, inserts an idempotent reward ledger row, credits the configured coins/gems, marks `reward_claimed`, and records `settled_at`. The same event/player reward cannot be paid twice.
+
+The production event-settler worker runs independently of the player Event page, so expiry and settlement do not depend on a user opening the page.
+
+### Event UI progress bar
+
+The progress fill must be a block-level element with explicit height and percentage width. Do not use a plain inline `<span>` for the fill. The current implementation uses `progressFill` with `display: block` and `height: 100%`, preventing a completed value such as `1/1` from displaying an empty bar.
+
 ## Admin contract
 
 Admin management controls belong inside **one hamburger menu**. They must not appear as scattered floating buttons outside the admin page.
@@ -211,13 +249,13 @@ Session cookie: `ludo_session`.
 
 Server identity lookup: `lib/auth-session.ts`.
 
-Never accept a client-supplied user id for privileged admin, wallet, purchase, XP, ownership or tournament mutations.
+Never accept a client-supplied user id for privileged admin, wallet, purchase, XP, ownership, tournament result or event reward mutations.
 
 ## Database authority
 
-PostgreSQL is authoritative for accounts, wallets, customization ownership, progression, tournament stats/sessions, financial records and earned free-spin balances. Socket.IO is authoritative for active multiplayer room state.
+PostgreSQL is authoritative for accounts, wallets, customization ownership, progression, tournament stats/sessions, financial records, earned free-spin balances, event definitions, event participation and event reward settlement.
 
-Do not use localStorage as the final authority for any server-owned financial, progression, ownership, tournament result or free-spin balance.
+Do not use localStorage as the final authority for any server-owned financial, progression, ownership, tournament result, free-spin balance, event progress or event reward balance.
 
 ## Responsive/UI discipline
 
@@ -238,6 +276,7 @@ Before reporting a release as complete:
 - [ ] No protected `/game` regression was introduced.
 - [ ] Financial and ownership mutations remain server-authoritative.
 - [ ] Free-spin activity/grants remain server-authoritative.
+- [ ] Event expiry/reward settlement remains server-authoritative and idempotent.
 - [ ] Railway deployment reaches `SUCCESS`.
 - [ ] If Railway fails, the actual build/deploy log was inspected.
 
@@ -248,9 +287,11 @@ Before reporting a release as complete:
 - Do not treat the Shop catalogue as the currency-package catalogue.
 - Do not put purchases in Award Room.
 - Do not render Award Room as a list; use the agreed grid.
-- Do not use client-only XP, tournament scoring or free-spin balances.
+- Do not use client-only XP, tournament scoring, free-spin balances or event rewards.
 - Do not reset earned free spins every day.
 - Do not calculate the 17:00–20:00 reward window using local device time; use Nigeria time on the server.
+- Do not expose History/Expired tabs on the player Event page unless explicitly requested.
+- Do not render an Event progress fill as an inline-only span; percentage width needs a block-level fill element.
 - Do not claim deployment success while Railway is building, queued, failed, or otherwise not successful.
 - Do not fix one TypeScript error by suppressing type checking; fix the type at its source.
 - Do not treat a green Mic button as proof of remote audio delivery.
