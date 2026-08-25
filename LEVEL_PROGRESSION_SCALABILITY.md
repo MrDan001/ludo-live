@@ -21,6 +21,15 @@ Examples:
 
 Because the formula is calculated from the current level, it continues indefinitely.
 
+## Active-time XP
+
+Verified active game-session time is an additional XP source:
+
+- Every completed 30 minutes normally grants **5 XP**.
+- During **17:00–20:00 Africa/Lagos time**, every completed 30-minute interval grants **15 XP**.
+- Active time is server-tracked through `ludo_spin_state`; client heartbeats cannot directly set XP.
+- Active-time XP uses the same canonical level/reward transaction path, so level-ups and milestone rewards remain consistent with all other server XP sources.
+
 ## Reward formula
 
 Every level grants coins:
@@ -37,21 +46,42 @@ Already-owned cosmetics receive their configured gem compensation and the reward
 
 ## Prestige
 
-Prestige is a derived long-term reputation layer above Level progression. It does not reset the player's level.
+Prestige is a derived long-term reputation layer above Level progression. It does not reset the player's level and is separate from the hours-based Hierarchy system.
 
-`prestige = floor((level - 1) / 100)`
+`prestige = floor((level - 1) / 10)`
 
-`prestigeLevel = ((level - 1) % 100) + 1`
+`prestigeLevel = ((level - 1) % 10) + 1`
 
 Therefore:
 
-- Level 1–100 → Prestige 0
-- Level 101–200 → Prestige 1
-- Level 201–300 → Prestige 2
-- Level 301–400 → Prestige 3
+- Level 1–10 → Prestige 0
+- Level 11–20 → Prestige 1
+- Level 21–30 → Prestige 2
+- Level 31–40 → Prestige 3
 - and indefinitely onward.
 
 There is no maximum Prestige. Prestige must be derived server-side from the authoritative level and must not be accepted from the client.
+
+## Hierarchy
+
+Hierarchy is independent of Level and Prestige. It is based on verified active game-session hours:
+
+- 0–<1 hour: **On Your Way**
+- 1 hour: **Rookie**
+- 3 hours: **Dabbler**
+- 10 hours: **Hobbyist**
+- 20 hours: **Enthusiast**
+- 40 hours: **Devotee**
+- 60 hours: **Fanatic**
+- 100 hours: **Expert**
+- 300 hours: **Prodigy**
+- 500 hours: **Champion**
+- 750 hours: **Mastermind**
+- 1,000 hours: **Legend**
+- 1,500 hours: **Grandmaster**
+- 2,000 hours: **Immortal**
+
+The server derives the title from `floor(total_active_seconds / 3600)`. It does not use client-provided hours, Level, wins, tournament wins, or cosmetic ownership.
 
 ## Player Showcase journey
 
