@@ -1,0 +1,36 @@
+"use client";
+
+import { useEffect, useRef } from "react";
+import { recordMissionEvent } from "../../lib/missionEvents";
+
+const GAME_PATHS = ["/game", "/game-online", "/tournament/game"];
+
+export default function MissionGameplayTracker() {
+  const started = useRef(false);
+  const winRecorded = useRef(false);
+
+  useEffect(() => {
+    if (!GAME_PATHS.some((path) => window.location.pathname === path)) return;
+
+    if (!started.current) {
+      started.current = true;
+      recordMissionEvent("play_games");
+    }
+
+    const onAudio = (event: Event) => {
+      const detail = (event as CustomEvent).detail;
+      if (detail === "dice") recordMissionEvent("roll_dice");
+      else if (detail === "move") recordMissionEvent("move_tokens");
+      else if (detail === "win" && !winRecorded.current) {
+        winRecorded.current = true;
+        recordMissionEvent("win_games");
+        recordMissionEvent("complete_games");
+      }
+    };
+
+    window.addEventListener("ludo-audio", onAudio);
+    return () => window.removeEventListener("ludo-audio", onAudio);
+  }, []);
+
+  return null;
+}
