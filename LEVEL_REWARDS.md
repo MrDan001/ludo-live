@@ -84,12 +84,14 @@ The showcase renders the **real equipped avatar icon** from `lib/customization-c
 
 The Player Showcase contains a vertical **Level Journey** track. It is a continuous level-by-level road rather than a single `Level 10` label.
 
-- For players at **Level 0**, the visible journey temporarily includes Level 0 so the exact current level can be marked. This is required because the canonical progression starts new players at Level 0 and Level 0 → 1 requires 10 XP.
-- For players below Level 5, the visible journey begins at Level 1 so their current level can still be marked exactly.
-- From Level 5 onward, the journey begins at Level 5 and continues through the current level plus a short look-ahead.
-- Every level is rendered in order (5, 6, 7, 8, ...), with the shared `getLevelRewardPlan(level)` determining the reward shown for that level.
-- The inspected player's exact current level receives a prominent **YOU ARE HERE / CURRENT LEVEL** marker.
-- On the current-level row, the showcase also displays the player's **current-level XP / XP required**, a progress bar, and the exact **XP remaining to enter the next level**. This is calculated with the canonical `xpRequiredForLevel(level)` function.
+- The visible journey starts at **Level 1**. Level 0 is never rendered as a public journey node.
+- For players below Level 5, the visible journey begins at Level 1 and continues forward so the player's current visible position can be marked.
+- For players at Level 5 or above, the journey begins at Level 5 and continues through the current level plus a short look-ahead.
+- If a legacy Level 0 record is encountered, the Showcase normalizes its visible journey position to **Level 1** rather than displaying Level 0.
+- Every level is rendered in order, with the shared `getLevelRewardPlan(level)` determining the reward shown for that level.
+- The inspected player's current visible level receives a prominent **CURRENT LEVEL** marker and 📍 node. The separate `YOU ARE HERE` label is intentionally not rendered.
+- The Level Journey does not include an explanatory paragraph above the road; the section title and track are the complete presentation.
+- On the current-level row, the showcase displays the player's current-level XP / XP required, a progress bar, and the exact XP remaining to enter the next level. This is calculated with the canonical `xpRequiredForLevel(level)` function.
 - Tenth-level milestones are visually distinguished as trophy nodes.
 - The journey is a progress/reputation surface; it does not grant anything from the client.
 
@@ -110,6 +112,10 @@ Current wired surfaces:
 These surfaces must reuse `PlayerIdentityLink`; do not create a second profile modal or duplicate showcase implementation.
 
 The canonical showcase requires an authenticated viewer, is server-derived, and does not expose wallet balances, email, password, sessions or other private account data.
+
+### Waiting-room avatar contract
+
+`app/_components/LiveSocial.tsx` must resolve the room avatar from the same `/api/player/[username]` authoritative equipped-avatar value used by the Showcase. A roster payload containing `avatar: "default"` must not mask a newer authoritative catalogue avatar returned by the player endpoint. The lobby uses the canonical `AVATARS` catalogue and the same `🧑🏽‍🎮` default representation as Profile/Showcase.
 
 ### Title hierarchy
 
@@ -158,7 +164,7 @@ A player must never receive a duplicate owned cosmetic. If the milestone item is
 
 ## UI behavior
 
-`XPLevelCelebration.tsx` displays the level reward, usable unlock, or already-owned compensation. The Profile page shows the next meaningful milestone. The Achievements page shows the lifetime Trophy Room and current loadout. The Player Showcase shows only the next milestone after the inspected player's current level and a progressive current-level journey marker with exact XP remaining to the next level. For a canonical Level 0 player, the journey includes a Level 0 row so the current-level marker is never missing.
+`XPLevelCelebration.tsx` displays the level reward, usable unlock, or already-owned compensation. The Profile page shows the next meaningful milestone. The Achievements page shows the lifetime Trophy Room and current loadout. The Player Showcase shows only the next milestone after the inspected player's current level and a progressive current-level journey marker with exact XP remaining to the next level. The public journey starts at Level 1, uses a 📍 current-level node without a separate `YOU ARE HERE` label, and has no explanatory paragraph above the road.
 
 ## Shared reward definition
 
@@ -186,7 +192,7 @@ Level milestone -> server entitlement -> target feature server check -> UI unloc
 - [ ] Reuse `PlayerIdentityLink` on new player-name/avatar surfaces.
 - [ ] Keep the waiting-room avatar sourced from the inspected player's real equipped avatar and preserve it through game-state merges.
 - [ ] Keep the showcase avatar resolved from the same authoritative catalogue and use the same default-avatar representation as Profile.
-- [ ] Keep the Level Journey continuous and mark the exact current level; include Level 0 for new canonical players; show current-level XP and remaining XP to the next level on that same row.
+- [ ] Keep the Level Journey starting at Level 1; never render Level 0 publicly; mark the current visible level and show current-level XP plus remaining XP to the next level.
 - [ ] Do not expose wallet, email, password, session or other private data in public showcases.
 - [ ] Update this document and the architecture/handoff documentation whenever progression or player identity rules change.
 - [ ] Build/test affected code before release.
