@@ -1,19 +1,29 @@
 # Ludo Live — Shop Pricing Contract
 
-This document records the currency-package implementation so future developers do not guess how Admin Shop pricing works.
+This document records the authoritative Shop pricing implementation so future developers do not guess how Admin Shop pricing works.
+
+## One authoritative catalogue
+
+`lib/customization-catalog.ts` contains the defaults. `app/api/shop/catalog.ts` merges `ludo_shop_catalog_overrides` from PostgreSQL and returns the effective catalogue.
+
+The Admin Shop can change **both price and payment currency** for currency packages and customization products. Supported payment currencies are:
+
+- `coins`
+- `gems`
+- `naira`
+
+The override is keyed by `(item_type,item_id)` and is the source of truth for both display and purchase validation.
 
 ## Currency packages
 
-The shared Shop catalogue contains two first-class package types:
+The shared catalogue contains:
 
 - `coin_package` — awards Coins.
 - `gem_package` — awards Gems.
 
-The catalogue is `lib/customization-catalog.ts` and is consumed by `app/api/shop/catalog.ts` and the Admin Shop API.
+Default packages are only fallbacks. Admin overrides replace their price/currency.
 
-## Default packages
-
-### Coin packages
+### Default Coin packages
 
 - 500 Coins — 25 Gems
 - 1,000 Coins — 50 Gems
@@ -23,7 +33,7 @@ The catalogue is `lib/customization-catalog.ts` and is consumed by `app/api/shop
 - 15,000 Coins — 800 Gems
 - 20,000 Coins — 1,000 Gems
 
-### Gem packages
+### Default Gem packages
 
 - 50 Gems — ₦1,000
 - 100 Gems — ₦1,500
@@ -33,52 +43,45 @@ The catalogue is `lib/customization-catalog.ts` and is consumed by `app/api/shop
 - 1,000 Gems — ₦8,000
 - 1,500 Gems — ₦10,000
 
-These are defaults only. Admin price overrides are authoritative.
-
-## Admin pricing
-
-Admin Shop can change the **price and payment currency** of a package to:
-
-- `coins`
-- `gems`
-- `naira`
-
-The override is stored in `ludo_shop_catalog_overrides` by `(item_type,item_id)`.
-
-Do not create a second package-price table or hard-code a different price source in the player Shop.
-
 ## Player Shop
 
-`app/api/shop/catalog.ts` merges Admin overrides into the shared catalogue.
+`app/shop/page.tsx` now loads the effective server catalogue through `/api/customization` and `/api/shop/catalog` and renders the returned price/currency for:
 
-`app/api/shop/catalog/route.ts` exposes the effective package catalogue to the authenticated/player Shop UI.
+- Coins
+- Gems
+- Items
+- Avatars
+- Boards
+- Dice
 
-The player Shop must display the effective Admin-configured price/currency and send the package type/id to the server. It must never decide the final price itself.
+The player Shop must never use a hard-coded product price as the final displayed price after the server catalogue has loaded.
 
-## Purchase paths
+## Purchase authority
 
-### Coins/Gems price
+`app/api/shop/purchase/route.ts` reads currency-package pricing from `getShopItem()` at purchase time. It does not trust a browser-supplied price.
 
-`app/api/shop/purchase/route.ts` validates the package from the shared catalogue, checks the selected wallet balance, performs the wallet mutation in a database transaction, and grants the package reward.
+`app/api/customization/route.ts` likewise reads the effective Admin override at purchase time for boards, dice, avatars and items. For `coins` or `gems`, the selected wallet is debited transactionally. For `naira`, the item must go through the verified Paystack item checkout rather than a client-side wallet mutation.
 
-### Naira price
+`app/api/paystack/initialize/route.ts` handles Naira currency packages from the effective catalogue.
 
-`app/api/paystack/initialize/route.ts` reads the effective package price from the shared catalogue and initializes Paystack with that amount.
+`app/api/paystack/shop-item/route.ts` handles Naira customization products from the effective catalogue.
 
-`app/api/paystack/callback/route.ts` verifies the Paystack transaction and only then credits the configured package reward.
+`app/api/paystack/callback/route.ts` verifies Paystack before crediting/fulfilling the purchase. Never trust a browser claim that a Naira payment succeeded.
 
-Never credit a Naira package because the browser claims payment succeeded.
+## Audit / wallet
+
+Wallet-changing purchases remain server-authoritative and are recorded in the existing admin wallet ledger. Do not introduce a second price or wallet source.
 
 ## XP rule
 
-A successful Gem purchase awards **+15 XP**, including Gem packages purchased through the internal wallet path or verified Naira checkout. Coin packages do not award the diamond-purchase XP bonus.
+A successful Gem purchase awards **+15 XP**, including Gem packages purchased through the internal wallet path or verified Naira checkout. Coin packages do not receive the diamond-purchase XP bonus.
 
 ## Important boundary
 
-Customization items (boards, dice, avatars and shop items) remain distinct from currency packages. They share the authoritative pricing override mechanism but retain their existing ownership/equip fulfilment path.
+Customization products and currency packages are distinct product types, but they share the same authoritative pricing override mechanism.
 
 Do not move purchased currency packages into Inventory or Award Room; they change wallet balances only.
 
 ## Change discipline
 
-If package IDs, package amounts, supported currencies, payment behavior or XP rules change, update this document together with `ARCHITECTURE.md` and `DEVELOPER_HANDOFF.md`.
+If product IDs, default prices, supported currencies, payment behavior, fulfillment, or XP rules change, update this document together with `ARCHITECTURE.md` and `DEVELOPER_HANDOFF.md`.
