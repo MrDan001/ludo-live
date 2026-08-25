@@ -1,0 +1,54 @@
+import {NextRequest,NextResponse} from "next/server";
+import {pool,ensureAuthSchema} from "../../auth/_db";
+import {currentUser} from "../../../lib/auth-session";
+import {LEVEL_REWARDS} from "../../../../lib/levelRewards";
+
+export const dynamic="force-dynamic";
+
+function titleFor(level:number, wins:number, tournamentWins:number){
+  if(tournamentWins>=1)return {id:"tournament-champion",label:"Tournament Champion",icon:"👑"};
+  if(wins>=500)return {id:"unstoppable",label:"Unstoppable",icon:"🔥"};
+  if(level>=100)return {id:"legend",label:"Legend",icon:"⚡"};
+  if(level>=75)return {id:"veteran",label:"Veteran",icon:"🔥"};
+  if(level>=50)return {id:"elite",label:"Elite",icon:"👑"};
+  if(level>=25)return {id:"contender",label:"Contender",icon:"💎"};
+  return {id:"rookie",label:"Rookie",icon:"🟢"};
+}
+
+export async function GET(req:NextRequest,{params}:{params:Promise<{username:string}>}){
+  try{
+    await ensureAuthSchema();
+    const viewer=await currentUser(req);
+    if(!viewer)return NextResponse.json({error:"Login required."},{status:401});
+    const {username}=await params;
+    const target=await pool.query(`SELECT id,username,level,xp,owned_boards,owned_dice,owned_avatars,equipped_board,equipped_dice,equipped_avatar FROM ludo_users WHERE LOWER(username)=LOWER($1) AND is_banned=FALSE LIMIT 1`,[decodeURIComponent(username)]);
+    const u=target.rows[0];
+    if(!u)return NextResponse.json({error:"Player not found."},{status:404});
+
+    await pool.query(`CREATE TABLE IF NOT EXISTS ludo_match_history(id BIGSERIAL PRIMARY KEY,user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE,opponent_id TEXT,opponent_name TEXT NOT NULL DEFAULT 'Player',result TEXT NOT NULL CHECK(result IN ('win','loss')),mode TEXT NOT NULL DEFAULT 'Online',room_code TEXT,match_key TEXT NOT NULL,played_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),xp INTEGER NOT NULL DEFAULT 0,UNIQUE(user_id,match_key));`);
+    await pool.query(`CREATE TABLE IF NOT EXISTS ludo_level_rewards(user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE,level INTEGER NOT NULL,coins INTEGER NOT NULL DEFAULT 0,gems INTEGER NOT NULL DEFAULT 0,badge_id TEXT,title TEXT NOT NULL,claimed_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),PRIMARY KEY(user_id,level));`);
+
+    const [games,tournaments,rewards]=await Promise.all([
+      pool.query(`SELECT COUNT(*)::int total,COUNT(*) FILTER(WHERE result='win')::int wins,COUNT(*) FILTER(WHERE result='loss')::int losses FROM ludo_match_history WHERE user_id=$1`,[u.id]),
+      pool.query(`SELECT COUNT(*) FILTER(WHERE status='winner')::int wins,COUNT(*)::int entries FROM ludo_tournament_entries WHERE user_id=$1`,[u.id]),
+      pool.query(`SELECT level,title,badge_id,coins,gems,claimed_at FROM ludo_level_rewards WHERE user_id=$1 ORDER BY level DESC`,[u.id])
+    ]);
+    const stats=games.rows[0]||{};
+    const wins=Number(stats.wins||0), tournamentWins=Number(tournaments.rows[0]?.wins||0);
+    const milestoneRewards=rewards.rows.map((r:any)=>({level:Number(r.level),title:r.title,badgeId:r.badge_id,coins:Number(r.coins||0),gems:Number(r.gems||0),claimedAt:r.claimed_at}));
+    const achievementCount=milestoneRewards.length + wins + tournamentWins;
+    const prestige=Number(u.level||0)*25 + wins*5 + tournamentWins*100 + milestoneRewards.length*20;
+    const title=titleFor(Number(u.level||0),wins,tournamentWins);
+    const ownedBoards=Array.isArray(u.owned_boards)?u.owned_boards:[];
+    const ownedDice=Array.isArray(u.owned_dice)?u.owned_dice:[];
+    const ownedAvatars=Array.isArray(u.owned_avatars)?u.owned_avatars:[];
+    const visibleRewards=milestoneRewards.slice(0,12);
+    return NextResponse.json({
+      player:{id:u.id,username:u.username,level:Number(u.level||0),xp:Number(u.xp||0),equipped:{board:u.equipped_board,dice:u.equipped_dice,avatar:u.equipped_avatar},ownedCounts:{boards:ownedBoards.length,dice:ownedDice.length,avatars:ownedAvatars.length}},
+      title,prestige,stats:{games:Number(stats.total||0),wins,losses:Number(stats.losses||0),tournamentWins,achievements:achievementCount},
+      trophyRoom:{levelRewards:visibleRewards,totalLevelRewards:milestoneRewards.length,earnedMilestones:milestoneRewards.map(r=>r.level)},
+      isSelf:viewer.id===u.id,
+      nextMilestones:LEVEL_REWARDS.filter((r:any)=>Number(r.level)>Number(u.level||0)).slice(0,5).map((r:any)=>({level:r.level,title:r.title,unlocks:r.unlocks||[]}))
+    });
+  }catch(e){console.error("player showcase GET",e);return NextResponse.json({error:"Player showcase unavailable."},{status:500});}
+}
