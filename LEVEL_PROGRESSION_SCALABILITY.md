@@ -35,6 +35,24 @@ Milestone cosmetics reuse the authoritative `MILESTONE_UNLOCKS` catalogue cyclic
 
 Already-owned cosmetics receive their configured gem compensation and the reward ledger remains idempotent on `(user_id, level)`.
 
+## Prestige
+
+Prestige is a derived long-term reputation layer above Level progression. It does not reset the player's level.
+
+`prestige = floor((level - 1) / 100)`
+
+`prestigeLevel = ((level - 1) % 100) + 1`
+
+Therefore:
+
+- Level 1–100 → Prestige 0
+- Level 101–200 → Prestige 1
+- Level 201–300 → Prestige 2
+- Level 301–400 → Prestige 3
+- and indefinitely onward.
+
+There is no maximum Prestige. Prestige must be derived server-side from the authoritative level and must not be accepted from the client.
+
 ## Player Showcase journey
 
 The Showcase does not attempt to render an infinite road.
