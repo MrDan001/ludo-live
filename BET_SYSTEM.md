@@ -26,7 +26,7 @@ The existing multiplayer room/game implementation remains authoritative for room
 
 `package.json` starts the server with:
 
-`node -r ./bet-system.js -r ./multiplayer-canonical.js -r ./mission-rules.js -r ./forfeit-rules.js -r ./event-settler.js server.js`
+`node -r ./empty-room-cleanup.js -r ./bet-system.js -r ./multiplayer-canonical.js -r ./mission-rules.js -r ./forfeit-rules.js -r ./event-settler.js server.js`
 
 Betting does **not** replace or duplicate the Ludo rules. The existing multiplayer server determines the winner first; the bet layer only locks coins before the match and settles the pot after the authoritative winner state is emitted.
 
@@ -45,6 +45,8 @@ Betting does **not** replace or duplicate the Ludo rules. The existing multiplay
 11. The existing Ludo match starts.
 12. The existing multiplayer game reaches `status: 'finished'` with an authoritative `winnerId`.
 13. The bet layer settles that exact winner and credits the complete pot in one transaction.
+
+If the room is abandoned before the match starts and its last member leaves, `empty-room-cleanup.js` removes the room from the server registry immediately. No bet is locked for an empty/unstarted room, and the old room code cannot be used to resurrect it.
 
 ## Canonical winner wiring
 
@@ -106,18 +108,20 @@ The client only displays these values. It never decides how many coins to deduct
 - Invalid stake is rejected.
 - A player without enough coins prevents the match from starting.
 - A room that has not started has no coins deducted.
+- An empty room is deleted from the server registry immediately; it is not left visible or joinable.
 - Duplicate lock/settlement attempts are guarded by the bet status and database transaction.
 - If settlement fails, the bet remains `locked` rather than silently losing the pot; it must be reconciled from the recorded bet.
 - The existing multiplayer host/forfeit lifecycle remains outside the betting layer unless an explicit refund/forfeit rule is later added.
 
 ## Files wired
 
+- `empty-room-cleanup.js` — isolated server preload that removes empty multiplayer room registry entries.
 - `bet-system.js` — server-side escrow, wallet locking, canonical winner settlement and Socket.IO bet events.
 - `app/room/page.tsx` — host stake selection and 500–10,000 validation.
 - `app/_components/LiveSocial.tsx` — displays authoritative stake/pot and sends the selected stake with room join.
 - `app/lobby/page.tsx` — displays stake and calculated pot for public rooms.
-- `package.json` — preloads `bet-system.js` in the production start command.
-- `MULTIPLAYER_LOBBY.md` — lobby behaviour and betting contract.
+- `package.json` — preloads the empty-room cleanup before the multiplayer/bet server layers.
+- `MULTIPLAYER_LOBBY.md` — lobby behaviour, room cleanup and betting contract.
 
 ## Developer safety rules
 
@@ -126,4 +130,5 @@ The client only displays these values. It never decides how many coins to deduct
 3. Do not settle from `game-moved`; settlement must follow the canonical finished game state.
 4. Do not bypass the PostgreSQL transaction boundary.
 5. Preserve the existing Ludo movement/rule engine when changing betting.
-6. If stake rules, refunds, forfeits or administrative bet controls change, update this document and the multiplayer documentation together.
+6. Do not remove the empty-room cleanup: a room with zero members must cease to exist and must not remain joinable.
+7. If stake rules, refunds, forfeits or administrative bet controls change, update this document and the multiplayer documentation together.
