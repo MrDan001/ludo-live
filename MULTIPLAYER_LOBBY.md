@@ -4,11 +4,11 @@
 
 The room lobby must display the authenticated player's profile username/nickname, never hard-coded `Player 1` placeholders. `/api/auth` is read when the room page loads and the resolved username is passed into `LiveSocial` and the multiplayer socket join payload.
 
-The waiting-room avatar is also player-specific. `LiveSocial` resolves each roster member's public Player Showcase data through `GET /api/player/[username]` and renders that player's current `equipped.avatar` through `lib/customization-catalog.ts`. The room must never use a generic hard-coded avatar for another player when a real equipped avatar is available.
+The waiting-room avatar is also player-specific. `LiveSocial` resolves each roster member's public Player Showcase data through `GET /api/player/[username]` and renders that player's current `equipped.avatar` through `lib/customization-catalog`. The room must never use a generic hard-coded avatar for another player when a real equipped avatar is available.
 
 ### Avatar state merge rule
 
-The room receives both a legacy `roster` event and later canonical `game-state` updates. The canonical game-state payload may omit cosmetic fields. `LiveSocial` must therefore merge state by stable `playerId` and preserve an existing `avatar`, `board`, `dice`, and player identity when the newer state does not include those fields. A game-state update must never erase a previously resolved avatar and cause the UI to fall back to the generic icon.
+The room receives both a legacy `roster` event and later canonical `game-state` updates. The canonical game-state payload may omit cosmetic fields. `LiveSocial` must therefore merge state by stable `playerId` and preserve an existing `avatar`, `board`, `dice` and player identity when the newer state does not include those fields. A game-state update must never erase a previously resolved avatar and cause the UI to fall back to the generic icon.
 
 Avatar enrichment is also written back into the local member record after the public showcase request resolves. This prevents a later state update or unrelated button interaction from dropping the resolved avatar back to a placeholder. If the canonical state includes a newer cosmetic value, that server value wins.
 
@@ -20,7 +20,42 @@ The data flow is:
 
 `app/_components/LiveSocial.tsx` is the canonical waiting-room presentation. It uses a 2x2 player-seat grid, host crown, real avatar, username, Ready/Not Ready state, invite empty seats, game mode/stake summary, voice control, Ready control, host-only Start Game, and a compact chat button. Empty seats copy the room code so the player can invite someone.
 
-The current multiplayer system has no server-backed betting/stake field, so the waiting room intentionally displays **BET AMOUNT: Free** rather than inventing a coin wager. If real stakes are introduced later, the amount must be carried by the authoritative room state and validated server-side before this UI changes.
+## Coin betting
+
+The waiting room now uses a server-authoritative virtual coin stake for both supported multiplayer sizes: **2 players** and **4 players**.
+
+- Minimum stake: **500 coins** per player.
+- Maximum stake: **10,000 coins** per player.
+- The host selects the stake when creating the room.
+- Joining players cannot change the host's stake.
+- The public lobby displays the stake and calculated pot.
+- The waiting room displays the authoritative stake and total pot.
+- The pot is `stake × roomSize`.
+- When the match starts, every player's stake is locked atomically in PostgreSQL.
+- When the existing authoritative Ludo game produces a winner, that winner receives the complete pot.
+
+Examples:
+
+`2 × 500 = 1,000 coins`
+
+`4 × 10,000 = 40,000 coins`
+
+Betting is game currency only. It does not use Paystack or real-money balances.
+
+### Betting implementation
+
+`bet-system.js` is preloaded before `server.js` in the production start command. It wraps the existing Socket.IO room/start/game lifecycle without replacing the existing Ludo movement rules.
+
+The system creates:
+
+- `ludo_match_bets` — one escrow record per match.
+- `ludo_match_bet_players` — the players who funded the escrow.
+
+The lock transaction uses PostgreSQL row locks on every player's wallet. If any player lacks the required coins, the whole lock transaction rolls back and the match does not start. Settlement is also transactional and checks the bet status so the same pot cannot be paid twice.
+
+The client receives `bet-room-state` for display and `bet-settled` after successful settlement. Clients never perform the authoritative coin deduction or award themselves winnings.
+
+See `BET_SYSTEM.md` for the complete betting contract and database/event details.
 
 ## Chat
 
@@ -67,6 +102,7 @@ There are two related server responsibilities:
 
 - `server.js` maintains the legacy room/lobby roster and room discovery.
 - `multiplayer-canonical.js` is preloaded by the production start command and owns canonical multiplayer readiness, start, dice, movement and reconnect state.
+- `bet-system.js` is preloaded by the same production start command and owns the coin escrow/settlement layer around the existing match lifecycle.
 
 A room socket disconnects when the player navigates from `/room` to `/game-online`. Once the canonical match has started, the canonical socket disconnect handler must own that lifecycle and must not forward the disconnect into the legacy room handler.
 
@@ -82,19 +118,23 @@ and:
 
 `Host customization -> host room member.board -> server start-game.board -> every client ludo-match-board -> MultiplayerGameCanonical`
 
+and for betting:
+
+`Host stake selection -> authoritative room stake -> player readiness -> atomic wallet lock -> existing Ludo winner -> atomic pot settlement -> winner wallet`
+
 ## Files
 
-- `app/room/page.tsx` — authenticated room/player naming, explicit Leave Room request, and navigation to the online game.
-- `app/_components/LiveSocial.tsx` — canonical waiting-room layout, roster/readiness synchronization, avatar state merging/enrichment, player inspection links, chat drawer, voice integration and start handling.
+- `app/room/page.tsx` — authenticated room/player naming, host stake selection, 500–10,000 validation, explicit Leave Room request, and navigation to the online game.
+- `app/_components/LiveSocial.tsx` — canonical waiting-room layout, roster/readiness synchronization, avatar state merging/enrichment, stake/pot display, bet state events, player inspection links, chat drawer, voice integration and start handling.
 - `app/_components/PlayerIdentityLink.tsx` — canonical player-to-showcase navigation wrapper.
 - `app/api/player/[username]/route.ts` — server-authoritative public showcase data, including equipped avatar and the single next milestone.
 - `app/player/[username]/page.tsx` — public Player Showcase, real avatar rendering and progressive Level Journey.
 - `app/api/auth/route.ts` — authenticated public user payload, including the current user's equipped avatar.
 - `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport and microphone control.
 - `server.js` — room discovery, roster, host ownership and authoritative `start-game.board` payload.
-- `multiplayer-canonical.js` — authoritative multiplayer readiness/start/game/reconnect rules.
-- `app/lobby/page.tsx` — public room discovery and capacity/occupancy display.
+- `bet-system.js` — isolated coin bet validation, escrow locking, database settlement and bet Socket.IO events.
+- `app/lobby/page.tsx` — public room discovery, capacity/occupancy and stake/pot display.
 
 ## Do not regress
 
-Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not let canonical game-state updates erase previously resolved player cosmetics. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority and match start server/canonical-state authoritative. Keep the permanent chat text area out of the waiting-room layout; the `💬` button opens the chat drawer. Keep voice status text out of the waiting-room layout; the microphone control is sufficient.
+Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not let canonical game-state updates erase previously resolved player cosmetics. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority, match start, bet locking and settlement server/database authoritative. Keep the permanent chat text area out of the waiting-room layout; the `💬` button opens the chat drawer. Keep voice status text out of the waiting-room layout; the microphone control is sufficient. Never deduct or award coins from client-side React code.
