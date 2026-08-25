@@ -20,34 +20,95 @@ jobs:
         with:
           fetch-depth: 1
 
-      - name: Install SVG rasterizer
+      - name: Install image tools
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y librsvg2-bin imagemagick
+          sudo apt-get install -y imagemagick curl unzip
 
-      - name: Validate vector atlas source
+      - name: Download the approved 30-character source atlas
         run: |
           set -e
-          test -s public/avatars/premium-elite-atlas.svg
-          grep -q 'width="1200" height="1440" viewBox="0 0 1200 1440"' public/avatars/premium-elite-atlas.svg
-          test "$(grep -o '<g transform="translate(' public/avatars/premium-elite-atlas.svg | wc -l)" -eq 30
+          curl -fL \
+            "https://raw.githubusercontent.com/MrDan001/ludo-live/bd890aa84f5d70b7dd8f0b731714d0d6035e9987/public/avatars/premium-elite-atlas.jpg" \
+            -o /tmp/source-atlas.jpg
 
-      - name: Render clean high-resolution raster atlas
+          identify /tmp/source-atlas.jpg
+          width=$(identify -format '%w' /tmp/source-atlas.jpg)
+          height=$(identify -format '%h' /tmp/source-atlas.jpg)
+          test "$width" -eq 200
+          test "$height" -eq 240
+
+      - name: Install Real-ESRGAN NCNN
         run: |
           set -e
-          rsvg-convert \
-            --width=4800 \
-            --height=5760 \
-            --format=png \
-            --output=/tmp/premium-elite-atlas.png \
-            public/avatars/premium-elite-atlas.svg
+          mkdir -p /tmp/realesrgan
+          curl -fL \
+            "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip" \
+            -o /tmp/realesrgan.zip
+          unzip -q /tmp/realesrgan.zip -d /tmp/realesrgan
+          find /tmp/realesrgan -type f -name 'realesrgan-ncnn-vulkan' -exec chmod +x {} \;
+          BIN=$(find /tmp/realesrgan -type f -name 'realesrgan-ncnn-vulkan' | head -n 1)
+          test -n "$BIN"
+          echo "REALESRGAN_BIN=$BIN" >> "$GITHUB_ENV"
+
+      - name: Split the real 5x6 atlas into 30 source characters
+        run: |
+          set -e
+          mkdir -p /tmp/avatar-src /tmp/avatar-upscaled /tmp/avatar-final
+          n=1
+          for row in 0 1 2 3 4 5; do
+            for col in 0 1 2 3 4; do
+              printf -v id '%02d' "$n"
+              convert /tmp/source-atlas.jpg \
+                -crop 40x40+$((col * 40))+$((row * 40)) +repage \
+                /tmp/avatar-src/avatar-${id}.png
+              n=$((n + 1))
+            done
+          done
+          test "$(find /tmp/avatar-src -name 'avatar-*.png' | wc -l)" -eq 30
+
+      - name: AI upscale every character individually
+        run: |
+          set -e
+          for input in /tmp/avatar-src/avatar-*.png; do
+            name=$(basename "$input" .png)
+            "$REALESRGAN_BIN" \
+              -i "$input" \
+              -o "/tmp/avatar-upscaled/${name}.png" \
+              -n realesrgan-x4plus-anime \
+              -s 4 \
+              -f png
+          done
+
+          test "$(find /tmp/avatar-upscaled -name 'avatar-*.png' | wc -l)" -eq 30
+
+      - name: Normalize each enhanced character to a clean 240x240 cell
+        run: |
+          set -e
+          for input in /tmp/avatar-upscaled/avatar-*.png; do
+            name=$(basename "$input")
+            convert "$input" \
+              -resize 240x240! \
+              -sampling-factor 4:4:4 \
+              /tmp/avatar-final/$name
+          done
+          test "$(find /tmp/avatar-final -name 'avatar-*.png' | wc -l)" -eq 30
+
+      - name: Rebuild the 1200x1440 5x6 atlas
+        run: |
+          set -e
+          montage /tmp/avatar-final/avatar-*.png \
+            -tile 5x6 \
+            -geometry 240x240+0+0 \
+            -background none \
+            /tmp/premium-elite-atlas.png
 
           identify /tmp/premium-elite-atlas.png
           width=$(identify -format '%w' /tmp/premium-elite-atlas.png)
           height=$(identify -format '%h' /tmp/premium-elite-atlas.png)
-          test "$width" -eq 4800
-          test "$height" -eq 5760
+          test "$width" -eq 1200
+          test "$height" -eq 1440
 
           convert /tmp/premium-elite-atlas.png \
             -sampling-factor 4:4:4 \
@@ -58,10 +119,10 @@ jobs:
           identify public/avatars/premium-elite-atlas.jpg
           width=$(identify -format '%w' public/avatars/premium-elite-atlas.jpg)
           height=$(identify -format '%h' public/avatars/premium-elite-atlas.jpg)
-          test "$width" -eq 4800
-          test "$height" -eq 5760
+          test "$width" -eq 1200
+          test "$height" -eq 1440
 
-      - name: Commit high-resolution raster atlas
+      - name: Commit the corrected new-character atlas
         run: |
           set -e
           git config user.name "github-actions[bot]"
@@ -71,5 +132,5 @@ jobs:
             echo "No avatar asset changes to commit."
             exit 0
           fi
-          git commit -m "Build high-resolution avatar atlas from vector source"
+          git commit -m "Build sharp atlas from approved 30-character source"
           git push
