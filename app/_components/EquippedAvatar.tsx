@@ -22,7 +22,7 @@ function atlasStyle(id: string): React.CSSProperties | null {
     width: "1em",
     height: "1em",
     verticalAlign: "middle",
-    backgroundImage: "url('/avatars/premium-elite-atlas.svg')",
+    backgroundImage: "url('/avatars/premium-elite-atlas.jpg')",
     backgroundSize: "500% 600%",
     backgroundRepeat: "no-repeat",
     backgroundPosition: `${(i % 5) * 25}% ${Math.floor(i / 5) * 20}%`,
