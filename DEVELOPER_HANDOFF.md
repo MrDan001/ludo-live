@@ -64,6 +64,24 @@ Supported audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
 - Level-up animation fills the current XP bar, transitions to the next level, begins the new level's progress, and shows a congratulatory celebration for about 4 seconds.
 - Use the existing progression refresh/event flow; do not create a second XP store.
 
+## Free Spin / Active Time contract
+
+Free spins are a server-authoritative player reward balance and are usable on the Spin Wheel.
+
+- Every **30 minutes of active app time** grants **1 free spin**.
+- Between **17:00 and 20:00 Nigeria time (`Africa/Lagos`)**, every completed 30-minute active interval grants **3 free spins** instead.
+- Active time is accumulated only while the browser document is visible. The client sends a heartbeat approximately every 60 seconds; the server caps heartbeat deltas to prevent a long inactive gap from becoming active time.
+- The authoritative activity/grant endpoint is `/api/spin/activity`.
+- Spin balance and spin consumption are authoritative in PostgreSQL via `ludo_spin_state` and `/api/spin`.
+- Free spins are not a wallet currency and must not be represented as coins or gems.
+- `/profile` displays the current earned **Free Rolls** balance.
+- `/spin` displays the current free-spin balance and lets the player consume it.
+- When a grant occurs, the app shows an in-app congratulatory notification. If browser Notification permission is already granted, a browser notification is also sent.
+- Do not treat a client timer as authoritative. The server decides when an interval is complete and how many spins are granted.
+- Do not reset earned spins daily. Unused earned spins persist until consumed.
+- The existing `extraSpin` wheel prize adds one additional spin to the server balance.
+- Nigeria-time window logic must use `Africa/Lagos`; never use the developer/device timezone as the business rule.
+
 ## Shop contract
 
 ### Player Shop
@@ -130,6 +148,15 @@ Rules:
 
 ## Home navigation contract
 
+Main home cards are ordered:
+
+1. Play Online
+2. Tournaments
+3. Play Solo
+4. Friends
+
+Inventory is a separate full-width card below the quick-access row. Do not duplicate Friends there.
+
 Bottom navigation stays:
 
 - Home
@@ -137,7 +164,7 @@ Bottom navigation stays:
 - Chat
 - Profile
 
-Quick-access row stays Daily Reward / Shop / Events / Spin Wheel unless explicitly redesigned. Inventory is accessed through the Friend/Inventory split instead of adding another bottom-nav item.
+Quick-access row stays Daily Reward / Shop / Events / Spin Wheel unless explicitly redesigned. Inventory is accessed through its full-width card instead of adding another bottom-nav item.
 
 ## Admin contract
 
@@ -175,9 +202,9 @@ Never accept a client-supplied user id for privileged admin, wallet, purchase, X
 
 ## Database authority
 
-PostgreSQL is authoritative for accounts, wallets, customization ownership, progression, tournament stats/sessions and financial records. Socket.IO is authoritative for active multiplayer room state.
+PostgreSQL is authoritative for accounts, wallets, customization ownership, progression, tournament stats/sessions, financial records and earned free-spin balances. Socket.IO is authoritative for active multiplayer room state.
 
-Do not use localStorage as the final authority for any server-owned financial, progression, ownership or tournament result.
+Do not use localStorage as the final authority for any server-owned financial, progression, ownership, tournament result or free-spin balance.
 
 ## Responsive/UI discipline
 
@@ -197,6 +224,7 @@ Before reporting a release as complete:
 - [ ] `npm run build` / equivalent build passes.
 - [ ] No protected `/game` regression was introduced.
 - [ ] Financial and ownership mutations remain server-authoritative.
+- [ ] Free-spin activity/grants remain server-authoritative.
 - [ ] Railway deployment reaches `SUCCESS`.
 - [ ] If Railway fails, the actual build/deploy log was inspected.
 
@@ -207,7 +235,9 @@ Before reporting a release as complete:
 - Do not treat the Shop catalogue as the currency-package catalogue.
 - Do not put purchases in Award Room.
 - Do not render Award Room as a list; use the agreed grid.
-- Do not use client-only XP or tournament scoring.
+- Do not use client-only XP, tournament scoring or free-spin balances.
+- Do not reset earned free spins every day.
+- Do not calculate the 17:00–20:00 reward window using local device time; use Nigeria time on the server.
 - Do not claim deployment success while Railway is building, queued, failed, or otherwise not successful.
 - Do not fix one TypeScript error by suppressing type checking; fix the type at its source.
 
