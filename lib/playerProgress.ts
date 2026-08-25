@@ -3,6 +3,13 @@ export type PlayerProgress = {
   xp: number;
 };
 
+export type LevelReward = {
+  coins: number;
+  gems: number;
+  badges: string[];
+  levels: number[];
+};
+
 export type Badge = {
   id: string;
   label: string;
@@ -10,7 +17,7 @@ export type Badge = {
   source: "spin" | "store" | "game" | "tournament";
 };
 
-export const PROGRESSION_VERSION = 3;
+export const PROGRESSION_VERSION = 4;
 export const STARTING_COINS = 1000;
 export const STARTING_GEMS = 10;
 
@@ -80,6 +87,9 @@ export async function awardServerXP(amount: number, source: "game_win" | "diamon
     if (!response.ok || !Number.isFinite(Number(data?.xp)) || !Number.isFinite(Number(data?.level))) return null;
     const progress = { level: Number(data.level), xp: Number(data.xp) };
     writeProgress(progress);
+    if (typeof window !== "undefined" && data?.reward?.levels?.length) {
+      window.dispatchEvent(new CustomEvent("ludo-level-reward", { detail: data.reward as LevelReward }));
+    }
     return progress;
   } catch {
     return null;
