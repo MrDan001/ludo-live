@@ -45,7 +45,7 @@ Supported audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
 
 `/player/<username>` is the canonical public player inspection route. Reuse `app/_components/PlayerIdentityLink.tsx` anywhere a player name/avatar should be inspectable. Do not create parallel profile modals or duplicate player-stat calculations.
 
-The showcase is server-derived from PostgreSQL and intentionally excludes private wallet, email, password and session data. It displays the player's current title, level, prestige, achievements, loadout and **only the single next milestone** after the player's current level.
+The showcase is server-derived from PostgreSQL and intentionally excludes private wallet, email, password and session data. It displays the player's current hierarchy title, level, prestige, achievements, loadout and **only the single next milestone** after the player's current level.
 
 The showcase avatar is resolved from the same authoritative `AVATARS` catalogue used by customization. Never replace a real equipped avatar ID with a generic icon when the catalogue contains it.
 
@@ -62,7 +62,37 @@ The Showcase Level Journey is a progressive road that **starts at Level 1**. Lev
 - **Tournament Wins** = tournament `gold` badges only. A gold badge means the player finished **1st place** in that tournament. The broader tournament-entry `status='winner'` is prize-eligibility/Top-10 state and must not be used as a championship count.
 - **Achievements** = unique earned achievement/badge unlocks: claimed level milestone rewards + reached win thresholds (1, 10, 25, 50, 100, 250, 500 wins, each once) + stored tournament badges (participation, Top-10, gold, silver, bronze). Individual match wins are not counted one-by-one as achievements.
 
-The `Tournament Champion` title uses the corrected gold-championship count. Prestige also uses the corrected Tournament Wins value.
+### Hierarchy
+
+Hierarchy is independent of Level and Prestige. It is based on verified active game-session time:
+
+- 0–<1 hour: **On Your Way**
+- 1 hour: **Rookie**
+- 3 hours: **Dabbler**
+- 10 hours: **Hobbyist**
+- 20 hours: **Enthusiast**
+- 40 hours: **Devotee**
+- 60 hours: **Fanatic**
+- 100 hours: **Expert**
+- 300 hours: **Prodigy**
+- 500 hours: **Champion**
+- 750 hours: **Mastermind**
+- 1,000 hours: **Legend**
+- 1,500 hours: **Grandmaster**
+- 2,000 hours: **Immortal**
+
+The server derives hierarchy from `floor(total_active_seconds / 3600)`. It does not use level, wins, tournament wins, cosmetic ownership or client-provided hours. `Tournament Champion` remains an achievement/title concept and is not part of this hours ladder.
+
+### Active-time rewards
+
+Only game-session surfaces count: `/room`, `/game`, `/game-online`, and `/tournament/game`.
+
+Every completed 30 minutes grants:
+
+- Normal period: **1 free spin + 5 XP**.
+- Rush Hour, **17:00–20:00 Africa/Lagos**: **3 free spins + 15 XP**.
+
+`app/_components/ActiveSpinRewards.tsx` sends heartbeats only while the player is on an eligible game-session surface and the document is visible. `/api/spin/activity` is authoritative, caps heartbeat elapsed time, persists total active seconds, grants the spin balance, and awards XP/level rewards transactionally. The client cannot directly set spins, XP or hierarchy hours.
 
 ### Multiplayer waiting room
 
