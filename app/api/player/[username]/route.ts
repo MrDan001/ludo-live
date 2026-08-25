@@ -61,7 +61,7 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{username:str
     // win/tournament-event counts. Individual wins remain in the Wins stat.
     const winAchievements=WIN_ACHIEVEMENT_MILESTONES.filter(n=>wins>=n).length;
     const achievementCount=milestoneRewards.length+winAchievements+tournamentBadges;
-    const prestige=Math.floor((level-1)/100);
+    const prestige=Math.floor((level-1)/10);
     const title=titleFor(activeHours);
 
     const ownedBoards=Array.isArray(u.owned_boards)?u.owned_boards:[];
