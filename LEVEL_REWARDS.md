@@ -64,7 +64,7 @@ Every level grants coins. Every fifth level also grants gems. Every tenth level 
 The Achievements page is the player's **Trophy Room**. It is not only a history ledger. It surfaces:
 
 - lifetime earned awards from missions, games, store activity and level rewards;
-- level milestone journey for Levels 10–100;
+- level milestone journey;
 - current equipped board, dice and avatar;
 - a prestige score derived from server-recorded progression and accomplishments;
 - the player's current title tier;
@@ -77,6 +77,21 @@ The Trophy Room is intentionally designed as a pride/identity surface. Cosmetics
 `app/player/[username]/page.tsx` is the public-facing player card. Its data comes from `GET /api/player/[username]` and is server-derived from PostgreSQL.
 
 The showcase exposes username, level/XP, current title, prestige, games/wins/losses/tournament wins, achievement count, equipped board/dice/avatar, owned cosmetic counts, earned level milestones, and **only the single next milestone**.
+
+The showcase renders the **real equipped avatar icon** from `lib/customization-catalog.ts`. It must not replace a real avatar with a generic placeholder when the player has an equipped catalogue avatar.
+
+### Level Journey / progressive track
+
+The Player Showcase contains a vertical **Level Journey** track. It is a continuous level-by-level road rather than a single `Level 10` label.
+
+- For players below Level 5, the visible journey begins at Level 1 so their current level can still be marked exactly.
+- From Level 5 onward, the journey begins at Level 5 and continues through the current level plus a short look-ahead.
+- Every level is rendered in order (5, 6, 7, 8, ...), with the server's shared `getLevelRewardPlan(level)` determining the reward shown for that level.
+- The inspected player's exact current level receives a prominent **YOU ARE HERE / CURRENT LEVEL** marker.
+- Tenth-level milestones are visually distinguished as trophy nodes.
+- The journey is a progress/reputation surface; it does not grant anything from the client.
+
+The road intentionally does not enumerate every future level to an arbitrary infinity. Unlimited progression remains server-side; the UI renders a useful current-level window so the page stays usable.
 
 The next milestone is calculated server-side as the next tenth-level milestone after the inspected player's current level. It is intentionally not a list of all future milestones.
 
@@ -141,7 +156,7 @@ A player must never receive a duplicate owned cosmetic. If the milestone item is
 
 ## UI behavior
 
-`XPLevelCelebration.tsx` displays the level reward, usable unlock, or already-owned compensation. The Profile page shows the next meaningful milestone. The Achievements page shows the lifetime Trophy Room and current loadout. The Player Showcase shows only the next milestone after the inspected player's current level.
+`XPLevelCelebration.tsx` displays the level reward, usable unlock, or already-owned compensation. The Profile page shows the next meaningful milestone. The Achievements page shows the lifetime Trophy Room and current loadout. The Player Showcase shows only the next milestone after the inspected player's current level and a progressive current-level journey marker.
 
 ## Shared reward definition
 
@@ -167,7 +182,9 @@ Level milestone -> server entitlement -> target feature server check -> UI unloc
 - [ ] Keep prestige/title calculations server-derived.
 - [ ] Reuse `/api/player/[username]` for public player inspection.
 - [ ] Reuse `PlayerIdentityLink` on new player-name/avatar surfaces.
-- [ ] Keep the waiting-room avatar sourced from the inspected player's real equipped avatar.
+- [ ] Keep the waiting-room avatar sourced from the inspected player's real equipped avatar and preserve it through game-state merges.
+- [ ] Keep the showcase avatar resolved from the same authoritative catalogue.
+- [ ] Keep the Level Journey continuous and mark the exact current level; do not replace it with a static next-level label.
 - [ ] Do not expose wallet, email, password, session or other private data in public showcases.
 - [ ] Update this document and the architecture/handoff documentation whenever progression or player identity rules change.
 - [ ] Build/test affected code before release.
