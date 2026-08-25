@@ -8,16 +8,15 @@ function atlasCell(id: string) {
   const match = id.match(/^(premium|elite)-(\d{2})$/);
   if (!match) return null;
   const n = Number(match[2]);
-  const index = id.startsWith("premium") ? n : 10 + n;
+  const index = id.startsWith("elite-") ? 10 + n : n;
   if (index < 1 || index > 30) return null;
   const zero = index - 1;
-  const col = zero % 6;
-  const row = Math.floor(zero / 6);
-  return { col, row };
+  return { col: zero % 6, row: Math.floor(zero / 6) };
 }
 
 export default function AvatarArtwork({ id, className, style, size }: Props) {
-  const cell = atlasCell(id || "");
+  const avatarId = id || "";
+  const cell = atlasCell(avatarId);
   if (!cell) return null;
 
   const width = size ?? "100%";
@@ -32,7 +31,7 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
   return (
     <span
       className={className}
-      aria-label={`${id.startsWith("elite-") ? "Elite" : "Premium"} avatar`}
+      aria-label={`${avatarId.startsWith("elite-") ? "Elite" : "Premium"} avatar`}
       style={{
         display: "block",
         width,
