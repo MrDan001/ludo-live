@@ -49,6 +49,8 @@ The showcase is server-derived from PostgreSQL and intentionally excludes privat
 
 The showcase avatar is resolved from the same authoritative `AVATARS` catalogue used by customization. Never replace a real equipped avatar ID with a generic icon when the catalogue contains it.
 
+The canonical progression starts at **Level 1**. Level 0 is a legacy/internal value only and must never be shown as the player's public level. New registered and guest accounts start at Level 1. Legacy Level 0 values are normalized to Level 1 at the auth/progression/showcase API and client progression boundaries.
+
 The Showcase Level Journey is a progressive road that **starts at Level 1**. Level 0 is never rendered as a public journey node. For a legacy Level 0 record, the visible journey position is normalized to Level 1 so the player is not presented with a Level 0 public milestone. The current visible level gets the 📍 marker and `CURRENT LEVEL` pill. The separate `YOU ARE HERE` text is intentionally removed, as is the explanatory paragraph above the road. The current row continues to show current-level XP, progress and XP remaining to the next level using canonical `xpRequiredForLevel()`.
 
 ### Showcase reputation/stat calculation contract
@@ -77,6 +79,8 @@ The room's board/theme remains host-authoritative; avatar identity remains playe
 ### Level rewards
 
 Read `LEVEL_REWARDS.md` before changing reward or milestone behavior. Level rewards are server-authoritative, idempotent by `(user_id, level)`, and already-owned milestone cosmetics convert to configured gem compensation rather than duplicates.
+
+The Level 1 starting rule is also reflected in `lib/playerProgress.ts`, `app/api/auth/route.ts`, `app/api/progress/route.ts`, `app/api/player/[username]/route.ts` and `/profile`. Do not reintroduce a Level 0 default or render `level || 0` in player-facing progression UI.
 
 ## Deployment discipline
 
