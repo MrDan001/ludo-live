@@ -1,11 +1,17 @@
-import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-const CHUNKS = Array.from({ length: 8 }, (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-6`);
+// The supplied 30-character atlas is a 6 x 5 sheet at 960 x 560.
+// Each avatar is rendered as an individual 160 x 112 SVG viewport so
+// the browser never stretches/crops the whole atlas as a CSS background.
+const ATLAS = "/avatars/atlas-chunks/atlas.webp?v=20260826-7";
 const COLS = 6;
 const ROWS = 5;
+const CELL_W = 160;
+const CELL_H = 112;
+const ATLAS_W = 960;
+const ATLAS_H = 560;
 
 function atlasIndex(id: string) {
   const match = id.match(/^(premium|elite)-(\d{2})$/);
@@ -18,62 +24,23 @@ function atlasIndex(id: string) {
 
 export default function AvatarArtwork({ id, className, style, size }: Props) {
   const index = atlasIndex(id || "");
-  const [src, setSrc] = useState<string | null>(null);
-  const [natural, setNatural] = useState<{ width: number; height: number } | null>(null);
+  if (index === null) return null;
 
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(
-      CHUNKS.map((url) =>
-        fetch(url, { cache: "no-store" }).then((r) => {
-          if (!r.ok) throw new Error(`Avatar asset failed: ${r.status}`);
-          return r.text();
-        }),
-      ),
-    )
-      .then((parts) => {
-        if (!cancelled) setSrc(`data:image/webp;base64,${parts.join("")}`);
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!src) return;
-    let cancelled = false;
-    const img = new Image();
-    img.onload = () => {
-      if (!cancelled) setNatural({ width: img.naturalWidth, height: img.naturalHeight });
-    };
-    img.src = src;
-    return () => {
-      cancelled = true;
-      img.onload = null;
-    };
-  }, [src]);
-
-  if (index === null || !src || !natural) return null;
-
-  // Use the decoded atlas dimensions instead of hard-coded pixels. This prevents
-  // a lower-resolution or differently-sized atlas from cropping multiple avatars.
-  const cellW = natural.width / COLS;
-  const cellH = natural.height / ROWS;
   const col = index % COLS;
   const row = Math.floor(index / COLS);
-  const x = -(col * cellW);
-  const y = -(row * cellH);
+  const x = -(col * CELL_W);
+  const y = -(row * CELL_H);
   const displaySize = size ?? "100%";
 
   return (
-    <div
+    <svg
       aria-hidden="true"
       className={className}
+      viewBox={`0 0 ${CELL_W} ${CELL_H}`}
+      preserveAspectRatio="xMidYMid slice"
+      width={displaySize}
+      height={displaySize}
       style={{
-        position: "relative",
         display: "block",
         width: displaySize,
         height: displaySize,
@@ -81,27 +48,20 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         minHeight: 0,
         overflow: "hidden",
         borderRadius: "inherit",
-        backgroundColor: "#000",
+        background: "#000",
+        imageRendering: "auto",
         ...style,
       }}
     >
-      <img
-        src={src}
-        alt=""
-        draggable={false}
-        decoding="async"
-        style={{
-          position: "absolute",
-          left: x,
-          top: y,
-          width: natural.width,
-          height: natural.height,
-          maxWidth: "none",
-          maxHeight: "none",
-          display: "block",
-          userSelect: "none",
-        }}
+      <image
+        href={ATLAS}
+        x={x}
+        y={y}
+        width={ATLAS_W}
+        height={ATLAS_H}
+        preserveAspectRatio="none"
+        hrefLang="en"
       />
-    </div>
+    </svg>
   );
 }
