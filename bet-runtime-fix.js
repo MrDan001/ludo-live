@@ -1,15 +1,15 @@
 // Reliability bridge for the in-room stake agreement UI.
 // This is intentionally separate from Ludo rules and wallet settlement.
-// It provides a second, explicit event path for the host's stake action so a
-// Socket.IO listener-order/runtime mismatch cannot leave the UI on "Setting…".
+// It replaces the fragile prototype-path for the host's stake event with a
+// deterministic handler loaded after bet-system and before server.js.
 const { Socket } = require('socket.io');
-const { rooms, state, validStake, broadcastState, MIN_STAKE, MAX_STAKE } = require('./bet-system');
+const { rooms, validStake, broadcastState, MIN_STAKE, MAX_STAKE } = require('./bet-system');
 
 if (!Socket.prototype.__ludoBetRuntimeFixPatched) {
   Socket.prototype.__ludoBetRuntimeFixPatched = true;
   const originalOn = Socket.prototype.on;
   Socket.prototype.on = function(event, listener) {
-    if (event === 'set-stake-fallback') {
+    if (event === 'set-stake') {
       return originalOn.call(this, event, (payload = {}) => {
         const code = String(this.data?.roomCode || '').trim().toUpperCase();
         const room = code ? rooms.get(code) : null;
