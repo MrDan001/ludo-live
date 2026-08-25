@@ -168,4 +168,4 @@ function installBetSystem() {
 }
 
 installBetSystem();
-module.exports={MIN_STAKE,MAX_STAKE};
+module.exports={MIN_STAKE,MAX_STAKE,rooms,state,validStake,broadcastState};
