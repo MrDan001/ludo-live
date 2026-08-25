@@ -49,7 +49,7 @@ Ludo Live Support is an authenticated two-way conversation system connecting pla
 - `resolved` — Admin has closed the case; player can reopen it.
 
 ## Design decision
-Support is separate from Friends/Game chat. It is a controlled support conversation so disputes, payments, game problems, events and account issues keep their own durable case history. This follows the common support pattern of a case/ticket containing a chronological message thread rather than putting the whole conversation into one mutable field. citeturn2search5turn2search7
+Support is separate from Friends/Game chat. It is a controlled support conversation so disputes, payments, game problems, events and account issues keep their own durable case history. The case record and chronological message records are intentionally separate so the conversation remains auditable and easy to extend.
 
 ## Future extensions
 - Push notification when Admin replies.
