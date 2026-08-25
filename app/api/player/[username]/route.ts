@@ -42,7 +42,7 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{username:str
     const wins=Number(stats.wins||0);
     const tournamentWins=Number(tournaments.rows[0]?.wins||0);
     const tournamentBadges=Number(tournaments.rows[0]?.badges||0);
-    const level=Number(u.level||0);
+    const level=Math.max(1,Number(u.level)||1);
     const milestoneRewards=rewards.rows.map((r:any)=>({level:Number(r.level),title:r.title,badgeId:r.badge_id,coins:Number(r.coins||0),gems:Number(r.gems||0),claimedAt:r.claimed_at}));
 
     // Showcase Achievements are unique earned achievement/badge unlocks, not raw
