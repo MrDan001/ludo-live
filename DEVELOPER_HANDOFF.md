@@ -51,6 +51,17 @@ The showcase avatar is resolved from the same authoritative `AVATARS` catalogue 
 
 The Showcase Level Journey is a progressive road that **starts at Level 1**. Level 0 is never rendered as a public journey node. For a legacy Level 0 record, the visible journey position is normalized to Level 1 so the player is not presented with a Level 0 public milestone. The current visible level gets the 📍 marker and `CURRENT LEVEL` pill. The separate `YOU ARE HERE` text is intentionally removed, as is the explanatory paragraph above the road. The current row continues to show current-level XP, progress and XP remaining to the next level using canonical `xpRequiredForLevel()`.
 
+### Showcase reputation/stat calculation contract
+
+`app/api/player/[username]/route.ts` is the authoritative source for the four Showcase counters:
+
+- **Games** = completed rows in `ludo_match_history` for the player.
+- **Wins** = `ludo_match_history` rows with `result='win'`.
+- **Tournament Wins** = tournament `gold` badges only. A gold badge means the player finished **1st place** in that tournament. The broader tournament-entry `status='winner'` is prize-eligibility/Top-10 state and must not be used as a championship count.
+- **Achievements** = unique earned achievement/badge unlocks: claimed level milestone rewards + reached win thresholds (1, 10, 25, 50, 100, 250, 500 wins, each once) + stored tournament badges (participation, Top-10, gold, silver, bronze). Individual match wins are not counted one-by-one as achievements.
+
+The `Tournament Champion` title uses the corrected gold-championship count. Prestige also uses the corrected Tournament Wins value.
+
 ### Multiplayer waiting room
 
 `app/_components/LiveSocial.tsx` is the canonical waiting-room UI. Its player cards must use real roster identities and link each name/avatar to the Player Showcase. The displayed avatar is resolved from the inspected player's authoritative `equipped.avatar` and `lib/customization-catalog`; generic placeholder avatars must not replace a real equipped avatar.
