@@ -7,9 +7,9 @@ type Member={id:string;playerId?:string;name:string;host?:boolean;ready?:boolean
 type Msg={id:string;name:string;text:string;at:number;type?:string};
 const QUICK=["👋 Hi!","😂 LOL","🔥 Nice!","😮 Wow!","👏 Good move","🎉 GG","❤️","😎"];
 
-export default function LiveSocial({roomCode,name,host=false,roomSize=4,compact=false,onStart,onKicked}:{roomCode:string;name:string;host?:boolean;roomSize?:number;compact?:boolean;onStart?:()=>void;onKicked?:()=>void}){
- const socketRef=useRef<Socket|null>(null),startRef=useRef(onStart),kickRef=useRef(onKicked),startTimerRef=useRef<number|null>(null);
- startRef.current=onStart;kickRef.current=onKicked;
+export default function LiveSocial({roomCode,name,host=false,roomSize=4,compact=false,onStart,onKicked,leaveRequested=false,onLeaveComplete}:{roomCode:string;name:string;host?:boolean;roomSize?:number;compact?:boolean;onStart?:()=>void;onKicked?:()=>void;leaveRequested?:boolean;onLeaveComplete?:()=>void}){
+ const socketRef=useRef<Socket|null>(null),startRef=useRef(onStart),kickRef=useRef(onKicked),leaveRef=useRef(onLeaveComplete),startTimerRef=useRef<number|null>(null);
+ startRef.current=onStart;kickRef.current=onKicked;leaveRef.current=onLeaveComplete;
  const[members,setMembers]=useState<Member[]>([]),[messages,setMessages]=useState<Msg[]>([]),[text,setText]=useState(""),[notice,setNotice]=useState(""),[selfId,setSelfId]=useState(""),[selfPlayerId,setSelfPlayerId]=useState("");
  useEffect(()=>{let cancelled=false;const connect=async()=>{
    let playerId="",board="classic",dice="classic";
@@ -28,6 +28,7 @@ export default function LiveSocial({roomCode,name,host=false,roomSize=4,compact=
    socket.on("kicked",()=>{setNotice("You were removed by the room host.");kickRef.current?.()});
    return()=>{cancelled=true;if(startTimerRef.current!==null)window.clearTimeout(startTimerRef.current);socket.disconnect();socketRef.current=null};
  };connect();return()=>{cancelled=true}},[roomCode,name,host,roomSize]);
+ useEffect(()=>{if(!leaveRequested)return;const socket=socketRef.current;if(!socket)return;setNotice("Leaving room…");socket.disconnect();socketRef.current=null;const timer=window.setTimeout(()=>leaveRef.current?.(),150);return()=>window.clearTimeout(timer)},[leaveRequested]);
  const self=members.find(m=>m.id===selfId||m.playerId===selfPlayerId),ready=!!self?.ready;
  const serverHost=!!members.find(m=>(m.host&&m.playerId===selfPlayerId)||(m.host&&m.id===selfId));
  const canStart=host&&serverHost&&members.length===roomSize&&members.every(m=>m.ready&&m.connected!==false);
