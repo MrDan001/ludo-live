@@ -34,7 +34,7 @@ export default function EquippedAvatar({ className, style }: { className?: strin
   }, []);
 
   if (isVectorAvatar(avatar)) {
-    return <AvatarArtwork id={avatar} className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }} aria-label="Player avatar" />;
+    return <AvatarArtwork id={avatar} className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }} />;
   }
 
   return <span className={className} style={style} aria-label="Player avatar">{AVATAR_ICONS[avatar] || AVATAR_ICONS.default}</span>;
