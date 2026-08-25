@@ -1,38 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ensureAuthSchema, pool } from "../auth/_db";
 import { currentUser } from "../../../lib/auth-session";
+import { getLevelRewardPlan, type MilestoneUnlock } from "../../../lib/levelRewards";
 
 const XP_PER_GAME_WIN = 7;
 const XP_PER_DIAMOND_PURCHASE = 15;
 
 function requiredForLevel(level: number) { return 10 + Math.max(0, level) * 5; }
 
-type Unlock = { type: "board" | "dice" | "avatar" | "item"; id: string; name: string; icon?: string; fallbackGems: number };
-
-// Every milestone points to a real item in lib/customization-catalog.ts.
-// Do not add an id here unless it exists in the authoritative Shop catalogue and can be equipped.
-const MILESTONE_UNLOCKS: Unlock[] = [
-  { type: "dice", id: "golden", name: "Golden Dice", fallbackGems: 25 },
-  { type: "board", id: "galaxy", name: "Galaxy Space", fallbackGems: 40 },
-  { type: "dice", id: "fire", name: "Fire Dice", fallbackGems: 45 },
-  { type: "board", id: "midnight-live", name: "Midnight Live", fallbackGems: 65 },
-  { type: "avatar", id: "avatar-6", name: "Avatar 6", icon: "🧙🏽‍♂️", fallbackGems: 100 },
-  { type: "board", id: "candy", name: "Candy Land", fallbackGems: 60 },
-  { type: "dice", id: "diamond", name: "Diamond Dice", fallbackGems: 60 },
-  { type: "board", id: "dragon", name: "Dragon Theme", fallbackGems: 40 },
-  { type: "dice", id: "rainbow", name: "Rainbow Dice", fallbackGems: 35 },
-  { type: "board", id: "neon", name: "Neon Glow", fallbackGems: 50 },
-];
-
-function levelReward(level: number) {
-  const coins = 250 + Math.max(0, level - 1) * 50;
-  const gems = level % 5 === 0 ? 10 + Math.floor(level / 10) * 5 : 0;
-  const badge = level % 10 === 0 ? `level-${level}` : null;
-  const unlock = level >= 10 && level % 10 === 0
-    ? MILESTONE_UNLOCKS[(level / 10 - 1) % MILESTONE_UNLOCKS.length]
-    : null;
-  return { coins, gems, badge, unlock };
-}
+type Unlock = MilestoneUnlock;
 
 export async function POST(request: NextRequest) {
   try {
@@ -80,7 +56,7 @@ export async function POST(request: NextRequest) {
       let rewardGems = 0;
       const rewardBadges: string[] = [];
       const rewardUnlocks: Omit<Unlock, "fallbackGems">[] = [];
-      const rewardCompensations: { type: Unlock["type"]; id: string; name: string; gems: number }[] = [];
+      const rewardCompensations: { type: Unlock["type"]; id: string; name: string; icon?: string; gems: number }[] = [];
 
       const owned = {
         board: Array.isArray(row.owned_boards) ? row.owned_boards.map(String) : ["classic"],
@@ -94,7 +70,7 @@ export async function POST(request: NextRequest) {
         level += 1;
         levelsGained += 1;
 
-        const reward = levelReward(level);
+        const reward = getLevelRewardPlan(level);
         let compensationGems = 0;
         if (reward.unlock) {
           const list = owned[reward.unlock.type];
@@ -120,7 +96,7 @@ export async function POST(request: NextRequest) {
             list.push(reward.unlock.id);
             rewardUnlocks.push({ type: reward.unlock.type, id: reward.unlock.id, name: reward.unlock.name, icon: reward.unlock.icon });
           } else {
-            rewardCompensations.push({ type: reward.unlock.type, id: reward.unlock.id, name: reward.unlock.name, gems: compensationGems });
+            rewardCompensations.push({ type: reward.unlock.type, id: reward.unlock.id, name: reward.unlock.name, icon: reward.unlock.icon, gems: compensationGems });
           }
         }
       }
