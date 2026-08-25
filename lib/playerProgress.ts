@@ -28,26 +28,28 @@ export type Badge = {
   source: "spin" | "store" | "game" | "tournament";
 };
 
-export const PROGRESSION_VERSION = 6;
+export const PROGRESSION_VERSION = 7;
 export const STARTING_COINS = 1000;
 export const STARTING_GEMS = 10;
 
-// XP needed to advance from level N to N+1.
-// Level 0 -> 1 = 10 XP, level 1 -> 2 = 15 XP, level 2 -> 3 = 20 XP, etc.
+// Ludo Live progression starts at Level 1.
+// XP needed to advance from level N to N+1: 10 + (N × 5).
+// Therefore Level 1 -> 2 requires 15 XP.
 export function xpRequiredForLevel(level: number): number {
-  return 10 + Math.max(0, level) * 5;
+  const normalizedLevel = Math.max(1, Math.floor(Number(level) || 1));
+  return 10 + normalizedLevel * 5;
 }
 
 export function readProgress(): PlayerProgress {
-  if (typeof window === "undefined") return { level: 0, xp: 0 };
+  if (typeof window === "undefined") return { level: 1, xp: 0 };
   try {
     const stored = JSON.parse(localStorage.getItem("ludo-progression") || "null");
     return {
-      level: Math.max(0, Number(stored?.level) || 0),
+      level: Math.max(1, Math.floor(Number(stored?.level) || 1)),
       xp: Math.max(0, Number(stored?.xp) || 0),
     };
   } catch {
-    return { level: 0, xp: 0 };
+    return { level: 1, xp: 0 };
   }
 }
 
@@ -55,8 +57,8 @@ export function writeProgress(progress: PlayerProgress) {
   if (typeof window === "undefined") return;
   const previous = readProgress();
   const next = {
-    level: Math.max(0, Math.floor(progress.level)),
-    xp: Math.max(0, Math.floor(progress.xp)),
+    level: Math.max(1, Math.floor(Number(progress.level) || 1)),
+    xp: Math.max(0, Math.floor(Number(progress.xp) || 0)),
   };
   localStorage.setItem("ludo-progression", JSON.stringify(next));
   localStorage.setItem("ludo-progression-version", String(PROGRESSION_VERSION));
@@ -96,7 +98,7 @@ export async function awardServerXP(amount: number, source: "game_win" | "diamon
     });
     const data = await response.json().catch(() => ({}));
     if (!response.ok || !Number.isFinite(Number(data?.xp)) || !Number.isFinite(Number(data?.level))) return null;
-    const progress = { level: Number(data.level), xp: Number(data.xp) };
+    const progress = { level: Math.max(1, Number(data.level)), xp: Number(data.xp) };
     writeProgress(progress);
     if (typeof window !== "undefined" && data?.reward?.levels?.length) {
       window.dispatchEvent(new CustomEvent("ludo-level-reward", { detail: data.reward as LevelReward }));
@@ -121,7 +123,7 @@ export function awardGemPurchaseXP() {
 
 export function syncProgressFromUser(user: { level?: number; xp?: number } | null | undefined) {
   if (!user) return;
-  writeProgress({ level: Number(user.level) || 0, xp: Number(user.xp) || 0 });
+  writeProgress({ level: Math.max(1, Number(user.level) || 1), xp: Number(user.xp) || 0 });
 }
 
 export function readBadges(): Badge[] {
