@@ -10,6 +10,7 @@ import XPLevelCelebration from "./_components/XPLevelCelebration";
 import XPWinWatcher from "./_components/XPWinWatcher";
 import ActiveSpinRewards from "./_components/ActiveSpinRewards";
 import MissionGameplayTracker from "./_components/MissionGameplayTracker";
+import NotificationGate from "./_components/NotificationGate";
 import AppShell from "./AppShell";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 
@@ -23,15 +24,10 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  width: "device-width",
-  initialScale: 1,
-  maximumScale: 1,
-  minimumScale: 1,
-  userScalable: false,
-  viewportFit: "cover",
-  themeColor: "#07152d"
+  width: "device-width", initialScale: 1, maximumScale: 1, minimumScale: 1,
+  userScalable: false, viewportFit: "cover", themeColor: "#07152d"
 };
 
 export default function RootLayout({children}:{children:React.ReactNode}){
-  return <html lang="en"><body><ServiceWorkerRegistration /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense><Suspense fallback={null}><LudoAudio /></Suspense><XPLevelCelebration /><XPWinWatcher /><ActiveSpinRewards /><MissionGameplayTracker /></body></html>;
+  return <html lang="en"><body><ServiceWorkerRegistration /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense><Suspense fallback={null}><LudoAudio /></Suspense><XPLevelCelebration /><XPWinWatcher /><ActiveSpinRewards /><MissionGameplayTracker /><NotificationGate /></body></html>;
 }
