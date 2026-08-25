@@ -1,0 +1,78 @@
+name: Optimize Ludo Live avatar assets
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - "public/avatars/premium-elite-atlas.jpg"
+
+permissions:
+  contents: write
+
+jobs:
+  optimize:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download Real-ESRGAN
+        run: |
+          set -e
+          mkdir -p /tmp/realesrgan
+          curl -L --fail --retry 3 -o /tmp/realesrgan/realesrgan.zip \
+            https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip
+          unzip -q /tmp/realesrgan/realesrgan.zip -d /tmp/realesrgan/bin
+          chmod +x /tmp/realesrgan/bin/realesrgan-ncnn-vulkan
+
+      - name: Prepare individual avatar crops
+        run: |
+          set -e
+          mkdir -p /tmp/avatar-crops public/avatars/premium public/avatars/elite
+          # The source atlas is 5 columns x 6 rows.
+          for row in 0 1 2 3 4 5; do
+            for col in 0 1 2 3 4; do
+              index=$((row * 5 + col + 1))
+              x=$((col * 240))
+              y=$((row * 240))
+              printf -v id '%02d' "$index"
+              magick public/avatars/premium-elite-atlas.jpg -crop 240x240+${x}+${y} +repage -strip -sampling-factor 4:4:4 /tmp/avatar-crops/avatar-${id}.png
+            done
+          done
+
+      - name: AI upscale and sharpen each avatar
+        run: |
+          set -e
+          /tmp/realesrgan/bin/realesrgan-ncnn-vulkan \
+            -i /tmp/avatar-crops \
+            -o /tmp/avatar-upscaled \
+            -n realesrgan-x4plus \
+            -s 4 \
+            -t 128
+
+      - name: Install optimized avatars
+        run: |
+          set -e
+          rm -rf public/avatars/premium public/avatars/elite
+          mkdir -p public/avatars/premium public/avatars/elite
+          for i in $(seq 1 30); do
+            printf -v id '%02d' "$i"
+            if [ "$i" -le 10 ]; then
+              cp "/tmp/avatar-upscaled/avatar-${id}.png" "public/avatars/premium/premium-${id}.png"
+            else
+              cp "/tmp/avatar-upscaled/avatar-${id}.png" "public/avatars/elite/elite-$((i-10)).png"
+            fi
+          done
+
+      - name: Commit optimized avatar assets
+        run: |
+          set -e
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/avatars/premium public/avatars/elite
+          if git diff --cached --quiet; then
+            echo "No avatar asset changes to commit."
+            exit 0
+          fi
+          git commit -m "Optimize premium and elite avatar artwork"
+          git push
