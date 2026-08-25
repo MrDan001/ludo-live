@@ -45,12 +45,12 @@ export default function LudoAudio(){
         };
 
         if(kind==="dice"){
-          // Soft felt/tabletop roll: low, rounded rattle rather than a piercing electronic tone.
-          softNoise(.18,0,.42);softNoise(.16,.13,.36);softNoise(.14,.25,.31);softNoise(.11,.35,.25);
-          tone(155,.12,.02,.30,"triangle",105);
-          tone(205,.10,.15,.26,"triangle",135);
-          tone(175,.09,.28,.22,"triangle",120);
-          tone(230,.08,.38,.18,"triangle",145);
+          // Keep the roll cue entirely at the beginning of the roll.
+          softNoise(.09,0,.42);softNoise(.075,.07,.34);
+          tone(155,.075,.01,.30,"triangle",105);
+          tone(205,.065,.075,.25,"triangle",135);
+          tone(175,.055,.14,.21,"triangle",120);
+          tone(230,.045,.19,.17,"triangle",145);
         }else if(kind==="move"){
           tone(610,.075,0,.095,"sine",545);
         }else if(kind==="capture"){
@@ -62,7 +62,7 @@ export default function LudoAudio(){
         }else if(kind==="win"){
           tone(523,.18,0,.18,"sine",659);tone(659,.18,.16,.18,"sine",784);tone(784,.22,.32,.20,"sine",1047);tone(1047,.42,.50,.23,"sine",1319);
         }
-        const end=kind==="win"?1.05:.52;
+        const end=kind==="dice"?0.25:(kind==="win"?1.05:.52);
         master.gain.setValueAtTime(0.0001,now);master.gain.linearRampToValueAtTime(1.45,now+.006);master.gain.setValueAtTime(1.45,now+.02);master.gain.linearRampToValueAtTime(0.0001,now+end);
       }catch{}
     };
