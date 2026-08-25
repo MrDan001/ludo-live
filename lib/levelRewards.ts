@@ -8,8 +8,7 @@ export type MilestoneUnlock = {
   fallbackGems: number;
 };
 
-// These are real entries from lib/customization-catalog.ts. Keep this list
-// aligned with the authoritative catalogue so every milestone reward is usable.
+// Real catalogue entries reused by the milestone formula. Progression has no cap.
 export const MILESTONE_UNLOCKS: MilestoneUnlock[] = [
   { type: "dice", id: "golden", name: "Golden Dice", fallbackGems: 25 },
   { type: "board", id: "galaxy", name: "Galaxy Space", fallbackGems: 40 },
@@ -30,19 +29,21 @@ export type LevelRewardPlan = {
   unlock: MilestoneUnlock | null;
 };
 
+/** Canonical reward formula. There is deliberately no maximum level. */
 export function getLevelRewardPlan(level: number): LevelRewardPlan {
-  const safeLevel = Math.max(0, Math.floor(level));
-  const coins = 250 + Math.max(0, safeLevel - 1) * 50;
+  const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
+  const coins = 250 + (safeLevel - 1) * 50;
   const gems = safeLevel % 5 === 0 ? 10 + Math.floor(safeLevel / 10) * 5 : 0;
   const badge = safeLevel % 10 === 0 ? `level-${safeLevel}` : null;
-  const unlock = safeLevel >= 10 && safeLevel % 10 === 0
-    ? MILESTONE_UNLOCKS[(safeLevel / 10 - 1) % MILESTONE_UNLOCKS.length]
+  const milestoneIndex = safeLevel / 10 - 1;
+  const unlock = safeLevel % 10 === 0
+    ? MILESTONE_UNLOCKS[milestoneIndex % MILESTONE_UNLOCKS.length]
     : null;
   return { coins, gems, badge, unlock };
 }
 
 export function getNextMilestone(level: number) {
-  const safeLevel = Math.max(0, Math.floor(level));
+  const safeLevel = Math.max(1, Math.floor(Number(level) || 1));
   const next = Math.floor(safeLevel / 10) * 10 + 10;
   return { level: next, unlock: getLevelRewardPlan(next).unlock };
 }
