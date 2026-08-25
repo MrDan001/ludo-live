@@ -93,7 +93,12 @@ Therefore Levels 1–10 are Prestige 0, Levels 11–20 are Prestige 1, Levels 21
 
 ### Active-time rewards
 
-Only game-session surfaces count: `/room`, `/game`, `/game-online`, and `/tournament/game`.
+Only game-session surfaces count:
+
+- `/room`
+- `/game` — **Human vs Bot** / canonical Bot-vs-Human game
+- `/game-online`
+- `/tournament/game`
 
 Every completed 30 minutes grants:
 
