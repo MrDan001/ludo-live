@@ -85,12 +85,13 @@ Cosmetic state is merged by stable player identity so a later game-state update 
 - `/player/<username>` is the canonical public player inspection route.
 - `app/player/[username]/page.tsx` consumes `GET /api/player/[username]` and renders server-derived public identity/progression data.
 - `app/_components/PlayerIdentityLink.tsx` is the shared navigation contract from player names/avatars to the Showcase.
-- The Showcase exposes public progression, title, prestige, achievements, loadout and the single next milestone, but not private wallet, email, password or session data.
+- The Showcase exposes public hierarchy title, level, prestige, achievements, loadout and the single next milestone, but not private wallet, email, password or session data.
 - The Showcase avatar resolves from the same `AVATARS` catalogue and the same `🧑🏽‍🎮` default representation as Profile.
 - The Level Journey is a progressive road that starts publicly at **Level 1**. Level 0 is never rendered as a public journey node. Legacy Level 0 records are visually normalized to Level 1 for the journey.
 - The current visible level receives a 📍 node and `CURRENT LEVEL` pill. The separate `YOU ARE HERE` label and the explanatory paragraph above the road are intentionally absent.
 - The current row displays current-level XP, a progress bar and exact XP remaining to the next level using canonical `xpRequiredForLevel()`.
 - The road renders a useful current-level window rather than enumerating unlimited future levels.
+- Hierarchy is independent of Level and Prestige and is derived from verified active game-session hours. The ladder is: On Your Way (<1h), Rookie (1h), Dabbler (3h), Hobbyist (10h), Enthusiast (20h), Devotee (40h), Fanatic (60h), Expert (100h), Prodigy (300h), Champion (500h), Mastermind (750h), Legend (1,000h), Grandmaster (1,500h), Immortal (2,000h).
 
 ## Tournament
 
@@ -112,8 +113,9 @@ Progression is server-backed.
 
 - A **game win in any game mode** awards **+7 XP**.
 - A **successful diamond purchase** awards **+15 XP**.
+- Every completed **30 minutes of verified active game-session time** awards **+5 XP** during normal hours or **+15 XP** during Rush Hour.
 - XP awards must be server-authoritative and protected against duplicate awards.
-- Existing level progression formula is retained; do not replace it without an explicit product decision.
+- Existing scalable level progression formula is retained; do not replace it without an explicit product decision.
 - `app/_components/XPLevelCelebration.tsx` provides the level-up presentation.
 - A level completion animates the XP bar filling, transitions to the next level, starts the next level's progress, and shows a congratulatory celebration for roughly 4 seconds.
 - XP/progression updates should dispatch/use the existing progression refresh mechanism rather than maintaining a second local progression system.
@@ -122,15 +124,17 @@ Progression is server-backed.
 
 Free spins are a server-authoritative reward balance that can be consumed by the Spin Wheel.
 
-- Every **30 minutes of active app time** grants **1 free spin**.
-- Between **17:00 and 20:00 Nigeria time (`Africa/Lagos`)**, every completed 30-minute active interval grants **3 free spins** instead.
-- Active time is counted while the app/document is visible. The client may send periodic heartbeats, but the server validates/caps elapsed intervals and decides when a reward is earned.
-- The authoritative activity/grant endpoint is `/api/spin/activity`.
+- Only active game-session surfaces count toward the engagement timer: `/room`, `/game`, `/game-online`, and `/tournament/game`.
+- The document must be visible. `app/_components/ActiveSpinRewards.tsx` sends periodic heartbeats only while an eligible game-session surface is visible.
+- Every completed **30 minutes** grants **1 free spin + 5 XP** during normal hours.
+- Between **17:00 and 20:00 Nigeria time (`Africa/Lagos`)**, every completed 30-minute interval grants **3 free spins + 15 XP** instead.
+- `/api/spin/activity` is authoritative for elapsed active time, spin grants, XP grants and persistent active-time totals. The server caps heartbeat elapsed time and uses a database transaction/row lock so concurrent heartbeats cannot double-award an interval.
+- `ludo_spin_state.active_seconds` stores the current unawarded remainder; `ludo_spin_state.total_active_seconds` stores the cumulative active-session time used by the hierarchy system.
 - Free-spin balance and consumption are authoritative in PostgreSQL via `ludo_spin_state` and `/api/spin`.
 - Free spins are not coins or gems and must not be represented as either wallet currency.
 - `/profile` displays the player's current **Free Rolls** balance.
 - `/spin` displays the current free-spin balance and consumes the server-side balance when a spin is used.
-- When a free-spin reward is granted, the app shows an in-app notification. Browser/OS notification is sent only when the browser notification permission/subscription capability is available; do not claim closed-app push delivery without the required push infrastructure.
+- When an active-time reward is granted, the app shows an in-game notification with the spin and XP award. Browser/OS notification is sent only when notification permission is available; do not claim closed-app push delivery without the required push infrastructure.
 - Unused earned spins persist until consumed; they do not reset daily.
 - An existing `extraSpin` wheel prize adds one additional free spin to the server balance.
 - The Nigeria-time window is a business rule and must use `Africa/Lagos`, never the developer/device timezone.
@@ -340,6 +344,8 @@ PostgreSQL is authoritative for accounts, wallets, customization ownership, tour
 - Do not claim Railway deployment success until the platform reports success.
 - Do not treat a successful `getUserMedia()` call or a green Mic button as proof that remote peers received audio. WebRTC call/stream state must be considered separately.
 - Do not answer an incoming WebRTC call with `undefined` just because the player has not enabled their mic yet; preserve the call and answer when the local audio stream becomes available.
+- Do not count backgrounded/non-game pages toward hierarchy hours or active-time rewards.
+- Do not award active-time spins or XP from the client. The server must validate elapsed heartbeat time and apply the reward transactionally.
 
 ## Do not guess
 
