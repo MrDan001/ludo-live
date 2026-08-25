@@ -2,7 +2,7 @@
 import {useEffect,useState} from "react";
 import AppFrame from "../_components/AppFrame";
 
-type Case={id:number;title:string;description:string;status:string;admin_note:string|null;created_at:string;updated_at:string};
+type Case={id:number;title:string;description:string;status:string;category?:string;admin_note:string|null;created_at:string;updated_at:string};
 type Message={id:number;sender_type:"user"|"admin";message:string;created_at:string};
 
 export default function Support(){
