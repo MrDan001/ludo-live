@@ -95,10 +95,10 @@ export const GEM_PACKAGES = [
   { id: "gems-50", name: "50 Gems", reward: 50, rewardCurrency: "gems", currency: "naira", price: 1000, rarity: "COMMON" },
   { id: "gems-100", name: "100 Gems", reward: 100, rewardCurrency: "gems", currency: "naira", price: 1500, rarity: "COMMON" },
   { id: "gems-200", name: "200 Gems", reward: 200, rewardCurrency: "gems", currency: "naira", price: 2500, rarity: "RARE" },
-  { id: "gems-400", name: "400 Gems", reward: 400, rewardCurrency: "naira", price: 4000, rarity: "RARE" },
-  { id: "gems-500", name: "500 Gems", reward: 500, rewardCurrency: "naira", price: 5000, rarity: "EPIC" },
-  { id: "gems-1000", name: "1,000 Gems", reward: 1000, rewardCurrency: "naira", price: 8000, rarity: "EPIC" },
-  { id: "gems-1500", name: "1,500 Gems", reward: 1500, rewardCurrency: "naira", price: 10000, rarity: "LEGENDARY" },
+  { id: "gems-400", name: "400 Gems", reward: 400, rewardCurrency: "gems", currency: "naira", price: 4000, rarity: "RARE" },
+  { id: "gems-500", name: "500 Gems", reward: 500, rewardCurrency: "gems", currency: "naira", price: 5000, rarity: "EPIC" },
+  { id: "gems-1000", name: "1,000 Gems", reward: 1000, rewardCurrency: "gems", currency: "naira", price: 8000, rarity: "EPIC" },
+  { id: "gems-1500", name: "1,500 Gems", reward: 1500, rewardCurrency: "gems", currency: "naira", price: 10000, rarity: "LEGENDARY" },
 ] as const;
 
 export const CATALOG = [
