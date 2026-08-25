@@ -56,20 +56,57 @@ Tournament badges are stored uniquely per tournament/player/type, so one badge c
 
 Mission achievement/reward history remains a separate history surface and is not added to this Showcase number simply because a player claimed a mission reward.
 
-## Title
+## Hierarchy
 
-`Tournament Champion` requires at least one actual gold tournament badge.
+Hierarchy is **independent of Level and Prestige**. It measures verified active app/game time from `ludo_spin_state.total_active_seconds` plus the current accumulated active interval.
 
-The remaining title ladder continues to use the existing level/win thresholds.
+The hierarchy ladder is:
 
-## Prestige
+| Verified active time | Hierarchy |
+|---:|---|
+| 0–<1 hour | On Your Way |
+| 1 hour | Rookie |
+| 3 hours | Dabbler |
+| 10 hours | Hobbyist |
+| 20 hours | Enthusiast |
+| 40 hours | Devotee |
+| 60 hours | Fanatic |
+| 100 hours | Expert |
+| 300 hours | Prodigy |
+| 500 hours | Champion |
+| 750 hours | Mastermind |
+| 1,000 hours | Legend |
+| 1,500 hours | Grandmaster |
+| 2,000 hours | Immortal |
 
-Current Showcase prestige is:
+Hierarchy is selected by the highest threshold reached. It does not reset when Prestige increases and does not depend on wins, tournament wins, cosmetic ownership, or level.
 
-`level * 25 + wins * 5 + tournamentWins * 100 + claimedLevelMilestones * 20`
+## Level and Prestige
 
-Because `tournamentWins` now means actual 1st-place championships, tournament prestige cannot be inflated by Top-10 finishes.
+**Level** is the XP progression system and is scalable beyond Level 10.
+
+**Prestige is separate from hierarchy.** The current Prestige cycle is one Prestige for every 100 completed levels:
+
+`Prestige = floor((Level - 1) / 100)`
+
+Therefore:
+
+- Levels 1–100 → Prestige 0
+- Levels 101–200 → Prestige 1
+- Levels 201–300 → Prestige 2
+- and so on indefinitely.
+
+A player can therefore be, for example, `Legend · Level 103 · Prestige 1` without the three systems being conflated.
+
+## Active-time rewards
+
+The same server-authoritative active-time tracker powers engagement rewards:
+
+- Every completed 30 minutes of active time → **1 free spin + 5 XP**.
+- During **17:00–20:00 Africa/Lagos time** → **3 free spins + 15 XP** per completed 30-minute interval.
+- The server caps heartbeat elapsed time and only counts visible active app time; the client cannot directly award spins or XP.
+- Unused free spins persist until consumed.
 
 ## Design rule
 
-The Showcase is intended to communicate genuine player strength and accomplishment. Do not replace these counters with client-derived totals, raw event counts, or cosmetic ownership counts. Any future reputation change must update this document, `ARCHITECTURE.md`, and `DEVELOPER_HANDOFF.md` together.
+The Showcase is intended to communicate genuine player progression and accomplishment. Do not replace these counters with client-derived totals, raw event counts, or cosmetic ownership counts. Any future reputation/progression change must update this document, `ARCHITECTURE.md`, and `DEVELOPER_HANDOFF.md` together.
