@@ -4,24 +4,30 @@ const path = require('path');
 const serverPath = path.join(process.cwd(), 'server.js');
 let source = fs.readFileSync(serverPath, 'utf8');
 
-const disconnectCount = () => (source.match(/socket\.on\s*\(/g) || []).filter(() => false).length;
-const hasLeave = source.includes('leave-room');
-const disconnectPositions = [];
-let scan = 0;
-while (true) {
-  const pos = source.indexOf('disconnect', scan);
-  if (pos < 0) break;
-  disconnectPositions.push(pos);
-  scan = pos + 10;
-}
-if (hasLeave && disconnectPositions.length === 1) process.exit(0);
-if (disconnectPositions.length === 0) throw new Error('No Socket.IO disconnect handler found in server.js');
+// IMPORTANT: count Socket.IO disconnect HANDLERS, not every occurrence of the
+// word "disconnect". The server also legitimately contains socket.disconnect()
+// calls, which are not room lifecycle handlers.
+const handlerPositions = () => {
+  const out = [];
+  const re = /socket\.on\s*\(\s*["']disconnect["']\s*,/g;
+  let match;
+  while ((match = re.exec(source)) !== null) out.push(match.index);
+  return out;
+};
 
-// Use the literal event-name position rather than quote/spacing assumptions.
-const firstDisconnectWord = disconnectPositions[0];
-const firstStart = source.lastIndexOf('socket.on', firstDisconnectWord);
-if (firstStart < 0) throw new Error('Could not locate first Socket.IO disconnect handler');
-const nextSocketHandler = source.indexOf('socket.on', firstDisconnectWord + 10);
+const hasLeave = source.includes('socket.on("leave-room"') || source.includes("socket.on('leave-room'");
+let positions = handlerPositions();
+if (hasLeave && positions.length === 1) {
+  console.log('Multiplayer room lifecycle already prepared successfully.');
+  process.exit(0);
+}
+if (positions.length === 0) throw new Error('No Socket.IO disconnect handler found in server.js');
+
+// Replace the first room disconnect handler with the canonical lifecycle. The
+// following Socket.IO handler is used as the deterministic boundary because the
+// legacy server is intentionally minified.
+const firstStart = positions[0];
+const nextSocketHandler = source.indexOf('socket.on', positions[0] + 10);
 if (nextSocketHandler < 0) throw new Error('Could not locate the handler after disconnect');
 
 const lifecycle = `socket.on("leave-room",()=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room)return socket.emit("room-left",{roomCode:code});const member=room.members.get(socket.id);if(!member)return socket.emit("room-left",{roomCode:code});const wasHost=room.hostId===socket.id||room.hostPlayerId===member.playerId;room.members.delete(socket.id);socket.leave(code);socket.data.roomCode=null;clearTimeout(member.reconnectTimer);if(wasHost){const candidates=[...room.members.values()].filter(m=>m.socketId&&m.connected!==false);if(candidates.length===0){clearTimeout(room.hostTimer);rooms.delete(code)}else{const next=candidates[0];for(const m of room.members.values())m.host=false;next.host=true;next.ready=true;room.hostId=next.id;room.hostPlayerId=next.playerId||next.id;room.hostPending=false;room.hostEligible=false;clearTimeout(room.hostTimer)}}if(rooms.has(code))io.to(code).emit("roster",publicMembers(room));broadcastRooms();socket.emit("room-left",{roomCode:code})});
@@ -29,33 +35,19 @@ const lifecycle = `socket.on("leave-room",()=>{const code=socket.data.roomCode,r
 
 source = source.slice(0, firstStart) + lifecycle + source.slice(nextSocketHandler);
 
-// Remove the old second room disconnect handler, if present. We identify it by
-// taking the last remaining disconnect word after the first replacement.
-let positions = [];
-scan = 0;
-while (true) {
-  const pos = source.indexOf('disconnect', scan);
-  if (pos < 0) break;
-  positions.push(pos);
-  scan = pos + 10;
-}
+// Remove any remaining legacy room disconnect handler. Use the actual handler
+// signature, never a generic "disconnect" substring.
+positions = handlerPositions();
 if (positions.length > 1) {
-  const legacyWord = positions[positions.length - 1];
-  const legacyStart = source.lastIndexOf('socket.on', legacyWord);
+  const legacyStart = positions[positions.length - 1];
   const legacyEnd = source.indexOf('\n });httpServer.listen', legacyStart);
-  if (legacyStart < 0 || legacyEnd < 0) throw new Error('Could not remove legacy disconnect handler');
+  if (legacyEnd < 0) throw new Error('Could not remove legacy disconnect handler');
   source = source.slice(0, legacyStart) + source.slice(legacyEnd);
 }
 
-let finalPositions = [];
-scan = 0;
-while (true) {
-  const pos = source.indexOf('disconnect', scan);
-  if (pos < 0) break;
-  finalPositions.push(pos);
-  scan = pos + 10;
-}
-if (finalPositions.length !== 1) throw new Error(`Expected one disconnect handler after repair; found ${finalPositions.length}`);
+positions = handlerPositions();
+if (positions.length !== 1) throw new Error(`Expected one Socket.IO disconnect handler after repair; found ${positions.length}`);
+if (!source.includes('socket.on("leave-room"')) throw new Error('Expected explicit leave-room handler after repair');
 
 fs.writeFileSync(serverPath, source);
 console.log('Multiplayer room lifecycle prepared successfully.');
