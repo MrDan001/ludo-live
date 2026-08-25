@@ -24,7 +24,7 @@ jobs:
         run: |
           set -e
           sudo apt-get update
-          sudo apt-get install -y imagemagick curl unzip
+          sudo apt-get install -y imagemagick curl
 
       - name: Download the approved 30-character source atlas
         run: |
@@ -39,20 +39,7 @@ jobs:
           test "$width" -eq 200
           test "$height" -eq 240
 
-      - name: Install Real-ESRGAN NCNN
-        run: |
-          set -e
-          mkdir -p /tmp/realesrgan
-          curl -fL \
-            "https://github.com/xinntao/Real-ESRGAN/releases/download/v0.2.5.0/realesrgan-ncnn-vulkan-20220424-ubuntu.zip" \
-            -o /tmp/realesrgan.zip
-          unzip -q /tmp/realesrgan.zip -d /tmp/realesrgan
-          find /tmp/realesrgan -type f -name 'realesrgan-ncnn-vulkan' -exec chmod +x {} \;
-          BIN=$(find /tmp/realesrgan -type f -name 'realesrgan-ncnn-vulkan' | head -n 1)
-          test -n "$BIN"
-          echo "REALESRGAN_BIN=$BIN" >> "$GITHUB_ENV"
-
-      - name: Split the real 5x6 atlas into 30 source characters
+      - name: Split the approved 5x6 atlas into 30 source characters
         run: |
           set -e
           mkdir -p /tmp/avatar-src /tmp/avatar-upscaled /tmp/avatar-final
@@ -68,37 +55,31 @@ jobs:
           done
           test "$(find /tmp/avatar-src -name 'avatar-*.png' | wc -l)" -eq 30
 
-      - name: AI upscale every character individually
+      - name: Upscale each character with deterministic high-quality CPU processing
         run: |
           set -e
           for input in /tmp/avatar-src/avatar-*.png; do
             name=$(basename "$input" .png)
-            "$REALESRGAN_BIN" \
-              -i "$input" \
-              -o "/tmp/avatar-upscaled/${name}.png" \
-              -n realesrgan-x4plus-anime \
-              -s 4 \
-              -f png
+            convert "$input" \
+              -filter Lanczos \
+              -resize 240x240! \
+              -unsharp 0x1.0+0.75+0.02 \
+              -sampling-factor 4:4:4 \
+              /tmp/avatar-upscaled/${name}.png
           done
-
           test "$(find /tmp/avatar-upscaled -name 'avatar-*.png' | wc -l)" -eq 30
 
-      - name: Normalize each enhanced character to a clean 240x240 cell
+      - name: Validate every enhanced character is exactly 240x240
         run: |
           set -e
           for input in /tmp/avatar-upscaled/avatar-*.png; do
-            name=$(basename "$input")
-            convert "$input" \
-              -resize 240x240! \
-              -sampling-factor 4:4:4 \
-              /tmp/avatar-final/$name
+            identify -format '%w %h\n' "$input" | grep -qx '240 240'
           done
-          test "$(find /tmp/avatar-final -name 'avatar-*.png' | wc -l)" -eq 30
 
       - name: Rebuild the 1200x1440 5x6 atlas
         run: |
           set -e
-          montage /tmp/avatar-final/avatar-*.png \
+          montage /tmp/avatar-upscaled/avatar-*.png \
             -tile 5x6 \
             -geometry 240x240+0+0 \
             -background none \
