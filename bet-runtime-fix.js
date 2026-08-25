@@ -1,8 +1,9 @@
 // Reliability bridge for the in-room stake agreement UI.
 // This is intentionally separate from Ludo rules and wallet settlement.
-// It replaces the fragile prototype-path for the host's stake event with a
-// deterministic handler loaded after bet-system and before server.js.
+// It bypasses the earlier Socket.prototype wrapper so the host's stake event
+// has one deterministic listener and cannot remain on "Setting…".
 const { Socket } = require('socket.io');
+const { EventEmitter } = require('events');
 const { rooms, validStake, broadcastState, MIN_STAKE, MAX_STAKE } = require('./bet-system');
 
 if (!Socket.prototype.__ludoBetRuntimeFixPatched) {
@@ -10,7 +11,7 @@ if (!Socket.prototype.__ludoBetRuntimeFixPatched) {
   const originalOn = Socket.prototype.on;
   Socket.prototype.on = function(event, listener) {
     if (event === 'set-stake') {
-      return originalOn.call(this, event, (payload = {}) => {
+      return EventEmitter.prototype.on.call(this, event, (payload = {}) => {
         const code = String(this.data?.roomCode || '').trim().toUpperCase();
         const room = code ? rooms.get(code) : null;
         const member = room?.members.get(this.id);
