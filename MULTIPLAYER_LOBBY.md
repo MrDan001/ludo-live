@@ -10,15 +10,23 @@ The waiting-room avatar is also player-specific. `LiveSocial` resolves each rost
 
 The room receives both a legacy `roster` event and later canonical `game-state` updates. The canonical game-state payload may omit cosmetic fields. `LiveSocial` must therefore merge state by stable `playerId` and preserve an existing `avatar`, `board`, `dice`, and player identity when the newer state does not include those fields. A game-state update must never erase a previously resolved avatar and cause the UI to fall back to the generic icon.
 
-If the canonical state does include a newer cosmetic value, that server value wins. After roster/game-state updates, `LiveSocial` may enrich public avatar data again through the Player Showcase API as a fallback. The data flow is:
+Avatar enrichment is also written back into the local member record after the public showcase request resolves. This prevents a later state update or unrelated button interaction from dropping the resolved avatar back to a placeholder. If the canonical state includes a newer cosmetic value, that server value wins.
+
+The data flow is:
 
 `roster/showcase -> local member state -> canonical game-state merge -> preserve cosmetics unless server provides a newer value -> render equipped avatar`
 
 ## Waiting room presentation
 
-`app/_components/LiveSocial.tsx` is the canonical waiting-room presentation. It uses a 2x2 player-seat grid, host crown, real avatar, username, Ready/Not Ready state, invite empty seats, game mode/stake summary, voice control, Ready control, host-only Start Game, and chat. Empty seats copy the room code so the player can invite someone.
+`app/_components/LiveSocial.tsx` is the canonical waiting-room presentation. It uses a 2x2 player-seat grid, host crown, real avatar, username, Ready/Not Ready state, invite empty seats, game mode/stake summary, voice control, Ready control, host-only Start Game, and a compact chat button. Empty seats copy the room code so the player can invite someone.
 
 The current multiplayer system has no server-backed betting/stake field, so the waiting room intentionally displays **BET AMOUNT: Free** rather than inventing a coin wager. If real stakes are introduced later, the amount must be carried by the authoritative room state and validated server-side before this UI changes.
+
+## Chat
+
+The waiting room does **not** render a permanent chat text area. The `💬` button is the canonical entry point and opens a chat drawer/sheet containing the existing room messages, quick messages and text composer. This keeps the room visually focused while retaining the same Socket.IO chat functionality.
+
+Do not add a second always-visible chat composer to the waiting-room card unless the product requirement explicitly changes.
 
 ## Player inspection
 
@@ -29,6 +37,8 @@ The public showcase intentionally exposes only the information needed for player
 ## Next milestone preview
 
 When one player inspects another from the room, the Player Showcase displays **only the single next milestone** after the player's current level. It does not list all future milestones. This keeps the inspection card focused on the one thing the player is currently working toward.
+
+The Showcase also contains a progressive Level Journey road. From Level 5 onward it shows sequential levels and marks the inspected player's exact current level. Players below Level 5 use a Level 1 starting point so their current marker remains visible. The journey uses the shared level reward plan for reward labels and does not grant anything from the client.
 
 ## Readiness
 
@@ -75,9 +85,10 @@ and:
 ## Files
 
 - `app/room/page.tsx` — authenticated room/player naming, explicit Leave Room request, and navigation to the online game.
-- `app/_components/LiveSocial.tsx` — canonical waiting-room layout, roster/readiness synchronization, avatar state merging/enrichment, player inspection links, chat, voice integration and start handling.
+- `app/_components/LiveSocial.tsx` — canonical waiting-room layout, roster/readiness synchronization, avatar state merging/enrichment, player inspection links, chat drawer, voice integration and start handling.
 - `app/_components/PlayerIdentityLink.tsx` — canonical player-to-showcase navigation wrapper.
 - `app/api/player/[username]/route.ts` — server-authoritative public showcase data, including equipped avatar and the single next milestone.
+- `app/player/[username]/page.tsx` — public Player Showcase, real avatar rendering and progressive Level Journey.
 - `app/api/auth/route.ts` — authenticated public user payload, including the current user's equipped avatar.
 - `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport and microphone control.
 - `server.js` — room discovery, roster, host ownership and authoritative `start-game.board` payload.
@@ -86,4 +97,4 @@ and:
 
 ## Do not regress
 
-Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not let canonical game-state updates erase previously resolved player cosmetics. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority and match start server/canonical-state authoritative. Keep voice status text out of the waiting-room layout; the microphone control is sufficient.
+Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not let canonical game-state updates erase previously resolved player cosmetics. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority and match start server/canonical-state authoritative. Keep the permanent chat text area out of the waiting-room layout; the `💬` button opens the chat drawer. Keep voice status text out of the waiting-room layout; the microphone control is sufficient.
