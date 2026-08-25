@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool, ensureAuthSchema } from "../../auth/_db";
-import { currentUser } from "../../../../lib/auth-session";
+
+const XP_PER_DIAMOND_PURCHASE = 15;
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url); const reference = url.searchParams.get("reference") || ""; const shopUrl = new URL("/shop", request.url);
@@ -26,10 +27,14 @@ export async function GET(request: NextRequest) {
       const row = locked.rows[0];
       if (!row) throw new Error("Payment record disappeared.");
       if (row.status !== "credited") {
-        const user = await client.query<any>("SELECT gems FROM ludo_users WHERE id=$1 FOR UPDATE", [row.user_id]);
+        const user = await client.query<any>("SELECT gems,xp,level FROM ludo_users WHERE id=$1 FOR UPDATE", [row.user_id]);
         if (!user.rows[0]) throw new Error("Account not found.");
         const before = Number(user.rows[0].gems) || 0; const after = before + Number(row.gems);
-        await client.query("UPDATE ludo_users SET gems=$1 WHERE id=$2", [after, row.user_id]);
+        let xp = Math.max(0, Number(user.rows[0].xp) || 0) + XP_PER_DIAMOND_PURCHASE;
+        let level = Math.max(0, Number(user.rows[0].level) || 0);
+        const required = (n:number) => 10 + Math.max(0, n) * 5;
+        while (xp >= required(level)) { xp -= required(level); level += 1; }
+        await client.query("UPDATE ludo_users SET gems=$1,xp=$2,level=$3 WHERE id=$4", [after, xp, level, row.user_id]);
         await client.query("UPDATE ludo_shop_payments SET status='credited',credited_at=NOW() WHERE reference=$1", [reference]);
         await client.query("INSERT INTO ludo_admin_ledger(user_id,currency,amount,balance_before,balance_after,reason,source) VALUES($1,'gems',$2,$3,$4,$5,'paystack')", [row.user_id, row.gems, before, after, `Purchased ${row.gems} gems`]);
       }
