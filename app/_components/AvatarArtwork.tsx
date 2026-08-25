@@ -2,15 +2,17 @@ import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// Uploaded artwork: 30 characters arranged 6 columns x 5 rows.
-const ATLAS = "/avatars/ludo-live-avatar-atlas.webp?v=20260826-2";
+// User-supplied Premium + Elite artwork: 30 characters in a 6-column x 5-row image atlas.
+const ATLAS = "/avatars/ludo-live-avatar-atlas.webp?v=20260826-3";
 
 function atlasCell(id: string) {
   const match = id.match(/^(premium|elite)-(\d{2})$/);
   if (!match) return null;
+
   const n = Number(match[2]);
   const index = id.startsWith("elite-") ? 10 + n : n;
   if (index < 1 || index > 30) return null;
+
   const zero = index - 1;
   return { col: zero % 6, row: Math.floor(zero / 6) };
 }
