@@ -27,17 +27,34 @@ A room socket disconnects when the player navigates from `/room` to `/game-onlin
 
 `multiplayer-canonical.js` now returns after handling a canonical disconnect, preventing the legacy room teardown from firing during the room-to-game transition.
 
+## Host theme/skin authority
+
+The host's equipped board/skin is the authoritative visual configuration for a multiplayer room. `LiveSocial` reads the current player's customization when joining, and the server stores the host's board on the host member. `server.js` sends the host member's stored `board` in the authoritative `start-game` payload.
+
+When `start-game` arrives, every client stores the server-provided host board in `ludo-match-board` before navigating to `/game-online`. **The Room page must not append a `board` query parameter from the local player's customization to the game URL.** That used to overwrite the server-authoritative host board on a guest's device, causing each guest to enter the match with their own skin instead of the host's.
+
+The game entry page only overrides `/api/customization` when an explicit `board` query parameter exists. Normal room starts therefore use the server-delivered host board from local storage. `MultiplayerGameCanonical` then loads that board and applies it to the shared board theme.
+
+Result:
+
+`Host profile/Shop skin -> host room member.board -> server start-game.board -> every client ludo-match-board -> MultiplayerGameCanonical -> same board/theme for everyone.`
+
+Player-specific profile data such as username/avatar remains player-specific; the shared board/theme is match-specific and host-authoritative.
+
 ## Files
 
-- `app/room/page.tsx` — authenticated room/player naming and navigation to the online game.
-- `app/_components/LiveSocial.tsx` — roster/readiness synchronization, chat and integration with `ChatVoice`.
+- `app/room/page.tsx` — authenticated room/player naming and navigation to the online game; must not override the host theme with a guest's URL board.
+- `app/_components/LiveSocial.tsx` — roster/readiness synchronization, chat, voice integration, and receipt of the authoritative start payload.
 - `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport and pending-call handling.
+- `server.js` — room discovery, roster, host ownership and authoritative `start-game.board` payload.
 - `multiplayer-canonical.js` — authoritative multiplayer readiness/start/game/reconnect rules and canonical disconnect ownership.
-- `app/game-online/page.tsx` — online game entry.
-- `app/game/MultiplayerGameCanonical.tsx` — canonical multiplayer board client.
+- `app/game-online/page.tsx` — online game entry; explicit board query parameters are only for controlled direct entry, not normal room handoff.
+- `app/game/MultiplayerGameCanonical.tsx` — canonical multiplayer board client and shared theme application.
 
 ## Do not regress
 
 Do not restore hard-coded `Player 1` defaults for authenticated players, create a second voice implementation, or bypass the canonical readiness handler with a competing readiness state. Keep the server/canonical game state authoritative.
 
 Do not forward a canonical multiplayer disconnect to the legacy lobby disconnect handler after a match has started; doing so can trigger the legacy 2-player host-left cleanup and kick the remaining player during navigation.
+
+Do not append the guest's local `board` to the normal room-to-game URL. The host board sent by the server must remain authoritative for every participant.
