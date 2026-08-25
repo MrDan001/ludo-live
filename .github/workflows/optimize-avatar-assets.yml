@@ -38,6 +38,7 @@ jobs:
           set -e
           rm -rf /tmp/avatar-crops /tmp/avatar-upscaled /tmp/avatar-atlas
           mkdir -p /tmp/avatar-crops /tmp/avatar-upscaled /tmp/avatar-atlas
+          # Ubuntu 24.04 ships ImageMagick 6 where the executable is `convert`, not `magick`.
           # The source atlas is 5 columns x 6 rows, 240x240 per cell.
           for row in 0 1 2 3 4 5; do
             for col in 0 1 2 3 4; do
@@ -45,7 +46,7 @@ jobs:
               x=$((col * 240))
               y=$((row * 240))
               printf -v id '%02d' "$index"
-              magick public/avatars/premium-elite-atlas.jpg \
+              convert public/avatars/premium-elite-atlas.jpg \
                 -crop 240x240+${x}+${y} +repage \
                 -strip -sampling-factor 4:4:4 -quality 100 \
                 /tmp/avatar-crops/avatar-${id}.png
@@ -73,9 +74,9 @@ jobs:
               printf -v id '%02d' "$index"
               files+=("/tmp/avatar-upscaled/avatar-${id}.png")
             done
-            magick "${files[@]}" +append "/tmp/avatar-atlas/row-${row}.png"
+            convert "${files[@]}" +append "/tmp/avatar-atlas/row-${row}.png"
           done
-          magick /tmp/avatar-atlas/row-{0,1,2,3,4,5}.png -append \
+          convert /tmp/avatar-atlas/row-{0,1,2,3,4,5}.png -append \
             -sampling-factor 4:4:4 -interlace Plane -quality 96 \
             public/avatars/premium-elite-atlas.jpg
           identify public/avatars/premium-elite-atlas.jpg
