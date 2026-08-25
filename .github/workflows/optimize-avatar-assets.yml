@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - "public/avatars/premium-elite-atlas.jpg"
+      - ".github/workflows/optimize-avatar-assets.yml"
 
 permissions:
   contents: write
@@ -15,6 +16,12 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Install image and Vulkan dependencies
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y imagemagick unzip libvulkan1 mesa-vulkan-drivers
 
       - name: Download Real-ESRGAN
         run: |
@@ -28,19 +35,23 @@ jobs:
       - name: Prepare individual avatar crops
         run: |
           set -e
-          mkdir -p /tmp/avatar-crops public/avatars/premium public/avatars/elite
-          # The source atlas is 5 columns x 6 rows.
+          rm -rf /tmp/avatar-crops /tmp/avatar-upscaled
+          mkdir -p /tmp/avatar-crops /tmp/avatar-upscaled
+          # The source atlas is 5 columns x 6 rows, 240x240 per cell.
           for row in 0 1 2 3 4 5; do
             for col in 0 1 2 3 4; do
               index=$((row * 5 + col + 1))
               x=$((col * 240))
               y=$((row * 240))
               printf -v id '%02d' "$index"
-              magick public/avatars/premium-elite-atlas.jpg -crop 240x240+${x}+${y} +repage -strip -sampling-factor 4:4:4 /tmp/avatar-crops/avatar-${id}.png
+              magick public/avatars/premium-elite-atlas.jpg \
+                -crop 240x240+${x}+${y} +repage \
+                -strip -sampling-factor 4:4:4 -quality 100 \
+                /tmp/avatar-crops/avatar-${id}.png
             done
           done
 
-      - name: AI upscale and sharpen each avatar
+      - name: AI upscale each avatar to 960x960
         run: |
           set -e
           /tmp/realesrgan/bin/realesrgan-ncnn-vulkan \
