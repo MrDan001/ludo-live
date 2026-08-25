@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool, ensureAuthSchema } from "../auth/_db";
 import { currentUser } from "../../../lib/auth-session";
-import { BOARDS, DICE, AVATARS, ITEMS, CATALOG } from "../../../lib/customization-catalog";
+import { CATALOG } from "../../../lib/customization-catalog";
+import { getShopCatalog, getShopItem } from "../shop/catalog";
 
 const clean = (list: unknown) => (Array.isArray(list) ? list.map(String) : []);
 
@@ -10,6 +11,7 @@ export async function GET(q: NextRequest) {
     await ensureAuthSchema();
     const u = await currentUser(q);
     if (!u) return NextResponse.json({ error: "Sign in required." }, { status: 401 });
+    const catalog = await getShopCatalog();
     return NextResponse.json({
       coins: Number(u.coins) || 0,
       gems: Number(u.gems) || 0,
@@ -21,10 +23,10 @@ export async function GET(q: NextRequest) {
       equippedAvatar: u.equipped_avatar || "default",
       ownedItems: clean(u.owned_items),
       equippedItems: clean(u.equipped_items),
-      boards: BOARDS,
-      dice: DICE,
-      avatars: AVATARS,
-      items: ITEMS,
+      boards: catalog.filter((x:any) => x.type === "board"),
+      dice: catalog.filter((x:any) => x.type === "dice"),
+      avatars: catalog.filter((x:any) => x.type === "avatar"),
+      items: catalog.filter((x:any) => x.type === "item"),
     });
   } catch (e) {
     console.error(e);
@@ -44,7 +46,7 @@ export async function POST(q: NextRequest) {
     const action = String(body.action || "");
     const id = String(body.id || "");
     const type = String(body.type || "");
-    const item = CATALOG.find((x) => x.id === id && x.type === type);
+    const item = await getShopItem(type, id);
     if (!item) return NextResponse.json({ error: "Item not found." }, { status: 404 });
 
     await client.query("BEGIN");
@@ -69,13 +71,10 @@ export async function POST(q: NextRequest) {
       const owned = type === "board" ? boards : type === "dice" ? dice : type === "avatar" ? avatars : items;
       if (!owned.includes(id)) return fail(client, "Purchase this item first.", 403);
 
-      if (type === "board") {
-        await client.query("UPDATE ludo_users SET equipped_board=$1 WHERE id=$2", [id, u.id]);
-      } else if (type === "dice") {
-        await client.query("UPDATE ludo_users SET equipped_dice=$1 WHERE id=$2", [id, u.id]);
-      } else if (type === "avatar") {
-        await client.query("UPDATE ludo_users SET equipped_avatar=$1 WHERE id=$2", [id, u.id]);
-      } else {
+      if (type === "board") await client.query("UPDATE ludo_users SET equipped_board=$1 WHERE id=$2", [id, u.id]);
+      else if (type === "dice") await client.query("UPDATE ludo_users SET equipped_dice=$1 WHERE id=$2", [id, u.id]);
+      else if (type === "avatar") await client.query("UPDATE ludo_users SET equipped_avatar=$1 WHERE id=$2", [id, u.id]);
+      else {
         const next = equippedItems.includes(id) ? equippedItems : [...equippedItems, id];
         await client.query("UPDATE ludo_users SET equipped_items=$1::jsonb WHERE id=$2", [JSON.stringify(next), u.id]);
       }
@@ -87,11 +86,12 @@ export async function POST(q: NextRequest) {
         equippedBoard: type === "board" ? id : cur.equipped_board,
         equippedDice: type === "dice" ? id : cur.equipped_dice,
         equippedAvatar: type === "avatar" ? id : cur.equipped_avatar,
-        equippedItems: type === "item" ? [...equippedItems.filter((x) => x !== id), id] : equippedItems,
+        equippedItems: type === "item" ? [...equippedItems.filter((x:string) => x !== id), id] : equippedItems,
       });
     }
 
     if (action !== "purchase") return fail(client, "Unknown customization action.", 400);
+    if (item.currency === "naira") return fail(client, "This item requires Naira payment. Use the payment button in the shop.", 409);
 
     const owned = type === "board" ? boards : type === "dice" ? dice : type === "avatar" ? avatars : items;
     if (owned.includes(id)) return fail(client, "You already own this item.", 409);
@@ -101,74 +101,28 @@ export async function POST(q: NextRequest) {
     if (balance < item.price) return fail(client, `Not enough ${currency}.`, 400);
     const next = balance - item.price;
 
-    // Explicitly cast the catalog id to text. PostgreSQL cannot infer the type
-    // of a parameter used only inside jsonb_build_array(), which was causing
-    // every shop purchase to fail with SQLSTATE 42P18.
     const walletParams = [currency, next, id, u.id];
     if (type === "board") {
-      await client.query(
-        `UPDATE ludo_users
-         SET coins=CASE WHEN $1::text='coins' THEN $2::integer ELSE coins END,
-             gems=CASE WHEN $1::text='gems' THEN $2::integer ELSE gems END,
-             owned_boards=owned_boards || jsonb_build_array($3::text)
-         WHERE id=$4`,
-        walletParams
-      );
+      await client.query(`UPDATE ludo_users SET coins=CASE WHEN $1::text='coins' THEN $2::integer ELSE coins END,gems=CASE WHEN $1::text='gems' THEN $2::integer ELSE gems END,owned_boards=owned_boards || jsonb_build_array($3::text) WHERE id=$4`, walletParams);
     } else if (type === "dice") {
-      await client.query(
-        `UPDATE ludo_users
-         SET coins=CASE WHEN $1::text='coins' THEN $2::integer ELSE coins END,
-             gems=CASE WHEN $1::text='gems' THEN $2::integer ELSE gems END,
-             owned_dice=owned_dice || jsonb_build_array($3::text)
-         WHERE id=$4`,
-        walletParams
-      );
+      await client.query(`UPDATE ludo_users SET coins=CASE WHEN $1::text='coins' THEN $2::integer ELSE coins END,gems=CASE WHEN $1::text='gems' THEN $2::integer ELSE gems END,owned_dice=owned_dice || jsonb_build_array($3::text) WHERE id=$4`, walletParams);
     } else if (type === "avatar") {
-      await client.query(
-        `UPDATE ludo_users
-         SET coins=CASE WHEN $1::text='coins' THEN $2::integer ELSE coins END,
-             gems=CASE WHEN $1::text='gems' THEN $2::integer ELSE gems END,
-             owned_avatars=owned_avatars || jsonb_build_array($3::text)
-         WHERE id=$4`,
-        walletParams
-      );
+      await client.query(`UPDATE ludo_users SET coins=CASE WHEN $1::text='coins' THEN $2::integer ELSE coins END,gems=CASE WHEN $1::text='gems' THEN $2::integer ELSE gems END,owned_avatars=owned_avatars || jsonb_build_array($3::text) WHERE id=$4`, walletParams);
     } else {
-      await client.query(
-        `UPDATE ludo_users
-         SET coins=CASE WHEN $1::text='coins' THEN $2::integer ELSE coins END,
-             gems=CASE WHEN $1::text='gems' THEN $2::integer ELSE gems END,
-             owned_items=owned_items || jsonb_build_array($3::text)
-         WHERE id=$4`,
-        walletParams
-      );
+      await client.query(`UPDATE ludo_users SET coins=CASE WHEN $1::text='coins' THEN $2::integer ELSE coins END,gems=CASE WHEN $1::text='gems' THEN $2::integer ELSE gems END,owned_items=owned_items || jsonb_build_array($3::text) WHERE id=$4`, walletParams);
     }
 
-    await client.query(
-      `INSERT INTO ludo_admin_ledger
-       (user_id,currency,amount,balance_before,balance_after,reason,source)
-       VALUES($1,$2,$3,$4,$5,$6,'shop')`,
-      [u.id, currency, -item.price, balance, next, `Purchased ${item.name}`]
-    );
+    await client.query(`INSERT INTO ludo_admin_ledger(user_id,currency,amount,balance_before,balance_after,reason,source) VALUES($1,$2,$3,$4,$5,$6,'shop')`, [u.id, currency, -item.price, balance, next, `Purchased ${item.name}`]);
 
     await client.query("COMMIT");
     inTx = false;
-
-    return NextResponse.json({
-      ok: true,
-      coins: currency === "coins" ? next : Number(cur.coins),
-      gems: currency === "gems" ? next : Number(cur.gems),
-      item,
-      purchased: true,
-      equippedAvatar: cur.equipped_avatar,
-    });
+    return NextResponse.json({ ok: true, coins: currency === "coins" ? next : Number(cur.coins), gems: currency === "gems" ? next : Number(cur.gems), item, purchased: true, equippedAvatar: cur.equipped_avatar });
   } catch (e: any) {
     if (inTx) await client.query("ROLLBACK").catch(() => {});
     if (e?.handled) return NextResponse.json({ error: e.message }, { status: Number(e.status) || 400 });
     console.error(e);
     return NextResponse.json({ error: "Unable to update customization." }, { status: 500 });
-  } finally {
-    client.release();
-  }
+  } finally { client.release(); }
 }
 
 async function fail(client: any, message: string, status: number): Promise<never> {
