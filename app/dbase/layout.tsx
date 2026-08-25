@@ -7,6 +7,7 @@ import MissionAdmin from "./MissionAdmin";
 import AdminFinance from "./AdminFinance";
 import AdminShop from "./AdminShop";
 import EventAdmin from "./EventAdmin";
+import SupportAdmin from "./SupportAdmin";
 
 type Tab = "overview" | "players" | "economy" | "visitors" | "disputes" | "audit";
 const tabs: Tab[] = ["overview", "players", "economy", "visitors", "disputes", "audit"];
@@ -66,6 +67,7 @@ export default function DbaseLayout({ children }: { children: React.ReactNode })
       <div className="dbase-tool-slot" data-tool="events"><EventAdmin /></div>
       <div className="dbase-tool-slot" data-tool="finance"><AdminFinance /></div>
       <div className="dbase-tool-slot" data-tool="shop"><AdminShop /></div>
+      <SupportAdmin />
       <style dangerouslySetInnerHTML={{ __html: `
         *{box-sizing:border-box}.dbase-mobile-shell{min-height:100vh;width:100%;overflow-x:hidden}.dbase-tool-slot>button{display:none!important}
         .dbase-hamburger{display:flex;position:fixed;right:18px;top:18px;z-index:1002;align-items:center;gap:8px;border:1px solid #3967a0;background:#0a1731;color:#e8f0ff;border-radius:12px;padding:10px 13px;box-shadow:0 10px 28px rgba(0,0,0,.35);font-size:13px;font-weight:900;cursor:pointer}.dbase-hamburger span{font-size:20px}
