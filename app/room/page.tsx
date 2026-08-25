@@ -2,7 +2,6 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
 import AppFrame from "../_components/AppFrame";
 import LiveSocial from "../_components/LiveSocial";
 import { AccountGateModal, useAccountGate } from "../_components/AccountGate";
@@ -13,9 +12,9 @@ function makeCode(){return Math.random().toString(36).slice(2,8).toUpperCase()}
 function bumpStat(key:string){try{const s=JSON.parse(localStorage.getItem("ludo-stats")||"{}");s[key]=(s[key]||0)+1;localStorage.setItem("ludo-stats",JSON.stringify(s));window.dispatchEvent(new Event("ludo-stats-updated"))}catch{}}
 function RoomContent(){
  const params=useSearchParams(); const action=params.get("action")||"create"; const presetCode=params.get("code")||""; const presetSize=params.get("size")||"4";
- const [room,setRoom]=useState<Room|null>(null); const [restoring,setRestoring]=useState(true); const [players,setPlayers]=useState(presetSize); const [code,setCode]=useState(presetCode.toUpperCase()); const [name,setName]=useState("Player 1"); const [notice,setNotice]=useState(""); const gate=useAccountGate();
- useEffect(()=>{try{const raw=localStorage.getItem(ROOM_KEY);if(raw){const saved=JSON.parse(raw) as Room;const sameRequestedRoom=!presetCode||saved.code===presetCode.toUpperCase();const sameMode=action==="join"?!saved.host:saved.host;if(saved?.code&&saved?.name&&sameRequestedRoom&&sameMode){setRoom(saved);setPlayers(String(saved.players));setCode(saved.code);setName(saved.name)}}}catch{}finally{setRestoring(false)}},[action,presetCode]);
- const create=()=>{const r={code:makeCode(),players:Number(players),host:true,name:name.trim()||"Player 1"};localStorage.setItem(ROOM_KEY,JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
+ const [room,setRoom]=useState<Room|null>(null); const [restoring,setRestoring]=useState(true); const [players,setPlayers]=useState(presetSize); const [code,setCode]=useState(presetCode.toUpperCase()); const [name,setName]=useState(""); const [notice,setNotice]=useState(""); const gate=useAccountGate();
+ useEffect(()=>{let cancelled=false;(async()=>{let profileName="";try{const a=await fetch("/api/auth",{cache:"no-store"}).then(r=>r.json());profileName=String(a?.user?.username||a?.user?.nickname||"").trim()}catch{}if(cancelled)return;try{const raw=localStorage.getItem(ROOM_KEY);if(raw){const saved=JSON.parse(raw) as Room;const sameRequestedRoom=!presetCode||saved.code===presetCode.toUpperCase();const sameMode=action==="join"?!saved.host:saved.host;if(saved?.code&&sameRequestedRoom&&sameMode){const restoredName=profileName||String(saved.name||"");setRoom({...saved,name:restoredName});setPlayers(String(saved.players));setCode(saved.code);setName(restoredName)}}if(profileName)setName(profileName)}catch{}finally{if(!cancelled)setRestoring(false)}})();return()=>{cancelled=true}},[action,presetCode]);
+ const create=()=>{const r={code:makeCode(),players:Number(players),host:true,name:name.trim()||"Player"};localStorage.setItem(ROOM_KEY,JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
  const join=()=>{const c=code.trim().toUpperCase();if(c.length<4){setNotice("Enter the room code.");return}const r={code:c,players:Number(players)||4,host:false,name:name.trim()||"Player"};localStorage.setItem(ROOM_KEY,JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
  const gatedAction=(fn:()=>void)=>gate.check(fn);
  const start=()=>{if(!room)return;let board="classic";try{board=String(localStorage.getItem("ludo-match-board")||"classic")}catch{}window.location.href=`/game-online?room=${encodeURIComponent(room.code)}&name=${encodeURIComponent(room.name)}${room.host?"&host=1":""}&board=${encodeURIComponent(board)}`};
