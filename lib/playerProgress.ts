@@ -10,12 +10,15 @@ export type LevelRewardUnlock = {
   icon?: string;
 };
 
+export type LevelRewardCompensation = LevelRewardUnlock & { gems: number };
+
 export type LevelReward = {
   coins: number;
   gems: number;
   badges: string[];
   levels: number[];
   unlocks: LevelRewardUnlock[];
+  compensations: LevelRewardCompensation[];
 };
 
 export type Badge = {
@@ -25,7 +28,7 @@ export type Badge = {
   source: "spin" | "store" | "game" | "tournament";
 };
 
-export const PROGRESSION_VERSION = 5;
+export const PROGRESSION_VERSION = 6;
 export const STARTING_COINS = 1000;
 export const STARTING_GEMS = 10;
 
