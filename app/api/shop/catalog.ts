@@ -3,6 +3,11 @@ import { CATALOG } from "../../../lib/customization-catalog";
 
 export type ShopCurrency = "coins" | "gems" | "naira";
 
+type ShopPrice = {
+  currency: ShopCurrency;
+  price: number;
+};
+
 async function ensureShopTable() {
   await ensureAuthSchema();
   await pool.query(`CREATE TABLE IF NOT EXISTS ludo_shop_catalog_overrides(
@@ -18,15 +23,22 @@ async function ensureShopTable() {
 
 export async function getShopCatalog() {
   await ensureShopTable();
-  const result = await pool.query<any>("SELECT item_type,item_id,currency,price FROM ludo_shop_catalog_overrides");
-  const overrides = new Map(result.rows.map((r:any) => [`${r.item_type}:${r.item_id}`, { currency: r.currency as ShopCurrency, price: Number(r.price) }]));
-  return CATALOG.map((item:any) => {
+  const result = await pool.query<{ item_type: string; item_id: string; currency: ShopCurrency; price: string | number }>(
+    "SELECT item_type,item_id,currency,price FROM ludo_shop_catalog_overrides"
+  );
+  const overrides = new Map<string, ShopPrice>(
+    result.rows.map((r) => [
+      `${r.item_type}:${r.item_id}`,
+      { currency: r.currency, price: Number(r.price) },
+    ])
+  );
+  return CATALOG.map((item: any) => {
     const override = overrides.get(`${item.type}:${item.id}`);
     return override ? { ...item, currency: override.currency, price: override.price } : item;
   });
 }
 
-export async function getShopItem(type:string,id:string) {
+export async function getShopItem(type: string, id: string) {
   const catalog = await getShopCatalog();
-  return catalog.find((item:any) => item.type === type && item.id === id) || null;
+  return catalog.find((item: any) => item.type === type && item.id === id) || null;
 }
