@@ -1,144 +1,223 @@
-# Ludo Live — Architecture
+# Ludo Live — Architecture & Product Contract
 
 ## Purpose
 
-This document is the technical map of the production Ludo Live application. Read it before changing game logic, board rendering, audio, tournament persistence, multiplayer, authentication, or customization.
+This is the production technical map. Read it before changing gameplay, board rendering, authentication, customization, XP/levels, Shop, Inventory, Award Room, admin, finance, tournaments, or deployment. **Do not infer product rules from screenshots or previous conversations.** If a rule changes, update this document and `DEVELOPER_HANDOFF.md` in the same change.
 
-## Runtime
+## Runtime / source of truth
 
 - Next.js 14 / React 18 / TypeScript 5.6.
-- PostgreSQL through `pg`.
-- Socket.IO for live multiplayer rooms.
-- Railway is the production deployment target used by this project.
-- `package.json` starts the custom Node server with `server.js`, plus the canonical/missions/forfeit rule preload files.
+- PostgreSQL through `pg` is the persistent source of truth.
+- Socket.IO in `server.js` owns live multiplayer room state.
+- `main` is the production GitHub branch connected to Railway.
+- A release is **not live** until Railway reports `SUCCESS`.
+- Authenticated server APIs derive identity from the `ludo_session` cookie. Never trust a client-supplied user id for privileged operations.
+- `localStorage` may support UX restoration, but it is not authoritative over server-backed account, wallet, customization, tournament, or progression state.
 
-## Core layers
+## Canonical gameplay architecture
 
-### 1. Board rendering
+### Board / rules
 
-- `app/_components/LudoBoard.tsx` — base 15×15 board, themes, palettes, board geometry, token cell rendering.
-- `app/_components/LudoBoardFixed.tsx` — framed/fixed board wrapper used by multiplayer rendering.
-- `app/_components/CanonicalLudoBoard.tsx` — canonical interactive board adapter. It accepts `legalTokenKeys`, renders legal-token breathing/pulse, handles token clicks, and renders finished tokens in the centre finish area.
-- `app/_components/LudoBoardMultiplayer.tsx` — multiplayer board wrapper with animated server updates and legal-token breathing.
+- `app/_components/LudoBoard.tsx` — base 15×15 board, themes, palettes, geometry and token rendering.
+- `app/_components/CanonicalLudoBoard.tsx` — canonical interactive board adapter; legal tokens are supplied through `legalTokenKeys` and receive the breathing/pulse animation.
+- `app/_components/LudoBoardFixed.tsx` — framed/fixed board wrapper.
+- `app/_components/LudoBoardMultiplayer.tsx` — multiplayer renderer.
+- `lib/ludoRules.ts` — underlying rules.
+- `lib/ludoEngine.ts` — public movement/capture/winner/seat adapter.
+- `lib/canonicalLudoBoard.ts` — canonical geometry/state helpers.
 
-Do not duplicate board geometry in a new game mode. Reuse the canonical board/engine unless there is a documented reason not to.
+Current team model: Human = `red` + `yellow`; Bot = `green` + `blue`. Teammates cannot capture each other.
 
-### 2. Rules / engine
+**Do not create a second board geometry or parallel rule engine.** Reuse the canonical implementation.
 
-- `lib/ludoRules.ts` — underlying rule implementation.
-- `lib/ludoEngine.ts` — public engine adapter. It exposes dice types, team colors, movement, legal-move checks, capture application, winner detection, finish constants, and seat mapping.
-- `lib/canonicalLudoBoard.ts` — canonical board geometry/state helpers and constants.
+### Protected Bot-vs-Human reference
 
-Current engine team model:
+`app/game/GameBoardContent.tsx` and `/game` are the known-good gameplay reference. Do not casually refactor or alter them while fixing another mode. Port only the smallest required behavior and preserve the reference behavior unless the user explicitly asks for a Bot-vs-Human change.
 
-- Human team: `red` + `yellow`.
-- Bot team: `green` + `blue`.
+### Dice/audio
 
-Teammates must not be treated as opponents for capture.
+- `app/_components/DemoDice.tsx` — player dice interaction and roll-start event.
+- `app/_components/LudoDice.tsx` — dice skins/rendering.
+- `app/_components/LudoAudio.tsx` — canonical audio system.
+- Audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
+- Exactly one player `dice` event occurs at roll start. Do not add another when the result appears. Bot paths may emit their own start-of-roll event because bots do not click `DemoDice`.
 
-### 3. Dice and audio
+## Authentication / profile / customization
 
-- `app/_components/DemoDice.tsx` — dice UI, roll interaction, dice skin loading, vibration/settings, and the single player-side roll-start audio event.
-- `app/_components/LudoDice.tsx` — dice skin definitions/rendering.
-- `app/_components/LudoAudio.tsx` — canonical application sound listener/player. Supported events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
+- `app/api/auth/route.ts` — registration, login, guest, logout, username changes and current user.
+- `lib/auth-session.ts` — server session lookup.
+- `app/api/auth/_db.ts` — auth DB schema/pool.
+- `app/api/customization/route.ts` — authoritative owned/equipped board, dice, avatar and item state.
 
-Sound rule: a player roll emits the `dice` event at the beginning of the roll. Do not add another `dice` event when the result appears. Bot roll paths may emit their own start-of-roll event because bots do not click `DemoDice`.
+The profile exposes `username`, wallet and progression/customization data. Multiplayer should use the real profile username rather than generic player labels when available.
 
-### 4. Authentication/profile/customization
+## Multiplayer
 
-- `app/api/auth/route.ts` — registration, login, guest, logout, username changes, current-user response.
-- `lib/auth-session.ts` — server-side session lookup from `ludo_session`.
-- `app/api/auth/_db.ts` — PostgreSQL auth schema/pool.
-- `app/api/customization/route.ts` — owned/equipped board, dice, avatar and item state.
+- `server.js` — Socket.IO room state, roster, host, dice/move events, chat/friends and match hooks.
+- `app/game/MultiplayerGameCanonical.tsx` — client live multiplayer.
+- `app/game-online/page.tsx` — online entry.
 
-The public auth user includes the profile `username` and equipped board/dice. Multiplayer player labels should use this profile name, not generic Player 1/Player 2 labels when the profile is available.
+The **host owns the room board skin**. A joining player's personal board skin must never replace the host skin. Seat/team mapping comes from the canonical engine; do not invent another mapping in UI.
 
-### 5. Online multiplayer
+2-player and 4-player multiplayer should remain viewport-sized and non-scrollable unless a deliberate responsive redesign is requested.
 
-- `server.js` — Socket.IO room server, roster, host handling, game state, dice/move events, chat/friend functionality, and match history hooks.
-- `app/game/MultiplayerGameCanonical.tsx` — client-side live multiplayer game.
-- `app/_components/LudoBoardMultiplayer.tsx` — multiplayer board renderer.
-- `app/game-online/page.tsx` — online-game entry/wiring.
-
-Host rules:
-
-- The room host owns the board skin for the match.
-- A joining player's personal board skin must not override the host's match skin.
-- Roster/start-game events provide the host board to clients.
-- Profile usernames are loaded from `/api/auth` and passed into room membership.
-
-Seat/team mapping is provided by the canonical engine/rules rather than inventing a new mapping in the UI.
-
-### 6. Bot vs Human — reference implementation
-
-- `app/game/GameBoardContent.tsx` is the working Bot-vs-Human board implementation.
-- `/game` is the protected/reference gameplay experience.
-
-This mode is currently treated as the known-good reference for gameplay feel, dice/audio behavior, token interaction, capture/finish behavior, and UI. **Do not modify this board casually.** If another mode needs the same behavior, port the behavior into that mode without regressing `/game`.
-
-### 7. Tournament
+## Tournament
 
 - `app/tournament/page.tsx` — tournament list/details/standings.
-- `app/tournament/game/page.tsx` — tournament game viewport shell.
-- `app/game/TournamentBotGame.tsx` — dedicated tournament Bot-vs-Human board.
+- `app/tournament/game/page.tsx` — tournament viewport shell.
+- `app/game/TournamentBotGame.tsx` — tournament Bot-vs-Human game.
 - `app/api/tournaments/route.ts` — tournament listing, join/leave, board persistence, win recording and leaderboard.
-- `app/api/tournaments/board-state/route.ts` — authenticated tournament board-session restore endpoint.
-- `app/api/tournaments/_schema.ts` — tournament DB schema helpers.
-- `app/_components/TournamentSessionResume.tsx` — unfinished tournament-session resume helper.
+- `app/api/tournaments/board-state/route.ts` — authenticated board-session restore.
+- `app/api/tournaments/_schema.ts` — schema helpers.
+- `app/_components/TournamentSessionResume.tsx` — resume helper.
 
-Tournament-specific invariants:
+Tournament intentionally uses the `classic` board skin unless product requirements explicitly change this. Tournament state is isolated per `(tournament_id, user_id)` with a private `board_token`. The server is authoritative for wins/points and the win transaction is idempotent. Never award tournament points from client state alone.
 
-- Tournament board skin is intentionally hard-coded to `classic` unless explicitly changed by product requirements. Do not make it inherit the Shop skin accidentally.
-- Tournament board state is persisted per `(tournament_id, user_id)` with a private `board_token`.
-- Match state includes an engine version, tokens, turn, roll, pending roll, six streak, bot roll key, winner, win-recorded state, and match number.
-- A human tournament win awards +5 points through the server `record_win` transaction.
-- `record_win` is idempotent for a board session via `state.winRecorded`.
-- Play Again increments the local match number and clears the per-match winner/win-recorded state so the next finished match can earn another +5.
-- Leaderboard ranking is points descending, then score-reached time, then username.
-- Tournament game page is intentionally viewport-locked with `overflow:hidden`; do not reintroduce document scrolling.
+Tournament game is intentionally viewport-locked/non-scrollable.
 
-### 8. Tournament scoring data model
+## XP / levels
 
-`ludo_tournament_player_stats` stores points/wins/eligibility. `ludo_tournament_board_sessions` stores the private board token and JSON game state. `ludo_tournament_entry_payments` stores entry payments. Admin wallet tables support tournament financial accounting.
+Progression is server-backed.
 
-Never award tournament points only from client state. The client may show progress, but the server transaction is authoritative.
+- A **game win in any game mode** awards **+7 XP**.
+- A **successful diamond purchase** awards **+15 XP**.
+- XP awards must be server-authoritative and protected against duplicate awards.
+- Existing level progression formula is retained; do not replace it without an explicit product decision.
+- `app/_components/XPLevelCelebration.tsx` provides the level-up presentation.
+- A level completion animates the XP bar filling, transitions to the next level, starts the next level's progress, and shows a congratulatory celebration for roughly 4 seconds.
+- XP/progression updates should dispatch/use the existing progression refresh mechanism rather than maintaining a second local progression system.
 
-## UI / viewport rules
+## Shop / pricing architecture
 
-- Bot-vs-Human `/game` is the protected known-good reference and must not be changed without explicit approval.
-- Multiplayer 2-player and 4-player game pages should be viewport-sized and non-scrollable.
-- Tournament game should be viewport-sized and non-scrollable.
-- Tournament game uses a fixed shell in `app/tournament/game/page.tsx` and a viewport grid in `TournamentBotGame.tsx`.
+The Shop has two responsibilities: catalogue availability and purchase pricing. The **server is authoritative** for price/currency and the player Shop must consume the same server-backed pricing that Admin manages.
 
-## Navigation
+### Player Shop categories
 
-`AppFrame` provides the generic back control. Tournament detail pages intentionally use `← Back to tournament` rather than a second generic back control.
+The player Shop has:
 
-## Deployment
+- Coins
+- Gems
+- Items
+- Avatars
+- Boards
+- Dice
 
-The project is deployed from GitHub to Railway. The `main` branch is the production source used by the connected Railway service. A code change is not considered live until Railway reports a successful deployment.
+### Admin Shop rules
 
-## Safe change procedure
+Admin Shop belongs **inside the admin hamburger menu**. It must not expose a floating/global button outside the admin page.
+
+Admin can change **price only**; admin must not change ownership data or item definitions from this screen.
+
+Supported price currencies:
+
+- `coins`
+- `gems`
+- `naira`
+
+The Admin Shop must include both **Coin purchase packages and Gem purchase packages**, in addition to customization items. Changing a package/item from Coins to Gems or Naira is a pricing configuration change and must flow through the same authoritative purchase path.
+
+Naira purchases must use the existing verified payment flow; never credit a Naira purchase merely because a client says payment succeeded.
+
+Admin Shop endpoint: `app/api/admin/shop/route.ts`. Player customization ownership remains under `app/api/customization/route.ts`.
+
+## Inventory / Award Room
+
+The home page has a split card with exactly two labels:
+
+- **Friend** → `/friends`
+- **Inventory** → `/inventory`
+
+Do not add explanatory subtitles or `OPEN` labels back to these two buttons unless explicitly requested.
+
+Inventory is strictly the player's acquired/owned collection.
+
+### My Items
+
+Shows only items the authenticated player owns/acquired from the Shop/customization system. It may include boards, dice, avatars and other owned shop items. Equip actions must use the authoritative customization API.
+
+### Award Room
+
+Award Room is a second tab **inside Inventory**. It is for earned rewards only, such as tournament medals/badges and achievement rewards.
+
+- Store purchases do **not** belong in Award Room.
+- Tournament awards are read from the existing server-backed tournament/medal data; do not fabricate awards client-side.
+- Awards are displayed in a **responsive grid**, not a list.
+- Awards are permanent historical achievements unless a future product rule explicitly says otherwise.
+- Do not mix purchased inventory with earned awards.
+
+## Home navigation contract
+
+Home bottom navigation remains:
+
+- Home
+- Missions
+- Chat
+- Profile
+
+The quick-access row retains the existing Daily Reward, Shop, Events and Spin Wheel functions unless explicitly redesigned. Inventory is intentionally accessed through the split Friend/Inventory card rather than adding another bottom-nav item.
+
+## Admin architecture
+
+All admin management controls belong inside the **admin hamburger menu**. Do not add floating/fixed admin trigger buttons that can be accessed outside the admin page.
+
+Current menu structure:
+
+### Dashboard
+
+- Overview
+- Players
+- Economy
+- Visitors
+- Disputes
+- Audit
+
+### Management
+
+- Shop
+- Missions
+- Tournament Control
+- Finance
+
+The underlying management components may remain mounted for state continuity, but their visible triggers must be controlled by the admin hamburger. Admin authentication/authorization must remain enforced server-side.
+
+### Finance
+
+The Admin Finance page includes server money-bank top-up and wallet transfer tools. The Server Top Up form must remain responsive on mobile: currency, amount and reason controls should stack to full width rather than forcing a desktop multi-column row. Do not sacrifice server-side authorization or audit logging for UI changes.
+
+## Database / financial authority
+
+PostgreSQL is authoritative for accounts, wallets, customization ownership, tournament data, progression and financial records. Server transactions must validate balances, ownership and payment state. Never implement a financial mutation as client-only state.
+
+## UI / responsive rules
+
+- Mobile layouts must not depend on desktop-only fixed-width grids.
+- Game pages that are designed as viewport experiences should remain `overflow:hidden` / `100dvh` where appropriate.
+- Admin controls should not float over unrelated pages.
+- Reuse existing design language/components where practical; do not introduce competing navigation systems.
+
+## Deployment / debugging discipline
 
 1. Inspect the current implementation before editing.
-2. Identify whether the requested behavior already exists in the Bot-vs-Human reference implementation or canonical engine.
-3. Reuse canonical rules/components rather than creating parallel rule systems.
-4. Preserve server authority for multiplayer/tournament state.
-5. Preserve tournament board isolation and idempotent scoring.
-6. Do not change `/game` unless explicitly requested.
-7. Build/deploy and verify Railway status before calling a change live.
-8. If a deployment fails, inspect the actual build error and fix that error before changing unrelated code.
+2. Trace the exact code path and identify the authoritative source of truth.
+3. Reuse canonical APIs/components instead of creating parallel systems.
+4. Make the smallest isolated change.
+5. Run/build-check the affected code.
+6. Push to `main`.
+7. Inspect Railway deployment status and logs.
+8. If deployment fails, fix the **actual reported error** before changing unrelated code.
+9. Only call a release live after Railway reports `SUCCESS`.
 
-## Known historical traps
+## Known traps / lessons
 
-- Tournament originally failed to pass legal token keys to `CanonicalLudoBoard`, making legal tokens unclickable and removing the breathing animation.
-- Tournament originally played the bot roll sound at result time instead of roll start.
-- Player tournament rolls had a duplicate dice sound trigger; only the beginning-of-roll event should remain.
-- Capture rules must use team relationships, not merely `color !== moverColor`.
-- A tournament kill can send the killer to the small centre finish area and must produce the appropriate finish/home sound.
-- Tournament win messaging must not be treated as proof that points were persisted; the server response is authoritative.
-- Multiplayer board skin is host-owned; never let Player 2's skin become the room skin.
+- Do not use screenshots as the sole source of truth for architecture.
+- Do not add a fixed admin button simply because a component needs a trigger; the trigger belongs in the admin hamburger.
+- Do not treat the Shop catalogue as equivalent to Coin/Gem purchase packages; they are distinct product types but must share authoritative pricing configuration.
+- Do not put purchased items into Award Room.
+- Do not make Award Room a list when the product contract calls for a grid.
+- Do not trust client-only XP, wallet, tournament points, ownership or payment state.
+- Do not modify the protected `/game` reference while fixing another mode.
+- Do not claim Railway deployment success until the platform reports success.
 
 ## Do not guess
 
-If a file/path referenced here has moved, search the repository and update this document. Do not create a second competing implementation just because an older path is unavailable.
+If a referenced file/path has moved, search the repository first and update this document. If an existing API already owns a piece of state, integrate with it instead of creating a competing implementation. When a product requirement is ambiguous, stop and verify rather than silently choosing an architecture that can break existing behavior.
