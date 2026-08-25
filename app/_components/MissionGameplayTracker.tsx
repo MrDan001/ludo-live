@@ -19,8 +19,14 @@ export default function MissionGameplayTracker() {
 
     const onAudio = (event: Event) => {
       const detail = (event as CustomEvent).detail;
-      if (detail === "dice") recordMissionEvent("roll_dice");
-      else if (detail === "move") recordMissionEvent("move_tokens");
+      if (detail === "dice") {
+        recordMissionEvent("roll_dice");
+        window.setTimeout(() => {
+          const diceValue = Number(document.querySelector(".dice-value")?.textContent?.trim());
+          if (diceValue === 6) recordMissionEvent("roll_sixes");
+        }, 950);
+      } else if (detail === "move") recordMissionEvent("move_tokens");
+      else if (detail === "home") recordMissionEvent("move_home");
       else if (detail === "win" && !winRecorded.current) {
         winRecorded.current = true;
         recordMissionEvent("win_games");
