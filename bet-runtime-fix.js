@@ -10,7 +10,7 @@ if (!Socket.prototype.__ludoBetRuntimeFixPatched) {
   Socket.prototype.__ludoBetRuntimeFixPatched = true;
   const originalOn = Socket.prototype.on;
   Socket.prototype.on = function(event, listener) {
-    if (event === 'set-stake') {
+    if (event === 'set-stake' || event === 'set-stake-fallback') {
       return EventEmitter.prototype.on.call(this, event, (payload = {}) => {
         const code = String(this.data?.roomCode || '').trim().toUpperCase();
         const room = code ? rooms.get(code) : null;
@@ -23,8 +23,10 @@ if (!Socket.prototype.__ludoBetRuntimeFixPatched) {
         room.stake = requested;
         room.stakedPlayers.clear();
         room.betStatus = 'open';
+        const pot = requested * room.roomSize;
         broadcastState(this.nsp, room);
-        this.nsp.to(room.code).emit('bet-agreed', { stake: requested, pot: requested * room.roomSize });
+        this.nsp.to(room.code).emit('bet-agreed', { stake: requested, pot });
+        this.emit('stake-set-confirmed', { stake: requested, pot });
       });
     }
     return originalOn.call(this, event, listener);
