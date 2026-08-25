@@ -67,7 +67,7 @@ export default function EventsPage() {
           <div style={body}><strong style={title}>{e.title}</strong><div style={desc}>{e.description}</div>
             <div style={meta}>🎮 {labels(e.modes)}</div><div style={meta}>🎨 {labels(e.boards)}</div>
             <div style={ends}>{tab === "Live Events" ? `Ends in: ${countdown(remaining)}` : `Starts in: ${countdown(remaining)}`}</div>
-            {e.joined && <><div style={progressHead}><span>Progress</span><b>{e.progress}/{e.missionTarget}</b></div><div style={progressTrack}><span style={{width:`${pct}%`}}/></div></>}
+            {e.joined && <><div style={progressHead}><span>Progress</span><b>{e.progress}/{e.missionTarget}</b></div><div style={progressTrack}><span style={{...progressFill,width:`${pct}%`}}/></div></>}
           </div>
           <div style={right}><div style={reward}>{e.reward}</div>{tab === "Live Events" && <button disabled={!!busy || e.joined} onClick={() => void join(e)} style={joinBtn}>{busy===e.id ? "JOINING…" : e.joined ? (e.progress>=e.missionTarget ? "COMPLETED" : "JOINED") : "JOIN EVENT"}</button>}</div>
         </article>;
@@ -99,6 +99,7 @@ const right:CSSProperties={display:"grid",justifyItems:"end",gap:8};
 const joinBtn:CSSProperties={border:"1px solid #70b1ff",borderRadius:9,padding:"8px 10px",background:"#1762d1",color:"#fff",fontSize:11,fontWeight:950,cursor:"pointer"};
 const progressHead:CSSProperties={display:"flex",justifyContent:"space-between",marginTop:8,fontSize:10,color:"#dbe8f8"};
 const progressTrack:CSSProperties={height:6,background:"rgba(0,0,0,.35)",borderRadius:99,overflow:"hidden",marginTop:4};
+const progressFill:CSSProperties={display:"block",height:"100%",borderRadius:99,background:"linear-gradient(90deg,#60a5fa,#22c55e)",transition:"width .25s ease"};
 const notice:CSSProperties={marginTop:10,padding:10,borderRadius:9,background:"#0c2b4d",border:"1px solid #1d5d8f",color:"#cce8ff",fontSize:12,fontWeight:700};
 const calendar:CSSProperties={width:"100%",marginTop:16,padding:14,border:0,borderRadius:7,background:"linear-gradient(180deg,#247bea,#145ec8)",color:"#fff",fontSize:16,fontWeight:950};
 const empty:CSSProperties={marginTop:12,padding:45,background:"#07172d",borderRadius:12,border:"1px solid #17385f",textAlign:"center",color:"#9db0c8"};
