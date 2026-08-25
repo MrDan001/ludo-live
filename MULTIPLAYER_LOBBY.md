@@ -87,14 +87,26 @@ Room voice uses the existing canonical `ChatVoice.tsx` implementation with PeerJ
 
 The waiting room intentionally shows **only the microphone control**. PeerJS/WebRTC connection errors, permission errors, and connection-status notices are not rendered as a large text block beside the controls. Voice errors may still be logged for debugging and the mic state remains local to the voice control. Do not reintroduce the verbose `Voice connection is unavailable...` waiting-room message unless the product requirement explicitly changes.
 
+## Empty-room cleanup and Leave Room
+
+An empty multiplayer room must **cease to exist immediately** when its last member leaves or disconnects before the match has started. It must not remain visible in the public lobby, remain joinable by room code, or appear as a ghost room with `0` players.
+
+The `empty-room-cleanup.js` preload provides this narrowly-scoped server-side cleanup. It tracks the actual `server.js` room registry and each room's member map. When the last member is removed, the parent room entry is deleted immediately. This means the next `list-rooms` broadcast cannot include the room and a later `join-room` by its code receives the normal `Room no longer exists` path instead of resurrecting the abandoned room.
+
+This cleanup does **not** change Ludo movement, betting, readiness, host selection for non-empty rooms, or match settlement. It only guarantees that a room with no members is removed from the server registry.
+
+The lifecycle remains:
+
+`Leave/disconnect -> remove member -> 0 members -> delete room registry entry -> broadcast room list -> player can create a new room or join another room`
+
 ## Explicit Leave Room vs accidental disconnect
 
 These are different lifecycle events and must remain different:
 
 - **Explicit Leave Room:** the player intentionally chooses Leave Room. The Room page raises `leaveRequested`; `LiveSocial` immediately disconnects its room socket before navigation.
-- **Accidental/network disconnect:** do not convert this into an explicit leave. The server's reconnect/host-recovery rules remain responsible for restoring the same room when appropriate.
-- **Last remaining participant:** when the server sees that no room members remain, the room must be deleted and `room-list` broadcast so it cannot appear as a ghost room.
-- **Host with other participants:** intentional leave should transfer host authority to an eligible connected member rather than leaving a usable room with `host = null`.
+- **Accidental/network disconnect:** do not convert this into an explicit leave. The server's reconnect/host-recovery rules remain responsible for restoring the same room when appropriate, unless the disconnect leaves the room with zero members; an empty room is always deleted.
+- **Last remaining participant:** when the server sees that no room members remain, `empty-room-cleanup.js` removes the room registry entry immediately and the room cannot remain visible or joinable.
+- **Host with other participants:** a non-empty room keeps the existing host-recovery/host-transfer behavior. Empty-room cleanup does not interfere with that behavior.
 
 ## Room-to-game handoff
 
@@ -103,6 +115,7 @@ There are two related server responsibilities:
 - `server.js` maintains the legacy room/lobby roster and room discovery.
 - `multiplayer-canonical.js` is preloaded by the production start command and owns canonical multiplayer readiness, start, dice, movement and reconnect state.
 - `bet-system.js` is preloaded by the same production start command and owns the coin escrow/settlement layer around the existing match lifecycle.
+- `empty-room-cleanup.js` is preloaded before the server and removes the room registry entry when its last member disconnects.
 
 A room socket disconnects when the player navigates from `/room` to `/game-online`. Once the canonical match has started, the canonical socket disconnect handler must own that lifecycle and must not forward the disconnect into the legacy room handler.
 
@@ -122,6 +135,10 @@ and for betting:
 
 `Host stake selection -> authoritative room stake -> player readiness -> atomic wallet lock -> existing Ludo winner -> atomic pot settlement -> winner wallet`
 
+and for room cleanup:
+
+`Player leaves/disconnects -> member removed -> empty room detected -> room registry entry deleted -> public lobby refreshed`
+
 ## Files
 
 - `app/room/page.tsx` — authenticated room/player naming, host stake selection, 500–10,000 validation, explicit Leave Room request, and navigation to the online game.
@@ -132,9 +149,10 @@ and for betting:
 - `app/api/auth/route.ts` — authenticated public user payload, including the current user's equipped avatar.
 - `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport and microphone control.
 - `server.js` — room discovery, roster, host ownership and authoritative `start-game.board` payload.
+- `empty-room-cleanup.js` — isolated automatic deletion of empty multiplayer room registry entries.
 - `bet-system.js` — isolated coin bet validation, escrow locking, database settlement and bet Socket.IO events.
 - `app/lobby/page.tsx` — public room discovery, capacity/occupancy and stake/pot display.
 
 ## Do not regress
 
-Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not let canonical game-state updates erase previously resolved player cosmetics. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority, match start, bet locking and settlement server/database authoritative. Keep the permanent chat text area out of the waiting-room layout; the `💬` button opens the chat drawer. Keep voice status text out of the waiting-room layout; the microphone control is sufficient. Never deduct or award coins from client-side React code.
+Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not let canonical game-state updates erase previously resolved player cosmetics. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority, match start, bet locking and settlement server/database authoritative. Keep the permanent chat text area out of the waiting-room layout; the `💬` button opens the chat drawer. Keep voice status text out of the waiting-room layout; the microphone control is sufficient. Never deduct or award coins from client-side React code. Never allow an empty room to remain in the public room registry or be joinable after its last member has left.
