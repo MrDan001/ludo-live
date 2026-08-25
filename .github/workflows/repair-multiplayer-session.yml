@@ -6,74 +6,64 @@ permissions:
   contents: write
 jobs:
   repair:
-    if: contains(github.event.head_commit.message, 'chore: run multiplayer session and voice repair')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch multiplayer lifecycle and voice
+      - name: Repair authoritative room leave lifecycle
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          # server.js: make explicit Leave authoritative, keep accidental disconnects
-          # reconnectable, and ensure there is only one room disconnect handler.
           p = Path('server.js')
           s = p.read_text()
-          start = s.find(' socket.on("disconnect",()=>{')
-          end = s.find(' socket.on("set-peer-id"', start)
-          if start < 0 or end < 0:
-              raise SystemExit('room disconnect anchors not found')
 
-          lifecycle = ''' socket.on("leave-room",()=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room)return socket.emit("room-left",{roomCode:code});const member=room.members.get(socket.id);if(!member)return socket.emit("room-left",{roomCode:code});const wasHost=room.hostId===socket.id||room.hostPlayerId===member.playerId;room.members.delete(socket.id);socket.leave(code);socket.data.roomCode=null;clearTimeout(member.reconnectTimer);if(wasHost){const candidates=[...room.members.values()].filter(m=>m.socketId&&m.connected!==false);if(candidates.length===0){clearTimeout(room.hostTimer);rooms.delete(code)}else{const next=candidates[0];for(const m of room.members.values())m.host=false;next.host=true;next.ready=true;room.hostId=next.id;room.hostPlayerId=next.playerId||next.id;room.hostPending=false;room.hostEligible=false;clearTimeout(room.hostTimer)}}if(rooms.has(code)){io.to(code).emit("roster",publicMembers(room))}broadcastRooms();socket.emit("room-left",{roomCode:code})});
- socket.on("disconnect",()=>{const code=socket.data.roomCode,room=rooms.get(code);if(room){const member=room.members.get(socket.id);if(member){const pid=member.playerId||member.id;const wasHost=room.hostId===socket.id||room.hostPlayerId===pid;member.connected=false;member.socketId=null;member.disconnectedAt=Date.now();if(wasHost){room.hostId=null;room.hostPlayerId=pid;room.hostPending=true;room.hostEligible=false;clearTimeout(room.hostTimer);room.hostTimer=setTimeout(()=>{const current=rooms.get(code);if(current!==room||!current.hostPending)return;const replacement=[...current.members.values()].find(m=>m.connected!==false&&m.socketId);if(replacement){for(const m of current.members.values())m.host=false;replacement.host=true;replacement.ready=true;current.hostId=replacement.id;current.hostPlayerId=replacement.playerId||replacement.id;current.hostPending=false;current.hostEligible=false;io.to(code).emit("host-transferred",{playerId:current.hostPlayerId});io.to(code).emit("roster",publicMembers(current));broadcastRooms()}else{rooms.delete(code);kickRoomMembers(room,"The room closed because no player reconnected.");broadcastRooms()}},30000)}else{clearTimeout(member.reconnectTimer);member.reconnectTimer=setTimeout(()=>{const current=rooms.get(code);if(current===room&&current.members.get(socket.id)===member&&member.connected===false){room.members.delete(socket.id);if(room.members.size===0){clearTimeout(room.hostTimer);rooms.delete(code)}if(rooms.has(code))io.to(code).emit("roster",publicMembers(room));broadcastRooms()}},30000)}io.to(code).emit("roster",publicMembers(room));broadcastRooms()}}const pid=String(socket.data.playerId||'').trim();if(playerSockets.get(pid)===socket)playerSockets.delete(pid);const cc=socket.data.chatRoomCode,cr=chatRooms.get(cc||'');if(cr){const chatMember=cr.members.get(pid);if(chatMember&&chatMember.socketId===socket.id)chatMember.socketId=null;io.to(`chat:${cc}`).emit('chat-room-members',publicChatMembers(cr));broadcastChatRooms()}});
+          # The deployed architecture already has a reconnect-aware disconnect
+          # handler. Do not replace it: that path is intentionally different from
+          # an explicit Leave Room action. We only add the authoritative leave event.
+          if 'socket.on("leave-room"' not in s:
+              anchor = ' socket.on("disconnect",()=>{'
+              pos = s.find(anchor)
+              if pos < 0:
+                  raise SystemExit('room disconnect anchor not found')
+
+              leave = ''' socket.on("leave-room",()=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room)return socket.emit("room-left",{roomCode:code});const member=room.members.get(socket.id);if(!member)return socket.emit("room-left",{roomCode:code});const wasHost=room.hostId===socket.id||room.hostPlayerId===member.playerId;room.members.delete(socket.id);socket.leave(code);socket.data.roomCode=null;if(room.hostTimer)clearTimeout(room.hostTimer);if(room.members.size===0){rooms.delete(code);broadcastRooms();socket.emit("room-left",{roomCode:code});return}if(wasHost){const next=[...room.members.values()].find(m=>m.socketId||m.id);if(next){for(const m of room.members.values())m.host=false;next.host=true;next.ready=true;room.hostId=next.id;room.hostPlayerId=next.playerId||next.id;room.hostPending=false;room.hostEligible=false}}io.to(code).emit("roster",publicMembers(room));broadcastRooms();socket.emit("room-left",{roomCode:code})});
 '''
-          s = s[:start] + lifecycle + s[end:]
+              s = s[:pos] + leave + s[pos:]
+              p.write_text(s)
 
-          # The old server also had a second legacy disconnect handler near the end
-          # of the Socket.IO connection callback. Remove that duplicate now that its
-          # chat/profile cleanup has been folded into the authoritative handler above.
-          second_start = s.rfind(' socket.on("disconnect",()=>{const code=socket.data.roomCode,r=rooms.get(code);')
-          if second_start >= end:
-              second_end = s.find('\n });httpServer.listen', second_start)
-              if second_end < 0:
-                  raise SystemExit('legacy disconnect terminator not found')
-              s = s[:second_start] + s[second_end:]
+          # Keep the handoff documentation beside the implementation.
+          Path('MULTIPLAYER_SESSION.md').write_text('''# Multiplayer Session & Reconnect Rules
 
-          if s.count('socket.on("disconnect"') != 1:
-              raise SystemExit('expected exactly one room disconnect handler after repair')
-          p.write_text(s)
+## Server authority
+The Socket.IO server is authoritative for room membership. `ludo-room` in browser storage is only a convenience cache and never proves that a player is still in a room.
 
-          # LiveSocial: explicit Leave Room is an acknowledged server event.
-          p = Path('app/_components/LiveSocial.tsx')
-          s = p.read_text()
-          marker = '   socket.on("kicked",()=>{setNotice("You were removed by the room host.");kickRef.current?.()});'
-          if 'socket.on("room-left"' not in s:
-              if marker not in s:
-                  raise SystemExit('LiveSocial kicked marker not found')
-              s = s.replace(marker, marker + '\n   socket.on("room-left",()=>{if(startTimerRef.current!==null)window.clearTimeout(startTimerRef.current);socket.disconnect();socketRef.current=null;leaveRef.current?.()});')
-          old_effect = ' useEffect(()=>{if(!leaveRequested)return;const socket=socketRef.current;if(!socket)return;setNotice("Leaving room…");socket.disconnect();socketRef.current=null;const timer=window.setTimeout(()=>leaveRef.current?.(),150);return()=>window.clearTimeout(timer)},[leaveRequested]);'
-          new_effect = ' useEffect(()=>{if(!leaveRequested)return;const socket=socketRef.current;if(!socket){leaveRef.current?.();return}setNotice("Leaving room…");let done=false;const fallback=window.setTimeout(()=>{if(done)return;done=true;socket.disconnect();socketRef.current=null;leaveRef.current?.()},1000);socket.emit("leave-room");return()=>window.clearTimeout(fallback)},[leaveRequested]);'
-          if old_effect in s:
-              s = s.replace(old_effect, new_effect)
-          elif new_effect not in s:
-              raise SystemExit('LiveSocial leave effect not found')
-          p.write_text(s)
+## Explicit Leave Room
+The Leave Room action emits `leave-room` before navigation. The server immediately removes that socket from the room.
 
-          # Keep the canonical voice transport and avoid outgoing calls when every
-          # audio track is disabled.
-          p = Path('app/_components/ChatVoice.tsx')
-          s = p.read_text()
-          old = 'const callPeer=(id:string)=>{if(!streamRef.current||!peerRef.current||id===selfPeer.current)return;try{const call=peerRef.current.call(id,streamRef.current);call?.on("stream",(s:MediaStream)=>playRemote(id,s))}catch{}};'
-          new = 'const callPeer=(id:string)=>{if(!streamRef.current||!peerRef.current||id===selfPeer.current)return;if(streamRef.current.getAudioTracks().every(t=>!t.enabled))return;try{const call=peerRef.current.call(id,streamRef.current);call?.on("stream",(s:MediaStream)=>playRemote(id,s))}catch{}};'
-          if old in s:
-              s = s.replace(old, new)
-          p.write_text(s)
+- If the leaving player was the only member, the room is deleted immediately and removed from Online Players.
+- If other players remain and the leaver was host, host authority transfers to a remaining participant.
+- The explicit leave path is intentionally separate from `disconnect`: an accidental network/browser disconnect must remain reconnectable.
+- A room must never remain publicly joinable solely because its former host disconnected intentionally.
 
-          Path('MULTIPLAYER_SESSION.md').write_text('''# Multiplayer Session & Reconnect Rules\n\n## Authority\nThe Socket.IO server is authoritative for room membership. `ludo-room` in localStorage is only a convenience cache and must never be treated as proof that a player is still in a room.\n\n## Explicit Leave\n- Clicking **Leave Room** requests `leave-room` from the server before navigation.\n- If the leaving player is the only member, the server deletes the room immediately and broadcasts the updated room list.\n- If other players remain and the leaver is host, the server transfers host authority to a connected remaining player.\n- A stale room must never remain publicly joinable after its final member leaves.\n\n## Unexpected disconnect\n- A temporary network disconnect is reserved for up to 30 seconds.\n- If the host reconnects with the same authenticated player ID, host authority is restored.\n- If the host does not return, an available connected player becomes host.\n- If nobody remains after the reconnect window, the room closes.\n\n## After game start\nThe canonical game session remains on the server during a temporary disconnect. Rejoining with the same authenticated player ID receives the current `game-state`; players do not create a second match.\n\n## Voice\n`ChatVoice.tsx` remains the single canonical room voice implementation. It uses PeerJS/WebRTC and browser microphone permission. Do not create room-specific duplicate voice implementations.\n\n## Regression guard\nThere must be exactly one Socket.IO room `disconnect` handler. Explicit Leave and unexpected disconnect are separate server events.\n''')
+## Accidental disconnect
+The existing disconnect/reconnect lifecycle remains unchanged. Temporary disconnects can preserve the room for reconnection and host replacement according to the existing server rules.
 
+## Room sizes
+The same lifecycle applies to 2-player and 4-player rooms. A 4-player room with only its creator is deleted immediately when that creator explicitly leaves; it is not treated as an active room waiting for a replacement host.
+
+## Voice
+`ChatVoice.tsx` remains the canonical room voice implementation. Do not create a second room voice transport.
+''')
+
+          # Make the workflow idempotent: after the repair commit, a subsequent run
+          # finds the handler and makes no further source change.
+          if git diff --quiet; then
+            echo 'No multiplayer repair changes required.'
+            exit 0
+          fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add server.js app/_components/LiveSocial.tsx app/_components/ChatVoice.tsx MULTIPLAYER_SESSION.md
-          git commit -m 'fix: robust multiplayer reconnect and room leave' || exit 0
+          git add server.js MULTIPLAYER_SESSION.md
+          git commit -m 'fix: authoritative multiplayer room leave'
           git push
