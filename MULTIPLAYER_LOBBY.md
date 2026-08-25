@@ -12,26 +12,29 @@ The room receives both a legacy `roster` event and later canonical `game-state` 
 
 Avatar enrichment is also written back into the local member record after the public showcase request resolves. This prevents a later state update or unrelated button interaction from dropping the resolved avatar back to a placeholder. If the canonical state includes a newer cosmetic value, that server value wins.
 
-The data flow is:
-
-`roster/showcase -> local member state -> canonical game-state merge -> preserve cosmetics unless server provides a newer value -> render equipped avatar`
-
 ## Waiting room presentation
 
-`app/_components/LiveSocial.tsx` is the canonical waiting-room presentation. It uses a 2x2 player-seat grid, host crown, real avatar, username, Ready/Not Ready state, invite empty seats, game mode/stake summary, voice control, Ready control, host-only Start Game, and a compact chat button. Empty seats copy the room code so the player can invite someone.
+`app/_components/LiveSocial.tsx` is the canonical waiting-room presentation. It uses a 2x2 player-seat grid, host crown, real avatar, username, Ready/Not Ready state, invite empty seats, game mode/stake summary, voice control, Ready control, host-only Start Game, stake agreement panel and compact chat button. Empty seats copy the room code so the player can invite someone.
 
-## Coin betting
+## Coin betting and in-room stake agreement
 
-The waiting room now uses a server-authoritative virtual coin stake for both supported multiplayer sizes: **2 players** and **4 players**.
+**Stake is intentionally NOT selected on Create Game or Join Game.** Creating/joining a room only establishes the room and player count. The players must first agree on the stake through the room's existing voice/chat. Only then does the host enter the agreed amount in the waiting room.
+
+Supported multiplayer sizes are **2 players** and **4 players**.
 
 - Minimum stake: **500 coins** per player.
 - Maximum stake: **10,000 coins** per player.
-- The host selects the stake when creating the room.
-- Joining players cannot change the host's stake.
-- The public lobby displays the stake and calculated pot.
-- The waiting room displays the authoritative stake and total pot.
+- Create Game does not ask for a stake.
+- Join Game does not ask for a stake.
+- The public lobby does not invent or display a stake before agreement.
+- Players can use the room voice/chat to agree on the amount.
+- The host then enters the agreed amount in the **Stake agreement** panel and clicks **Set agreed stake**.
+- The server validates the host's amount and broadcasts it to every room member.
+- Every player, including the host, must then click **Stake & Confirm**.
+- The server tracks the confirmations by socket/player membership.
+- The game cannot start until all room members have confirmed the agreed stake and all players are Ready.
+- The actual coin deduction happens atomically when the host starts the fully confirmed match; this prevents partial coin deductions when only some players have agreed/staked.
 - The pot is `stake × roomSize`.
-- When the match starts, every player's stake is locked atomically in PostgreSQL.
 - When the existing authoritative Ludo game produces a winner, that winner receives the complete pot.
 
 Examples:
@@ -46,6 +49,13 @@ Betting is game currency only. It does not use Paystack or real-money balances.
 
 `bet-system.js` is preloaded before `server.js` in the production start command. It wraps the existing Socket.IO room/start/game lifecycle without replacing the existing Ludo movement rules.
 
+The server-side room bet state contains:
+
+- `stake` — zero until the host sets the agreed amount.
+- `stakedPlayers` — socket members who confirmed the agreed stake.
+- `allStaked` — true only when every room seat has confirmed.
+- `locked` — true only after the atomic wallet transaction has completed and the match is entering the game.
+
 The system creates:
 
 - `ludo_match_bets` — one escrow record per match.
@@ -53,13 +63,13 @@ The system creates:
 
 The lock transaction uses PostgreSQL row locks on every player's wallet. If any player lacks the required coins, the whole lock transaction rolls back and the match does not start. Settlement is also transactional and checks the bet status so the same pot cannot be paid twice.
 
-The client receives `bet-room-state` for display and `bet-settled` after successful settlement. Clients never perform the authoritative coin deduction or award themselves winnings.
+The client receives `bet-room-state`, `bet-agreed`, `stake-confirmed`, `stake-error` and `bet-settled` events for display. Clients never perform the authoritative coin deduction or award themselves winnings.
 
 See `BET_SYSTEM.md` for the complete betting contract and database/event details.
 
 ## Chat
 
-The waiting room does **not** render a permanent chat text area. The `💬` button is the canonical entry point and opens a chat drawer/sheet containing the existing room messages, quick messages and text composer. This keeps the room visually focused while retaining the same Socket.IO chat functionality.
+The waiting room does **not** render a permanent chat text area. The `💬` button is the canonical entry point and opens a chat drawer/sheet containing the existing room messages, quick messages and text composer. This is also the intended place for players to agree on the stake before the host sets it.
 
 Do not add a second always-visible chat composer to the waiting-room card unless the product requirement explicitly changes.
 
@@ -67,92 +77,47 @@ Do not add a second always-visible chat composer to the waiting-room card unless
 
 Every room player avatar/name is wrapped by `PlayerIdentityLink` and opens the canonical `/player/<username>` Player Showcase. The same public showcase API supplies level, title, prestige, achievements, loadout and next milestone. The Player Showcase must not create a second player-profile implementation.
 
-The public showcase intentionally exposes only the information needed for player identity/reputation. Private wallet balances, email, password, sessions and other private account fields are not exposed.
-
-## Next milestone preview
-
-When one player inspects another from the room, the Player Showcase displays **only the single next milestone** after the player's current level. It does not list all future milestones. This keeps the inspection card focused on the one thing the player is currently working toward.
-
-The Showcase also contains a progressive Level Journey road. From Level 5 onward it shows sequential levels and marks the inspected player's exact current level. Players below Level 5 use a Level 1 starting point so their current marker remains visible. The journey uses the shared level reward plan for reward labels and does not grant anything from the client.
-
 ## Readiness
 
-The canonical multiplayer socket layer owns readiness for the actual match. The host is initially ready (`seat === 0`). Other players can toggle Ready/Unready from the lobby. `LiveSocial` listens to the canonical `game-state` event and merges each player's `playerId`, `name`, `ready`, `seat`, and `connected` state into the lobby roster. This prevents the legacy lobby roster from becoming stale when the canonical `ready` handler intercepts the Socket.IO event.
+The canonical multiplayer socket layer owns readiness for the actual match. The host is initially ready (`seat === 0`). Other players can toggle Ready/Unready from the room. `LiveSocial` listens to the canonical `game-state` event and merges each player's `playerId`, `name`, `ready`, `seat`, and `connected` state into the lobby roster.
 
-The Start Game control remains host-only and requires the full room, every player ready, and every player connected.
+The Start Game control remains host-only and requires the full room, every player ready, every player connected, an agreed stake, and every player having confirmed that stake.
 
 ## Voice chat
 
-Room voice uses the existing canonical `ChatVoice.tsx` implementation with PeerJS/WebRTC. `LiveSocial.tsx` must not create a second room voice transport. The profile microphone preference does not itself grant browser hardware permission. The first use of Mic On must call `navigator.mediaDevices.getUserMedia({ audio: ... })`; browsers require explicit permission and secure HTTPS context.
-
-The waiting room intentionally shows **only the microphone control**. PeerJS/WebRTC connection errors, permission errors, and connection-status notices are not rendered as a large text block beside the controls. Voice errors may still be logged for debugging and the mic state remains local to the voice control. Do not reintroduce the verbose `Voice connection is unavailable...` waiting-room message unless the product requirement explicitly changes.
+Room voice uses the existing canonical `ChatVoice.tsx` implementation with PeerJS/WebRTC. `LiveSocial.tsx` must not create a second room voice transport. The voice control is intentionally reused as the first place for stake negotiation.
 
 ## Empty-room cleanup and Leave Room
 
 An empty multiplayer room must **cease to exist immediately** when its last member leaves or disconnects before the match has started. It must not remain visible in the public lobby, remain joinable by room code, or appear as a ghost room with `0` players.
 
-The `empty-room-cleanup.js` preload provides this narrowly-scoped server-side cleanup. It tracks the actual `server.js` room registry and each room's member map. When the last member is removed, the parent room entry is deleted immediately. This means the next `list-rooms` broadcast cannot include the room and a later `join-room` by its code receives the normal `Room no longer exists` path instead of resurrecting the abandoned room.
+The `empty-room-cleanup.js` preload provides this narrowly-scoped server-side cleanup. It tracks the actual `server.js` room registry and each room's member map. When the last member is removed, the parent room entry is deleted immediately.
 
-This cleanup does **not** change Ludo movement, betting, readiness, host selection for non-empty rooms, or match settlement. It only guarantees that a room with no members is removed from the server registry.
-
-The lifecycle remains:
-
-`Leave/disconnect -> remove member -> 0 members -> delete room registry entry -> broadcast room list -> player can create a new room or join another room`
-
-## Explicit Leave Room vs accidental disconnect
-
-These are different lifecycle events and must remain different:
-
-- **Explicit Leave Room:** the player intentionally chooses Leave Room. The Room page raises `leaveRequested`; `LiveSocial` immediately disconnects its room socket before navigation.
-- **Accidental/network disconnect:** do not convert this into an explicit leave. The server's reconnect/host-recovery rules remain responsible for restoring the same room when appropriate, unless the disconnect leaves the room with zero members; an empty room is always deleted.
-- **Last remaining participant:** when the server sees that no room members remain, `empty-room-cleanup.js` removes the room registry entry immediately and the room cannot remain visible or joinable.
-- **Host with other participants:** a non-empty room keeps the existing host-recovery/host-transfer behavior. Empty-room cleanup does not interfere with that behavior.
+The betting layer also removes its own room state when the last member disconnects. No stake is locked for an empty/unstarted room.
 
 ## Room-to-game handoff
 
-There are two related server responsibilities:
+There are four related server responsibilities:
 
 - `server.js` maintains the legacy room/lobby roster and room discovery.
-- `multiplayer-canonical.js` is preloaded by the production start command and owns canonical multiplayer readiness, start, dice, movement and reconnect state.
-- `bet-system.js` is preloaded by the same production start command and owns the coin escrow/settlement layer around the existing match lifecycle.
-- `empty-room-cleanup.js` is preloaded before the server and removes the room registry entry when its last member disconnects.
+- `multiplayer-canonical.js` owns canonical multiplayer readiness, start, dice, movement and reconnect state.
+- `bet-system.js` owns the in-room stake agreement, stake confirmations, atomic wallet lock and winner settlement around the existing match lifecycle.
+- `empty-room-cleanup.js` removes the room registry entry when its last member disconnects.
 
-A room socket disconnects when the player navigates from `/room` to `/game-online`. Once the canonical match has started, the canonical socket disconnect handler must own that lifecycle and must not forward the disconnect into the legacy room handler.
+The lifecycle is:
 
-## Host theme/skin authority
-
-The host's equipped board/skin is the authoritative visual configuration for a multiplayer room. Player-specific avatar data is separate and remains individual to each player.
-
-Result:
-
-`Player profile -> equipped avatar -> public Player Showcase -> waiting-room roster avatar`
-
-and:
-
-`Host customization -> host room member.board -> server start-game.board -> every client ludo-match-board -> MultiplayerGameCanonical`
-
-and for betting:
-
-`Host stake selection -> authoritative room stake -> player readiness -> atomic wallet lock -> existing Ludo winner -> atomic pot settlement -> winner wallet`
-
-and for room cleanup:
-
-`Player leaves/disconnects -> member removed -> empty room detected -> room registry entry deleted -> public lobby refreshed`
+`Create/Join room -> players negotiate stake via voice/chat -> host sets agreed stake -> all players confirm stake -> all players Ready -> atomic wallet lock -> existing Ludo game -> authoritative winner -> full pot settlement`
 
 ## Files
 
-- `app/room/page.tsx` — authenticated room/player naming, host stake selection, 500–10,000 validation, explicit Leave Room request, and navigation to the online game.
-- `app/_components/LiveSocial.tsx` — canonical waiting-room layout, roster/readiness synchronization, avatar state merging/enrichment, stake/pot display, bet state events, player inspection links, chat drawer, voice integration and start handling.
-- `app/_components/PlayerIdentityLink.tsx` — canonical player-to-showcase navigation wrapper.
-- `app/api/player/[username]/route.ts` — server-authoritative public showcase data, including equipped avatar and the single next milestone.
-- `app/player/[username]/page.tsx` — public Player Showcase, real avatar rendering and progressive Level Journey.
-- `app/api/auth/route.ts` — authenticated public user payload, including the current user's equipped avatar.
-- `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport and microphone control.
+- `app/room/page.tsx` — room creation/joining and player identity. It intentionally does not collect a stake.
+- `app/_components/LiveSocial.tsx` — waiting-room UI, chat/voice access, host stake agreement input, player stake confirmation, readiness and start controls.
+- `app/lobby/page.tsx` — public room discovery; it does not invent a stake before players agree inside the room.
 - `server.js` — room discovery, roster, host ownership and authoritative `start-game.board` payload.
+- `bet-system.js` — server-side stake agreement, confirmations, escrow lock, canonical winner settlement and bet Socket.IO events.
 - `empty-room-cleanup.js` — isolated automatic deletion of empty multiplayer room registry entries.
-- `bet-system.js` — isolated coin bet validation, escrow locking, database settlement and bet Socket.IO events.
-- `app/lobby/page.tsx` — public room discovery, capacity/occupancy and stake/pot display.
+- `BET_SYSTEM.md` — detailed betting contract.
 
 ## Do not regress
 
-Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not let canonical game-state updates erase previously resolved player cosmetics. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority, match start, bet locking and settlement server/database authoritative. Keep the permanent chat text area out of the waiting-room layout; the `💬` button opens the chat drawer. Keep voice status text out of the waiting-room layout; the microphone control is sufficient. Never deduct or award coins from client-side React code. Never allow an empty room to remain in the public room registry or be joinable after its last member has left.
+Do not put stake selection back on Create Game or Join Game. Do not allow a client to choose the final stake outside the host's server-validated in-room agreement. Do not deduct coins from React when a player clicks Stake; the server must perform the final atomic wallet lock. Do not trust a client-provided winner. Do not settle from `game-moved`; settlement must follow the canonical finished game state. Preserve the existing Ludo movement/rule engine. Never allow an empty room to remain visible or joinable after its last member has left.
