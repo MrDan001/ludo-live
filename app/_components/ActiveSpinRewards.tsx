@@ -12,6 +12,7 @@ function isGameSession(pathname:string){
 
 export default function ActiveSpinRewards(){
   const pathname=usePathname();
+  const [notice,setNotice]=useState<Notice|null>(null);
   useEffect(()=>{
     if(!isGameSession(pathname||""))return;
     let alive=true;let timer:number|undefined;
