@@ -10,7 +10,7 @@ Before changing production behavior, read `ARCHITECTURE.md`, `LEVEL_REWARDS.md` 
 2. Identify the authoritative server/API/database source of truth.
 3. Reuse canonical engines/components/APIs instead of creating parallel implementations.
 4. Keep financial, wallet, ownership, tournament and progression mutations server-authoritative.
-5. Keep `/game` Bot-vs-Human as the protected known-good reference unless explicitly asked to change it.
+5. Keep `/game` Bot-vs-Human as the protected known-good reference unless explicitly asked to change.
 6. Keep multiplayer/tournament viewport behavior intact unless a responsive redesign is explicitly requested.
 7. After code changes, build and inspect Railway deployment logs.
 8. Never call a change live until Railway reports `SUCCESS`.
@@ -47,11 +47,17 @@ Supported audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
 
 The showcase is server-derived from PostgreSQL and intentionally excludes private wallet, email, password and session data. It displays the player's current title, level, prestige, achievements, loadout and **only the single next milestone** after the player's current level.
 
+The showcase avatar is resolved from the same authoritative `AVATARS` catalogue used by customization. Never replace a real equipped avatar ID with a generic icon when the catalogue contains it.
+
+The showcase also has a progressive **Level Journey** road. From Level 5 onward it renders sequential levels and highlights the inspected player's exact current level with a current-location marker. For players below Level 5 it starts at Level 1 so the current marker remains visible. The road is a UI window over unlimited progression; it does not cap or grant levels.
+
 ### Multiplayer waiting room
 
 `app/_components/LiveSocial.tsx` is the canonical waiting-room UI. Its player cards must use real roster identities and link each name/avatar to the Player Showcase. The displayed avatar is resolved from the inspected player's authoritative `equipped.avatar` and `lib/customization-catalog.ts`; generic placeholder avatars must not replace a real equipped avatar.
 
-The room layout is intentionally a 2x2 seat grid for the existing 2/4-player room sizes, with host crown, Ready/Not Ready state, empty-seat invite, game mode/stake summary, voice control, host-only Start Game and chat. The current system has no server-backed betting amount, so the UI must say `Free` rather than imply a fake wager.
+Canonical `game-state` updates may omit cosmetic fields. Merge waiting-room state by stable player identity and preserve an already-resolved `avatar`, `board`, `dice`, and name unless the newer server state explicitly supplies a replacement. Avatar enrichment is written back into member state so unrelated UI updates cannot make the avatar disappear.
+
+The room layout is intentionally a 2x2 seat grid for the existing 2/4-player room sizes, with host crown, Ready/Not Ready state, empty-seat invite, game mode/stake summary, voice control, host-only Start Game and a compact chat button. The permanent chat text area is removed; the `💬` button opens the existing Socket.IO room chat in a drawer/sheet. The current system has no server-backed betting amount, so the UI must say `Free` rather than imply a fake wager.
 
 The room's board/theme remains host-authoritative; avatar identity remains player-specific.
 
