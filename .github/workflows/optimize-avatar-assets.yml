@@ -12,6 +12,7 @@ permissions:
 
 jobs:
   optimize:
+    if: github.actor != 'github-actions[bot]'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -35,8 +36,8 @@ jobs:
       - name: Prepare individual avatar crops
         run: |
           set -e
-          rm -rf /tmp/avatar-crops /tmp/avatar-upscaled
-          mkdir -p /tmp/avatar-crops /tmp/avatar-upscaled
+          rm -rf /tmp/avatar-crops /tmp/avatar-upscaled /tmp/avatar-atlas
+          mkdir -p /tmp/avatar-crops /tmp/avatar-upscaled /tmp/avatar-atlas
           # The source atlas is 5 columns x 6 rows, 240x240 per cell.
           for row in 0 1 2 3 4 5; do
             for col in 0 1 2 3 4; do
@@ -61,29 +62,33 @@ jobs:
             -s 4 \
             -t 128
 
-      - name: Install optimized avatars
+      - name: Rebuild one high-resolution atlas
         run: |
           set -e
-          rm -rf public/avatars/premium public/avatars/elite
-          mkdir -p public/avatars/premium public/avatars/elite
-          for i in $(seq 1 30); do
-            printf -v id '%02d' "$i"
-            if [ "$i" -le 10 ]; then
-              cp "/tmp/avatar-upscaled/avatar-${id}.png" "public/avatars/premium/premium-${id}.png"
-            else
-              cp "/tmp/avatar-upscaled/avatar-${id}.png" "public/avatars/elite/elite-$((i-10)).png"
-            fi
+          for row in 0 1 2 3 4 5; do
+            rm -f "/tmp/avatar-atlas/row-${row}.png"
+            files=()
+            for col in 0 1 2 3 4; do
+              index=$((row * 5 + col + 1))
+              printf -v id '%02d' "$index"
+              files+=("/tmp/avatar-upscaled/avatar-${id}.png")
+            done
+            magick "${files[@]}" +append "/tmp/avatar-atlas/row-${row}.png"
           done
+          magick /tmp/avatar-atlas/row-{0,1,2,3,4,5}.png -append \
+            -sampling-factor 4:4:4 -interlace Plane -quality 96 \
+            public/avatars/premium-elite-atlas.jpg
+          identify public/avatars/premium-elite-atlas.jpg
 
-      - name: Commit optimized avatar assets
+      - name: Commit optimized high-resolution atlas
         run: |
           set -e
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add public/avatars/premium public/avatars/elite
+          git add public/avatars/premium-elite-atlas.jpg
           if git diff --cached --quiet; then
             echo "No avatar asset changes to commit."
             exit 0
           fi
-          git commit -m "Optimize premium and elite avatar artwork"
+          git commit -m "Replace avatar atlas with AI-upscaled high-resolution artwork"
           git push
