@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This is the production technical map. Read it before changing gameplay, board rendering, authentication, customization, XP/levels, Shop, Inventory, Award Room, admin, finance, tournaments, or deployment. **Do not infer product rules from screenshots or previous conversations.** If a rule changes, update this document and `DEVELOPER_HANDOFF.md` in the same change.
+This is the production technical map. Read it before changing gameplay, board rendering, authentication, customization, XP/levels, Shop, Inventory, Award Room, admin, finance, tournaments, free spins, or deployment. **Do not infer product rules from screenshots or previous conversations.** If a rule changes, update this document and `DEVELOPER_HANDOFF.md` in the same change.
 
 ## Runtime / source of truth
 
@@ -87,6 +87,24 @@ Progression is server-backed.
 - A level completion animates the XP bar filling, transitions to the next level, starts the next level's progress, and shows a congratulatory celebration for roughly 4 seconds.
 - XP/progression updates should dispatch/use the existing progression refresh mechanism rather than maintaining a second local progression system.
 
+## Free Spin / Active Time Rewards
+
+Free spins are a server-authoritative reward balance that can be consumed by the Spin Wheel.
+
+- Every **30 minutes of active app time** grants **1 free spin**.
+- Between **17:00 and 20:00 Nigeria time (`Africa/Lagos`)**, every completed 30-minute active interval grants **3 free spins** instead.
+- Active time is counted while the app/document is visible. The client may send periodic heartbeats, but the server validates/caps elapsed intervals and decides when a reward is earned.
+- The authoritative activity/grant endpoint is `/api/spin/activity`.
+- Free-spin balance and consumption are authoritative in PostgreSQL via `ludo_spin_state` and `/api/spin`.
+- Free spins are not coins or gems and must not be represented as either wallet currency.
+- `/profile` displays the player's current **Free Rolls** balance.
+- `/spin` displays the current free-spin balance and consumes the server-side balance when a spin is used.
+- When a free-spin reward is granted, the app shows an in-app notification. Browser/OS notification is sent only when the browser notification permission/subscription capability is available; do not claim closed-app push delivery without the required push infrastructure.
+- Unused earned spins persist until consumed; they do not reset daily.
+- An existing `extraSpin` wheel prize adds one additional free spin to the server balance.
+- The Nigeria-time window is a business rule and must use `Africa/Lagos`, never the developer/device timezone.
+- Do not implement the reward as a client-only timer or localStorage balance.
+
 ## Shop / pricing architecture
 
 The Shop has two responsibilities: catalogue availability and purchase pricing. The **server is authoritative** for price/currency and the player Shop must consume the same server-backed pricing that Admin manages.
@@ -147,6 +165,15 @@ Award Room is a second tab **inside Inventory**. It is for earned rewards only, 
 
 ## Home navigation contract
 
+Main home cards are ordered:
+
+1. Play Online
+2. Tournaments
+3. Play Solo
+4. Friends
+
+Inventory is a separate full-width card below the quick-access row. Do not duplicate Friends there.
+
 Home bottom navigation remains:
 
 - Home
@@ -154,7 +181,7 @@ Home bottom navigation remains:
 - Chat
 - Profile
 
-The quick-access row retains the existing Daily Reward, Shop, Events and Spin Wheel functions unless explicitly redesigned. Inventory is intentionally accessed through the split Friend/Inventory card rather than adding another bottom-nav item.
+The quick-access row retains the existing Daily Reward, Shop, Events and Spin Wheel functions unless explicitly redesigned. Inventory is intentionally accessed through its separate full-width card rather than adding another bottom-nav item.
 
 ## Admin architecture
 
@@ -214,8 +241,8 @@ PostgreSQL is authoritative for accounts, wallets, customization ownership, tour
 - Do not treat the Shop catalogue as equivalent to Coin/Gem purchase packages; they are distinct product types but must share authoritative pricing configuration.
 - Do not put purchased items into Award Room.
 - Do not make Award Room a list when the product contract calls for a grid.
-- Do not trust client-only XP, wallet, tournament points, ownership or payment state.
-- Do not modify the protected `/game` reference while fixing another mode.
+- Do not trust client-only XP, wallet, tournament points, ownership, payment state or free-spin balance.
+- Do not calculate the 17:00–20:00 reward window using local device time; use Nigeria time on the server.
 - Do not claim Railway deployment success until the platform reports success.
 
 ## Do not guess
