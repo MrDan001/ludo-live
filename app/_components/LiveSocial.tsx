@@ -23,7 +23,7 @@ const atlasAvatarStyle = (id?: string): React.CSSProperties | null => {
     width: "100%",
     height: "100%",
     borderRadius: "50%",
-    backgroundImage: "url('/avatars/premium-elite-atlas.svg')",
+    backgroundImage: "url('/avatars/premium-elite-atlas.jpg')",
     backgroundSize: "500% 600%",
     backgroundRepeat: "no-repeat",
     backgroundPosition: `${(i % 5) * 25}% ${Math.floor(i / 5) * 20}%`,
