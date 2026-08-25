@@ -1,5 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 import {pool,ensureAuthSchema} from "../../auth/_db";
+import {ensureTournamentV2Schema} from "../../tournaments/_schema";
 import {currentUser} from "../../../../lib/auth-session";
 import {getLevelRewardPlan} from "../../../../lib/levelRewards";
 
@@ -20,6 +21,7 @@ const WIN_ACHIEVEMENT_MILESTONES=[1,10,25,50,100,250,500];
 export async function GET(req:NextRequest,{params}:{params:Promise<{username:string}>}){
   try{
     await ensureAuthSchema();
+    await ensureTournamentV2Schema();
     const viewer=await currentUser(req);
     if(!viewer)return NextResponse.json({error:"Login required."},{status:401});
     const{username}=await params;
