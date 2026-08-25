@@ -6,6 +6,14 @@ The room lobby must display the authenticated player's profile username/nickname
 
 The waiting-room avatar is also player-specific. `LiveSocial` resolves each roster member's public Player Showcase data through `GET /api/player/[username]` and renders that player's current `equipped.avatar` through `lib/customization-catalog.ts`. The room must never use a generic hard-coded avatar for another player when a real equipped avatar is available.
 
+### Avatar state merge rule
+
+The room receives both a legacy `roster` event and later canonical `game-state` updates. The canonical game-state payload may omit cosmetic fields. `LiveSocial` must therefore merge state by stable `playerId` and preserve an existing `avatar`, `board`, `dice`, and player identity when the newer state does not include those fields. A game-state update must never erase a previously resolved avatar and cause the UI to fall back to the generic icon.
+
+If the canonical state does include a newer cosmetic value, that server value wins. After roster/game-state updates, `LiveSocial` may enrich public avatar data again through the Player Showcase API as a fallback. The data flow is:
+
+`roster/showcase -> local member state -> canonical game-state merge -> preserve cosmetics unless server provides a newer value -> render equipped avatar`
+
 ## Waiting room presentation
 
 `app/_components/LiveSocial.tsx` is the canonical waiting-room presentation. It uses a 2x2 player-seat grid, host crown, real avatar, username, Ready/Not Ready state, invite empty seats, game mode/stake summary, voice control, Ready control, host-only Start Game, and chat. Empty seats copy the room code so the player can invite someone.
@@ -31,6 +39,8 @@ The Start Game control remains host-only and requires the full room, every playe
 ## Voice chat
 
 Room voice uses the existing canonical `ChatVoice.tsx` implementation with PeerJS/WebRTC. `LiveSocial.tsx` must not create a second room voice transport. The profile microphone preference does not itself grant browser hardware permission. The first use of Mic On must call `navigator.mediaDevices.getUserMedia({ audio: ... })`; browsers require explicit permission and secure HTTPS context.
+
+The waiting room intentionally shows **only the microphone control**. PeerJS/WebRTC connection errors, permission errors, and connection-status notices are not rendered as a large text block beside the controls. Voice errors may still be logged for debugging and the mic state remains local to the voice control. Do not reintroduce the verbose `Voice connection is unavailable...` waiting-room message unless the product requirement explicitly changes.
 
 ## Explicit Leave Room vs accidental disconnect
 
@@ -65,15 +75,15 @@ and:
 ## Files
 
 - `app/room/page.tsx` — authenticated room/player naming, explicit Leave Room request, and navigation to the online game.
-- `app/_components/LiveSocial.tsx` — canonical waiting-room layout, roster/readiness synchronization, public avatar enrichment, player inspection links, chat, voice integration and start handling.
+- `app/_components/LiveSocial.tsx` — canonical waiting-room layout, roster/readiness synchronization, avatar state merging/enrichment, player inspection links, chat, voice integration and start handling.
 - `app/_components/PlayerIdentityLink.tsx` — canonical player-to-showcase navigation wrapper.
 - `app/api/player/[username]/route.ts` — server-authoritative public showcase data, including equipped avatar and the single next milestone.
 - `app/api/auth/route.ts` — authenticated public user payload, including the current user's equipped avatar.
-- `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport.
+- `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport and microphone control.
 - `server.js` — room discovery, roster, host ownership and authoritative `start-game.board` payload.
 - `multiplayer-canonical.js` — authoritative multiplayer readiness/start/game/reconnect rules.
 - `app/lobby/page.tsx` — public room discovery and capacity/occupancy display.
 
 ## Do not regress
 
-Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority and match start server/canonical-state authoritative.
+Do not restore hard-coded `Player 1` or generic opponent avatars when a real account identity is available. Do not let canonical game-state updates erase previously resolved player cosmetics. Do not duplicate Player Showcase logic in the room. Do not invent betting values or gameplay buffs in the waiting room. Keep readiness, room membership, host authority and match start server/canonical-state authoritative. Keep voice status text out of the waiting-room layout; the microphone control is sufficient.
