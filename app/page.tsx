@@ -5,19 +5,154 @@ import Link from "next/link";
 
 export default function LandingPage() {
   const [boardImage, setBoardImage] = useState("");
-  useEffect(() => { fetch("/ludo-board.b64").then(r => r.text()).then(b64 => setBoardImage(`data:image/webp;base64,${b64.trim()}`)).catch(() => {}); }, []);
 
-  return <main className="landing">
-    <div className="orb orbA"/><div className="orb orbB"/>
-    <nav className="nav"><div className="logo"><span>◆</span> LUDO <b>LIVE</b></div><div className="nav-right"><span className="online"><i/> LIVE NOW</span><span className="lang">🌐 English ▾</span></div></nav>
-    <section className="hero">
-      <div className="hero-copy"><div className="badge">✦ THE LIVE LUDO EXPERIENCE</div><h1>Play Ludo,<br/><span>Win Big!</span></h1><p>Play with real players, challenge your friends and become the <strong>Ludo champion.</strong></p><div className="cta-row"><Link href="/account?mode=create" className="cta primary">CREATE FREE ACCOUNT <b>→</b></Link><Link href="/account?mode=login" className="cta ghost">SIGN IN <b>→</b></Link></div><div className="players"><span className="avatar a1"/><span className="avatar a2"/><span className="avatar a3"/><span className="avatar a4"/><i/> Join 10M+ players worldwide</div></div>
-      <div className="board-stage"><div className="glow"/>{boardImage ? <img className="hero-board" src={boardImage} alt="Ludo Live board"/> : <div className="board-fallback"><span>🎲</span><b>LUDO LIVE</b></div>}</div>
-    </section>
-    <section className="stats"><div><span>👥</span><strong>10M+</strong><small>Players<br/>Worldwide</small></div><div><span>🏆</span><strong>50K+</strong><small>Daily<br/>Wins</small></div><div><span>🛡</span><strong>100%</strong><small>Secure &<br/>Fair Play</small></div><div><span>⚡</span><strong>24/7</strong><small>Active<br/>Support</small></div></section>
-    <section className="why"><h2>✦ Why Play <span>Ludo Live?</span> ✦</h2><div className="features"><article><em>01</em><div>👥</div><h3>Live Matches</h3><p>Play real-time matches with players around the world.</p></article><article><em>02</em><div>⌂</div><h3>Private Rooms</h3><p>Create private rooms and play with your friends.</p></article><article><em>03</em><div>🏆</div><h3>Tournaments</h3><p>Join exciting tournaments and win amazing rewards.</p></article><article><em>04</em><div>🎁</div><h3>Daily Rewards</h3><p>Login daily and claim exciting rewards and bonuses.</p></article><article><em>05</em><div>🛡</div><h3>Fair Play</h3><p>Advanced anti-cheat systems help keep every game fair.</p></article><article><em>06</em><div>●</div><h3>Player Profile</h3><p>Build your profile, track stats and climb the ranks.</p></article></div></section>
-    <section className="bottom-cta"><div className="happy"><div className="faces"><span>👨🏾</span><span>👩🏽</span><span>👨🏻</span></div><b>10M+</b><small>Happy Players<br/>Worldwide</small><strong>★★★★★</strong></div><div className="join"><h2>Ready to Roll the Dice?</h2><p>Join millions of players and experience the thrill of <span>Ludo Live!</span></p><div><Link href="/account?mode=create">CREATE FREE ACCOUNT →</Link><Link href="/account?mode=login" className="dark">SIGN IN →</Link></div></div><div className="trusted"><div>♜</div><b>Trusted by Millions</b><small>Safe · Secure · Fair</small></div></section>
-    <footer><span>© 2026 LUDO LIVE</span><span>SECURE • FAIR • SOCIAL</span></footer>
-    <style>{`*{box-sizing:border-box}.landing{min-height:100dvh;overflow:hidden;position:relative;background:#020610;color:#f7f9ff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:0 28px}.landing:before{content:"";position:absolute;inset:0;background:linear-gradient(rgba(80,120,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(80,120,255,.035) 1px,transparent 1px);background-size:72px 72px;mask-image:linear-gradient(#000,transparent 85%);pointer-events:none}.orb{position:absolute;border-radius:50%;filter:blur(110px);opacity:.25;pointer-events:none}.orbA{width:460px;height:460px;background:#006cff;left:-220px;top:220px}.orbB{width:500px;height:500px;background:#8a19ff;right:-260px;top:420px}.nav{height:82px;width:min(1180px,100%);margin:auto;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.09);position:relative;z-index:5}.logo{font-weight:950;letter-spacing:-1px;font-size:21px}.logo span{color:#59b6ff;margin-right:7px}.logo b{font-size:12px;background:linear-gradient(90deg,#159cff,#b51cff);padding:5px 8px;border-radius:7px;margin-left:4px}.nav-right{display:flex;gap:20px;align-items:center;color:#9ca9bf;font-size:10px;font-weight:900;letter-spacing:1px}.online i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#36ed9b;box-shadow:0 0 12px #36ed9b;margin-right:7px}.lang{border:1px solid #33415f;border-radius:24px;padding:10px 15px;color:#eef3ff}.hero{width:min(1180px,100%);margin:auto;min-height:590px;display:grid;grid-template-columns:43% 57%;align-items:center;position:relative;z-index:2}.hero-copy{padding:70px 0 50px}.badge{display:inline-block;border:1px solid rgba(40,166,255,.3);background:rgba(20,90,170,.12);color:#48b8ff;border-radius:30px;padding:9px 15px;font-size:9px;font-weight:950;letter-spacing:2px}.hero h1{font-size:clamp(62px,7vw,100px);line-height:.9;letter-spacing:-5px;margin:26px 0 20px;font-weight:950}.hero h1 span{background:linear-gradient(90deg,#008eff,#7448ff 55%,#d21dff);-webkit-background-clip:text;color:transparent}.hero p{max-width:470px;color:#a1aec2;font-size:16px;line-height:1.7}.hero p strong{color:#ffd21f}.cta-row{display:flex;gap:12px;margin-top:30px;flex-wrap:wrap}.cta{min-width:190px;text-decoration:none;border-radius:11px;padding:16px 18px;font-size:11px;font-weight:950;letter-spacing:.5px}.cta.primary{color:#fff;background:linear-gradient(100deg,#009cff,#7c19ff);box-shadow:0 12px 40px rgba(44,75,255,.3)}.cta b{float:right;font-size:16px}.cta.ghost{color:#fff;border:1px solid #3b4b70;background:rgba(5,11,24,.65)}.players{margin-top:24px;color:#b5c0d2;font-size:11px;display:flex;align-items:center}.players i{width:7px;height:7px;background:#22e18a;border-radius:50%;margin:0 8px 0 10px}.avatar{width:28px;height:28px;border-radius:50%;border:2px solid #101a30;margin-left:-6px;background:linear-gradient(145deg,#e0b08b,#513b2e)}.avatar:first-child{margin-left:0}.a2{background:linear-gradient(145deg,#ffd0ad,#4c2d26)}.a3{background:linear-gradient(145deg,#b9825f,#21150e)}.a4{background:linear-gradient(145deg,#f0c39a,#64402d)}.board-stage{height:560px;display:grid;place-items:center;position:relative}.glow{position:absolute;width:430px;height:330px;border-radius:50%;background:#154fff;filter:blur(90px);opacity:.35}.hero-board{position:relative;width:min(680px,58vw);max-height:560px;object-fit:contain;filter:drop-shadow(0 35px 40px rgba(0,0,0,.65)) drop-shadow(0 0 35px rgba(58,67,255,.28));transform:perspective(1200px) rotateY(-3deg);border-radius:18px}.board-fallback{width:430px;height:430px;border-radius:30px;background:linear-gradient(135deg,#ef3149,#09bd72,#ffd21d,#247cff);display:grid;place-items:center;box-shadow:0 0 90px #164fff}.board-fallback span{font-size:70px}.board-fallback b{font-size:25px}.stats{width:min(1120px,100%);margin:0 auto;display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #25375e;border-radius:18px;background:linear-gradient(100deg,rgba(8,18,50,.9),rgba(5,12,31,.85));position:relative;z-index:3;overflow:hidden}.stats div{min-height:108px;display:grid;grid-template-columns:55px 1fr 1.2fr;align-items:center;padding:18px 24px;border-right:1px solid #223150}.stats div:last-child{border-right:0}.stats span{font-size:30px}.stats strong{font-size:27px}.stats small{color:#c0cad9;font-size:10px;line-height:1.5}.why{width:min(1180px,100%);margin:65px auto 0;position:relative;z-index:2}.why h2{text-align:center;font-size:34px;letter-spacing:-1px}.why h2 span{background:linear-gradient(90deg,#008eff,#b21eff);-webkit-background-clip:text;color:transparent}.features{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-top:30px}.features article{min-height:265px;padding:20px 14px;border:1px solid #26365d;border-radius:13px;background:linear-gradient(160deg,rgba(11,21,54,.8),rgba(3,9,25,.85));text-align:center;position:relative}.features em{position:absolute;right:10px;top:7px;color:#26385d;font-size:24px;font-style:normal;font-weight:900}.features article>div{font-size:35px;height:65px;display:grid;place-items:center}.features h3{font-size:14px;margin:14px 0 10px;color:#45baff}.features article:nth-child(2) h3{color:#00e3a2}.features article:nth-child(3) h3{color:#ffd21e}.features article:nth-child(4) h3,.features article:nth-child(6) h3{color:#e26cff}.features article:nth-child(5) h3{color:#34dfff}.features p{font-size:10px;line-height:1.7;color:#aab5c8;margin:0}.bottom-cta{width:min(1180px,100%);margin:55px auto 0;padding:30px;border:1px solid #263b6b;border-radius:18px;background:linear-gradient(100deg,rgba(8,20,55,.95),rgba(11,10,35,.92));display:grid;grid-template-columns:22% 56% 22%;align-items:center;position:relative;z-index:2}.happy{text-align:center;border-right:1px solid #263452}.faces span{display:inline-grid;place-items:center;width:42px;height:42px;border-radius:50%;background:#151d48;border:2px solid #0a0e22;margin-left:-8px}.happy>b{display:block;color:#fff;font-size:18px;margin-top:10px}.happy small,.trusted small{display:block;color:#aab5c8;font-size:10px;line-height:1.5;margin-top:4px}.happy>strong{color:#ffd21e;letter-spacing:3px}.join{text-align:center}.join h2{font-size:28px;margin:0}.join p{color:#a8b3c7;font-size:13px}.join p span{color:#a946ff}.join a{display:inline-block;text-decoration:none;color:#fff;background:linear-gradient(90deg,#009eff,#871cff);border-radius:10px;padding:14px 20px;font-size:10px;font-weight:950;margin:8px 5px}.join a.dark{background:#071027;border:1px solid #41537e}.trusted{text-align:center;border-left:1px solid #263452}.trusted>div{font-size:45px;color:#a84cff}.trusted b{display:block;font-size:14px}.trusted small{color:#25e5a0}footer{width:min(1180px,100%);margin:28px auto;padding:18px 0 26px;border-top:1px solid #121d34;color:#45536a;font-size:8px;font-weight:900;letter-spacing:1px;display:flex;justify-content:space-between;position:relative;z-index:2}@media(max-width:900px){.hero{grid-template-columns:1fr;text-align:center}.hero-copy{padding-bottom:10px}.hero p{margin:auto}.cta-row,.players{justify-content:center}.board-stage{height:430px}.hero-board{width:min(650px,90vw)}.stats{grid-template-columns:1fr 1fr}.stats div:nth-child(2){border-right:0}.features{grid-template-columns:repeat(3,1fr)}.bottom-cta{grid-template-columns:1fr}.happy,.trusted{border:0;border-bottom:1px solid #263452;padding:0 0 20px;margin-bottom:20px}.trusted{border:0;margin:20px 0 0;padding-top:20px;border-top:1px solid #263452}}@media(max-width:560px){.landing{padding:0 14px}.nav{height:68px}.online{display:none}.hero h1{font-size:58px;letter-spacing:-4px}.hero p{font-size:13px}.board-stage{height:330px}.hero-board{width:100%;max-height:330px}.stats div{grid-template-columns:42px 1fr;padding:14px}.stats small{grid-column:2}.stats strong{font-size:21px}.why{margin-top:45px}.why h2{font-size:27px}.features{grid-template-columns:1fr 1fr}.features article{min-height:230px}.bottom-cta{padding:22px 16px}.join h2{font-size:24px}.join a{display:block}.hero-copy{padding-top:50px}}@media(max-width:390px){.features{grid-template-columns:1fr}.players{font-size:8px}.hero h1{font-size:52px}}`}</style>
-  </main>;
+  useEffect(() => {
+    let alive = true;
+    fetch("/ludo-board.b64")
+      .then((r) => r.text())
+      .then((b64) => {
+        if (alive && b64.trim()) setBoardImage(`data:image/webp;base64,${b64.trim()}`);
+      })
+      .catch(() => {});
+    return () => { alive = false; };
+  }, []);
+
+  return (
+    <main className="landing">
+      <div className="stars" aria-hidden="true" />
+      <div className="aurora auroraOne" aria-hidden="true" />
+      <div className="aurora auroraTwo" aria-hidden="true" />
+      <div className="aurora auroraThree" aria-hidden="true" />
+
+      <nav className="nav">
+        <Link href="/" className="brand" aria-label="Ludo Live home">
+          <span className="brandMark">◆</span>
+          <span>LUDO</span>
+          <b>LIVE</b>
+        </Link>
+        <div className="navRight">
+          <span className="livePill"><i /> LIVE PLAY</span>
+          <Link href="/account?mode=login" className="navSignIn">Sign in</Link>
+          <Link href="/account?mode=create" className="navJoin">Join free <span>↗</span></Link>
+        </div>
+      </nav>
+
+      <section className="hero">
+        <div className="heroCopy">
+          <div className="eyebrow"><span>✦</span> THE LUDO LIVE EXPERIENCE</div>
+          <h1>Roll it.<br /><span>Own it.</span></h1>
+          <p className="lead">
+            A modern Ludo arena built for <strong>live multiplayer, tournaments, missions and rewards.</strong>
+            Roll the dice, make your move and climb your way to the top.
+          </p>
+
+          <div className="heroActions">
+            <Link href="/account?mode=create" className="primaryCta">
+              <span className="ctaIcon">🎲</span>
+              <span><small>START PLAYING</small><b>Create free account</b></span>
+              <strong>→</strong>
+            </Link>
+            <Link href="/account?mode=login" className="secondaryCta">
+              I already have an account <span>→</span>
+            </Link>
+          </div>
+
+          <div className="trustLine">
+            <div className="avatarStack" aria-hidden="true"><span>🧑🏽</span><span>👩🏾</span><span>🧑🏻</span><span>👨🏿</span></div>
+            <div><b>Ready when you are.</b><small>Play fair. Play live. Play Ludo.</small></div>
+            <span className="shield">🛡️</span>
+          </div>
+        </div>
+
+        <div className="heroVisual">
+          <div className="visualGlow" />
+          <div className="orbit orbitOne" />
+          <div className="orbit orbitTwo" />
+          <div className="floatingChip chipTop"><span>🏆</span><div><b>Tournaments</b><small>Compete & climb</small></div></div>
+          <div className="floatingChip chipBottom"><span>⚡</span><div><b>Live matches</b><small>Real-time action</small></div></div>
+          <div className="dice diceOne">🎲</div>
+          <div className="dice diceTwo">🎲</div>
+          <div className="boardFrame">
+            <div className="boardHalo" />
+            {boardImage ? (
+              <img className="heroBoard" src={boardImage} alt="Ludo Live game board" />
+            ) : (
+              <div className="boardFallback"><span>🎲</span><b>LUDO LIVE</b></div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      <section className="featureStrip" aria-label="Ludo Live highlights">
+        <div className="stripItem"><span>♟</span><div><b>Multiplayer</b><small>Play together in real time</small></div></div>
+        <div className="stripItem"><span>🏆</span><div><b>Tournaments</b><small>Compete for the top spot</small></div></div>
+        <div className="stripItem"><span>🎯</span><div><b>Missions</b><small>Complete goals and earn rewards</small></div></div>
+        <div className="stripItem"><span>💎</span><div><b>Rewards</b><small>Make your progress matter</small></div></div>
+      </section>
+
+      <section className="section showcase">
+        <div className="sectionHeading">
+          <div><span>BUILT FOR EVERY MOVE</span><h2>Everything happens<br /><em>inside the game.</em></h2></div>
+          <p>From your first roll to the final token home, Ludo Live keeps the experience social, competitive and rewarding.</p>
+        </div>
+        <div className="featureGrid">
+          <article className="featureCard cardBlue"><div className="cardNumber">01</div><div className="featureIcon">♟</div><h3>Live Multiplayer</h3><p>Challenge other players and make every turn count with real-time Ludo rooms.</p><div className="cardLine" /></article>
+          <article className="featureCard cardGold"><div className="cardNumber">02</div><div className="featureIcon">🏆</div><h3>Reward Tournaments</h3><p>Enter dedicated competitions, track your points and fight your way up the standings.</p><div className="cardLine" /></article>
+          <article className="featureCard cardPurple"><div className="cardNumber">03</div><div className="featureIcon">🎯</div><h3>Daily Missions</h3><p>Fresh daily challenges give your normal gameplay another reason to keep rolling.</p><div className="cardLine" /></article>
+          <article className="featureCard cardGreen"><div className="cardNumber">04</div><div className="featureIcon">💎</div><h3>Meaningful Rewards</h3><p>Build up your coins, gems, progress and achievements as you play.</p><div className="cardLine" /></article>
+        </div>
+      </section>
+
+      <section className="section playSection">
+        <div className="playPanel">
+          <div className="miniBoard" aria-hidden="true"><div className="miniCenter">🎲</div><i className="miniToken red" /><i className="miniToken blue" /><i className="miniToken green" /><i className="miniToken yellow" /></div>
+          <div className="playCopy">
+            <span className="eyebrow">YOUR NEXT GAME IS WAITING</span>
+            <h2>One roll can<br /><em>change everything.</em></h2>
+            <p>Join Ludo Live and enter a game built around the way you actually want to play.</p>
+            <Link href="/account?mode=create" className="wideCta">CREATE YOUR FREE ACCOUNT <b>→</b></Link>
+          </div>
+        </div>
+      </section>
+
+      <footer className="footer">
+        <div className="footerBrand"><span className="brandMark">◆</span> LUDO <b>LIVE</b></div>
+        <span>© 2026 Ludo Live</span>
+        <span>SECURE · FAIR · SOCIAL</span>
+      </footer>
+
+      <style>{`
+        *{box-sizing:border-box}
+        .landing{min-height:100dvh;overflow:hidden;position:relative;background:#020611;color:#f7f9ff;font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding:0 22px}
+        .landing:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 50% 10%,rgba(35,82,180,.16),transparent 35%),linear-gradient(rgba(91,132,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(91,132,255,.035) 1px,transparent 1px);background-size:auto,68px 68px,68px 68px;pointer-events:none}
+        .stars{position:absolute;inset:0;opacity:.45;background-image:radial-gradient(circle,rgba(255,255,255,.75) 0 1px,transparent 1.5px),radial-gradient(circle,rgba(91,170,255,.55) 0 1px,transparent 1.5px);background-size:127px 127px,193px 193px;background-position:15px 22px,83px 41px;animation:starsDrift 18s linear infinite;pointer-events:none}
+        .aurora{position:absolute;border-radius:50%;filter:blur(100px);pointer-events:none;opacity:.24;animation:floatGlow 9s ease-in-out infinite}
+        .auroraOne{width:420px;height:420px;left:-240px;top:170px;background:#006dff}.auroraTwo{width:480px;height:480px;right:-260px;top:270px;background:#7c19ff;animation-delay:-3s}.auroraThree{width:360px;height:360px;left:35%;top:780px;background:#00b8ff;opacity:.1;animation-delay:-6s}
+        .nav{width:min(1180px,100%);height:82px;margin:auto;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(255,255,255,.08);position:relative;z-index:10}
+        .brand{display:flex;align-items:center;gap:6px;text-decoration:none;color:#fff;font-size:20px;font-weight:950;letter-spacing:-1px}.brandMark{color:#5ebcff;text-shadow:0 0 18px #168fff;margin-right:2px}.brand b,.footerBrand b{font-size:9px;letter-spacing:1px;background:linear-gradient(90deg,#159cff,#a51cff);padding:5px 7px;border-radius:6px;margin-left:3px}
+        .navRight{display:flex;align-items:center;gap:18px;font-size:11px;font-weight:850}.livePill{color:#9eacc4;letter-spacing:1px}.livePill i{display:inline-block;width:7px;height:7px;border-radius:50%;background:#35e99b;box-shadow:0 0 13px #35e99b;margin-right:7px;animation:pulse 1.8s ease-in-out infinite}.navSignIn{color:#c7d0df;text-decoration:none}.navJoin{color:#fff;text-decoration:none;border:1px solid #34486e;border-radius:10px;padding:10px 13px;background:rgba(8,18,40,.65)}.navJoin span{color:#67bdff;margin-left:6px}
+        .hero{width:min(1180px,100%);min-height:670px;margin:auto;display:grid;grid-template-columns:46% 54%;align-items:center;position:relative;z-index:2}.heroCopy{padding:70px 0 55px}.eyebrow{display:inline-flex;align-items:center;gap:8px;color:#63b9ff;font-size:9px;font-weight:950;letter-spacing:2.5px}.eyebrow span{color:#b468ff;font-size:13px}.hero h1{font-size:clamp(70px,8vw,112px);line-height:.86;letter-spacing:-7px;margin:24px 0 25px;font-weight:950}.hero h1 span{background:linear-gradient(100deg,#15a5ff,#7350ff 58%,#cf35ff);-webkit-background-clip:text;color:transparent;text-shadow:0 0 50px rgba(79,80,255,.12)}.lead{max-width:520px;color:#a7b4ca;font-size:15px;line-height:1.75;margin:0}.lead strong{color:#f4c92f;font-weight:850}.heroActions{margin-top:30px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}.primaryCta{min-width:260px;display:flex;align-items:center;gap:12px;padding:12px 14px;text-decoration:none;color:#fff;border:1px solid rgba(114,154,255,.35);border-radius:13px;background:linear-gradient(100deg,#067fff,#771cff);box-shadow:0 18px 45px rgba(36,78,255,.26);transition:transform .25s,box-shadow .25s}.primaryCta:hover{transform:translateY(-3px);box-shadow:0 22px 55px rgba(36,78,255,.38)}.ctaIcon{width:39px;height:39px;display:grid;place-items:center;background:rgba(255,255,255,.12);border-radius:10px;font-size:21px}.primaryCta span:nth-child(2){display:grid;gap:2px;text-align:left}.primaryCta small{font-size:8px;letter-spacing:1.4px;color:#c8e7ff}.primaryCta b{font-size:12px}.primaryCta>strong{margin-left:auto;font-size:20px}.secondaryCta{color:#9daac0;text-decoration:none;border:1px solid #293b5d;border-radius:12px;padding:15px 16px;font-size:10px;font-weight:850;background:rgba(4,11,25,.55)}.secondaryCta span{color:#5dbaff;margin-left:7px}.trustLine{margin-top:25px;display:flex;align-items:center;gap:10px;color:#aab6c9}.trustLine b{display:block;color:#e5ebf6;font-size:10px}.trustLine small{display:block;font-size:9px;margin-top:2px;color:#687a96}.avatarStack{display:flex;padding-left:8px}.avatarStack span{width:28px;height:28px;margin-left:-8px;display:grid;place-items:center;border-radius:50%;border:2px solid #0b1428;background:#18243e;font-size:14px}.shield{margin-left:8px;opacity:.75}
+        .heroVisual{height:620px;display:grid;place-items:center;position:relative}.visualGlow{position:absolute;width:480px;height:370px;border-radius:50%;background:radial-gradient(circle,#1d5dff 0,rgba(79,40,255,.42) 40%,transparent 72%);filter:blur(35px);animation:glowPulse 4.5s ease-in-out infinite}.boardFrame{width:min(610px,52vw);position:relative;transform:perspective(1200px) rotateY(-5deg) rotateX(2deg);animation:boardFloat 5.5s ease-in-out infinite}.boardFrame:after{content:"";position:absolute;inset:6%;border-radius:30px;box-shadow:0 35px 80px rgba(0,0,0,.7);pointer-events:none}.boardHalo{position:absolute;inset:9%;border-radius:30px;background:linear-gradient(135deg,#00a5ff,#7d25ff,#ff2c7c);filter:blur(28px);opacity:.32}.heroBoard{position:relative;z-index:2;width:100%;height:auto;display:block;object-fit:contain;border-radius:23px;filter:drop-shadow(0 25px 25px rgba(0,0,0,.35))}.boardFallback{position:relative;z-index:2;aspect-ratio:1;border-radius:28px;display:grid;place-items:center;align-content:center;gap:15px;background:conic-gradient(#20bd65 0 25%,#ffd22e 0 50%,#2d70ef 0 75%,#ef3150 0);box-shadow:0 30px 80px #000a}.boardFallback span{font-size:76px}.boardFallback b{font-size:24px;letter-spacing:3px}
+        .orbit{position:absolute;border:1px solid rgba(99,170,255,.18);border-radius:50%;animation:spin 17s linear infinite}.orbitOne{width:540px;height:540px}.orbitTwo{width:680px;height:360px;transform:rotate(-20deg);animation-direction:reverse;animation-duration:22s}.dice{position:absolute;z-index:5;font-size:47px;filter:drop-shadow(0 15px 15px #0008);animation:diceFloat 4s ease-in-out infinite}.diceOne{right:7%;top:17%;transform:rotate(16deg)}.diceTwo{left:8%;bottom:14%;font-size:38px;animation-delay:-2s;transform:rotate(-18deg)}.floatingChip{position:absolute;z-index:6;display:flex;align-items:center;gap:9px;padding:10px 12px;border:1px solid rgba(120,161,255,.32);border-radius:13px;background:rgba(5,13,32,.8);backdrop-filter:blur(15px);box-shadow:0 18px 40px #0006;animation:chipFloat 4.5s ease-in-out infinite}.floatingChip>span{width:35px;height:35px;display:grid;place-items:center;border-radius:10px;background:linear-gradient(145deg,#213f8c,#32155c);font-size:18px}.floatingChip b,.floatingChip small{display:block}.floatingChip b{font-size:10px}.floatingChip small{font-size:8px;color:#7183a1;margin-top:2px}.chipTop{right:1%;top:12%}.chipBottom{left:1%;bottom:11%;animation-delay:-2.2s}.chipBottom>span{background:linear-gradient(145deg,#0a664d,#0a3562)}
+        .featureStrip{width:min(1120px,100%);margin:-5px auto 0;position:relative;z-index:7;display:grid;grid-template-columns:repeat(4,1fr);border:1px solid #22375e;border-radius:18px;background:linear-gradient(100deg,rgba(7,19,46,.96),rgba(5,11,29,.96));box-shadow:0 25px 60px #0005;overflow:hidden}.stripItem{display:flex;align-items:center;gap:12px;padding:18px 21px;border-right:1px solid #1d2e4e}.stripItem:last-child{border-right:0}.stripItem>span{font-size:24px}.stripItem b,.stripItem small{display:block}.stripItem b{font-size:11px}.stripItem small{font-size:8px;color:#70819c;margin-top:4px}
+        .section{width:min(1180px,100%);margin:95px auto 0;position:relative;z-index:2}.sectionHeading{display:grid;grid-template-columns:1fr 360px;gap:50px;align-items:end}.sectionHeading>div>span{font-size:9px;letter-spacing:2.5px;font-weight:950;color:#5faeff}.sectionHeading h2{font-size:44px;line-height:1;letter-spacing:-2.5px;margin:13px 0 0}.sectionHeading h2 em{font-style:normal;background:linear-gradient(90deg,#6fbaff,#bd52ff);-webkit-background-clip:text;color:transparent}.sectionHeading p{color:#8494ad;font-size:11px;line-height:1.8;margin:0 0 3px}.featureGrid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:35px}.featureCard{position:relative;min-height:250px;padding:22px;border-radius:17px;border:1px solid #263a61;background:linear-gradient(160deg,rgba(9,23,52,.92),rgba(4,10,25,.96));overflow:hidden;transition:transform .25s,border-color .25s}.featureCard:hover{transform:translateY(-7px);border-color:#4d70ae}.cardNumber{position:absolute;right:14px;top:10px;font-size:25px;font-weight:950;color:#172b4d}.featureIcon{width:52px;height:52px;display:grid;place-items:center;border-radius:14px;background:#0d2347;font-size:25px;margin-bottom:32px}.featureCard h3{font-size:15px;margin:0 0 10px}.featureCard p{font-size:10px;line-height:1.75;color:#7e8fa9;margin:0}.cardLine{position:absolute;left:22px;bottom:18px;width:42px;height:2px;border-radius:2px}.cardBlue .featureIcon{box-shadow:0 0 25px rgba(30,144,255,.16)}.cardBlue h3{color:#65baff}.cardBlue .cardLine{background:#2f91ff}.cardGold .featureIcon{background:#3a2c0d}.cardGold h3{color:#ffd341}.cardGold .cardLine{background:#f5c62e}.cardPurple .featureIcon{background:#2d1648}.cardPurple h3{color:#d179ff}.cardPurple .cardLine{background:#b94cff}.cardGreen .featureIcon{background:#0b3a31}.cardGreen h3{color:#3de0ad}.cardGreen .cardLine{background:#22d69e}
+        .playSection{margin-top:100px}.playPanel{min-height:420px;position:relative;display:grid;grid-template-columns:42% 58%;align-items:center;padding:45px 55px;border-radius:25px;border:1px solid #304d80;background:radial-gradient(circle at 15% 50%,rgba(26,111,255,.22),transparent 30%),linear-gradient(120deg,#071a3b,#100b2b 70%,#060a19);overflow:hidden}.playPanel:after{content:"";position:absolute;width:420px;height:420px;border-radius:50%;right:-120px;top:-130px;background:radial-gradient(circle,rgba(137,42,255,.25),transparent 67%);filter:blur(8px)}.miniBoard{width:290px;aspect-ratio:1;border-radius:50%;position:relative;display:grid;place-items:center;background:conic-gradient(#24b867 0 25%,#f9c91d 0 50%,#2d6ff0 0 75%,#ef3150 0);box-shadow:0 25px 70px #0009,0 0 60px rgba(36,98,255,.17);animation:slowSpin 15s linear infinite}.miniBoard:before{content:"";position:absolute;width:54%;height:54%;background:#07152e;border:2px solid rgba(255,255,255,.14);transform:rotate(45deg);border-radius:13px}.miniCenter{position:relative;z-index:2;font-size:45px;animation:counterSpin 15s linear infinite}.miniToken{position:absolute;width:34px;height:34px;border-radius:50%;border:4px solid rgba(255,255,255,.75);box-shadow:0 7px 13px #0008}.miniToken.red{background:#ef3150;left:31px;top:31px}.miniToken.blue{background:#2d70ef;right:31px;top:31px}.miniToken.green{background:#20bd65;left:31px;bottom:31px}.miniToken.yellow{background:#f8c921;right:31px;bottom:31px}.playCopy{position:relative;z-index:2}.playCopy h2{font-size:49px;line-height:.95;letter-spacing:-2.5px;margin:14px 0}.playCopy h2 em{font-style:normal;color:#a24cff}.playCopy p{max-width:430px;color:#8e9db5;font-size:12px;line-height:1.8}.wideCta{display:inline-flex;align-items:center;justify-content:space-between;min-width:260px;margin-top:12px;padding:14px 17px;border-radius:11px;color:#fff;text-decoration:none;background:linear-gradient(90deg,#078fff,#801fff);font-size:9px;font-weight:950;letter-spacing:.6px;box-shadow:0 14px 35px rgba(60,39,255,.24)}.wideCta b{font-size:16px}
+        .footer{width:min(1180px,100%);margin:30px auto 0;padding:24px 0 32px;border-top:1px solid #14213a;color:#50617c;display:flex;justify-content:space-between;align-items:center;font-size:8px;font-weight:900;letter-spacing:1px;position:relative;z-index:2}.footerBrand{color:#dce6f5;font-size:15px}.footerBrand .brandMark{font-size:12px}
+        @keyframes boardFloat{0%,100%{transform:perspective(1200px) rotateY(-5deg) rotateX(2deg) translateY(0)}50%{transform:perspective(1200px) rotateY(-2deg) rotateX(1deg) translateY(-13px)}}
+        @keyframes diceFloat{0%,100%{translate:0 0 rotate(0)}50%{translate:0 -12px rotate(9deg)}}
+        @keyframes chipFloat{0%,100%{translate:0 0}50%{translate:0 -9px}}
+        @keyframes glowPulse{0%,100%{opacity:.65;scale:1}50%{opacity:.95;scale:1.08}}
+        @keyframes floatGlow{0%,100%{translate:0 0}50%{translate:0 -25px}}
+        @keyframes starsDrift{from{transform:translateY(0)}to{transform:translateY(68px)}}
+        @keyframes spin{to{transform:rotate(360deg)}}
+        @keyframes slowSpin{to{transform:rotate(360deg)}}
+        @keyframes counterSpin{to{transform:rotate(-360deg)}}
+        @keyframes pulse{0%,100%{scale:1;opacity:1}50%{scale:1.5;opacity:.65}}
+        @media(max-width:980px){.hero{grid-template-columns:1fr;min-height:auto}.heroCopy{text-align:center;padding:65px 0 10px}.lead{margin:auto}.heroActions,.trustLine{justify-content:center}.heroVisual{height:570px}.boardFrame{width:min(650px,80vw)}.featureStrip{grid-template-columns:1fr 1fr}.stripItem:nth-child(2){border-right:0}.featureGrid{grid-template-columns:1fr 1fr}.sectionHeading{grid-template-columns:1fr;gap:15px}.sectionHeading p{max-width:580px}.playPanel{grid-template-columns:36% 64%;padding:35px}.miniBoard{width:240px}}
+        @media(max-width:650px){.landing{padding:0 14px}.nav{height:68px}.navRight{gap:9px}.livePill{display:none}.navJoin{padding:9px 10px}.navSignIn{font-size:10px}.hero h1{font-size:70px;letter-spacing:-5px}.heroCopy{padding-top:52px}.lead{font-size:12px;line-height:1.7}.heroActions{flex-direction:column;align-items:stretch}.primaryCta,.secondaryCta{width:100%;justify-content:center}.trustLine{text-align:left}.heroVisual{height:390px}.boardFrame{width:96vw;max-width:560px}.orbitOne{width:350px;height:350px}.orbitTwo{width:420px;height:250px}.floatingChip{transform:scale(.78)}.chipTop{right:-18px;top:7%}.chipBottom{left:-18px;bottom:7%}.dice{font-size:32px}.diceOne{right:3%;top:11%}.diceTwo{left:4%;bottom:8%}.featureStrip{margin-top:15px}.stripItem{padding:15px 13px}.stripItem>span{font-size:20px}.stripItem small{font-size:7px}.section{margin-top:70px}.sectionHeading h2{font-size:37px}.featureGrid{grid-template-columns:1fr 1fr;gap:9px}.featureCard{min-height:235px;padding:17px}.featureIcon{width:45px;height:45px;font-size:21px;margin-bottom:25px}.featureCard h3{font-size:12px}.featureCard p{font-size:9px}.playSection{margin-top:75px}.playPanel{grid-template-columns:1fr;padding:25px 20px;text-align:center;min-height:auto;gap:20px}.miniBoard{width:180px;margin:auto}.playCopy h2{font-size:38px}.playCopy p{margin:0 auto}.wideCta{width:100%}.footer{font-size:7px}.footerBrand{font-size:12px}.footer>span:last-child{display:none}}
+        @media(max-width:390px){.hero h1{font-size:60px}.featureGrid{grid-template-columns:1fr}.featureCard{min-height:210px}.featureStrip{grid-template-columns:1fr}.stripItem{border-right:0;border-bottom:1px solid #1d2e4e}.stripItem:last-child{border-bottom:0}.floatingChip{display:none}}
+        @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
+      `}</style>
+    </main>
+  );
 }
