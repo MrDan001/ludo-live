@@ -16,6 +16,17 @@ Room voice uses the existing canonical `ChatVoice.tsx` implementation with PeerJ
 
 `ChatVoice` preserves incoming WebRTC calls when the receiving player has not enabled their microphone yet, then answers those pending calls when the local microphone stream becomes available. Remote streams are attached to autoplay/playsinline audio elements.
 
+## Explicit Leave Room vs accidental disconnect
+
+These are different lifecycle events and must remain different:
+
+- **Explicit Leave Room:** the player intentionally chooses Leave Room. The Room page raises `leaveRequested`; `LiveSocial` immediately disconnects its room socket before navigation. This makes the server's disconnect cleanup run immediately instead of relying on browser navigation timing.
+- **Accidental/network disconnect:** do not convert this into an explicit leave. The server's reconnect/host-recovery rules remain responsible for restoring the same room when appropriate.
+- **Last remaining participant:** when the server sees that no room members remain, the room must be deleted and `room-list` broadcast so it cannot appear as a ghost room.
+- **Host with other participants:** intentional leave should transfer host authority to an eligible connected member rather than leaving a usable room with `host = null`.
+
+The Online Players UI displays `{players}/{roomSize}` for occupancy. The secondary label says `2-player game`/`4-player game` so capacity is not confused with current occupancy.
+
 ## Room-to-game handoff
 
 There are two related server responsibilities:
@@ -23,7 +34,7 @@ There are two related server responsibilities:
 - `server.js` maintains the legacy room/lobby roster and room discovery.
 - `multiplayer-canonical.js` is preloaded by the production start command and owns canonical multiplayer readiness, start, dice, movement and reconnect state.
 
-A room socket disconnects when the player navigates from `/room` to `/game-online`. Once the canonical match has started, the canonical socket disconnect handler must own that lifecycle and must not forward the disconnect into the legacy room handler. The legacy 2-player room handler closes the room and emits `kicked` when it believes the host permanently left; forwarding the normal navigation disconnect during a game transition therefore incorrectly kicked the other player back to `/lobby`.
+A room socket disconnects when the player navigates from `/room` to `/game-online`. Once the canonical match has started, the canonical socket disconnect handler must own that lifecycle and must not forward the disconnect into the legacy room handler. The legacy 2-player room handler closes the room and emits `kicked` when it believes the host permanently left; forwarding the normal navigation disconnect during a game transition therefore incorrectly kicked the remaining player back to `/lobby`.
 
 `multiplayer-canonical.js` now returns after handling a canonical disconnect, preventing the legacy room teardown from firing during the room-to-game transition.
 
@@ -43,11 +54,12 @@ Player-specific profile data such as username/avatar remains player-specific; th
 
 ## Files
 
-- `app/room/page.tsx` — authenticated room/player naming and navigation to the online game; must not override the host theme with a guest's URL board.
-- `app/_components/LiveSocial.tsx` — roster/readiness synchronization, chat, voice integration, and receipt of the authoritative start payload.
+- `app/room/page.tsx` — authenticated room/player naming, explicit Leave Room request, and navigation to the online game; must not override the host theme with a guest's URL board.
+- `app/_components/LiveSocial.tsx` — roster/readiness synchronization, chat, voice integration, room socket lifecycle, and receipt of the authoritative start payload.
 - `app/_components/ChatVoice.tsx` — canonical PeerJS/WebRTC voice transport and pending-call handling.
 - `server.js` — room discovery, roster, host ownership and authoritative `start-game.board` payload.
 - `multiplayer-canonical.js` — authoritative multiplayer readiness/start/game/reconnect rules and canonical disconnect ownership.
+- `app/lobby/page.tsx` — public room discovery and capacity/occupancy display.
 - `app/game-online/page.tsx` — online game entry; explicit board query parameters are only for controlled direct entry, not normal room handoff.
 - `app/game/MultiplayerGameCanonical.tsx` — canonical multiplayer board client and shared theme application.
 
@@ -58,3 +70,5 @@ Do not restore hard-coded `Player 1` defaults for authenticated players, create 
 Do not forward a canonical multiplayer disconnect to the legacy lobby disconnect handler after a match has started; doing so can trigger the legacy 2-player host-left cleanup and kick the remaining player during navigation.
 
 Do not append the guest's local `board` to the normal room-to-game URL. The host board sent by the server must remain authoritative for every participant.
+
+Do not rely on `localStorage.removeItem("ludo-room")` alone to leave a room. A player must disconnect the room socket first so the server membership is updated immediately.
