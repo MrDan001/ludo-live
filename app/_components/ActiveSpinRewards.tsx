@@ -5,12 +5,13 @@ import { usePathname } from "next/navigation";
 type Notice = { spins:number; xp:number; rush:boolean };
 
 function isGameSession(pathname:string){
+  // /game is the canonical Human-vs-Bot game surface.
+  // Keep it in the same verified active-time contract as multiplayer and tournament play.
   return pathname === "/room" || pathname.startsWith("/room/") || pathname === "/game" || pathname.startsWith("/game/") || pathname === "/game-online" || pathname.startsWith("/game-online/") || pathname === "/tournament/game" || pathname.startsWith("/tournament/game/");
 }
 
 export default function ActiveSpinRewards(){
   const pathname=usePathname();
-  const [notice,setNotice]=useState<Notice|null>(null);
   useEffect(()=>{
     if(!isGameSession(pathname||""))return;
     let alive=true;let timer:number|undefined;
