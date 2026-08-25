@@ -25,3 +25,6 @@ The canonical game session remains on the server during a temporary disconnect. 
 
 ## Regression guard
 There must be exactly one Socket.IO room `disconnect` handler. Explicit Leave and unexpected disconnect are separate server events.
+
+## Deployment repair marker
+The room lifecycle repair workflow must complete before this change is considered live.
