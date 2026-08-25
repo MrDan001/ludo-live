@@ -1,13 +1,14 @@
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// The supplied 30-character atlas is a 6 x 5 sheet at 960 x 560.
-// Each avatar is rendered as an individual 160 x 112 SVG viewport so
-// the browser never stretches/crops the whole atlas as a CSS background.
-const ATLAS = "/avatars/atlas-chunks/atlas.webp?v=20260826-7";
+// The supplied artwork is a 6 x 5 sheet at 960 x 560 (160 x 112 per avatar).
+// We reconstruct the already-working WebP once, then use an SVG viewport to
+// display exactly ONE character. This avoids CSS background scaling/cropping
+// that previously showed multiple characters in a single card.
+const CHUNKS = Array.from({ length: 8 }, (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-7`);
 const COLS = 6;
-const ROWS = 5;
 const CELL_W = 160;
 const CELL_H = 112;
 const ATLAS_W = 960;
@@ -24,7 +25,30 @@ function atlasIndex(id: string) {
 
 export default function AvatarArtwork({ id, className, style, size }: Props) {
   const index = atlasIndex(id || "");
-  if (index === null) return null;
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all(
+      CHUNKS.map((url) =>
+        fetch(url, { cache: "force-cache" }).then((r) => {
+          if (!r.ok) throw new Error(`Avatar asset failed: ${r.status}`);
+          return r.text();
+        }),
+      ),
+    )
+      .then((parts) => {
+        if (!cancelled) setSrc(`data:image/webp;base64,${parts.join("")}`);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (index === null || !src) return null;
 
   const col = index % COLS;
   const row = Math.floor(index / COLS);
@@ -49,18 +73,16 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         overflow: "hidden",
         borderRadius: "inherit",
         background: "#000",
-        imageRendering: "auto",
         ...style,
       }}
     >
       <image
-        href={ATLAS}
+        href={src}
         x={x}
         y={y}
         width={ATLAS_W}
         height={ATLAS_H}
         preserveAspectRatio="none"
-        hrefLang="en"
       />
     </svg>
   );
