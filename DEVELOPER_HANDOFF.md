@@ -83,6 +83,14 @@ Hierarchy is independent of Level and Prestige. It is based on verified active g
 
 The server derives hierarchy from `floor(total_active_seconds / 3600)`. It does not use level, wins, tournament wins, cosmetic ownership or client-provided hours. `Tournament Champion` remains an achievement/title concept and is not part of this hours ladder.
 
+### Prestige
+
+Prestige is separate from Hierarchy and Level. It is derived from the authoritative level using one Prestige for every **10 completed levels**:
+
+`prestige = floor((level - 1) / 10)`
+
+Therefore Levels 1–10 are Prestige 0, Levels 11–20 are Prestige 1, Levels 21–30 are Prestige 2, and the cycle continues indefinitely. The player's Level never resets when Prestige changes.
+
 ### Active-time rewards
 
 Only game-session surfaces count: `/room`, `/game`, `/game-online`, and `/tournament/game`.
@@ -98,7 +106,7 @@ Every completed 30 minutes grants:
 
 `app/_components/LiveSocial.tsx` is the canonical waiting-room UI. Its player cards must use real roster identities and link each name/avatar to the Player Showcase. The displayed avatar is resolved from the inspected player's authoritative `equipped.avatar` and `lib/customization-catalog`; generic placeholder avatars must not replace a real equipped avatar.
 
-The Player Showcase endpoint is authoritative for roster avatar enrichment. If a Socket.IO roster/game-state payload contains `avatar: "default"` while the player endpoint reports another equipped catalogue avatar, the endpoint value wins. This prevents a server roster update from masking the real avatar.
+The Player Showcase endpoint is authoritative for roster avatar enrichment. If a Socket.IO roster/game-state payload contains `avatar: "default"` while the player endpoint reports another equipped catalogue avatar, the endpoint value wins. This prevents a server roster update from masking the real equipped avatar.
 
 Canonical `game-state` updates may omit cosmetic fields. Merge waiting-room state by stable player identity and preserve an already-resolved `avatar`, `board`, `dice`, and name unless the newer server state explicitly supplies a replacement. Avatar enrichment is written back into member state so unrelated UI updates cannot make the avatar disappear.
 
