@@ -2,7 +2,7 @@ import {NextRequest,NextResponse} from "next/server";
 import {pool,ensureAuthSchema} from "../../auth/_db";
 import {ensureTournamentV2Schema} from "../../tournaments/_schema";
 import {currentUser} from "../../../../lib/auth-session";
-import {getLevelRewardPlan} from "../../../../lib/levelRewards";
+import {getNextMilestone,getLevelRewardPlan} from "../../../../lib/levelRewards";
 
 export const dynamic="force-dynamic";
 
@@ -55,9 +55,10 @@ export async function GET(req:NextRequest,{params}:{params:Promise<{username:str
     const ownedBoards=Array.isArray(u.owned_boards)?u.owned_boards:[];
     const ownedDice=Array.isArray(u.owned_dice)?u.owned_dice:[];
     const ownedAvatars=Array.isArray(u.owned_avatars)?u.owned_avatars:[];
-    const nextLevel=Math.floor(level/10)*10+10;
-    const nextPlan=getLevelRewardPlan(nextLevel);
-    const nextMilestone={level:nextLevel,title:`Level ${nextLevel} Milestone`,unlocks:nextPlan.unlock?[{name:nextPlan.unlock.name,type:nextPlan.unlock.type,icon:nextPlan.unlock.icon}]:[]};
+    // Keep the API on the same canonical reward/milestone helpers used by XP awards.
+    const next=getNextMilestone(level);
+    const nextPlan=getLevelRewardPlan(next.level);
+    const nextMilestone={level:next.level,title:`Level ${next.level} Milestone`,unlocks:nextPlan.unlock?[{name:nextPlan.unlock.name,type:nextPlan.unlock.type,icon:nextPlan.unlock.icon}]:[]};
 
     return NextResponse.json({
       player:{id:u.id,username:u.username,level,xp:Number(u.xp||0),equipped:{board:u.equipped_board,dice:u.equipped_dice,avatar:u.equipped_avatar},ownedCounts:{boards:ownedBoards.length,dice:ownedDice.length,avatars:ownedAvatars.length}},
