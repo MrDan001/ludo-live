@@ -2,7 +2,7 @@
 
 ## Read this first
 
-Before changing production behavior, read `ARCHITECTURE.md` and this file. The project has several protected contracts. **Do not guess from screenshots, old code, or previous conversation context. Trace the current implementation first.**
+Before changing production behavior, read `ARCHITECTURE.md`, `LEVEL_REWARDS.md` and this file. The project has several protected contracts. **Do not guess from screenshots, old code, or previous conversation context. Trace the current implementation first.**
 
 ## Non-negotiable engineering rules
 
@@ -15,7 +15,7 @@ Before changing production behavior, read `ARCHITECTURE.md` and this file. The p
 7. After code changes, build and inspect Railway deployment logs.
 8. Never call a change live until Railway reports `SUCCESS`.
 9. When a deployment fails, fix the exact reported error before touching unrelated code.
-10. When a product rule changes, update both `ARCHITECTURE.md` and this handoff document.
+10. When a product rule changes, update both `ARCHITECTURE.md` and this handoff document, plus the focused feature MD when one exists.
 
 ## Gameplay contracts
 
@@ -71,11 +71,31 @@ Supported audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
 
 ## XP / progression contract
 
+Read `LEVEL_REWARDS.md` for the complete reward ladder and implementation details.
+
 - Every game win in **any game mode** = **+7 XP**.
 - Every successful diamond purchase = **+15 XP**.
 - XP awards are server-authoritative and duplicate-protected.
 - Level-up animation fills the current XP bar, transitions to the next level, begins the new level's progress, and shows a congratulatory celebration for about 4 seconds.
 - Use the existing progression refresh/event flow; do not create a second XP store.
+- XP requirements continue without a hard-coded maximum level: `10 + (level × 5)`.
+- Every level grants coins; every fifth level grants gems; every tenth level grants a real usable cosmetic plus a milestone badge.
+- Milestone cosmetics come only from `lib/customization-catalog.ts` through the canonical shared table in `lib/levelRewards.ts`.
+- A milestone cosmetic that the player already owns is never duplicated. The server instead grants its configured fallback gem compensation and records it in `ludo_level_rewards.compensation_gems`.
+- Level reward grants and ownership/wallet mutations occur in the same PostgreSQL transaction and are idempotent on `(user_id, level)`.
+- `app/_components/XPLevelCelebration.tsx` displays the actual unlock or already-owned compensation.
+- `app/profile/page.tsx` displays the next meaningful milestone using `getNextMilestone()`.
+- Do not claim a feature such as VIP, Ranked, Elite Rooms or Tournament qualification is unlocked unless there is a real server-side entitlement check for that feature.
+
+## Level reward implementation map
+
+- `lib/levelRewards.ts` — canonical milestone table and reward calculation shared by server/UI.
+- `app/api/progress/route.ts` — authoritative XP calculation, level transition, reward ledger, wallet grant and customization ownership grant/compensation.
+- `app/_components/XPLevelCelebration.tsx` — level-up reward presentation.
+- `app/profile/page.tsx` — next-milestone preview.
+- `app/api/customization/route.ts` — authoritative equip/ownership API used after a level cosmetic is granted.
+- `lib/customization-catalog.ts` — authoritative catalogue containing the real board/dice/avatar IDs.
+- `LEVEL_REWARDS.md` — full developer contract, ladder and duplicate/compensation rules.
 
 ## Free Spin / Active Time contract
 
@@ -93,7 +113,7 @@ Free spins are a server-authoritative player reward balance and are usable on th
 - Do not treat a client timer as authoritative. The server decides when an interval is complete and how many spins are granted.
 - Do not reset earned spins daily. Unused earned spins persist until consumed.
 - The existing `extraSpin` wheel prize adds one additional spin to the server balance.
-- Nigeria-time window logic must use `Africa/Lagos`; never use the developer/device timezone as the business rule.
+- Nigeria-time window logic must use `Africa/Lagos`; never use the developer/device timezone.
 
 ## Shop contract
 
@@ -277,6 +297,8 @@ Before reporting a release as complete:
 - [ ] Financial and ownership mutations remain server-authoritative.
 - [ ] Free-spin activity/grants remain server-authoritative.
 - [ ] Event expiry/reward settlement remains server-authoritative and idempotent.
+- [ ] Level reward grants remain server-authoritative and idempotent.
+- [ ] Every level milestone points to a real usable catalogue item or a real configured future entitlement.
 - [ ] Railway deployment reaches `SUCCESS`.
 - [ ] If Railway fails, the actual build/deploy log was inspected.
 
@@ -296,6 +318,7 @@ Before reporting a release as complete:
 - Do not fix one TypeScript error by suppressing type checking; fix the type at its source.
 - Do not treat a green Mic button as proof of remote audio delivery.
 - Do not discard an incoming WebRTC call because the microphone is currently off; queue it and answer once the local stream exists.
+- Do not add a level reward that is only a mock label. If it says unlocked, the player must own/use the real asset or the server must enforce the corresponding entitlement.
 
 ## Handoff rule
 
