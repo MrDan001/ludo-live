@@ -68,10 +68,29 @@ The profile exposes `username`, wallet and progression/customization data. Multi
 - `server.js` — Socket.IO room state, roster, host, dice/move events, chat/friends and match hooks.
 - `app/game/MultiplayerGameCanonical.tsx` — client live multiplayer.
 - `app/game-online/page.tsx` — online entry.
+- `app/_components/LiveSocial.tsx` — canonical multiplayer waiting-room presentation.
 
 The **host owns the room board skin**. A joining player's personal board skin must never replace the host skin. Seat/team mapping comes from the canonical engine; do not invent another mapping in UI.
 
 2-player and 4-player multiplayer should remain viewport-sized and non-scrollable unless a deliberate responsive redesign is requested.
+
+### Waiting-room identity contract
+
+Player names and avatars in the waiting room use `PlayerIdentityLink` and the authoritative `/api/player/[username]` profile data. If a Socket.IO roster/game-state update contains a stale/default avatar, the authoritative equipped avatar from the player endpoint wins. The canonical `AVATARS` catalogue is the only avatar icon source, including the shared `🧑🏽‍🎮` default representation.
+
+Cosmetic state is merged by stable player identity so a later game-state update cannot make an already-resolved avatar disappear. The waiting room must not create a second avatar catalogue or hard-coded player identities.
+
+## Player Showcase / reputation identity
+
+- `/player/<username>` is the canonical public player inspection route.
+- `app/player/[username]/page.tsx` consumes `GET /api/player/[username]` and renders server-derived public identity/progression data.
+- `app/_components/PlayerIdentityLink.tsx` is the shared navigation contract from player names/avatars to the Showcase.
+- The Showcase exposes public progression, title, prestige, achievements, loadout and the single next milestone, but not private wallet, email, password or session data.
+- The Showcase avatar resolves from the same `AVATARS` catalogue and the same `🧑🏽‍🎮` default representation as Profile.
+- The Level Journey is a progressive road that starts publicly at **Level 1**. Level 0 is never rendered as a public journey node. Legacy Level 0 records are visually normalized to Level 1 for the journey.
+- The current visible level receives a 📍 node and `CURRENT LEVEL` pill. The separate `YOU ARE HERE` label and the explanatory paragraph above the road are intentionally absent.
+- The current row displays current-level XP, a progress bar and exact XP remaining to the next level using canonical `xpRequiredForLevel()`.
+- The road renders a useful current-level window rather than enumerating unlimited future levels.
 
 ## Tournament
 
