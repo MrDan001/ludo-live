@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import AvatarArtwork from "../_components/AvatarArtwork";
 
 type Currency = "coins" | "gems" | "naira";
 type Item = { type:string; id:string; name:string; description?:string; icon?:string; rarity?:string; currency:Currency; price:number };
@@ -19,18 +20,12 @@ export default function AdminShop() {
   </>;
 }
 
-function AtlasIcon({icon}:{icon:string}) {
-  const match = /^atlas:(\d{1,2})$/.exec(icon);
-  if (!match) return null;
-  const index = Number(match[1]);
-  if (index < 1 || index > 30) return null;
-  const zero = index - 1;
-  const column = zero % 5;
-  const rowIndex = Math.floor(zero / 5);
-  return <span aria-label={`Avatar ${index}`} style={{...iconStyle, backgroundImage:"url('/avatars/premium-elite-atlas.jpg')", backgroundSize:"500% 600%", backgroundPosition:`${column * 25}% ${rowIndex * 20}%`, backgroundRepeat:"no-repeat"}}/>;
+function PriceRow({item,busy,onSave}:{item:Item;busy:boolean;onSave:(item:Item,currency:Currency,price:string)=>void}){
+  const[currency,setCurrency]=useState<Currency>(item.currency),[price,setPrice]=useState(String(item.price));
+  useEffect(()=>{setCurrency(item.currency);setPrice(String(item.price))},[item.currency,item.price]);
+  const vectorAvatar=/^(premium|elite)-\d{2}$/.test(item.id) && item.type === "avatar";
+  return <article style={row}><div style={info}>{vectorAvatar?<AvatarArtwork id={item.id} style={{width:42,height:42,flex:"0 0 42px",borderRadius:12,display:"block"}}/>:<div style={iconStyle}>{item.icon||(item.type==="board"?"🎨":item.type==="dice"?"🎲":item.type==="avatar"?"🧑‍🎮":"✨")}</div>}<div><b>{item.name}</b><small>{item.type.toUpperCase()} • {item.rarity||"ITEM"}</small></div></div><select style={input} value={currency} onChange={e=>setCurrency(e.target.value as Currency)}><option value="coins">🪙 Coins</option><option value="gems">💎 Gems</option><option value="naira">₦ Naira</option></select><input style={input} type="number" min="0" step="1" value={price} onChange={e=>setPrice(e.target.value)}/><div style={current}>{label(item.currency)}<b>{Number(item.price).toLocaleString("en-NG")}</b></div><button style={saveBtn} disabled={busy} onClick={()=>onSave(item,currency,price)}>{busy?"Saving…":"Save price"}</button></article>
 }
-
-function PriceRow({item,busy,onSave}:{item:Item;busy:boolean;onSave:(item:Item,currency:Currency,price:string)=>void}){const[currency,setCurrency]=useState<Currency>(item.currency),[price,setPrice]=useState(String(item.price));useEffect(()=>{setCurrency(item.currency);setPrice(String(item.price))},[item.currency,item.price]);return <article style={row}><div style={info}>{item.icon?.startsWith("atlas:")?<AtlasIcon icon={item.icon}/>:<div style={iconStyle}>{item.icon||(item.type==="board"?"🎨":item.type==="dice"?"🎲":item.type==="avatar"?"🧑‍🎮":"✨")}</div>}<div><b>{item.name}</b><small>{item.type.toUpperCase()} • {item.rarity||"ITEM"}</small></div></div><select style={input} value={currency} onChange={e=>setCurrency(e.target.value as Currency)}><option value="coins">🪙 Coins</option><option value="gems">💎 Gems</option><option value="naira">₦ Naira</option></select><input style={input} type="number" min="0" step="1" value={price} onChange={e=>setPrice(e.target.value)}/><div style={current}>{label(item.currency)}<b>{Number(item.price).toLocaleString("en-NG")}</b></div><button style={saveBtn} disabled={busy} onClick={()=>onSave(item,currency,price)}>{busy?"Saving…":"Save price"}</button></article>}
 
 const shopButton:any={position:"fixed",right:18,top:18,zIndex:1100,border:"1px solid #31b978",background:"#116b42",color:"white",borderRadius:12,padding:"10px 14px",fontWeight:900,cursor:"pointer",boxShadow:"0 10px 28px rgba(0,0,0,.3)"};
 const overlay:any={position:"fixed",inset:0,zIndex:1099,background:"rgba(0,0,0,.72)",display:"flex",alignItems:"flex-start",justifyContent:"center",padding:"72px 14px 20px",overflow:"auto"};
