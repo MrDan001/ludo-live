@@ -26,9 +26,10 @@ export default function LiveSocial({roomCode,name,host=false,roomSize=4,compact=
    socket.on("room-error",(m:string)=>{if(startTimerRef.current!==null){window.clearTimeout(startTimerRef.current);startTimerRef.current=null}setNotice(m||"Unable to update the room.")});
    socket.on("start-error",(m:string)=>setNotice(m||"Unable to start the game."));
    socket.on("kicked",()=>{setNotice("You were removed by the room host.");kickRef.current?.()});
+   socket.on("room-left",()=>{if(startTimerRef.current!==null)window.clearTimeout(startTimerRef.current);socket.disconnect();socketRef.current=null;leaveRef.current?.()});
    return()=>{cancelled=true;if(startTimerRef.current!==null)window.clearTimeout(startTimerRef.current);socket.disconnect();socketRef.current=null};
  };connect();return()=>{cancelled=true}},[roomCode,name,host,roomSize]);
- useEffect(()=>{if(!leaveRequested)return;const socket=socketRef.current;if(!socket)return;setNotice("Leaving room…");socket.disconnect();socketRef.current=null;const timer=window.setTimeout(()=>leaveRef.current?.(),150);return()=>window.clearTimeout(timer)},[leaveRequested]);
+ useEffect(()=>{if(!leaveRequested)return;const socket=socketRef.current;if(!socket){leaveRef.current?.();return}setNotice("Leaving room…");let done=false;const fallback=window.setTimeout(()=>{if(done)return;done=true;socket.disconnect();socketRef.current=null;leaveRef.current?.()},1000);socket.emit("leave-room");return()=>window.clearTimeout(fallback)},[leaveRequested]);
  const self=members.find(m=>m.id===selfId||m.playerId===selfPlayerId),ready=!!self?.ready;
  const serverHost=!!members.find(m=>(m.host&&m.playerId===selfPlayerId)||(m.host&&m.id===selfId));
  const canStart=host&&serverHost&&members.length===roomSize&&members.every(m=>m.ready&&m.connected!==false);
