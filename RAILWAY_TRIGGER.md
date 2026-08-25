@@ -32,4 +32,18 @@ The complete architecture and product contracts live in:
 - `ARCHITECTURE.md`
 - `DEVELOPER_HANDOFF.md`
 
-Those documents are the source of developer-facing product rules for gameplay, XP, Shop, Inventory/Award Room, admin navigation, finance responsiveness, authentication, server authority and deployment discipline.
+Those documents are the source of developer-facing product rules for gameplay, XP, Shop, Inventory/Award Room, active-time free spins, admin navigation, finance responsiveness, authentication, server authority and deployment discipline.
+
+## Free Spin deployment rule
+
+The active-time free-spin system is a production gameplay/reward feature and must be verified like any other server-authoritative feature.
+
+- Every 30 minutes of server-validated active app time grants 1 free spin.
+- From 17:00 to 20:00 Nigeria time (`Africa/Lagos`), every completed 30-minute interval grants 3 free spins.
+- Free-spin balance is server/database authoritative and is consumed by the Spin Wheel.
+- Profile displays the current Free Rolls balance.
+- Reward grants produce an in-app notification; browser notification is conditional on notification permission/subscription support.
+- Do not claim OS-level closed-app push delivery unless the required web-push infrastructure is actually configured and verified.
+- Unused earned spins persist until consumed.
+
+Any change to these rules must be reflected in `ARCHITECTURE.md` and `DEVELOPER_HANDOFF.md` in the same release.
