@@ -9,7 +9,7 @@ type Props = { id?: string; className?: string; style?: CSSProperties; size?: nu
 // while 06.txt is 6264 bytes. The LF is not part of the Base64 payload.
 const CHUNKS = Array.from(
   { length: 8 },
-  (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-8`,
+  (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-9`,
 );
 const COLS = 6;
 const CELL_W = 160;
@@ -24,6 +24,22 @@ function atlasIndex(id: string) {
   const index = id.startsWith("elite-") ? 10 + n : n;
   if (index < 1 || index > 30) return null;
   return index - 1;
+}
+
+function normalizeBase64(parts: string[]) {
+  const joined = parts.join("").replace(/\s+/g, "");
+
+  // A previous atlas repair left a few characters after the final Base64
+  // padding marker. Anything after '=' cannot belong to a valid Base64 image
+  // and causes browsers to reject the resulting WebP data URI.
+  const paddingIndex = joined.indexOf("=");
+  const base64 = paddingIndex >= 0 ? joined.slice(0, paddingIndex + 2) : joined;
+
+  if (!base64 || base64.length % 4 !== 0) {
+    throw new Error(`Invalid avatar Base64 length: ${base64.length}`);
+  }
+
+  return base64;
 }
 
 export default function AvatarArtwork({ id, className, style, size }: Props) {
@@ -41,10 +57,7 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
       }),
     )
       .then((parts) => {
-        const base64 = parts.join("");
-        if (base64.length % 4 !== 0) {
-          throw new Error(`Invalid avatar Base64 length: ${base64.length}`);
-        }
+        const base64 = normalizeBase64(parts);
         if (!cancelled) setSrc(`data:image/webp;base64,${base64}`);
       })
       .catch(() => {
