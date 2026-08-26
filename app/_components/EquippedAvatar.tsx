@@ -33,9 +33,10 @@ export default function EquippedAvatar({ className, style }: { className?: strin
     return () => { alive = false; window.removeEventListener("focus", sync); window.removeEventListener("ludo-wallet-updated", sync); };
   }, []);
 
+  const displayAvatar = broken ? { ...avatar, imageUrl: null } : avatar;
   return (
     <AvatarRenderer
-      avatar={avatar}
+      avatar={displayAvatar}
       className={className}
       style={style}
       onImageError={() => setBroken(true)}
