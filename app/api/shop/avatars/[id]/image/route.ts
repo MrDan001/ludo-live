@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { pool } from "../../../auth/_db";
+import { pool } from "../../../../auth/_db";
 
 export const dynamic = "force-dynamic";
 
