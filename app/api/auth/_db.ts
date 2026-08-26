@@ -18,9 +18,6 @@ function databaseConfig() {
   return {
     connectionString,
     ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
-    // Railway/Postgres is behind a constrained session pool. Keep each app
-    // process small and release idle connections quickly so serverless
-    // instances cannot exhaust the upstream pool.
     max: 3,
     idleTimeoutMillis: 5_000,
     connectionTimeoutMillis: 5_000,
@@ -57,4 +54,4 @@ CREATE TABLE IF NOT EXISTS ludo_tournaments(id TEXT PRIMARY KEY,name TEXT NOT NU
 ('fire-ice','Fire & Ice Clash','Elemental tournament: hot entry, cool rewards.','open',750,0,50000,500,128,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '4 days','{"playersPerMatch":4,"topPlaces":3,"format":"single-elimination"}','[{"place":1,"coins":25000,"gems":250},{"place":2,"coins":15000,"gems":150},{"place":3,"coins":10000,"gems":100}]'),
 ('rookie-road','Rookie Road','Low-cost tournament built for new competitors.','open',100,0,10000,100,32,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '2 days','{"playersPerMatch":4,"topPlaces":3,"format":"single-elimination"}','[{"place":1,"coins":5000,"gems":50},{"place":2,"coins":3000,"gems":30},{"place":3,"coins":2000,"gems":20}]'),
 ('weekend-legends','Weekend Legends','The weekend leaderboard tournament.','open',1000,0,80000,1000,256,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '6 days','{"playersPerMatch":4,"topPlaces":3,"format":"single-elimination"}','[{"place":1,"coins":40000,"gems":500},{"place":2,"coins":24000,"gems":300},{"place":3,"coins":16000,"gems":200}]'),
-('ludo-live-finals','Ludo Live Finals','Elite final bracket for serious competitors.','open',5000,100,200000,5000,128,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '7 days','{"playersPerMatch":4,"topPlaces":3,"format":"single-elimination"}','[{"place":1,"coins":100000,"gems":2500},{"place":2,"coins":60000,"gems":1500},{"place":3,"coins":40000,"gems":1000}]`)}).catch(e=>{console.error("auth schema",e);throw e})}return schemaPromise}
+('ludo-live-finals','Ludo Live Finals','Elite final bracket for serious competitors.','open',5000,100,200000,5000,128,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '7 days','{"playersPerMatch":4,"topPlaces":3,"format":"single-elimination"}','[{"place":1,"coins":100000,"gems":2500},{"place":2,"coins":60000,"gems":1500},{"place":3,"coins":40000,"gems":1000}]')`)}).catch(e=>{console.error("auth schema",e);throw e})}return schemaPromise}
