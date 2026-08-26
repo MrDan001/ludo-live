@@ -1,9 +1,41 @@
 import { Pool } from "pg";
 
-const globalForDb=globalThis as unknown as {ludoPool?:Pool};
-function databaseConfig(){const raw=process.env.DATABASE_URL;if(!raw)throw new Error("DATABASE_URL is not configured");let connectionString=raw;try{const u=new URL(raw);u.searchParams.delete("sslmode");u.searchParams.delete("sslcert");u.searchParams.delete("sslkey");u.searchParams.delete("sslrootcert");connectionString=u.toString()}catch{}return{connectionString,ssl:process.env.NODE_ENV==="production"?{rejectUnauthorized:false}:false}}
-export const pool=globalForDb.ludoPool??new Pool(databaseConfig());if(!globalForDb.ludoPool)globalForDb.ludoPool=pool;let schemaPromise:Promise<void>|null=null;
-export function ensureAuthSchema(){if(!schemaPromise){schemaPromise=pool.query(`
+const globalForDb = globalThis as unknown as { ludoPool?: Pool };
+
+function databaseConfig() {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) throw new Error("DATABASE_URL is not configured");
+  let connectionString = raw;
+  try {
+    const u = new URL(raw);
+    u.searchParams.delete("sslmode");
+    u.searchParams.delete("sslcert");
+    u.searchParams.delete("sslkey");
+    u.searchParams.delete("sslrootcert");
+    connectionString = u.toString();
+  } catch {}
+
+  return {
+    connectionString,
+    ssl: process.env.NODE_ENV === "production" ? { rejectUnauthorized: false } : false,
+    // Railway/Postgres is behind a constrained session pool. Keep each app
+    // process small and release idle connections quickly so serverless
+    // instances cannot exhaust the upstream pool.
+    max: 3,
+    idleTimeoutMillis: 5_000,
+    connectionTimeoutMillis: 5_000,
+    allowExitOnIdle: true,
+  };
+}
+
+export const pool = globalForDb.ludoPool ?? new Pool(databaseConfig());
+if (!globalForDb.ludoPool) globalForDb.ludoPool = pool;
+
+let schemaPromise: Promise<void> | null = null;
+
+export function ensureAuthSchema() {
+  if (!schemaPromise) {
+    schemaPromise = pool.query(`
 CREATE TABLE IF NOT EXISTS ludo_users(id TEXT PRIMARY KEY,username TEXT NOT NULL,email TEXT UNIQUE,password_hash TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),coins INTEGER NOT NULL DEFAULT 1000,gems INTEGER NOT NULL DEFAULT 10,xp INTEGER NOT NULL DEFAULT 0,level INTEGER NOT NULL DEFAULT 0,is_guest BOOLEAN NOT NULL DEFAULT FALSE,is_banned BOOLEAN NOT NULL DEFAULT FALSE,banned_at TIMESTAMPTZ,ban_reason TEXT,last_seen_at TIMESTAMPTZ);
 ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS is_banned BOOLEAN NOT NULL DEFAULT FALSE;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS banned_at TIMESTAMPTZ;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS ban_reason TEXT;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS last_seen_at TIMESTAMPTZ;
 ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS owned_boards JSONB NOT NULL DEFAULT '["classic"]'::jsonb;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS owned_dice JSONB NOT NULL DEFAULT '["classic"]'::jsonb;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS equipped_board TEXT NOT NULL DEFAULT 'classic';ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS equipped_dice TEXT NOT NULL DEFAULT 'classic';ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS owned_avatars JSONB NOT NULL DEFAULT '[]'::jsonb;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS equipped_avatar TEXT NOT NULL DEFAULT 'default';ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS owned_items JSONB NOT NULL DEFAULT '[]'::jsonb;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS equipped_items JSONB NOT NULL DEFAULT '[]'::jsonb;
