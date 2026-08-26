@@ -1,6 +1,12 @@
 const { Pool } = require('pg');
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: process.env.DATABASE_SSL === 'false' ? false : { rejectUnauthorized: false } });
+const databaseSslDisabled = String(process.env.DATABASE_SSL || '').toLowerCase() === 'false';
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  // Railway/Postgres may use a self-signed certificate. Keep TLS enabled,
+  // but do not reject the platform certificate chain.
+  ssl: databaseSslDisabled ? false : { rejectUnauthorized: false },
+});
 let running = false;
 
 async function ensure() {
