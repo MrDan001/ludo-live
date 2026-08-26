@@ -4,19 +4,58 @@ import {useSearchParams} from "next/navigation";
 import AppFrame from "../_components/AppFrame";
 import LiveSocial from "../_components/LiveSocial";
 import {AccountGateModal,useAccountGate} from "../_components/AccountGate";
-type Room={code:string;players:number;host:boolean;name:string;stake:number};
+
+type Room={code:string;players:number;host:boolean;name:string};
 const ROOM_KEY="ludo-room";
 function makeCode(){return Math.random().toString(36).slice(2,8).toUpperCase()}
 function bumpStat(key:string){try{const s=JSON.parse(localStorage.getItem("ludo-stats")||"{}");s[key]=(s[key]||0)+1;localStorage.setItem("ludo-stats",JSON.stringify(s));window.dispatchEvent(new Event("ludo-stats-updated"))}catch{}}
-function RoomContent(){const params=useSearchParams();const action=params.get("action")||"create";const presetCode=params.get("code")||"";const presetSize=params.get("size")||"4";const[room,setRoom]=useState<Room|null>(null);const[restoring,setRestoring]=useState(true);const[players,setPlayers]=useState(presetSize);const[code,setCode]=useState(presetCode.toUpperCase());const[name,setName]=useState("");const[notice,setNotice]=useState("");const[leaving,setLeaving]=useState(false);const gate=useAccountGate();
- useEffect(()=>{let cancelled=false;(async()=>{let profileName="";try{const a=await fetch("/api/auth",{cache:"no-store"}).then(r=>r.json());profileName=String(a?.user?.username||a?.user?.nickname||"").trim()}catch{}if(cancelled)return;try{const raw=localStorage.getItem(ROOM_KEY);if(raw){const saved=JSON.parse(raw) as Room;const sameRequestedRoom=!presetCode||saved.code===presetCode.toUpperCase();const sameMode=action==="join"?!saved.host:saved.host;if(saved?.code&&sameRequestedRoom&&sameMode){const restoredName=profileName||String(saved.name||"");setRoom({...saved,name:restoredName,stake:0});setPlayers(String(saved.players));setCode(saved.code);setName(restoredName)}}if(profileName)setName(profileName)}catch{}finally{if(!cancelled)setRestoring(false)}})();return()=>{cancelled=true}},[action,presetCode]);
+
+function RoomContent(){
+ const params=useSearchParams();
+ const action=params.get("action")||"create";
+ const presetCode=params.get("code")||"";
+ const presetSize=params.get("size")||"4";
+ const[room,setRoom]=useState<Room|null>(null);
+ const[restoring,setRestoring]=useState(true);
+ const[players,setPlayers]=useState(presetSize);
+ const[code,setCode]=useState(presetCode.toUpperCase());
+ const[name,setName]=useState("");
+ const[notice,setNotice]=useState("");
+ const[leaving,setLeaving]=useState(false);
+ const gate=useAccountGate();
+
+ useEffect(()=>{let cancelled=false;(async()=>{
+   let profileName="";
+   try{const a=await fetch("/api/auth",{cache:"no-store"}).then(r=>r.json());profileName=String(a?.user?.username||a?.user?.nickname||"").trim()}catch{}
+   if(cancelled)return;
+   try{
+     const raw=localStorage.getItem(ROOM_KEY);
+     if(raw){
+       const saved=JSON.parse(raw) as Room;
+       const sameRequestedRoom=!presetCode||saved.code===presetCode.toUpperCase();
+       const sameMode=action==="join"?!saved.host:saved.host;
+       if(saved?.code&&sameRequestedRoom&&sameMode){
+         const restoredName=profileName||String(saved.name||"");
+         setRoom({...saved,name:restoredName});setPlayers(String(saved.players));setCode(saved.code);setName(restoredName)
+       }
+     }
+     if(profileName)setName(profileName);
+   }catch{}finally{if(!cancelled)setRestoring(false)}
+ })();return()=>{cancelled=true}},[action,presetCode]);
+
  useEffect(()=>{if(!room)return;const html=document.documentElement;const body=document.body;const oldHtml=html.style.overflow;const oldBody=body.style.overflow;html.style.overflow="hidden";body.style.overflow="hidden";return()=>{html.style.overflow=oldHtml;body.style.overflow=oldBody}},[room]);
- const create=()=>{const r={code:makeCode(),players:Number(players)===2?2:4,host:true,name:name.trim()||"Player",stake:0};localStorage.setItem(ROOM_KEY,JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
- const join=()=>{const c=code.trim().toUpperCase();if(c.length<4){setNotice("Enter the room code.");return}const r={code:c,players:Number(players)===2?2:4,host:false,name:name.trim()||"Player",stake:0};localStorage.setItem(ROOM_KEY,JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
- const gatedAction=(fn:()=>void)=>gate.check(fn);const start=()=>{if(!room)return;window.location.href=`/game-online?room=${encodeURIComponent(room.code)}&name=${encodeURIComponent(room.name)}${room.host?"&host=1":""}`};const leave=()=>{if(leaving)return;setLeaving(true);setNotice("Leaving room…")};const finishLeave=()=>{localStorage.removeItem(ROOM_KEY);setRoom(null);window.location.href="/lobby"};
+ const create=()=>{const r={code:makeCode(),players:Number(players)===2?2:4,host:true,name:name.trim()||"Player"};localStorage.setItem(ROOM_KEY,JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
+ const join=()=>{const c=code.trim().toUpperCase();if(c.length<4){setNotice("Enter the room code.");return}const r={code:c,players:Number(players)===2?2:4,host:false,name:name.trim()||"Player"};localStorage.setItem(ROOM_KEY,JSON.stringify(r));bumpStat("gameRoomsEntered");setRoom(r)};
+ const gatedAction=(fn:()=>void)=>gate.check(fn);
+ const start=()=>{if(!room)return;window.location.href=`/game-online?room=${encodeURIComponent(room.code)}&name=${encodeURIComponent(room.name)}${room.host?"&host=1":""}`};
+ const leave=()=>{if(leaving)return;setLeaving(true);setNotice("Leaving room…")};
+ const finishLeave=()=>{localStorage.removeItem(ROOM_KEY);setRoom(null);window.location.href="/lobby"};
  if(restoring)return <AppFrame back="/lobby"><div style={{maxWidth:520,margin:"0 auto",padding:40,textAlign:"center",color:"#94a3b8"}}>Restoring your room…</div></AppFrame>;
- if(room)return <AppFrame back="/lobby"><div className="room-page-viewport"><LiveSocial compact roomCode={room.code} name={room.name} host={room.host} roomSize={room.players} stake={0} leaveRequested={leaving} onLeaveComplete={finishLeave} onStart={start} onKicked={()=>{localStorage.removeItem(ROOM_KEY);window.location.href="/lobby"}}/><div className="room-leave-dock"><button type="button" onClick={leave} disabled={leaving} style={{...leaveBtn,opacity:leaving?.6:1}}>{leaving?"Leaving…":"Leave Room"}</button></div>{notice&&<p className="room-page-notice">{notice}</p>}<style jsx global>{`.room-page-viewport{position:relative;max-width:900px;margin:-16px auto 0;min-height:0;overflow:hidden}.room-leave-dock{display:flex;justify-content:flex-end;margin-top:8px;position:relative;z-index:20}.room-page-notice{margin:6px 0 0;text-align:right;color:#fbbf24;font-size:12px;pointer-events:none}@media(max-width:520px){.room-page-viewport{margin-top:-12px}.room-leave-dock{margin-top:7px}.room-page-notice{font-size:11px}}`}</style></div></AppFrame>;
- return <AppFrame back="/lobby"><div style={{maxWidth:520,margin:"0 auto"}}><h1 style={{fontSize:38}}>{action==="join"?"Join a Game":"Create a Game"}</h1><p style={{color:"#94a3b8"}}>{action==="join"?"Join an open room and take an available seat. The stake is agreed by the players inside the room.":"Create the room first. Once players are together, agree the stake through chat/voice and set it inside the room."}</p><label style={label}>Your name<input value={name} onChange={e=>setName(e.target.value)} style={input}/></label>{action==="join"?<><label style={label}>Room code<input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} style={input}/></label><label style={label}>Players<select value={players} onChange={e=>setPlayers(e.target.value)} style={input}><option value="2">2 Players</option><option value="4">4 Players</option></select></label><div style={infoBox}>🪙 No stake is chosen here. Agree the amount in the room first. The host then sets the agreed amount (500–10,000 coins), and every player confirms their stake there.</div></>:<><label style={label}>Number of players<select value={players} onChange={e=>setPlayers(e.target.value)} style={input}><option value="2">2 Players</option><option value="4">4 Players</option></select></label><div style={infoBox}>🪙 Staking happens inside the room after everyone has agreed through chat/voice. The host sets the agreed amount there, from 500 to 10,000 coins.</div></>}<button onClick={()=>gatedAction(action==="join"?join:create)} style={primary}>{action==="join"?"Join Room":"Create Room"}</button>{notice&&<p style={{color:"#fbbf24"}}>{notice}</p>}<div style={{marginTop:18,padding:12,borderRadius:12,background:"rgba(30,41,59,.55)",color:"#94a3b8",fontSize:12}}>🔐 A registered account is required to create or join a game. Guest mode is for exploring the app only.</div></div><AccountGateModal open={gate.open} onClose={()=>gate.setOpen(false)}/></AppFrame>;
+ if(room)return <AppFrame back="/lobby"><div className="room-page-viewport"><LiveSocial compact roomCode={room.code} name={room.name} host={room.host} roomSize={room.players} leaveRequested={leaving} onLeaveComplete={finishLeave} onStart={start} onKicked={()=>{localStorage.removeItem(ROOM_KEY);window.location.href="/lobby"}}/><div className="room-leave-dock"><button type="button" onClick={leave} disabled={leaving} style={{...leaveBtn,opacity:leaving?.6:1}}>{leaving?"Leaving…":"Leave Room"}</button></div>{notice&&<p className="room-page-notice">{notice}</p>}<style jsx global>{`.room-page-viewport{position:relative;max-width:900px;margin:-16px auto 0;min-height:0;overflow:hidden}.room-leave-dock{display:flex;justify-content:flex-end;margin-top:8px;position:relative;z-index:20}.room-page-notice{margin:6px 0 0;text-align:right;color:#fbbf24;font-size:12px;pointer-events:none}@media(max-width:520px){.room-page-viewport{margin-top:-12px}.room-leave-dock{margin-top:7px}.room-page-notice{font-size:11px}}`}</style></div></AppFrame>;
+ return <AppFrame back="/lobby"><div style={{maxWidth:520,margin:"0 auto"}}><h1 style={{fontSize:38}}>{action==="join"?"Join a Game":"Create a Game"}</h1><p style={{color:"#94a3b8"}}>{action==="join"?"Join an open room and take an available seat.":"Create a room, invite your players, and start when everyone is ready."}</p><label style={label}>Your name<input value={name} onChange={e=>setName(e.target.value)} style={input}/></label>{action==="join"?<><label style={label}>Room code<input value={code} onChange={e=>setCode(e.target.value.toUpperCase())} placeholder="ABC123" maxLength={6} style={input}/></label><label style={label}>Players<select value={players} onChange={e=>setPlayers(e.target.value)} style={input}><option value="2">2 Players</option><option value="4">4 Players</option></select></label></>:<label style={label}>Number of players<select value={players} onChange={e=>setPlayers(e.target.value)} style={input}><option value="2">2 Players</option><option value="4">4 Players</option></select></label>}<button onClick={()=>gatedAction(action==="join"?join:create)} style={primary}>{action==="join"?"Join Room":"Create Room"}</button>{notice&&<p style={{color:"#fbbf24"}}>{notice}</p>}<div style={{marginTop:18,padding:12,borderRadius:12,background:"rgba(30,41,59,.55)",color:"#94a3b8",fontSize:12}}>🔐 A registered account is required to create or join a game. Guest mode is for exploring the app only.</div></div><AccountGateModal open={gate.open} onClose={()=>gate.setOpen(false)}/></AppFrame>;
 }
 export default function RoomPage(){return <Suspense fallback={<AppFrame back="/lobby"><p>Loading room…</p></AppFrame>}><RoomContent/></Suspense>}
-const label={display:"grid",gap:8,marginBottom:16,color:"#cbd5e1",fontWeight:700};const input={width:"100%",boxSizing:"border-box" as const,padding:14,borderRadius:12,border:"1px solid #334155",background:"#0f172a",color:"#fff",fontSize:16};const primary={border:0,cursor:"pointer",padding:"13px 18px",borderRadius:12,background:"#22c55e",color:"#fff",fontWeight:900,fontSize:16};const leaveBtn={border:0,cursor:"pointer",padding:"9px 13px",borderRadius:10,background:"#7f1d1d",color:"#fff",fontWeight:800};const infoBox={marginBottom:16,padding:12,borderRadius:12,background:"rgba(30,41,59,.55)",color:"#94a3b8",fontSize:12,lineHeight:1.6};
+const label={display:"grid",gap:8,marginBottom:16,color:"#cbd5e1",fontWeight:700};
+const input={width:"100%",boxSizing:"border-box" as const,padding:14,borderRadius:12,border:"1px solid #334155",background:"#0f172a",color:"#fff",fontSize:16};
+const primary={border:0,cursor:"pointer",padding:"13px 18px",borderRadius:12,background:"#22c55e",color:"#fff",fontWeight:900,fontSize:16};
+const leaveBtn={border:0,cursor:"pointer",padding:"9px 13px",borderRadius:10,background:"#7f1d1d",color:"#fff",fontWeight:800};
