@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import AppFrame from "../_components/AppFrame";
 import LudoBoard, { BoardThemeId } from "../_components/LudoBoard";
-import AvatarArtwork from "../_components/AvatarArtwork";
 import ShopItemArtwork from "../_components/ShopItemArtwork";
 
 type MainTab = "Coins" | "Gems" | "Items" | "Avatars" | "Boards" | "Dice";
