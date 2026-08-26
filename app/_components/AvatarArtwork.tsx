@@ -32,8 +32,6 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
       style={{
         display: "block",
         width: displaySize,
-        height: size ?? "auto",
-        aspectRatio: "1 / 1",
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
