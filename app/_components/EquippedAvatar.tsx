@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AvatarArtwork from "./AvatarArtwork";
 
 export const AVATAR_ICONS: Record<string, string> = {
   default: "🧑🏽‍🎮",
@@ -12,8 +11,6 @@ export const AVATAR_ICONS: Record<string, string> = {
   "avatar-5": "👩🏾‍🚀",
   "avatar-6": "🧙🏽‍♂️",
 };
-
-const isVectorAvatar = (id: string) => /^(premium|elite)-\d{2}$/.test(id);
 
 export default function EquippedAvatar({ className, style }: { className?: string; style?: React.CSSProperties }) {
   const [avatar, setAvatar] = useState("default");
@@ -32,10 +29,6 @@ export default function EquippedAvatar({ className, style }: { className?: strin
     window.addEventListener("ludo-wallet-updated", sync);
     return () => { alive = false; window.removeEventListener("focus", sync); window.removeEventListener("ludo-wallet-updated", sync); };
   }, []);
-
-  if (isVectorAvatar(avatar)) {
-    return <AvatarArtwork id={avatar} className={className} style={{ display: "inline-block", verticalAlign: "middle", ...style }} />;
-  }
 
   return <span className={className} style={style} aria-label="Player avatar">{AVATAR_ICONS[avatar] || AVATAR_ICONS.default}</span>;
 }
