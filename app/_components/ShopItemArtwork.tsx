@@ -21,10 +21,10 @@ function isImagePath(value: unknown): value is string {
 
 export default function ShopItemArtwork({ item }: Props) {
   const image = isImagePath(item.imageUrl) ? item.imageUrl : isImagePath(item.image) ? item.image : null;
-  const premium = item.type === "avatar" && /^(premium|elite)-\d+$/i.test(item.id ?? "");
+  const premium = /^(premium|elite)-\d{2}$/i.test(item.id ?? "");
 
   if (premium) {
-    return <AvatarArtwork avatarId={item.id ?? ""} size={96} />;
+    return <AvatarArtwork id={item.id} size={96} />;
   }
 
   if (image) {
@@ -37,9 +37,6 @@ export default function ShopItemArtwork({ item }: Props) {
           sizes="96px"
           className="object-contain"
           unoptimized={image.startsWith("http")}
-          onError={(event) => {
-            event.currentTarget.style.display = "none";
-          }}
         />
       </div>
     );
