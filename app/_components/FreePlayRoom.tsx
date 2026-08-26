@@ -1,0 +1,145 @@
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { io, type Socket } from "socket.io-client";
+import AppFrame from "./AppFrame";
+
+type Member = {
+  id: string;
+  playerId?: string;
+  name: string;
+  host?: boolean;
+  ready?: boolean;
+  connected?: boolean;
+};
+
+type Props = {
+  initialCode?: string;
+  initialSize?: number;
+  create?: boolean;
+};
+
+const ROOM_KEY = "ludo-free-room";
+const makeCode = () => Math.random().toString(36).slice(2, 8).toUpperCase();
+
+export default function FreePlayRoom({ initialCode = "", initialSize = 2, create = false }: Props) {
+  const socketRef = useRef<Socket | null>(null);
+  const playerIdRef = useRef("");
+  const roomRef = useRef("");
+  const hostRef = useRef(false);
+  const [roomCode, setRoomCode] = useState(initialCode.toUpperCase());
+  const [roomSize, setRoomSize] = useState(initialSize === 4 ? 4 : 2);
+  const [name, setName] = useState("Player");
+  const [members, setMembers] = useState<Member[]>([]);
+  const [connected, setConnected] = useState(false);
+  const [joined, setJoined] = useState(false);
+  const [isHost, setIsHost] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [ready, setReady] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [joinCode, setJoinCode] = useState(initialCode.toUpperCase());
+  const [joinSize, setJoinSize] = useState(initialSize === 4 ? 4 : 2);
+
+  const self = useMemo(() => members.find(m => m.playerId === playerIdRef.current || m.id === socketRef.current?.id), [members]);
+  const allReady = members.length === roomSize && members.every(m => m.ready && m.connected !== false);
+  const canStart = isHost && members.length === roomSize && allReady && !starting;
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const auth = await fetch("/api/auth", { cache: "no-store" }).then(r => r.json());
+        const pid = String(auth?.user?.id || "");
+        const username = String(auth?.user?.username || auth?.user?.nickname || "Player").trim() || "Player";
+        if (!pid) {
+          setNotice("Please sign in before using Free Play.");
+          return;
+        }
+        if (cancelled) return;
+        playerIdRef.current = pid;
+        setName(username);
+
+        let saved: any = null;
+        try { saved = JSON.parse(localStorage.getItem(ROOM_KEY) || "null"); } catch {}
+        const codeFromUrl = initialCode.toUpperCase();
+        const shouldCreate = create && !codeFromUrl;
+        const code = codeFromUrl || (shouldCreate ? makeCode() : String(saved?.code || "").toUpperCase());
+        if (!code) return;
+        const size = codeFromUrl ? (initialSize === 4 ? 4 : 2) : (Number(saved?.roomSize) === 4 ? 4 : 2);
+        setRoomCode(code);
+        setRoomSize(size);
+        roomRef.current = code;
+
+        const socket = io(window.location.origin, { transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 300 });
+        socketRef.current = socket;
+
+        const join = () => socket.emit("join-room", {
+          roomCode: code,
+          name: username,
+          roomSize: size,
+          playerId: pid,
+          board: "classic",
+          dice: "classic",
+          host: shouldCreate || saved?.host === true,
+          stake: 0,
+          freePlay: true,
+        });
+
+        socket.on("connect", () => { setConnected(true); join(); });
+        socket.on("disconnect", () => { setConnected(false); setNotice("Reconnecting…"); });
+        socket.on("connect_error", () => setNotice("Unable to connect to the live room."));
+        socket.on("room-error", (message: string) => setNotice(message || "Unable to join this room."));
+        socket.on("start-error", (message: string) => { setStarting(false); setNotice(message || "The host cannot start yet."); });
+        socket.on("roster", (list: Member[]) => {
+          if (cancelled) return;
+          const normalized = Array.isArray(list) ? list : [];
+          setMembers(normalized);
+          const me = normalized.find(m => m.playerId === pid || m.id === socket.id);
+          if (me) {
+            const host = !!me.host;
+            hostRef.current = host;
+            setIsHost(host);
+            setReady(!!me.ready);
+            try { localStorage.setItem(ROOM_KEY, JSON.stringify({ code, roomSize: size, host, name: username })); } catch {}
+          }
+          setJoined(true);
+          setNotice(normalized.length < size ? "Waiting for another player to join…" : normalized.every(m => m.ready) ? "Everyone is ready. Host can start." : "Both players must be Ready before the host starts.");
+        });
+        socket.on("start-game", () => {
+          try { localStorage.setItem("ludo-match-board", "classic"); localStorage.setItem("ludo-match-bet", JSON.stringify({ enabled: false, stake: 0, roomSize: size })); } catch {}
+          window.location.href = `/game-online?room=${encodeURIComponent(code)}&name=${encodeURIComponent(username)}&host=${shouldCreate || hostRef.current ? "1" : ""}`;
+        });
+      } catch {
+        if (!cancelled) setNotice("Unable to initialize Free Play.");
+      }
+    })();
+    return () => { cancelled = true; socketRef.current?.disconnect(); socketRef.current = null; };
+  }, [create, initialCode, initialSize]);
+
+  const toggleReady = () => {
+    const socket = socketRef.current;
+    if (!socket?.connected) { setNotice("Reconnecting to the room…"); return; }
+    socket.emit("ready", { ready: !ready });
+  };
+
+  const startGame = () => {
+    const socket = socketRef.current;
+    if (!socket?.connected) { setNotice("Reconnecting to the room…"); return; }
+    if (!canStart) return;
+    setStarting(true);
+    setNotice("Starting free game…");
+    socket.emit("start-game");
+  };
+
+  const leave = () => {
+    try { localStorage.removeItem(ROOM_KEY); } catch {}
+    socketRef.current?.disconnect();
+    window.location.href = "/lobby";
+  };
+
+  if (!roomCode) {
+    return <AppFrame back="/lobby"><div className="free-shell"><h1>🎮 Free Play</h1><p>No-stakes multiplayer Ludo. Create a room or join a friend's room.</p><div className="free-card"><h2>Join a room</h2><input value={joinCode} onChange={e => setJoinCode(e.target.value.toUpperCase())} placeholder="ROOM ID" maxLength={6}/><select value={joinSize} onChange={e => setJoinSize(Number(e.target.value))}><option value={2}>2 Players</option><option value={4}>4 Players</option></select><button onClick={() => window.location.href = `/free-play?room=${encodeURIComponent(joinCode.trim())}&size=${joinSize}`}>Join Free Room</button></div></div></AppFrame>;
+  }
+
+  return <AppFrame back="/lobby"><main className="free-shell"><header><div><small>FREE PLAY</small><h1>🎮 No-Stakes Ludo</h1><p>Normal multiplayer Ludo without coins, stakes, or locking.</p></div><span className={connected ? "live" : "offline"}>● {connected ? "CONNECTED" : "CONNECTING"}</span></header><section className="free-room"><div className="room-top"><div><small>ROOM ID</small><strong>{roomCode}</strong></div><button onClick={() => navigator.clipboard?.writeText(roomCode)}>📋 Copy code</button></div><div className="players-head"><b>Players</b><span>{members.length}/{roomSize}</span></div><div className="players">{Array.from({ length: roomSize }, (_, i) => { const m = members[i]; return m ? <div className={`player ${m.host ? "host" : ""}`} key={m.id}><div className="avatar">{m.host ? "👑" : "🧑🏽‍🎮"}</div><b>{m.name}{m.playerId === playerIdRef.current || m.id === socketRef.current?.id ? " (you)" : ""}</b><span className={m.ready ? "ready" : "not-ready"}>{m.ready ? "✓ Ready" : "Not Ready"}</span></div> : <div className="empty" key={`empty-${i}`}>＋<small>Waiting for player</small></div>; })}</div><div className="free-note">🪙 <b>No coins required.</b> Free Play uses the same multiplayer Ludo board, dice, moves, sounds and win rules.</div><div className="controls"><button className={`ready ${ready ? "on" : ""}`} onClick={toggleReady} disabled={!joined || !connected}>{ready ? "✓ Ready — Tap to Not Ready" : "Ready"}</button>{isHost ? <button className="start" onClick={startGame} disabled={!canStart}>{starting ? "STARTING…" : "START FREE GAME"}</button> : <div className="waiting">👑 Waiting for host to start…</div>}</div>{notice && <div className="notice">{notice}</div>}<button className="leave" onClick={leave}>Leave Room</button></section><style jsx global>{`.free-shell{max-width:720px;margin:0 auto;padding:10px 12px 36px;color:#fff}.free-shell header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;padding:18px;border-radius:20px;background:linear-gradient(145deg,#0b2a62,#071127);border:1px solid rgba(96,165,250,.25)}.free-shell header small,.room-top small{display:block;color:#93c5fd;font-size:10px;letter-spacing:2px;font-weight:900}.free-shell h1{margin:4px 0;font-size:28px}.free-shell header p{margin:4px 0 0;color:#94a3b8;font-size:12px}.live,.offline{white-space:nowrap;font-size:10px;font-weight:900}.live{color:#4ade80}.offline{color:#fbbf24}.free-room{margin-top:10px;padding:14px;border-radius:20px;background:#030817;border:1px solid rgba(148,163,184,.16)}.room-top{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:4px}.room-top strong{display:block;font-size:32px;letter-spacing:4px}.room-top button,.leave{border:1px solid #334155;background:#0f172a;color:#fff;border-radius:10px;padding:9px 11px;font-weight:800;cursor:pointer}.players-head{display:flex;justify-content:space-between;margin:14px 4px 7px}.players-head span{color:#94a3b8}.players{display:grid;grid-template-columns:1fr 1fr;gap:8px}.player,.empty{min-height:112px;border-radius:14px;border:1px solid rgba(59,130,246,.18);background:linear-gradient(160deg,#081a42,#071127);display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}.player.host{border-color:rgba(250,204,21,.45)}.avatar{font-size:32px;margin-bottom:4px}.player b{font-size:14px}.player span{font-size:11px;font-weight:900;margin-top:2px}.ready{color:#4ade80}.not-ready{color:#f87171}.empty{border-style:dashed;color:#64748b;font-size:28px}.empty small{font-size:10px}.free-note{margin-top:10px;padding:11px;border-radius:12px;background:rgba(15,23,42,.8);color:#94a3b8;font-size:11px;line-height:1.5}.controls{display:flex;gap:8px;align-items:center;margin-top:10px}.controls button{min-height:46px;flex:1;border:0;border-radius:12px;padding:10px;font-weight:900;cursor:pointer}.controls button:disabled{opacity:.45;cursor:not-allowed}.controls .ready{background:#2563eb;color:#fff}.controls .ready.on{background:#16a34a}.controls .start{background:#16a34a;color:#fff}.waiting{flex:1;min-height:46px;display:grid;place-items:center;border-radius:12px;background:#0f172a;border:1px solid #334155;color:#94a3b8;font-size:12px;font-weight:800}.notice{margin-top:9px;padding:9px;border-radius:10px;background:#0f172a;color:#cbd5e1;font-size:11px}.leave{display:block;margin:10px 0 0 auto;background:#7f1d1d}.free-card{margin-top:20px;padding:18px;border-radius:18px;background:#071127;border:1px solid #334155;display:grid;gap:10px}.free-card input,.free-card select{padding:13px;border-radius:11px;border:1px solid #334155;background:#0f172a;color:#fff;font-size:16px}.free-card button{border:0;border-radius:11px;background:#16a34a;color:#fff;padding:13px;font-weight:900}@media(max-width:480px){.free-shell{padding:6px 8px 24px}.free-shell h1{font-size:23px}.free-shell header{padding:14px}.room-top strong{font-size:27px}.players{gap:6px}.player,.empty{min-height:100px}.controls{flex-direction:column}.controls>*{width:100%;flex:none}}`}</style></main></AppFrame>;
+}
