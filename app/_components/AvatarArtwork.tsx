@@ -7,9 +7,8 @@ type Props = {
   size?: number | string;
 };
 
-// The 30 new avatars are a single, clean sprite made directly from the 30
-// supplied WebP files. There is no Base64, chunk fetching, Blob construction,
-// SVG atlas, or runtime image decoding.
+// The 30 supplied premium/elite avatars are rendered from one clean sprite.
+// No Base64 chunks, runtime decoding, Blob creation, or SVG atlas is used.
 const SHEET = "/avatars/premium-elite.webp";
 const COLS = 5;
 const ROWS = 6;
@@ -33,10 +32,6 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
   const col = index % COLS;
   const row = Math.floor(index / COLS);
   const displaySize = size ?? "100%";
-  const backgroundWidth = `${COLS * 100}%`;
-  const backgroundHeight = `${ROWS * 100}%`;
-  const backgroundX = COLS === 1 ? 0 : (col / (COLS - 1)) * 100;
-  const backgroundY = ROWS === 1 ? 0 : (row / (ROWS - 1)) * 100;
 
   return (
     <div
@@ -52,8 +47,8 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         overflow: "hidden",
         backgroundImage: `url(${SHEET})`,
         backgroundRepeat: "no-repeat",
-        backgroundSize: `${backgroundWidth} ${backgroundHeight}`,
-        backgroundPosition: `${backgroundX}% ${backgroundY}%`,
+        backgroundSize: "500% 600%",
+        backgroundPosition: `${col * 25}% ${row * 20}%`,
         ...style,
       }}
     />
