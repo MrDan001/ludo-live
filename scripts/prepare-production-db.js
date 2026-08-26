@@ -8,7 +8,7 @@ async function main() {
   await client.connect();
   try {
     await client.query(`
-      CREATE TABLE IF NOT EXISTS ludo_users (id TEXT PRIMARY KEY, username TEXT NOT NULL, email TEXT UNIQUE, password_hash TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), coins INTEGER NOT NULL DEFAULT 1000, gems INTEGER NOT NULL DEFAULT 10, xp INTEGER NOT NULL DEFAULT 0, level INTEGER NOT NULL DEFAULT 0, is_guest BOOLEAN NOT NULL DEFAULT FALSE, is_banned BOOLEAN NOT NULL DEFAULT FALSE, banned_at TIMESTAMPTZ, ban_reason TEXT, last_seen_at TIMESTAMPTZ, owned_boards JSONB NOT NULL DEFAULT '["classic"]', owned_dice JSONB NOT NULL DEFAULT '["classic"]', equipped_board TEXT NOT NULL DEFAULT 'classic', equipped_dice TEXT NOT NULL DEFAULT 'classic', owned_avatars JSONB NOT NULL DEFAULT '[]', equipped_avatar TEXT NOT NULL DEFAULT 'default', owned_items JSONB NOT NULL DEFAULT '[]', equipped_items JSONB NOT NULL DEFAULT '[]');
+      CREATE TABLE IF NOT EXISTS ludo_users (id TEXT PRIMARY KEY, username TEXT NOT NULL, email TEXT UNIQUE, password_hash TEXT, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), coins INTEGER NOT NULL DEFAULT 1000, gems INTEGER NOT NULL DEFAULT 10, xp INTEGER NOT NULL DEFAULT 0, level INTEGER NOT NULL DEFAULT 0, is_guest BOOLEAN NOT NULL DEFAULT FALSE, is_banned BOOLEAN NOT NULL DEFAULT FALSE, banned_at TIMESTAMPTZ, ban_reason TEXT, last_seen_at TIMESTAMPTZ, owned_boards JSONB NOT NULL DEFAULT '[\"classic\"]', owned_dice JSONB NOT NULL DEFAULT '[\"classic\"]', equipped_board TEXT NOT NULL DEFAULT 'classic', equipped_dice TEXT NOT NULL DEFAULT 'classic', owned_avatars JSONB NOT NULL DEFAULT '[]', equipped_avatar TEXT NOT NULL DEFAULT 'default', owned_items JSONB NOT NULL DEFAULT '[]', equipped_items JSONB NOT NULL DEFAULT '[]');
       CREATE TABLE IF NOT EXISTS ludo_sessions (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), expires_at TIMESTAMPTZ NOT NULL);
       CREATE INDEX IF NOT EXISTS ludo_sessions_user_idx ON ludo_sessions(user_id);
       CREATE INDEX IF NOT EXISTS ludo_sessions_expiry_idx ON ludo_sessions(expires_at);
@@ -18,9 +18,23 @@ async function main() {
       ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
       ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS reward_coins INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS reward_gems INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS title TEXT NOT NULL DEFAULT '';
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS icon TEXT NOT NULL DEFAULT '🎉';
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS color TEXT NOT NULL DEFAULT 'purple';
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS reward TEXT NOT NULL DEFAULT '🎁';
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS event_type TEXT NOT NULL DEFAULT 'challenge';
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS mission_kind TEXT NOT NULL DEFAULT 'win_games';
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS mission_target INTEGER NOT NULL DEFAULT 1;
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS modes JSONB NOT NULL DEFAULT '[\"bot\",\"2p\",\"4p\",\"tournament\"]'::jsonb;
+      ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS boards JSONB NOT NULL DEFAULT '[\"classic\"]'::jsonb;
+      CREATE INDEX IF NOT EXISTS ludo_events_window_idx ON ludo_events(starts_at,ends_at);
+      CREATE INDEX IF NOT EXISTS ludo_events_status_idx ON ludo_events(status);
       CREATE TABLE IF NOT EXISTS ludo_event_entries (event_id TEXT NOT NULL REFERENCES ludo_events(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE, score INTEGER NOT NULL DEFAULT 0, joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), completed BOOLEAN NOT NULL DEFAULT FALSE, reward_claimed BOOLEAN NOT NULL DEFAULT FALSE, PRIMARY KEY(event_id,user_id));
       ALTER TABLE ludo_event_entries ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE;
       ALTER TABLE ludo_event_entries ADD COLUMN IF NOT EXISTS reward_claimed BOOLEAN NOT NULL DEFAULT FALSE;
+      ALTER TABLE ludo_event_entries ADD COLUMN IF NOT EXISTS progress INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE ludo_event_entries ADD COLUMN IF NOT EXISTS completed_at TIMESTAMPTZ;
+      CREATE INDEX IF NOT EXISTS ludo_event_entries_user_idx ON ludo_event_entries(user_id,joined_at DESC);
       CREATE TABLE IF NOT EXISTS ludo_event_rewards (event_id TEXT NOT NULL REFERENCES ludo_events(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE, coins INTEGER NOT NULL DEFAULT 0, gems INTEGER NOT NULL DEFAULT 0, settled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(event_id,user_id));
       ALTER TABLE ludo_event_rewards ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
       ALTER TABLE ludo_event_rewards ADD COLUMN IF NOT EXISTS coins INTEGER NOT NULL DEFAULT 0;
@@ -31,3 +45,4 @@ async function main() {
   } finally { await client.end(); }
 }
 main().catch((error) => { console.error('Production DB preparation failed:', error); process.exit(1); });
+
