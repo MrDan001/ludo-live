@@ -15,11 +15,15 @@ Open `/dbase/avatars` or use **DBASE → Management → Avatars** as an authoriz
 ### Create
 
 1. Choose PNG, JPEG, or WebP artwork.
-2. Artwork must be square, 128–2048px, and no larger than 1.5 MB.
-3. Enter name and description.
-4. Select a category and rarity.
-5. Set price and currency: Naira, Coins, or Gems.
-6. Publish.
+2. Artwork may use any aspect ratio and is automatically prepared into the square avatar canvas without cropping.
+3. The complete source artwork is fitted inside the canvas with transparent padding where necessary.
+4. Source artwork must have a longest side of at least 128px and no more than 2048px, and the prepared file must be no larger than 1.5 MB.
+5. Enter name and description.
+6. Select a category and rarity.
+7. Set price and currency: Naira, Coins, or Gems.
+8. Publish.
+
+Admins do **not** need to manually crop artwork before uploading it.
 
 ### Manage
 
@@ -41,7 +45,7 @@ Artwork is stored as binary data with the avatar record in PostgreSQL and served
 
 `/api/shop/avatars/:id/image`
 
-The server validates MIME type, file size, and square dimensions before storage. Generated UUID-based IDs are used instead of filenames. Replacing artwork keeps the same avatar ID and therefore preserves ownership/equipping references. Deleting an uploaded avatar deletes its stored artwork with the database row.
+The browser prepares non-square artwork before upload by fitting the entire source image into a square canvas; it does not crop the source. The server then validates the resulting PNG/JPEG/WebP payload, file size, and square dimensions before storage. Generated UUID-based IDs are used instead of filenames. Replacing artwork keeps the same avatar ID and therefore preserves ownership/equipping references. Deleting an uploaded avatar deletes its stored artwork with the database row.
 
 Image responses are cache-safe for replacements and include `X-Content-Type-Options: nosniff`.
 
@@ -63,7 +67,7 @@ Categories are separate database records. Hiding a category removes its avatars 
 
 ## Player rendering
 
-The same avatar ID is used by Shop, Inventory, profile/game avatar rendering, purchase, and equip flows. Managed artwork is rendered through `ShopItemArtwork`/`EquippedAvatar` with a resilient icon fallback if an image becomes unavailable.
+The same avatar ID is used by Shop, Inventory, profile/game avatar rendering, purchase, and equip flows. Managed artwork is rendered through `ShopItemArtwork`/`EquippedAvatar` with `object-fit: contain` and a resilient icon fallback if an image becomes unavailable. The renderer must not crop managed avatar artwork.
 
 ## Legacy cleanup
 
@@ -77,24 +81,27 @@ No code change is required.
 
 1. Open Avatar Management.
 2. Create or select the category.
-3. Upload valid square artwork.
-4. Enter the avatar metadata and price.
-5. Publish.
-6. Verify it appears in Shop.
-7. Buy it with a test account.
-8. Verify it appears in Inventory.
-9. Equip it.
-10. Verify the artwork appears in profile/game surfaces.
+3. Upload valid PNG, JPEG, or WebP artwork in any aspect ratio.
+4. Let Avatar Management automatically fit the complete artwork without cropping.
+5. Enter the avatar metadata and price.
+6. Publish.
+7. Verify it appears in Shop with the complete artwork visible.
+8. Buy it with a test account.
+9. Verify it appears in Inventory.
+10. Equip it.
+11. Verify the artwork appears in profile/game surfaces.
 
 ## Verification checklist
 
 - `/dbase/avatars` loads for an admin.
 - Create validates artwork before database insertion.
+- Portrait, landscape, and square source artwork are accepted.
+- Source artwork is fitted without cropping.
 - Replacement artwork keeps the avatar ID.
 - Hidden avatars disappear from the public Shop.
 - Deleted uploaded avatars disappear and their binary data is removed with the row.
 - The six built-in avatars remain available as database records.
-- Shop displays managed artwork and has a broken-image fallback.
+- Shop displays managed artwork with the complete image visible and has a broken-image fallback.
 - Inventory displays the same managed artwork.
 - Equip uses the canonical avatar ID.
 - Non-avatar shop items, wallet, notifications, and multiplayer logic remain on their existing paths.
