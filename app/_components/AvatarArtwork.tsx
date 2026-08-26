@@ -1,10 +1,14 @@
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// Premium/elite artwork is a separate 6-column x 5-row atlas (30 distinct avatars).
-// The first six shop avatars are separate from this premium/elite set.
-const ATLAS_URL = "/avatars/premium-elite-atlas.webp?v=20260826-10";
+// Premium/elite artwork is stored as Base64 text chunks. The first six shop
+// avatars are a separate set and do not use this renderer.
+const CHUNKS = Array.from(
+  { length: 8 },
+  (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-11`,
+);
 const COLS = 6;
 const CELL_W = 160;
 const CELL_H = 112;
@@ -20,17 +24,68 @@ function atlasIndex(id: string) {
   return index - 1;
 }
 
+function cleanBase64(value: string) {
+  const cleaned = value.replace(/\s+/g, "");
+  const firstPadding = cleaned.indexOf("=");
+  return firstPadding >= 0 ? cleaned.slice(0, firstPadding + 2) : cleaned;
+}
+
+function decodeBase64(value: string) {
+  const binary = atob(value);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i);
+  return bytes;
+}
+
 export default function AvatarArtwork({ id, className, style, size }: Props) {
   const index = atlasIndex(id || "");
-  if (index === null) return null;
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (index === null) return;
+    let cancelled = false;
+    let objectUrl: string | null = null;
+
+    (async () => {
+      const responses = await Promise.all(
+        CHUNKS.map(async (url) => {
+          const response = await fetch(url, { cache: "no-store" });
+          if (!response.ok) throw new Error(`Avatar chunk failed: ${response.status}`);
+          return cleanBase64(await response.text());
+        }),
+      );
+
+      // Decode every chunk independently. This is important because Base64
+      // padding is allowed at a chunk boundary; joining padded strings first
+      // produces invalid binary data.
+      const decoded = responses.map(decodeBase64);
+      const total = decoded.reduce((sum, chunk) => sum + chunk.length, 0);
+      const combined = new Uint8Array(total);
+      let offset = 0;
+      for (const chunk of decoded) {
+        combined.set(chunk, offset);
+        offset += chunk.length;
+      }
+
+      const blob = new Blob([combined], { type: "image/webp" });
+      objectUrl = URL.createObjectURL(blob);
+      if (!cancelled) setSrc(objectUrl);
+    })().catch(() => {
+      if (!cancelled) setSrc(null);
+    });
+
+    return () => {
+      cancelled = true;
+      if (objectUrl) URL.revokeObjectURL(objectUrl);
+    };
+  }, [index]);
+
+  if (index === null || !src) return null;
 
   const col = index % COLS;
   const row = Math.floor(index / COLS);
   const displaySize = size ?? "100%";
 
-  // Clip one cell from the dedicated premium/elite atlas. Do not rebuild the
-  // image from Base64 chunks: the repository already contains the complete
-  // WebP atlas and the direct asset is much more reliable in the browser.
   return (
     <svg
       aria-hidden="true"
@@ -52,7 +107,7 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
       }}
     >
       <image
-        href={ATLAS_URL}
+        href={src}
         x={-(col * CELL_W)}
         y={-(row * CELL_H)}
         width={ATLAS_W}
