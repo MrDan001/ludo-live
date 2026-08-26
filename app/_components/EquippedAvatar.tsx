@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export const AVATAR_ICONS: Record<string, string> = {
-  default: "🧑🏽‍🎮", "avatar-1": "🧑🏽‍🎮", "avatar-2": "👩🏽‍🎤", "avatar-3": "🧔🏾‍♂️", "avatar-4": "👨🏽‍🚀", "avatar-5": "👩🏽‍🚀", "avatar-6": "🧙🏽‍♂️",
+  default: "🧑🏽‍🎮", "avatar-1": "🧑🏽‍🎮", "avatar-2": "👩🏽‍🎤", "avatar-3": "🧔🏾‍♂️", "avatar-4": "👨🏽‍🚀", "avatar-5": "👩🏾‍🚀", "avatar-6": "🧙🏽‍♂️",
 };
 
 type Avatar = { id: string; name?: string; icon?: string | null; imageUrl?: string | null };
