@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "prestart": "node scripts/prepare-multiplayer-room.js",
-    "start": "node -r ./room-refresh-persistence.js -r ./empty-room-cleanup.js -r ./bet-system.js -r ./bet-event-bridge.js -r ./stake-canonical-bridge.js -r ./multiplayer-canonical.js -r ./mission-rules.js -r ./forfeit-rules.js -r ./event-settler.js server.js",
+    "start": "node -r ./room-refresh-persistence.js -r ./empty-room-cleanup.js -r ./multiplayer-canonical.js -r ./mission-rules.js -r ./forfeit-rules.js -r ./event-settler.js server.js",
     "vercel-build": "next build"
   },
   "dependencies": {
