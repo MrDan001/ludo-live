@@ -1,10 +1,18 @@
 const { Pool } = require('pg');
 
+function databaseConnectionString() {
+  const raw = process.env.DATABASE_URL;
+  if (!raw) return raw;
+  // pg connection-string parameters can override the explicit `ssl` option.
+  // Railway may provide sslmode=require/verify-full in DATABASE_URL, which can
+  // force certificate-chain validation and produce SELF_SIGNED_CERT_IN_CHAIN.
+  // Remove only sslmode so our explicit Railway-safe TLS policy below wins.
+  return raw.replace(/([?&])sslmode=[^&]*&?/i, (match, prefix) => prefix === '?' ? '?' : '').replace(/[?&]$/, '');
+}
+
 const databaseSslDisabled = String(process.env.DATABASE_SSL || '').toLowerCase() === 'false';
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  // Railway/Postgres may use a self-signed certificate. Keep TLS enabled,
-  // but do not reject the platform certificate chain.
+  connectionString: databaseConnectionString(),
   ssl: databaseSslDisabled ? false : { rejectUnauthorized: false },
 });
 let running = false;
