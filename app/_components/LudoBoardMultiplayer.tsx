@@ -41,12 +41,11 @@ export default function LudoBoardMultiplayer({
   snapOnUpdate = false,
   finishSound = false,
   animateUpdates = true,
-  legalTokenKeys = [],
 }: Props) {
   const normalizedTokens = useMemo(() => {
     const incoming = new Map(demoTokens.map((token) => [`${token.color}:${token.id}`, token]));
     return STATIC_TOKENS.map((staticToken) => {
-      const token = incoming.get(`${staticToken.color}:${staticToken.id}`,);
+      const token = incoming.get(`${staticToken.color}:${staticToken.id}`);
       return token ?? staticToken;
     });
   }, [demoTokens]);
@@ -62,7 +61,6 @@ export default function LudoBoardMultiplayer({
       snapOnUpdate={snapOnUpdate}
       finishSound={finishSound}
       animateUpdates={animateUpdates}
-      legalTokenKeys={legalTokenKeys}
     />
   );
 }
