@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 export const AVATAR_ICONS: Record<string, string> = {
-  default: "🧑🏽‍🎮", "avatar-1": "🧑🏽‍🎮", "avatar-2": "👩🏽‍🎤", "avatar-3": "🧔🏾‍♂️", "avatar-4": "👨🏽‍🚀", "avatar-5": "👩🏾‍🚀", "avatar-6": "🧙🏽‍♂️",
+  default: "🧑🏽‍🎮", "avatar-1": "🧑🏽‍🎮", "avatar-2": "👩🏽‍🎤", "avatar-3": "🧔🏾‍♂️", "avatar-4": "👨🏽‍🚀", "avatar-5": "👩🏽‍🚀", "avatar-6": "🧙🏽‍♂️",
 };
 
 type Avatar = { id: string; name?: string; icon?: string | null; imageUrl?: string | null };
@@ -32,9 +32,32 @@ export default function EquippedAvatar({ className, style }: { className?: strin
     return () => { alive = false; window.removeEventListener("focus", sync); window.removeEventListener("ludo-wallet-updated", sync); };
   }, []);
 
+  const frameStyle: React.CSSProperties = {
+    ...style,
+    display: "block",
+    position: "relative",
+    width: "100%",
+    height: "100%",
+    minWidth: 0,
+    minHeight: 0,
+    overflow: "hidden",
+    borderRadius: "50%",
+  };
+
   if (avatar.imageUrl && !broken) {
-    return <img src={avatar.imageUrl} alt={avatar.name || "Player avatar"} className={className} style={{ ...style, display: "block", width: "100%", height: "100%", maxWidth: "100%", maxHeight: "100%", objectFit: "contain", objectPosition: "center center" }} onError={() => setBroken(true)} decoding="async" />;
+    return (
+      <span className={className} style={frameStyle} aria-label={avatar.name || "Player avatar"}>
+        <img
+          src={avatar.imageUrl}
+          alt=""
+          draggable={false}
+          decoding="async"
+          onError={() => setBroken(true)}
+          style={{ display: "block", width: "100%", height: "100%", minWidth: 0, minHeight: 0, objectFit: "contain", objectPosition: "center center" }}
+        />
+      </span>
+    );
   }
 
-  return <span className={className} style={style} aria-label={avatar.name || "Player avatar"}>{avatar.icon || AVATAR_ICONS[avatar.id] || AVATAR_ICONS.default}</span>;
+  return <span className={className} style={{ ...frameStyle, display: "grid", placeItems: "center", fontSize: "inherit" }} aria-label={avatar.name || "Player avatar"}>{avatar.icon || AVATAR_ICONS[avatar.id] || AVATAR_ICONS.default}</span>;
 }
