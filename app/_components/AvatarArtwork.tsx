@@ -2,15 +2,11 @@ import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// The supplied artwork is a 6 x 5 sheet at 960 x 560 (160 x 112 per avatar).
-// Use the existing WebP directly and an SVG viewport to display exactly ONE character.
-// This avoids the broken Base64 chunk reconstruction and CSS background scaling/cropping.
+// The premium/elite artwork is a 5-column x 6-row atlas (30 avatars).
+// The shop catalogue maps atlas:01..atlas:30 to premium-01..elite-20.
 const ATLAS_SRC = "/avatars/premium-elite-atlas.webp";
-const COLS = 6;
-const CELL_W = 160;
-const CELL_H = 112;
-const ATLAS_W = 960;
-const ATLAS_H = 560;
+const COLS = 5;
+const ROWS = 6;
 
 function atlasIndex(id: string) {
   const match = id.match(/^(premium|elite)-(\d{2})$/);
@@ -27,38 +23,28 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
 
   const col = index % COLS;
   const row = Math.floor(index / COLS);
-  const x = -(col * CELL_W);
-  const y = -(row * CELL_H);
   const displaySize = size ?? "100%";
 
   return (
-    <svg
+    <div
       aria-hidden="true"
       className={className}
-      viewBox={`0 0 ${CELL_W} ${CELL_H}`}
-      preserveAspectRatio="xMidYMid slice"
-      width={displaySize}
-      height={displaySize}
       style={{
         display: "block",
         width: displaySize,
-        height: displaySize,
+        height: size ?? "auto",
+        aspectRatio: `${COLS} / ${COLS}`,
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
         borderRadius: "inherit",
-        background: "#000",
+        backgroundImage: `url(${ATLAS_SRC})`,
+        backgroundRepeat: "no-repeat",
+        backgroundSize: `${COLS * 100}% ${ROWS * 100}%`,
+        backgroundPosition: `${col * 25}% ${row * 20}%`,
+        backgroundColor: "#000",
         ...style,
       }}
-    >
-      <image
-        href={ATLAS_SRC}
-        x={x}
-        y={y}
-        width={ATLAS_W}
-        height={ATLAS_H}
-        preserveAspectRatio="none"
-      />
-    </svg>
+    />
   );
 }
