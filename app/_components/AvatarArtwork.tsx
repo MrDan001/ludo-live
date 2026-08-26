@@ -1,16 +1,10 @@
-import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// The supplied premium/elite artwork is a 6-column x 5-row sheet at 960 x 560.
-// The artwork is stored in 8 Base64 text chunks. Trim each chunk before joining:
-// seven files contain a trailing newline (6265 bytes = 6264 Base64 chars + LF),
-// while 06.txt is 6264 bytes. The LF is not part of the Base64 payload.
-const CHUNKS = Array.from(
-  { length: 8 },
-  (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-9`,
-);
+// Premium/elite artwork is a separate 6-column x 5-row atlas (30 distinct avatars).
+// The first six shop avatars are separate from this premium/elite set.
+const ATLAS_URL = "/avatars/premium-elite-atlas.webp?v=20260826-10";
 const COLS = 6;
 const CELL_W = 160;
 const CELL_H = 112;
@@ -26,57 +20,17 @@ function atlasIndex(id: string) {
   return index - 1;
 }
 
-function normalizeBase64(parts: string[]) {
-  const joined = parts.join("").replace(/\s+/g, "");
-
-  // A previous atlas repair left a few characters after the final Base64
-  // padding marker. Anything after '=' cannot belong to a valid Base64 image
-  // and causes browsers to reject the resulting WebP data URI.
-  const paddingIndex = joined.indexOf("=");
-  const base64 = paddingIndex >= 0 ? joined.slice(0, paddingIndex + 2) : joined;
-
-  if (!base64 || base64.length % 4 !== 0) {
-    throw new Error(`Invalid avatar Base64 length: ${base64.length}`);
-  }
-
-  return base64;
-}
-
 export default function AvatarArtwork({ id, className, style, size }: Props) {
   const index = atlasIndex(id || "");
-  const [src, setSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    Promise.all(
-      CHUNKS.map(async (url) => {
-        const response = await fetch(url, { cache: "no-store" });
-        if (!response.ok) throw new Error(`Avatar asset failed: ${response.status}`);
-        return (await response.text()).trim();
-      }),
-    )
-      .then((parts) => {
-        const base64 = normalizeBase64(parts);
-        if (!cancelled) setSrc(`data:image/webp;base64,${base64}`);
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(null);
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (index === null || !src) return null;
+  if (index === null) return null;
 
   const col = index % COLS;
   const row = Math.floor(index / COLS);
-  const x = -(col * CELL_W);
-  const y = -(row * CELL_H);
   const displaySize = size ?? "100%";
 
+  // Clip one cell from the dedicated premium/elite atlas. Do not rebuild the
+  // image from Base64 chunks: the repository already contains the complete
+  // WebP atlas and the direct asset is much more reliable in the browser.
   return (
     <svg
       aria-hidden="true"
@@ -93,14 +47,14 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         minHeight: 0,
         overflow: "hidden",
         borderRadius: "inherit",
-        background: "#000",
+        background: "transparent",
         ...style,
       }}
     >
       <image
-        href={src}
-        x={x}
-        y={y}
+        href={ATLAS_URL}
+        x={-(col * CELL_W)}
+        y={-(row * CELL_H)}
         width={ATLAS_W}
         height={ATLAS_H}
         preserveAspectRatio="none"
