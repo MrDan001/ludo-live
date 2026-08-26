@@ -33,7 +33,7 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         display: "block",
         width: displaySize,
         height: size ?? "auto",
-        aspectRatio: `${COLS} / ${COLS}`,
+        aspectRatio: "1 / 1",
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
@@ -44,6 +44,10 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
         backgroundPosition: `${col * 25}% ${row * 20}%`,
         backgroundColor: "#000",
         ...style,
+        // The Shop passes height:100%, but .simple-icon has no fixed height.
+        // Keep an intrinsic square so the avatar cannot collapse to zero height.
+        height: size ?? "auto",
+        aspectRatio: "1 / 1",
       }}
     />
   );
