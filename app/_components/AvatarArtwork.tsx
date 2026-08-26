@@ -1,12 +1,21 @@
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
-// The premium/elite artwork is a 5-column x 6-row atlas (30 avatars).
-// The shop catalogue maps atlas:01..atlas:30 to premium-01..elite-20.
-const ATLAS_SRC = "/avatars/premium-elite-atlas.webp";
-const COLS = 5;
-const ROWS = 6;
+// The supplied premium/elite artwork is a 6-column x 5-row sheet at 960 x 560.
+// The artwork is stored in 8 Base64 text chunks. Trim each chunk before joining:
+// seven files contain a trailing newline (6265 bytes = 6264 Base64 chars + LF),
+// while 06.txt is 6264 bytes. The LF is not part of the Base64 payload.
+const CHUNKS = Array.from(
+  { length: 8 },
+  (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-8`,
+);
+const COLS = 6;
+const CELL_W = 160;
+const CELL_H = 112;
+const ATLAS_W = 960;
+const ATLAS_H = 560;
 
 function atlasIndex(id: string) {
   const match = id.match(/^(premium|elite)-(\d{2})$/);
@@ -19,34 +28,70 @@ function atlasIndex(id: string) {
 
 export default function AvatarArtwork({ id, className, style, size }: Props) {
   const index = atlasIndex(id || "");
-  if (index === null) return null;
+  const [src, setSrc] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    Promise.all(
+      CHUNKS.map(async (url) => {
+        const response = await fetch(url, { cache: "no-store" });
+        if (!response.ok) throw new Error(`Avatar asset failed: ${response.status}`);
+        return (await response.text()).trim();
+      }),
+    )
+      .then((parts) => {
+        const base64 = parts.join("");
+        if (base64.length % 4 !== 0) {
+          throw new Error(`Invalid avatar Base64 length: ${base64.length}`);
+        }
+        if (!cancelled) setSrc(`data:image/webp;base64,${base64}`);
+      })
+      .catch(() => {
+        if (!cancelled) setSrc(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (index === null || !src) return null;
 
   const col = index % COLS;
   const row = Math.floor(index / COLS);
+  const x = -(col * CELL_W);
+  const y = -(row * CELL_H);
   const displaySize = size ?? "100%";
 
   return (
-    <div
+    <svg
       aria-hidden="true"
       className={className}
+      viewBox={`0 0 ${CELL_W} ${CELL_H}`}
+      preserveAspectRatio="xMidYMid slice"
+      width={displaySize}
+      height={displaySize}
       style={{
         display: "block",
         width: displaySize,
+        height: displaySize,
         minWidth: 0,
         minHeight: 0,
         overflow: "hidden",
         borderRadius: "inherit",
-        backgroundImage: `url(${ATLAS_SRC})`,
-        backgroundRepeat: "no-repeat",
-        backgroundSize: `${COLS * 100}% ${ROWS * 100}%`,
-        backgroundPosition: `${col * 25}% ${row * 20}%`,
-        backgroundColor: "#000",
+        background: "#000",
         ...style,
-        // The Shop passes height:100%, but .simple-icon has no fixed height.
-        // Keep an intrinsic square so the avatar cannot collapse to zero height.
-        height: size ?? "auto",
-        aspectRatio: "1 / 1",
       }}
-    />
+    >
+      <image
+        href={src}
+        x={x}
+        y={y}
+        width={ATLAS_W}
+        height={ATLAS_H}
+        preserveAspectRatio="none"
+      />
+    </svg>
   );
 }
