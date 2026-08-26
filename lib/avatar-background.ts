@@ -1,49 +1,52 @@
 import sharp from "sharp";
 
 /**
- * Automatically makes the connected image background transparent.
+ * Converts ordinary avatar artwork into a transparent, square-ready asset.
  *
- * This is intentionally local and dependency-light: it estimates the background
- * from the image border and flood-fills only pixels that are visually similar to
- * that border. It preserves the original canvas and softens the cut edge instead
- * of simply deleting every pixel of one exact RGB value.
- *
- * For artwork with a highly textured/photographic background, a model-based
- * segmentation service is required for true subject matting; this function is
- * the safe built-in fallback and never sends the uploaded artwork off-server.
+ * This is intentionally local to the Railway server. It removes only background
+ * pixels connected to the image border, then trims transparent margins and pads
+ * the subject back onto a square transparent canvas. That last step is important:
+ * source images often contain large empty margins, which otherwise makes an avatar
+ * look tiny inside the circular UI.
  */
 export async function stripAvatarBackground(input: Buffer): Promise<Buffer> {
-  const image = sharp(input, { failOn: "error" }).ensureAlpha();
-  const meta = await image.metadata();
+  const source = sharp(input, { failOn: "error" }).ensureAlpha();
+  const meta = await source.metadata();
   if (!meta.width || !meta.height) throw new Error("Unable to read avatar dimensions.");
 
-  const { data, info } = await image.raw().toBuffer({ resolveWithObject: true });
+  const { data, info } = await source.raw().toBuffer({ resolveWithObject: true });
   const width = info.width;
   const height = info.height;
   const channels = info.channels;
   if (channels < 4) throw new Error("Avatar image must have an alpha channel after decoding.");
 
-  // Estimate the background from the four corners and a sparse border sample.
+  // Use a robust median-ish border estimate instead of a simple average. This
+  // prevents one colourful corner from pulling the estimated background too far.
   const samples: number[][] = [];
-  const step = Math.max(1, Math.floor(Math.min(width, height) / 64));
+  const step = Math.max(1, Math.floor(Math.min(width, height) / 96));
   for (let y = 0; y < height; y += step) {
     for (const x of [0, width - 1]) {
       const i = (y * width + x) * channels;
-      samples.push([data[i], data[i + 1], data[i + 2]]);
+      if (data[i + 3] > 8) samples.push([data[i], data[i + 1], data[i + 2]]);
     }
   }
   for (let x = 0; x < width; x += step) {
     for (const y of [0, height - 1]) {
       const i = (y * width + x) * channels;
-      samples.push([data[i], data[i + 1], data[i + 2]]);
+      if (data[i + 3] > 8) samples.push([data[i], data[i + 1], data[i + 2]]);
     }
   }
 
-  const bg = [0, 0, 0];
-  for (const s of samples) {
-    bg[0] += s[0]; bg[1] += s[1]; bg[2] += s[2];
-  }
-  bg[0] /= samples.length; bg[1] /= samples.length; bg[2] /= samples.length;
+  const median = (values: number[]) => {
+    if (!values.length) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    return sorted[Math.floor(sorted.length / 2)];
+  };
+  const bg = [
+    median(samples.map(s => s[0])),
+    median(samples.map(s => s[1])),
+    median(samples.map(s => s[2])),
+  ];
 
   const distance = (i: number) => Math.sqrt(
     (data[i] - bg[0]) ** 2 +
@@ -51,9 +54,8 @@ export async function stripAvatarBackground(input: Buffer): Promise<Buffer> {
     (data[i + 2] - bg[2]) ** 2,
   );
 
-  // Pixels are considered background only when connected to the border.
-  // This avoids punching holes through foreground areas that happen to share
-  // a similar colour with the background.
+  // Flood-fill only background that is connected to the border. This protects
+  // similarly-coloured areas inside the character from being punched out.
   const visited = new Uint8Array(width * height);
   const queue = new Int32Array(width * height);
   let head = 0;
@@ -62,8 +64,7 @@ export async function stripAvatarBackground(input: Buffer): Promise<Buffer> {
     const p = y * width + x;
     if (visited[p]) return;
     const i = p * channels;
-    // Transparent input is already background.
-    if (data[i + 3] === 0 || distance(i) <= 58) {
+    if (data[i + 3] === 0 || distance(i) <= 64) {
       visited[p] = 1;
       queue[tail++] = p;
     }
@@ -82,10 +83,8 @@ export async function stripAvatarBackground(input: Buffer): Promise<Buffer> {
     if (y + 1 < height) seed(x, y + 1);
   }
 
-  // Convert the connected background to transparency with a soft transition.
-  // Pixels farther than the threshold remain untouched.
-  const hard = 42;
-  const soft = 24;
+  const hard = 48;
+  const soft = 28;
   for (let p = 0; p < width * height; p++) {
     if (!visited[p]) continue;
     const i = p * channels;
@@ -99,7 +98,27 @@ export async function stripAvatarBackground(input: Buffer): Promise<Buffer> {
     }
   }
 
-  return sharp(data, { raw: { width, height, channels: 4 } })
+  // Trim transparent margins so the subject fills the avatar viewport. Add a
+  // small transparent safety margin, then force a square transparent canvas.
+  const cleaned = sharp(data, { raw: { width, height, channels: 4 } });
+  const trimmed = await cleaned.trim({ background: { r: 0, g: 0, b: 0, alpha: 0 }, threshold: 2 }).png().toBuffer();
+  const trimmedMeta = await sharp(trimmed).metadata();
+  if (!trimmedMeta.width || !trimmedMeta.height) throw new Error("Unable to normalize avatar artwork.");
+
+  const maxSide = Math.max(trimmedMeta.width, trimmedMeta.height);
+  const padding = Math.max(8, Math.round(maxSide * 0.08));
+  const canvas = maxSide + padding * 2;
+
+  return sharp(trimmed)
+    .resize({ width: maxSide, height: maxSide, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .extend({
+      top: padding,
+      bottom: padding,
+      left: padding,
+      right: padding,
+      background: { r: 0, g: 0, b: 0, alpha: 0 },
+    })
+    .resize({ width: canvas, height: canvas, fit: "contain", background: { r: 0, g: 0, b: 0, alpha: 0 } })
     .png({ compressionLevel: 9, adaptiveFiltering: true })
     .toBuffer();
 }
