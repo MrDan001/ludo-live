@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React, { useMemo } from "react";
 import LudoBoardGame, { BOARD_NAMES, BOARD_PALETTES, type BoardThemeId, type DemoToken } from "./LudoBoardGame";
 export type { BoardThemeId, DemoToken };
 export { BOARD_NAMES, BOARD_PALETTES };
@@ -17,10 +17,24 @@ type Props = {
   legalTokenKeys?: string[];
 };
 
+const COLORS: DemoToken["color"][] = ["red", "yellow", "green", "blue"];
+const STATIC_TOKENS: DemoToken[] = COLORS.flatMap((color) =>
+  Array.from({ length: 4 }, (_, id) => ({
+    color,
+    id,
+    position: 0,
+    state: "yard" as const,
+  }))
+);
+
 /**
  * Multiplayer intentionally uses the same board implementation as Bot vs Human.
  * Keep this wrapper multiplayer-only: the Bot vs Human board remains untouched.
  * Server/socket state is still owned by MultiplayerGameCanonical.
+ *
+ * The wrapper guarantees that every colour always has its four static yard
+ * tokens. This prevents a partial/late server token payload from making the
+ * multiplayer board appear empty or incomplete while the room is syncing.
  */
 export default function LudoBoardMultiplayer({
   theme = "classic",
@@ -33,13 +47,21 @@ export default function LudoBoardMultiplayer({
   finishSound = false,
   animateUpdates = true,
 }: Props) {
+  const normalizedTokens = useMemo(() => {
+    const incoming = new Map(demoTokens.map((token) => [`${token.color}:${token.id}`, token]));
+    return STATIC_TOKENS.map((staticToken) => {
+      const token = incoming.get(`${staticToken.color}:${staticToken.id}`);
+      return token ?? staticToken;
+    });
+  }, [demoTokens]);
+
   return (
     <LudoBoardGame
       theme={theme}
       preview={preview}
       className={className}
       style={style}
-      demoTokens={demoTokens}
+      demoTokens={normalizedTokens}
       onTokenClick={onTokenClick}
       snapOnUpdate={snapOnUpdate}
       finishSound={finishSound}
