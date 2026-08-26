@@ -25,8 +25,8 @@ async function ensureAvatarCatalogue() {
 async function dynamicAvatars() {
   try {
     await ensureAvatarCatalogue();
-    const result = await pool.query<any>(`SELECT a.id,a.name,a.description,a.category_id,c.name AS category_name,a.rarity,a.currency,a.price,a.is_published,a.sort_order,a.icon,a.is_builtin,a.image_data IS NOT NULL AS has_image FROM ludo_shop_avatars a LEFT JOIN ludo_avatar_categories c ON c.id=a.category_id WHERE a.is_published=TRUE AND (c.is_active=TRUE OR a.category_id IS NULL) ORDER BY a.sort_order,a.created_at DESC`);
-    return result.rows.map((r:any)=>({id:r.id,type:"avatar" as const,name:r.name,description:r.description||"",categoryId:r.category_id||null,category:r.category_name||null,rarity:r.rarity,currency:r.currency as ShopCurrency,price:Number(r.price),icon:r.icon||"🧑‍🎮",imageUrl:r.has_image?`/api/shop/avatars/${encodeURIComponent(r.id)}/image`:null,isBuiltin:Boolean(r.is_builtin),sortOrder:Number(r.sort_order)}));
+    const result = await pool.query<any>(`SELECT a.id,a.name,a.description,a.category_id,c.name AS category_name,a.rarity,a.currency,a.price,a.is_published,a.sort_order,a.icon,a.is_builtin,a.image_data IS NOT NULL AS has_image,a.updated_at FROM ludo_shop_avatars a LEFT JOIN ludo_avatar_categories c ON c.id=a.category_id WHERE a.is_published=TRUE AND (c.is_active=TRUE OR a.category_id IS NULL) ORDER BY a.sort_order,a.created_at DESC`);
+    return result.rows.map((r:any)=>({id:r.id,type:"avatar" as const,name:r.name,description:r.description||"",categoryId:r.category_id||null,category:r.category_name||null,rarity:r.rarity,currency:r.currency as ShopCurrency,price:Number(r.price),icon:r.icon||"🧑‍🎮",imageUrl:r.has_image?`/api/shop/avatars/${encodeURIComponent(r.id)}/image?v=${encodeURIComponent(new Date(r.updated_at).getTime())}`:null,isBuiltin:Boolean(r.is_builtin),sortOrder:Number(r.sort_order)}));
   } catch(error) { console.error("Dynamic avatar lookup failed",error); return []; }
 }
 
