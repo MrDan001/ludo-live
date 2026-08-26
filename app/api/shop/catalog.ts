@@ -1,41 +1,31 @@
-import { pool, ensureAuthSchema } from "../auth/_db";
+import { pool } from "../auth/_db";
 import { CATALOG } from "../../../lib/customization-catalog";
 
 export type ShopCurrency = "coins" | "gems" | "naira";
 
-type ShopPrice = {
-  currency: ShopCurrency;
-  price: number;
-};
-
-async function ensureShopTable() {
-  await ensureAuthSchema();
-  await pool.query(`CREATE TABLE IF NOT EXISTS ludo_shop_catalog_overrides(
-    item_type TEXT NOT NULL,
-    item_id TEXT NOT NULL,
-    currency TEXT NOT NULL CHECK(currency IN ('coins','gems','naira')),
-    price INTEGER NOT NULL CHECK(price>=0),
-    updated_by TEXT REFERENCES ludo_users(id) ON DELETE SET NULL,
-    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-    PRIMARY KEY(item_type,item_id)
-  )`);
-}
+type ShopPrice = { currency: ShopCurrency; price: number };
 
 export async function getShopCatalog() {
-  await ensureShopTable();
-  const result = await pool.query<{ item_type: string; item_id: string; currency: ShopCurrency; price: string | number }>(
-    "SELECT item_type,item_id,currency,price FROM ludo_shop_catalog_overrides"
-  );
-  const overrides = new Map<string, ShopPrice>(
-    result.rows.map((r) => [
+  // The catalogue is code-owned and must remain available even if the optional
+  // admin override table is unavailable. Never run schema migrations here.
+  try {
+    const result = await pool.query<{ item_type: string; item_id: string; currency: ShopCurrency; price: string | number }>(
+      "SELECT item_type,item_id,currency,price FROM ludo_shop_catalog_overrides"
+    );
+    const overrides = new Map<string, ShopPrice>(result.rows.map((r) => [
       `${r.item_type}:${r.item_id}`,
       { currency: r.currency, price: Number(r.price) },
-    ])
-  );
-  return CATALOG.map((item: any) => {
-    const override = overrides.get(`${item.type}:${item.id}`);
-    return override ? { ...item, currency: override.currency, price: override.price } : item;
-  });
+    ]));
+    return CATALOG.map((item: any) => {
+      const override = overrides.get(`${item.type}:${item.id}`);
+      return override ? { ...item, currency: override.currency, price: override.price } : item;
+    });
+  } catch (error: any) {
+    // 42P01 = undefined_table. The static catalogue is still valid and should
+    // be returned rather than making the Shop appear empty.
+    if (error?.code !== "42P01") console.error("Shop override lookup failed", error);
+    return CATALOG;
+  }
 }
 
 export async function getShopItem(type: string, id: string) {
