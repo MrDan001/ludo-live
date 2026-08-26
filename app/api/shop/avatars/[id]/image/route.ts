@@ -13,9 +13,9 @@ export async function GET(_q: NextRequest, { params }: { params: { id: string } 
     const row = r.rows[0];
     if (!row?.image_data || !row.is_published) return new NextResponse(null, { status: 404 });
 
-    // Older managed avatars may have been stored before automatic background
-    // removal existed. Normalize those assets lazily on first request so existing
-    // avatars are upgraded without requiring the admin to re-upload them.
+    // New admin uploads are normalized to PNG before they reach the database.
+    // Keep the legacy migration path, but only run it once: after normalization
+    // the stored type becomes PNG and subsequent requests are a cheap byte read.
     let bytes = row.image_data;
     let contentType = row.image_type || "application/octet-stream";
     if (contentType !== "image/png") {
@@ -27,8 +27,6 @@ export async function GET(_q: NextRequest, { params }: { params: { id: string } 
           [params.id, bytes],
         );
       } catch (processingError) {
-        // A legacy image that cannot be processed should still be served rather
-        // than making the avatar disappear entirely.
         console.error("Unable to normalize legacy avatar artwork", processingError);
       }
     }
@@ -37,7 +35,9 @@ export async function GET(_q: NextRequest, { params }: { params: { id: string } 
       status: 200,
       headers: {
         "Content-Type": contentType,
-        "Cache-Control": "public, max-age=300, must-revalidate",
+        // Catalog URLs include the avatar updatedAt version, so immutable caching
+        // is safe and prevents repeated database/image requests on every surface.
+        "Cache-Control": "public, max-age=31536000, immutable",
         "X-Content-Type-Options": "nosniff",
       },
     });
