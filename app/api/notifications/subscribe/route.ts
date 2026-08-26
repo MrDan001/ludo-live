@@ -1,18 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { pool, ensureAuthSchema } from "../../auth/_db";
+import { pool } from "../../auth/_db";
 import { currentUser } from "../../../../lib/auth-session";
 
 export const dynamic = "force-dynamic";
 
-async function ensurePushSchema() {
-  await ensureAuthSchema();
-  await pool.query(`CREATE TABLE IF NOT EXISTS ludo_push_subscriptions (id BIGSERIAL PRIMARY KEY,user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE,endpoint TEXT NOT NULL UNIQUE,p256dh TEXT NOT NULL,auth TEXT NOT NULL,user_agent TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
-  await pool.query(`CREATE INDEX IF NOT EXISTS ludo_push_subscriptions_user_idx ON ludo_push_subscriptions(user_id)`);
-}
-
 export async function GET(request: NextRequest) {
   try {
-    await ensurePushSchema();
     const user = await currentUser(request);
     if (!user) return NextResponse.json({ subscribed: false }, { status: 401 });
     const result = await pool.query("SELECT 1 FROM ludo_push_subscriptions WHERE user_id=$1 LIMIT 1", [user.id]);
@@ -25,7 +18,6 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await ensurePushSchema();
     const user = await currentUser(request);
     if (!user) return NextResponse.json({ error: "Login required." }, { status: 401 });
     const body = await request.json();
@@ -44,7 +36,6 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    await ensurePushSchema();
     const user = await currentUser(request);
     if (!user) return NextResponse.json({ error: "Login required." }, { status: 401 });
     const body = await request.json().catch(() => ({}));
