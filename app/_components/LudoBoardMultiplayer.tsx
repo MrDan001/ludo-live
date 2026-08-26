@@ -1,5 +1,5 @@
 "use client";
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import LudoBoardGame, { BOARD_NAMES, BOARD_PALETTES, type BoardThemeId, type DemoToken } from "./LudoBoardGame";
 export type { BoardThemeId, DemoToken };
 export { BOARD_NAMES, BOARD_PALETTES };
@@ -26,11 +26,11 @@ const STATIC_TOKENS: DemoToken[] = COLORS.flatMap((color) =>
     state: "yard" as const,
   }))
 );
+const FINISH_PROGRESS = 57;
+const HOME_LAST_PROGRESS = 56;
+const FINISH_REVEAL_MS = 1200;
 
-/** Multiplayer-only board wrapper. The Bot vs Human and Tournament boards are
- * intentionally left untouched. Multiplayer supplies live token state while
- * the shared board renderer provides the proven visual/movement presentation.
- */
+/** Multiplayer-only board wrapper. Bot vs Human and Tournament remain untouched. */
 export default function LudoBoardMultiplayer({
   theme = "classic",
   preview = false,
@@ -42,13 +42,79 @@ export default function LudoBoardMultiplayer({
   finishSound = false,
   animateUpdates = true,
 }: Props) {
+  const [heldFinishes, setHeldFinishes] = useState<Set<string>>(new Set());
+  const previousPositionsRef = useRef<Map<string, number>>(new Map());
+  const timersRef = useRef<Record<string, number>>({});
+
+  useEffect(() => {
+    const previous = previousPositionsRef.current;
+    const next = new Map<string, number>();
+
+    for (const token of demoTokens) {
+      const key = `${token.color}:${token.id}`;
+      const position = Number(token.position);
+      next.set(key, position);
+
+      // Multiplayer visibly traverses the home/finish lane before the final
+      // authoritative finish position is rendered in the centre.
+      if (
+        animateUpdates &&
+        !snapOnUpdate &&
+        token.state === "finished" &&
+        position === FINISH_PROGRESS &&
+        (previous.get(key) ?? 0) > 0 &&
+        (previous.get(key) ?? 0) < FINISH_PROGRESS &&
+        !timersRef.current[key]
+      ) {
+        setHeldFinishes((current) => {
+          const copy = new Set(current);
+          copy.add(key);
+          return copy;
+        });
+        timersRef.current[key] = window.setTimeout(() => {
+          delete timersRef.current[key];
+          setHeldFinishes((current) => {
+            const copy = new Set(current);
+            copy.delete(key);
+            return copy;
+          });
+        }, FINISH_REVEAL_MS);
+      }
+    }
+
+    for (const key of Object.keys(timersRef.current)) {
+      const token = demoTokens.find((item) => `${item.color}:${item.id}` === key);
+      if (!token || Number(token.position) !== FINISH_PROGRESS) {
+        window.clearTimeout(timersRef.current[key]);
+        delete timersRef.current[key];
+        setHeldFinishes((current) => {
+          const copy = new Set(current);
+          copy.delete(key);
+          return copy;
+        });
+      }
+    }
+
+    previousPositionsRef.current = next;
+  }, [demoTokens, animateUpdates, snapOnUpdate]);
+
+  useEffect(() => () => {
+    Object.values(timersRef.current).forEach((timer) => window.clearTimeout(timer));
+    timersRef.current = {};
+  }, []);
+
   const normalizedTokens = useMemo(() => {
     const incoming = new Map(demoTokens.map((token) => [`${token.color}:${token.id}`, token]));
     return STATIC_TOKENS.map((staticToken) => {
-      const token = incoming.get(`${staticToken.color}:${staticToken.id}`);
-      return token ?? staticToken;
+      const key = `${staticToken.color}:${staticToken.id}`;
+      const token = incoming.get(key);
+      if (!token) return staticToken;
+      if (heldFinishes.has(key) && Number(token.position) === FINISH_PROGRESS) {
+        return { ...token, position: HOME_LAST_PROGRESS, state: "home" as const };
+      }
+      return token;
     });
-  }, [demoTokens]);
+  }, [demoTokens, heldFinishes]);
 
   return (
     <LudoBoardGame
