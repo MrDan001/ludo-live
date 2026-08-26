@@ -1,68 +1,101 @@
 # Ludo Live Avatar Catalogue
 
-## Purpose
+## Production architecture
 
-The avatar catalogue is database-backed for administrator-created artwork. The six built-in avatars remain available as a safe baseline, while uploaded avatars can be added without a code deployment.
+Avatars are a single database-backed catalogue. The application no longer depends on a committed avatar atlas or hard-coded artwork paths.
+
+**Admin → PostgreSQL avatar record → Shop → purchase → owned inventory → equip → profile/game**
+
+The six baseline avatars are seeded into `ludo_shop_avatars` as protected built-in records. New artwork is never committed to Git.
 
 ## Admin workflow
 
-Open `/dbase/avatars` as an authorized administrator.
+Open `/dbase/avatars` or use **DBASE → Management → Avatars** as an authorized administrator.
 
-1. Choose a PNG, JPEG, or WebP image up to 1.5 MB.
-2. Enter the avatar name and optional description.
-3. Choose a category and rarity.
-4. Set the price and choose exactly one currency: Naira, Coins, or Gems.
-5. Publish the avatar.
-6. Use the manager to hide, recategorize, or delete uploaded avatars.
+### Create
 
-## Storage architecture
+1. Choose PNG, JPEG, or WebP artwork.
+2. Artwork must be square, 128–2048px, and no larger than 1.5 MB.
+3. Enter name and description.
+4. Select a category and rarity.
+5. Set price and currency: Naira, Coins, or Gems.
+6. Publish.
 
-Avatar metadata is stored in PostgreSQL in `ludo_shop_avatars`. Artwork bytes are stored with the avatar record and are served through `/api/shop/avatars/:id/image`. This avoids committing binary artwork to Git and gives every avatar a stable application URL.
+### Manage
 
-The catalogue API returns `imageUrl` only for published database avatars. The player Shop renders that URL with a transparent `object-contain` image; built-in avatars continue to use their icon fallback.
+Admins can:
+
+- Edit name and description.
+- Change category, rarity, price, and currency.
+- Replace artwork without changing the avatar ID.
+- Publish/hide an avatar.
+- Reorder catalogue items.
+- Delete uploaded avatars.
+- Manage categories and their active state.
+
+The six protected built-ins cannot be permanently deleted; they can be hidden if the product requires that behaviour.
+
+## Storage
+
+Artwork is stored as binary data with the avatar record in PostgreSQL and served through a stable application URL:
+
+`/api/shop/avatars/:id/image`
+
+The server validates MIME type, file size, and square dimensions before storage. Generated UUID-based IDs are used instead of filenames. Replacing artwork keeps the same avatar ID and therefore preserves ownership/equipping references. Deleting an uploaded avatar deletes its stored artwork with the database row.
+
+Image responses are cache-safe for replacements and include `X-Content-Type-Options: nosniff`.
 
 ## Categories
 
-Default categories are seeded once:
+The seeded catalogue includes:
 
 - Classic
 - Heroes
 - Royal
 - Fantasy
 - Sports
-- Funny
 - Animals
+- Funny
 - Seasonal
 - Limited Edition
 
-Category records are separate from avatar records so category names and activation can evolve without rewriting avatar artwork.
+Categories are separate database records. Hiding a category removes its avatars from the public catalogue without rewriting avatar ownership data.
 
-## Pricing
+## Player rendering
 
-Allowed currencies are `naira`, `coins`, and `gems`. Prices are stored as non-negative integer values. Existing Shop price overrides continue to apply to the non-avatar static catalogue.
+The same avatar ID is used by Shop, Inventory, profile/game avatar rendering, purchase, and equip flows. Managed artwork is rendered through `ShopItemArtwork`/`EquippedAvatar` with a resilient icon fallback if an image becomes unavailable.
 
-Naira is intentionally not charged by the normal customization purchase endpoint. It remains a checkout/payment flow and must be wired to the application's payment provider before a Naira avatar can be purchased.
+## Legacy cleanup
 
-## Safety rules
+The obsolete avatar atlas and premium/elite sprite assets were removed from the repository before this architecture was introduced. Do not reintroduce `AvatarArtwork`, atlas paths, or filename-based avatar lookup.
 
-- Do not commit uploaded avatar binaries to the repository.
-- Keep the 1.5 MB server-side image limit.
-- Accept only PNG, JPEG, and WebP MIME types.
-- Keep image serving restricted to published avatars.
-- Use generated avatar IDs; never use the filename as an identifier.
-- Record avatar create/update/delete actions in the admin audit table.
-- Do not reintroduce the removed atlas, premium/elite image set, or `AvatarArtwork` legacy path.
+The legacy six-avatar constants are no longer used to populate the Shop; the six baseline records are seeded into the database instead.
+
+## Adding a new avatar
+
+No code change is required.
+
+1. Open Avatar Management.
+2. Create or select the category.
+3. Upload valid square artwork.
+4. Enter the avatar metadata and price.
+5. Publish.
+6. Verify it appears in Shop.
+7. Buy it with a test account.
+8. Verify it appears in Inventory.
+9. Equip it.
+10. Verify the artwork appears in profile/game surfaces.
 
 ## Verification checklist
 
-After a deployment, verify:
-
 - `/dbase/avatars` loads for an admin.
-- Uploading an image creates a database avatar.
-- The image URL returns the stored image.
-- The avatar appears in the player Shop after publishing.
-- Buy/equip uses the same avatar ID returned by the catalogue.
-- Hiding an avatar removes it from the public Shop.
-- Deleting an avatar removes its database artwork.
-- Existing six built-in avatars still render.
-- Non-avatar Shop items and notifications are unaffected.
+- Create validates artwork before database insertion.
+- Replacement artwork keeps the avatar ID.
+- Hidden avatars disappear from the public Shop.
+- Deleted uploaded avatars disappear and their binary data is removed with the row.
+- The six built-in avatars remain available as database records.
+- Shop displays managed artwork and has a broken-image fallback.
+- Inventory displays the same managed artwork.
+- Equip uses the canonical avatar ID.
+- Non-avatar shop items, wallet, notifications, and multiplayer logic remain on their existing paths.
+- Railway production deployment remains healthy after each release.
