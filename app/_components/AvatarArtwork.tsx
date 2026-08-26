@@ -1,13 +1,11 @@
-import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 
 type Props = { id?: string; className?: string; style?: CSSProperties; size?: number | string };
 
 // The supplied artwork is a 6 x 5 sheet at 960 x 560 (160 x 112 per avatar).
-// We reconstruct the already-working WebP once, then use an SVG viewport to
-// display exactly ONE character. This avoids CSS background scaling/cropping
-// that previously showed multiple characters in a single card.
-const CHUNKS = Array.from({ length: 8 }, (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-8`);
+// Use the existing WebP directly and an SVG viewport to display exactly ONE character.
+// This avoids the broken Base64 chunk reconstruction and CSS background scaling/cropping.
+const ATLAS_SRC = "/avatars/premium-elite-atlas.webp";
 const COLS = 6;
 const CELL_W = 160;
 const CELL_H = 112;
@@ -25,30 +23,7 @@ function atlasIndex(id: string) {
 
 export default function AvatarArtwork({ id, className, style, size }: Props) {
   const index = atlasIndex(id || "");
-  const [src, setSrc] = useState<string | null>(null);
-
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all(
-      CHUNKS.map((url) =>
-        fetch(url, { cache: "force-cache" }).then((r) => {
-          if (!r.ok) throw new Error(`Avatar asset failed: ${r.status}`);
-          return r.text();
-        }),
-      ),
-    )
-      .then((parts) => {
-        if (!cancelled) setSrc(`data:image/webp;base64,${parts.join("")}`);
-      })
-      .catch(() => {
-        if (!cancelled) setSrc(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  if (index === null || !src) return null;
+  if (index === null) return null;
 
   const col = index % COLS;
   const row = Math.floor(index / COLS);
@@ -77,7 +52,7 @@ export default function AvatarArtwork({ id, className, style, size }: Props) {
       }}
     >
       <image
-        href={src}
+        href={ATLAS_SRC}
         x={x}
         y={y}
         width={ATLAS_W}
