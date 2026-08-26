@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { pool } from "../../../../auth/_db";
-import { stripAvatarBackground } from "../../../../../lib/avatar-background";
+import { stripAvatarBackground } from "../../../../../../lib/avatar-background";
 
 export const dynamic = "force-dynamic";
 
