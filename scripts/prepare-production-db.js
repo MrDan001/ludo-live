@@ -22,6 +22,9 @@ async function main() {
       ALTER TABLE ludo_event_entries ADD COLUMN IF NOT EXISTS completed BOOLEAN NOT NULL DEFAULT FALSE;
       ALTER TABLE ludo_event_entries ADD COLUMN IF NOT EXISTS reward_claimed BOOLEAN NOT NULL DEFAULT FALSE;
       CREATE TABLE IF NOT EXISTS ludo_event_rewards (event_id TEXT NOT NULL REFERENCES ludo_events(id) ON DELETE CASCADE, user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE, coins INTEGER NOT NULL DEFAULT 0, gems INTEGER NOT NULL DEFAULT 0, settled_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), PRIMARY KEY(event_id,user_id));
+      ALTER TABLE ludo_event_rewards ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+      ALTER TABLE ludo_event_rewards ADD COLUMN IF NOT EXISTS coins INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE ludo_event_rewards ADD COLUMN IF NOT EXISTS gems INTEGER NOT NULL DEFAULT 0;
       CREATE INDEX IF NOT EXISTS ludo_event_rewards_user_idx ON ludo_event_rewards(user_id, settled_at DESC);
     `);
     console.log('Production database schema prepared.');
