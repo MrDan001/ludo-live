@@ -8,8 +8,23 @@ type OpenRoom={code:string;players:number;roomSize:number;hostName:string};
 export default function LobbyPage(){
  const [rooms,setRooms]=useState<OpenRoom[]>([]);const [connected,setConnected]=useState(false);const gate=useAccountGate();
  useEffect(()=>{const socket:Socket=io(window.location.origin,{transports:["websocket","polling"]});const refresh=(list:OpenRoom[])=>setRooms(list);socket.on("connect",()=>{setConnected(true);socket.emit("list-rooms")});socket.on("disconnect",()=>setConnected(false));socket.on("room-list",refresh);return()=>{socket.disconnect()}},[]);
+ useEffect(()=>{
+  const stateKey="ludo-live-online-lobby";
+  window.history.pushState({ludoLiveLobby:true,stateKey},"",window.location.href);
+  const handlePopState=()=>{
+   const leave=window.confirm("Leave the Online Players lobby?\n\nAny room you are currently joining or creating may be interrupted.");
+   if(leave){
+    window.removeEventListener("popstate",handlePopState);
+    window.history.back();
+   }else{
+    window.history.pushState({ludoLiveLobby:true,stateKey},"",window.location.href);
+   }
+  };
+  window.addEventListener("popstate",handlePopState);
+  return()=>window.removeEventListener("popstate",handlePopState);
+ },[]);
  const openRoom=(href:string)=>{gate.check(()=>{window.location.href=href})};
- return <AppFrame><div style={{maxWidth:900,margin:"0 auto",paddingBottom:40}}>
+ return <AppFrame hideBack><div style={{maxWidth:900,margin:"0 auto",paddingBottom:40}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}><div><h1 style={{fontSize:40,marginBottom:6}}>🌐 Online Players</h1><p style={{color:"#94a3b8",marginTop:0}}>See players who are waiting right now and jump into an open game.</p></div><span style={{padding:"7px 11px",borderRadius:999,background:connected?"rgba(34,197,94,.12)":"rgba(245,158,11,.12)",color:connected?"#4ade80":"#fbbf24",fontSize:12,fontWeight:900}}>{connected?"● LIVE":"○ CONNECTING"}</span></div>
   <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12,marginTop:22}}><button onClick={()=>openRoom("/room?action=create")} style={tile}><span style={{fontSize:30}}>➕</span><b style={{display:"block",fontSize:20,marginTop:8}}>Create Game</b><small>Open your own room and wait for players.</small></button><button onClick={()=>openRoom("/room?action=join")} style={tile}><span style={{fontSize:30}}>🔑</span><b style={{display:"block",fontSize:20,marginTop:8}}>Join by Code</b><small>Enter a friend's private room code.</small></button></div>
   <section style={{marginTop:28}}><div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}><h2 style={{margin:0}}>🔥 Rooms waiting for players</h2><span style={{color:"#64748b",fontSize:12}}>{rooms.length} open</span></div>
