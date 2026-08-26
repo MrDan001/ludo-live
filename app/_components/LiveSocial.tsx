@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import ChatVoice from "./ChatVoice";
 import PlayerIdentityLink from "./PlayerIdentityLink";
+import AvatarRenderer from "./AvatarRenderer";
 import { AVATAR_ICONS } from "./EquippedAvatar";
 
 type Member = { id: string; playerId?: string; name: string; host?: boolean; ready?: boolean; board?: string; dice?: string; connected?: boolean; avatar?: string };
@@ -15,8 +16,7 @@ const QUICK = ["👋 Hi!", "😂 LOL", "🔥 Nice!", "😮 Wow!", "👏 Good mov
 
 const avatarVisual = (id?: string, imageUrl?: string | null) => {
   const safeId = String(id || "default");
-  if (imageUrl) return <img src={imageUrl} alt="Player avatar" draggable={false} decoding="async" />;
-  return AVATAR_ICONS[safeId] || "🧑🏽‍🎮";
+  return <AvatarRenderer avatar={{ id: safeId, icon: AVATAR_ICONS[safeId] || "🧑🏽‍🎮", imageUrl: imageUrl || null }} size={52} border="3px solid #d7b94a" background="#0b2a62" fallback={AVATAR_ICONS[safeId] || "🧑🏽‍🎮"} />;
 };
 
 const ROOM_CSS = `
