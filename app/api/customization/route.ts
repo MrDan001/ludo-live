@@ -7,13 +7,8 @@ const clean = (list: unknown) => (Array.isArray(list) ? list.map(String) : []);
 
 export async function GET(q: NextRequest) {
   try {
-    await ensureAuthSchema();
     const u = await currentUser(q);
     const catalog = await getShopCatalog();
-
-    // The catalogue is public. Ownership/equipped state is only available
-    // when a signed-in account exists. This prevents the Shop UI from appearing
-    // empty simply because the visitor has not authenticated yet.
     return NextResponse.json({
       coins: u ? Number(u.coins) || 0 : 0,
       gems: u ? Number(u.gems) || 0 : 0,
