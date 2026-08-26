@@ -9,11 +9,7 @@ const currencies:[Currency,string][]=[["naira","₦ Naira"],["coins","🪙 Coins
 const rarities=["COMMON","RARE","EPIC","LEGENDARY"];
 const emptyForm={name:"",description:"",categoryId:"classic",rarity:"COMMON",currency:"coins" as Currency,price:"0",isPublished:true};
 
-/**
- * Converts any supported source artwork into the square avatar canvas without cropping it.
- * The complete source image is fitted inside the canvas (contain), with transparent padding
- * where necessary. This means admins never have to manually crop artwork before uploading.
- */
+/** Converts any supported source artwork into a square avatar canvas without cropping it. */
 async function prepareAvatarImage(file:File):Promise<File>{
   if(!["image/png","image/jpeg","image/webp"].includes(file.type))throw Error("Only PNG, JPEG and WebP images are supported.");
   const url=URL.createObjectURL(file);
@@ -43,7 +39,7 @@ export default function AvatarManager(){
  const load=async()=>{try{const r=await fetch("/api/admin/avatars",{cache:"no-store"}),d=await r.json();if(!r.ok)throw Error(d.error||"Unable to load avatars");setAvatars(d.avatars||[]);setCategories(d.categories||[]);setError("")}catch(e){setError(e instanceof Error?e.message:"Unable to load avatar manager.")}};
  useEffect(()=>{void load()},[]);
  const reset=()=>{setEditing(null);setFile(null);setSourceName("");setForm({...emptyForm})};
- const chooseFile=async(raw:File|null)=>{setError("");setNotice("");setFile(null);setSourceName("");if(!raw)return;try{const prepared=await prepareAvatarImage(raw);setFile(prepared);setSourceName(raw.name);setNotice(raw.width?"":"Artwork prepared automatically: the full image will be preserved and fitted without cropping.")}catch(e){setError(e instanceof Error?e.message:"Unable to prepare avatar artwork.")}};
+ const chooseFile=async(raw:File|null)=>{setError("");setNotice("");setFile(null);setSourceName("");if(!raw)return;try{const prepared=await prepareAvatarImage(raw);setFile(prepared);setSourceName(raw.name);setNotice("Artwork prepared automatically: the full image will be preserved and fitted without cropping.")}catch(e){setError(e instanceof Error?e.message:"Unable to prepare avatar artwork.")}};
  const save=async()=>{setBusy(true);setNotice("");setError("");try{if(!editing&&!file)throw Error("Choose an avatar image first.");const fd=new FormData();Object.entries(form).forEach(([k,v])=>fd.set(k,String(v)));if(file)fd.set("image",file);let r;if(editing){fd.set("id",editing);r=await fetch("/api/admin/avatars",{method:"PATCH",body:fd})}else r=await fetch("/api/admin/avatars",{method:"POST",body:fd});const d=await r.json();if(!r.ok)throw Error(d.error||"Save failed");setAvatars(d.avatars||[]);setCategories(d.categories||[]);setNotice(editing?"Avatar updated successfully.":"Avatar published successfully.");reset()}catch(e){setError(e instanceof Error?e.message:"Unable to save avatar.")}finally{setBusy(false)}};
  const edit=(a:Avatar)=>{setEditing(a.id);setFile(null);setSourceName("");setForm({name:a.name,description:a.description,categoryId:a.categoryId||"classic",rarity:a.rarity,currency:a.currency,price:String(a.price),isPublished:a.isPublished});window.scrollTo({top:0,behavior:"smooth"})};
  const update=async(id:string,patch:any)=>{setBusy(true);try{const r=await fetch("/api/admin/avatars",{method:"PATCH",headers:{"Content-Type":"application/json"},body:JSON.stringify({id,...patch})}),d=await r.json();if(!r.ok)throw Error(d.error||"Update failed");setAvatars(d.avatars||[]);setCategories(d.categories||[]);setNotice("Avatar updated.")}catch(e){setError(e instanceof Error?e.message:"Unable to update avatar.")}finally{setBusy(false)}};
