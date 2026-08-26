@@ -55,7 +55,10 @@ export default function AvatarRenderer({
           alt=""
           draggable={false}
           decoding="async"
-          loading="lazy"
+          // Avatars are identity UI and are normally above the fold. Lazy loading
+          // made profile/avatar surfaces wait unnecessarily, especially on mobile.
+          loading="eager"
+          fetchPriority="high"
           onError={onImageError}
           style={{
             position: "absolute",
