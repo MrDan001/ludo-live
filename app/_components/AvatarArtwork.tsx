@@ -7,7 +7,7 @@ type Props = { id?: string; className?: string; style?: CSSProperties; size?: nu
 // We reconstruct the already-working WebP once, then use an SVG viewport to
 // display exactly ONE character. This avoids CSS background scaling/cropping
 // that previously showed multiple characters in a single card.
-const CHUNKS = Array.from({ length: 8 }, (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-7`);
+const CHUNKS = Array.from({ length: 8 }, (_, i) => `/avatars/atlas-chunks/${String(i).padStart(2, "0")}.txt?v=20260826-8`);
 const COLS = 6;
 const CELL_W = 160;
 const CELL_H = 112;
