@@ -11,40 +11,21 @@ export { BOARD_NAMES, BOARD_PALETTES };
 type Props = { theme?: BoardThemeId; preview?: boolean; className?: string; style?: React.CSSProperties; demoTokens?: DemoToken[]; onTokenClick?: (color: DemoToken["color"], id: number) => void; snapOnUpdate?: boolean; finishSound?: boolean; animateUpdates?: boolean; legalTokenKeys?: string[] };
 const COLORS: DemoToken["color"][] = ["red", "yellow", "green", "blue"];
 const STATIC_TOKENS: DemoToken[] = COLORS.flatMap(color => Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const })));
-
-// These are the same yard centers used by the canonical board. The small pixel
-// inset compensates for the circular token diameter so the visual center lands
-// exactly on the four yard slots at every board size.
 const YARD_CENTERS: Record<DemoToken["color"], Array<[string, string]>> = {
   green: [["calc(13.61% + 2.85px)", "calc(13.61% + 2.85px)"], ["calc(26.39% - 2.85px)", "calc(13.61% + 2.85px)"], ["calc(13.61% + 2.85px)", "calc(26.39% - 2.85px)"], ["calc(26.39% - 2.85px)", "calc(26.39% - 2.85px)"]],
   yellow: [["calc(73.61% + 2.85px)", "calc(13.61% + 2.85px)"], ["calc(86.39% - 2.85px)", "calc(13.61% + 2.85px)"], ["calc(73.61% + 2.85px)", "calc(26.39% - 2.85px)"], ["calc(86.39% - 2.85px)", "calc(26.39% - 2.85px)"]],
   red: [["calc(13.61% + 2.85px)", "calc(73.61% + 2.85px)"], ["calc(26.39% - 2.85px)", "calc(73.61% + 2.85px)"], ["calc(13.61% + 2.85px)", "calc(86.39% - 2.85px)"], ["calc(26.39% - 2.85px)", "calc(86.39% - 2.85px)"]],
   blue: [["calc(73.61% + 2.85px)", "calc(73.61% + 2.85px)"], ["calc(86.39% - 2.85px)", "calc(73.61% + 2.85px)"], ["calc(73.61% + 2.85px)", "calc(86.39% - 2.85px)"], ["calc(86.39% - 2.85px)", "calc(86.39% - 2.85px)"]],
 };
-
 const keyOf = (t: DemoToken) => `${t.color}:${t.id}`;
 function canonicalCell(t: DemoToken) { if (t.state === "yard" || t.state === "finished") return null; return getCanonicalTokenCell(t.color, Number(t.position)); }
-
-// Multiplayer rules are 1-based on the main track; the shared visual board is 0-based.
-// Progress 1 must therefore render at visual track step 0. Home progress 52+ already
-// uses the visual board's home-lane coordinates and is passed through unchanged.
-function toRenderToken(t: DemoToken): DemoToken {
-  if (t.state === "track" && t.position >= 1 && t.position <= 51) return { ...t, position: t.position - 1, state: "track" };
-  return t;
-}
-
+function toRenderToken(t: DemoToken): DemoToken { if (t.state === "track" && t.position >= 1 && t.position <= 51) return { ...t, position: t.position - 1, state: "track" }; return t; }
 type OverlayPosition = [string, string];
 function cellPosition(t: DemoToken): OverlayPosition | null {
-  if (t.state === "yard") {
-    return YARD_CENTERS[t.color]?.[t.id] || YARD_CENTERS[t.color]?.[0] || null;
-  }
+  if (t.state === "yard") return YARD_CENTERS[t.color]?.[t.id] || YARD_CENTERS[t.color]?.[0] || null;
   if (t.state === "finished") return null;
-  if (t.state === "track" && t.position >= 1 && t.position <= 51) {
-    const cell = getRenderTokenCell(t.color, t.position - 1);
-    return cell ? [`${(cell[1] + .5) * 100 / 15}%`, `${(cell[0] + .5) * 100 / 15}%`] : null;
-  }
-  const cell = canonicalCell(t);
-  return cell ? [`${(cell[1] + .5) * 100 / 15}%`, `${(cell[0] + .5) * 100 / 15}%`] : null;
+  if (t.state === "track" && t.position >= 1 && t.position <= 51) { const cell = getRenderTokenCell(t.color, t.position - 1); return cell ? [`${(cell[1] + .5) * 100 / 15}%`, `${(cell[0] + .5) * 100 / 15}%`] : null; }
+  const cell = canonicalCell(t); return cell ? [`${(cell[1] + .5) * 100 / 15}%`, `${(cell[0] + .5) * 100 / 15}%`] : null;
 }
 function emitAudio(kind: "move" | "capture" | "safe" | "home" | "finish" | "win") { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ludo-audio", { detail: kind })); }
 
@@ -55,7 +36,6 @@ export default function LudoBoardMultiplayer({ theme="classic", preview=false, c
   const timersRef = useRef<Record<string, number>>({});
   const mountedRef = useRef(false);
   useEffect(() => { displayRef.current = displayTokens; }, [displayTokens]);
-
   useEffect(() => {
     const incoming = new Map(tokens.map(t => [keyOf(t), t]));
     if (!mountedRef.current) { mountedRef.current = true; displayRef.current = tokens; setDisplayTokens(tokens); return; }
@@ -85,18 +65,16 @@ export default function LudoBoardMultiplayer({ theme="classic", preview=false, c
     for (const token of incoming.values()) if (!reconciled.some(t => keyOf(t) === keyOf(token))) reconciled.push(token);
     displayRef.current = reconciled; setDisplayTokens(reconciled);
   }, [tokens, snapOnUpdate, animateUpdates]);
-
   useEffect(() => () => { Object.values(timersRef.current).forEach(timer => window.clearTimeout(timer)); timersRef.current = {}; }, []);
   const renderTokens = useMemo(() => displayTokens.map(toRenderToken), [displayTokens]);
   const startTrackTokens = useMemo(() => displayTokens.filter(t => t.state === "track" && t.position === 1), [displayTokens]);
   const legal = new Set(legalTokenKeys);
   const palette = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
-
   return <div className="mp-board-wrap" style={{ position:"relative", width:"100%", aspectRatio:"1", ...style }}>
     <LudoBoardFixed theme={theme} preview={preview} className={className} style={{ width:"100%", height:"100%" }} demoTokens={renderTokens.filter(t => !(t.state === "track" && t.position === 0))} onTokenClick={onTokenClick} />
     <div className="mp-overlay" aria-hidden="true">
       {startTrackTokens.map(token => { const pos = cellPosition(token); if (!pos) return null; return <button key={`start-${keyOf(token)}`} type="button" onClick={() => onTokenClick?.(token.color, token.id)} aria-label={`${legal.has(keyOf(token)) ? "Legal move for " : ""}${token.color} token`} style={{ position:"absolute", left:pos[0], top:pos[1], transform:"translate(-50%,-50%)", width:"5.1%", aspectRatio:1, borderRadius:"50%", border:"2px solid #222", background:palette[token.color], zIndex:30, fontWeight:900, padding:0, color:"transparent", fontSize:0, cursor:legal.has(keyOf(token)) ? "pointer" : "default", pointerEvents:legal.has(keyOf(token)) ? "auto" : "none", filter:legal.has(keyOf(token)) ? "brightness(1.08)" : "none", animation:legal.has(keyOf(token)) ? "canonicalTokenBreath 1.45s ease-in-out infinite" : undefined }} />; })}
-      {displayTokens.map(token => { if (!legal.has(keyOf(token))) return null; const pos = cellPosition(token); if (!pos) return null; const yard = token.state === "yard"; return <span key={`pulse-${keyOf(token)}`} aria-hidden="true" style={{ position:"absolute", left:pos[0], top:pos[1], width:yard ? "12.2%" : "6.8%", aspectRatio:"1", transform:"translate(-50%,-50%)", borderRadius:"50%", background:"transparent", border:"2px solid ${palette[token.color]}", boxShadow:`0 0 0 2px rgba(255,255,255,.9),0 0 14px ${palette[token.color]}`, animation:"mpLegalBreath 1.15s ease-in-out infinite", pointerEvents:"none", zIndex:31 }} />; })}
+      {displayTokens.map(token => { if (!legal.has(keyOf(token))) return null; const pos = cellPosition(token); if (!pos) return null; const yard = token.state === "yard"; return <span key={`pulse-${keyOf(token)}`} aria-hidden="true" style={{ position:"absolute", left:pos[0], top:pos[1], width:yard ? "12.2%" : "6.8%", aspectRatio:"1", transform:"translate(-50%,-50%)", borderRadius:"50%", border:"0", background:"transparent", boxShadow:`0 0 0 2px rgba(255,255,255,.9),0 0 14px ${palette[token.color]}`, animation:"mpLegalBreath 1.15s ease-in-out infinite", pointerEvents:"none", zIndex:31 }} />; })}
     </div>
     <style jsx global>{`@keyframes mpLegalBreath{0%,100%{opacity:.35;transform:translate(-50%,-50%) scale(.9)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}}.mp-board-wrap{position:relative}.mp-overlay{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:40}.mp-overlay button{font-size:0!important;color:transparent!important;text-indent:-9999px!important;pointer-events:none}.mp-overlay button[style*="pointer-events: auto"]{pointer-events:auto!important}`}</style>
   </div>;
