@@ -18,36 +18,44 @@ jobs:
         run: |
           python - <<'PY'
           from pathlib import Path
+
           p=Path('app/_components/LudoBoardMultiplayer.tsx')
           s=p.read_text()
           s=s.replace('if(!receivedServerStateRef.current && tokens.some(t=>Number(t.position)!==0)){','if(!receivedServerStateRef.current){',1)
-          marker='function emitAudio(kind:"move"|"capture"|"safe"|"home"|"finish"|"win")'
           if 'const CENTER_SLOTS:' not in s:
-              idx=s.index(marker); end=s.index('\n',idx)+1
-              s=s[:end]+'\n// Compact, clean 4x4 center grid: red/green on top, yellow/blue below.\nconst CENTER_SLOTS: Record<DemoToken["color"], Array<[number,number]>> = {red:[[43,43],[47.5,43],[43,47.5],[47.5,47.5]],green:[[52.5,43],[57,43],[52.5,47.5],[57,47.5]],yellow:[[43,52.5],[47.5,52.5],[43,57],[47.5,57]],blue:[[52.5,52.5],[57,52.5],[52.5,57],[57,57]]};\nfunction centerPosition(t:DemoToken):[string,string]{const p=CENTER_SLOTS[t.color][Math.max(0,Math.min(3,t.id))];return [`${p[0]}%`,`${p[1]}%`];}\n'+s[end:]
-          s=s.replace('const capturePairs:Array<{killerKey:string;killerFrom:number;capturedKey:string;capturedFrom:number}>=[];','const capturePairs:Array<{killerKey:string;killerFrom:number;capturedKey:string;killerTarget:number}>=[];',1)
+              marker='function emitAudio(kind:"move"|"capture"|"safe"|"home"|"finish"|"win")'
+              idx=s.index(marker)
+              end=s.index('\n',idx)+1
+              helper='''\nconst CENTER_SLOTS: Record<DemoToken["color"], Array<[number,number]>> = {red:[[43,43],[47.5,43],[43,47.5],[47.5,47.5]],green:[[52.5,43],[57,43],[52.5,47.5],[57,47.5]],yellow:[[43,52.5],[47.5,52.5],[43,57],[47.5,57]],blue:[[52.5,52.5],[57,52.5],[52.5,57],[57,57]]};\nfunction centerPosition(t:DemoToken):[string,string]{const p=CENTER_SLOTS[t.color][Math.max(0,Math.min(3,t.id))];return [`${p[0]}%`,`${p[1]}%`];}\n'''
+              s=s[:end]+helper+s[end:]
+          old='const capturePairs:Array<{killerKey:string;killerFrom:number;capturedKey:string;capturedFrom:number}>=[];'
+          new='const capturePairs:Array<{killerKey:string;killerFrom:number;capturedKey:string;capturedFrom:number}>=[];'
+          s=s.replace(old,new,1)
           old='if(to>0&&to<FINISH_PROGRESS&&from>0){const victim=[...current.values()].find(v=>Number(v.position)===to&&Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});continue;}}'
-          new='if(to===FINISH_PROGRESS&&from>0){const victim=[...current.values()].find(v=>Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),killerTarget:to});continue;}}'
-          if old in s: s=s.replace(old,new,1)
+          new='if(to===FINISH_PROGRESS&&from>0){const victim=[...current.values()].find(v=>Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});continue;}}'
+          if old not in s: raise SystemExit('capture detection source not found')
+          s=s.replace(old,new,1)
           old='for(const pair of capturePairs){const direction=pair.capturedFrom>pair.killerFrom?1:-1;const advanceToKill=()=>{const live=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!live){delete timersRef.current[pair.killerKey];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=pair.capturedFrom:next<=pair.capturedFrom,position=reached?pair.capturedFrom:next;const nextTokens=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position,state:stateForPosition(position)}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(reached){const resolved=displayRef.current.map(t=>keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);displayRef.current=resolved;setDisplayTokens(resolved);emitAudio("capture");delete timersRef.current[pair.killerKey];return;}emitAudio("move");timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220)};timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220)}'
-          new='for(const pair of capturePairs){const resolved=displayRef.current.map(t=>keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);displayRef.current=resolved;setDisplayTokens(resolved);emitAudio("capture");timersRef.current[pair.killerKey]=window.setTimeout(()=>{const next=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position:FINISH_PROGRESS,state:"finished" as const}:t);displayRef.current=next;setDisplayTokens(next);delete timersRef.current[pair.killerKey]},260)}'
-          if old not in s: raise SystemExit('capture animation block not found')
+          new='''for(const pair of capturePairs){const direction=pair.capturedFrom>pair.killerFrom?1:-1;const advanceToKill=()=>{const live=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!live){delete timersRef.current[pair.killerKey];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=pair.capturedFrom:next<=pair.capturedFrom,position=reached?pair.capturedFrom:next;const nextTokens=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position,state:stateForPosition(position)}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(reached){const victimRemoved=displayRef.current.map(t=>keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);displayRef.current=victimRemoved;setDisplayTokens(victimRemoved);emitAudio("capture");timersRef.current[pair.killerKey]=window.setTimeout(()=>{const centerTokens=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position:FINISH_PROGRESS,state:"finished" as const}:t);displayRef.current=centerTokens;setDisplayTokens(centerTokens);delete timersRef.current[pair.killerKey]},260);return;}emitAudio("move");timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220)};timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220)}'''
+          if old not in s: raise SystemExit('capture animation source not found')
           s=s.replace(old,new,1)
           old='{trackTokens.map(token=>renderBoardToken(token,keyOf(token)))}{homeTokens.map(token=>renderBoardToken(token,`home-${keyOf(token)}`))}{finishedTokens.map(token=>renderBoardToken(token,`finish-${keyOf(token)}`))}'
           new='{trackTokens.map(token=>renderBoardToken(token,keyOf(token)))}{homeTokens.map(token=>renderBoardToken(token,`home-${keyOf(token)}`))}{finishedTokens.map(token=>{const pos=centerPosition(token);return <span key={`center-${keyOf(token)}`} style={{position:"absolute",left:pos[0],top:pos[1],width:"3.4%",aspectRatio:1,borderRadius:"50%",border:"1px solid #222",background:palette[token.color],transform:"translate(-50%,-50%)",zIndex:35,padding:0,pointerEvents:"none",boxSizing:"border-box"}}/>})}'
-          if old not in s: raise SystemExit('finished render block not found')
+          if old not in s: raise SystemExit('finished render source not found')
           s=s.replace(old,new,1)
           p.write_text(s)
 
-          p=Path('app/game/MultiplayerGameCanonical.tsx'); s=p.read_text()
-          s=s.replace('    let mounted = true;\n\n    const connect = async () => {','    let mounted = true;\n    let cleanupConnection: (() => void) | null = null;\n\n    const connect = async () => {',1)
-          s=s.replace('''      return () => {\n        clearDiceTimer();\n        clearMoveTimer();\n        nextSocket.disconnect();\n      };''','''      cleanupConnection = () => {\n        clearDiceTimer();\n        clearMoveTimer();\n        nextSocket.disconnect();\n      };''',1)
-          s=s.replace('''    return () => {\n      mounted = false;\n    };''','''    return () => {\n      mounted = false;\n      cleanupConnection?.();\n    };''',1)
+          p=Path('app/game/MultiplayerGameCanonical.tsx')
+          s=p.read_text()
+          if 'let cleanupConnection: (() => void) | null = null;' not in s:
+              s=s.replace('let mounted = true;\n\n    const connect = async () => {','let mounted = true;\n    let cleanupConnection: (() => void) | null = null;\n\n    const connect = async () => {',1)
+              s=s.replace('''      return () => {\n        clearDiceTimer();\n        clearMoveTimer();\n        nextSocket.disconnect();\n      };''','''      cleanupConnection = () => {\n        clearDiceTimer();\n        clearMoveTimer();\n        nextSocket.disconnect();\n      };''',1)
+              s=s.replace('''    return () => {\n      mounted = false;\n    };''','''    return () => {\n      mounted = false;\n      cleanupConnection?.();\n    };''',1)
           p.write_text(s)
           PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add app/_components/LudoBoardMultiplayer.tsx app/game/MultiplayerGameCanonical.tsx
           git diff --cached --quiet && exit 0
-          git commit -m 'fix: capture to center and stable reconnect hydration'
+          git commit -m 'fix: correct capture sequencing and center token layout'
           git push
