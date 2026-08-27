@@ -30,6 +30,29 @@ Current team model: Human = `red` + `yellow`; Bot = `green` + `blue`. Teammates 
 
 **Do not create a second board geometry or parallel rule engine.** Reuse the canonical implementation.
 
+### Multiplayer token rendering and movement contract
+
+`app/_components/LudoBoardMultiplayer.tsx` owns the multiplayer overlay token presentation and movement interpolation.
+
+- The multiplayer breathing/glow is attached to the same token element rather than rendered as an independent board marker. This keeps the glow locked to the token when it moves.
+- Yard tokens use a **9%** board-relative size. Track and launch tokens retain their existing **5.1%** size.
+- A token leaving the yard uses the existing launch animation and transitions from its yard center to its first track cell without leaving a glow behind in the yard.
+- The existing finish animation is preserved.
+
+### Custom capture/kill rule
+
+This game intentionally uses a custom rule: when a token successfully kills an opponent token, the **killer immediately jumps to finish position `57`**. Do not replace this with standard Ludo capture behavior unless explicitly requested.
+
+- The killed token is reset to position `0` / `yard`.
+- The killer must not animate box-by-box from its capture square through the finish lane.
+- The killer is treated as reaching `57` directly and should use the finish-token sound.
+
+### Finish-lane audio contract
+
+Positions `52–56` are the colored finish/home lane. Passing through those positions uses the normal **move** sound only.
+
+The **finish** sound is emitted only when the token actually reaches position `57`. It must not fire once per finish-lane step. A custom kill that directly sends the killer to `57` also triggers the finish sound once.
+
 ### Protected Bot-vs-Human reference
 
 `app/game/GameBoardContent.tsx` and `/game` are the known-good gameplay reference. Do not casually refactor or alter them while fixing another mode. Port only the smallest required behavior and preserve the reference behavior unless the user explicitly asks for a Bot-vs-Human change.
@@ -73,6 +96,10 @@ The profile exposes `username`, wallet and progression/customization data. Multi
 The **host owns the room board skin**. A joining player's personal board skin must never replace the host skin. Seat/team mapping comes from the canonical engine; do not invent another mapping in UI.
 
 2-player and 4-player multiplayer should remain viewport-sized and non-scrollable unless a deliberate responsive redesign is requested.
+
+### Online Player navigation contract
+
+The in-app Back button on the online player page routes directly to `/home`. It must not return the player to the lobby unless the navigation requirement is explicitly changed.
 
 ### Waiting-room identity contract
 
@@ -343,10 +370,3 @@ PostgreSQL is authoritative for accounts, wallets, customization ownership, tour
 - Do not render an Event progress fill as an inline-only span; percentage width needs a block-level fill element.
 - Do not claim Railway deployment success until the platform reports success.
 - Do not treat a successful `getUserMedia()` call or a green Mic button as proof that remote peers received audio. WebRTC call/stream state must be considered separately.
-- Do not answer an incoming WebRTC call with `undefined` just because the player has not enabled their mic yet; preserve the call and answer when the local audio stream becomes available.
-- Do not count backgrounded/non-game pages toward hierarchy hours or active-time rewards.
-- Do not award active-time spins or XP from the client. The server must validate elapsed heartbeat time and apply the reward transactionally.
-
-## Do not guess
-
-If a referenced file/path has moved, search the repository first and update this document. If an existing API already owns a piece of state, integrate with it instead of creating a competing implementation. When a product requirement is ambiguous, stop and verify rather than silently choosing an architecture that can break existing behavior.
