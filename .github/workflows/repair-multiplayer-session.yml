@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Repair multiplayer session, dice audio and reconnect hydration
+      - name: Repair multiplayer dice, captures and reconnect hydration
         shell: bash
         run: |
           python - <<'PY'
@@ -17,164 +17,59 @@ jobs:
 
           changed = False
 
-          # Multiplayer dice sound: the multiplayer controller already plays the
-          # sound from the authoritative game-dice event. DemoDice must not also
-          # play it locally, otherwise one roll produces two sounds.
+          # Dice: 3 must be three pips; 5 must be five pips.
           p = Path('app/_components/DemoDice.tsx')
           s = p.read_text()
-          old = 'const startDiceSound=()=>{if(settings.sound&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:"dice"}))};'
-          new = 'const startDiceSound=()=>{if(!authoritative&&settings.sound&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:"dice"}))};'
-          if old in s:
-              s = s.replace(old, new)
+          s2 = s.replace('5:[0,4,8]', '5:[0,2,4,6,8]')
+          if s2 != s:
+              s = s2
               changed = True
-          # Safety repair for the dice-face definition; this workflow must never
-          # alter the visual pip layout while fixing audio.
-          s = s.replace('5:[0,4,8]', '5:[0,2,4,6,8]')
           p.write_text(s)
 
-          # Reconnect hydration: a reconnect/refresh receives the authoritative
-          # game-state snapshot. That snapshot is a restore, not a new roll, so it
-          # must update the displayed face without replaying the 900ms roll animation
-          # or dice sound. A real roll is only animated after the first state snapshot.
-          p = Path('app/game/MultiplayerGameCanonical.tsx')
+          # Multiplayer board animation: the first server state after a fresh
+          # mount/reconnect is a snapshot. Never animate every token from yard
+          # into its restored position. Later authoritative states animate normally.
+          p = Path('app/_components/LudoBoardMultiplayer.tsx')
           s = p.read_text()
-          if 'const hydratedRef = useRef(false);' not in s:
-              anchor = '  const winnerSoundRef = useRef<string | null>(null);'
-              replacement = anchor + '\n  const hydratedRef = useRef(false);'
+          anchor = 'const[displayTokens,setDisplayTokens]=useState<DemoToken[]>(tokens);const displayRef=useRef(tokens);'
+          replacement = anchor + 'const receivedServerStateRef=useRef(false);'
+          if 'const receivedServerStateRef=useRef(false);' not in s:
               if anchor not in s:
-                  raise SystemExit('winner sound ref anchor not found')
+                  raise SystemExit('display token ref anchor not found')
               s = s.replace(anchor, replacement, 1)
               changed = True
 
-          old = '''      nextSocket.on("connect", () => {
-        if (!mounted) return;'''
-          new = '''      nextSocket.on("connect", () => {
-        if (!mounted) return;
-        // Every Socket.IO reconnect must hydrate from the server snapshot before
-        // any subsequent dice event is treated as a new roll.
-        hydratedRef.current = false;'''
-          if old in s:
-              s = s.replace(old, new, 1)
-              changed = True
+          old = '''if(!mountedRef.current){mountedRef.current=true;displayRef.current=tokens;setDisplayTokens(tokens);return;}\n  if(snapOnUpdate||!animateUpdates){'''
+          new = '''if(!mountedRef.current){mountedRef.current=true;displayRef.current=tokens;setDisplayTokens(tokens);return;}\n  // First non-empty server state is hydration, not a movement animation.\n  // This is what makes refresh/reconnect restore tokens instantly.\n  if(!receivedServerStateRef.current){receivedServerStateRef.current=true;Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout);timersRef.current={};launchTimersRef.current={};setLaunchingKeys(new Set());displayRef.current=Array.from(incoming.values());setDisplayTokens(displayRef.current);return;}\n  if(snapOnUpdate||!animateUpdates){'''
+          if old not in s:
+              raise SystemExit('hydration effect anchor not found')
+          s = s.replace(old, new, 1)
 
-          old = '''        setRoll(event.value);
-        setRemoteRolling(true);
-        emitAudio("dice");
-        setNotice('''
-          new = '''        setRoll(event.value);
-        // A game-dice event received before the first authoritative snapshot can
-        // only be a stale/replayed event during reconnect. Restore the face but do
-        // not spend time animating or playing audio for it.
-        if (!hydratedRef.current) {
-          setRemoteRolling(false);
-          return;
-        }
-        setRemoteRolling(true);
-        emitAudio("dice");
-        setNotice('''
-          if old in s:
-              s = s.replace(old, new, 1)
-              changed = True
+          # Correct capture detection. A capture is when the killer's destination
+          # equals an opponent's current cell and that opponent becomes yard in the
+          # authoritative state. The previous code incorrectly looked for FINISH.
+          old = '''if(to===FINISH_PROGRESS&&from>0){const victim=[...current.values()].find(v=>Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});continue;}}'''
+          new = '''if(to>0&&to<FINISH_PROGRESS&&from!==to){const victim=[...current.values()].find(v=>Number(v.position)===to&&Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});continue;}}'''
+          if old not in s:
+              raise SystemExit('capture detection anchor not found')
+          s = s.replace(old, new, 1)
 
-          old = '''        const accepted = applyServerState(next);
-        if (!accepted) return;
-
-        if (next.dice !== null) setRoll(next.dice);'''
-          new = '''        const accepted = applyServerState(next);
-        if (!accepted) return;
-
-        // This is the authoritative restore point after refresh/reconnect. It is
-        // deliberately not passed through the roll animation path.
-        hydratedRef.current = true;
-        setRemoteRolling(false);
-        if (next.dice !== null) setRoll(next.dice);'''
-          if old in s:
-              s = s.replace(old, new, 1)
-              changed = True
-
-          # The previous effect returned cleanup from inside an async function,
-          # which React never receives. Keep the actual socket in the effect scope
-          # so unmount cleans it up and cannot leave duplicate listeners/connections.
-          old = '''  useEffect(() => {
-    let mounted = true;
-
-    const connect = async () => {'''
-          new = '''  useEffect(() => {
-    let mounted = true;
-    let activeSocket: Socket | null = null;
-
-    const connect = async () => {'''
-          if old in s:
-              s = s.replace(old, new, 1)
-              changed = True
-
-          old = '''      setSocket(nextSocket);
-
-      const clearDiceTimer = () => {'''
-          new = '''      activeSocket = nextSocket;
-      setSocket(nextSocket);
-
-      const clearDiceTimer = () => {'''
-          if old in s:
-              s = s.replace(old, new, 1)
-              changed = True
-
-          old = '''      return () => {
-        clearDiceTimer();
-        clearMoveTimer();
-        nextSocket.disconnect();
-      };
-    };
-
-    void connect();
-
-    return () => {
-      mounted = false;
-    };'''
-          new = '''      return () => {
-        clearDiceTimer();
-        clearMoveTimer();
-        nextSocket.disconnect();
-        if (activeSocket === nextSocket) activeSocket = null;
-      };
-    };
-
-    void connect();
-
-    return () => {
-      mounted = false;
-      clearTimeout(0);
-      if (activeSocket) {
-        activeSocket.disconnect();
-        activeSocket = null;
-      }
-    };'''
-          if old in s:
-              s = s.replace(old, new, 1)
-              changed = True
-          else:
-              # Keep the outer cleanup simple if the inner cleanup has already
-              # been repaired by a previous workflow run.
-              s = s.replace('''    return () => {
-      mounted = false;
-    };
-  }, [applyServerState, isTournament]);''','''    return () => {
-      mounted = false;
-      if (activeSocket) {
-        activeSocket.disconnect();
-        activeSocket = null;
-      }
-    };
-  }, [applyServerState, isTournament]);''',1)
-
+          # At capture, put the victim back into the yard exactly when the killer
+          # lands on that square. Do not play a finish sound here. The finish sound
+          # is reserved for the actual FINISH_PROGRESS -> center transition.
+          old = '''const finished=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position:FINISH_PROGRESS,state:"finished" as const}:keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);displayRef.current=finished;setDisplayTokens(finished);emitAudio("capture");emitAudio("finish");delete timersRef.current[pair.killerKey];return;'''
+          new = '''const resolved=displayRef.current.map(t=>keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);displayRef.current=resolved;setDisplayTokens(resolved);emitAudio("capture");delete timersRef.current[pair.killerKey];return;'''
+          if old not in s:
+              raise SystemExit('capture completion anchor not found')
+          s = s.replace(old, new, 1)
           p.write_text(s)
 
-          if not changed and git diff --quiet; then
-            echo 'No multiplayer session repairs required.'
-            exit 0
+          if not changed and git diff --quiet:
+              echo 'No multiplayer repair changes required.'
+              exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add app/_components/DemoDice.tsx app/game/MultiplayerGameCanonical.tsx .github/workflows/repair-multiplayer-session.yml
-          git commit -m 'fix: preserve multiplayer dice state across reconnects'
+          git add app/_components/DemoDice.tsx app/_components/LudoBoardMultiplayer.tsx
+          git commit -m 'fix: repair multiplayer dice captures and reconnect state'
           git push
