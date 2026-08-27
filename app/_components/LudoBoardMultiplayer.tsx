@@ -53,7 +53,49 @@ export default function LudoBoardMultiplayer({theme="classic",preview=false,clas
  },[demoTokens]);
  const[displayTokens,setDisplayTokens]=useState<DemoToken[]>(tokens);const displayRef=useRef(tokens);const timersRef=useRef<Record<string,number>>({});const launchTimersRef=useRef<Record<string,number>>({});const[launchingKeys,setLaunchingKeys]=useState<Set<string>>(new Set());const mountedRef=useRef(false);
  useEffect(()=>{displayRef.current=displayTokens},[displayTokens]);
- useEffect(()=>{const incoming=new Map(tokens.map(t=>[keyOf(t),t]));if(!mountedRef.current){mountedRef.current=true;displayRef.current=tokens;setDisplayTokens(tokens);return;}if(snapOnUpdate||!animateUpdates){Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout);timersRef.current={};launchTimersRef.current={};setLaunchingKeys(new Set());displayRef.current=Array.from(incoming.values());setDisplayTokens(displayRef.current);return;}const current=new Map(displayRef.current.map(t=>[keyOf(t),t]));for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken){current.set(key,target);continue;}const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;if(currentToken.position>0&&target.state==="yard"){current.set(key,target);displayRef.current=Array.from(current.values());setDisplayTokens(displayRef.current);emitAudio("capture");delete timersRef.current[key];continue;}if(from===0&&to===1&&target.state==="track"){const launched=displayRef.current.map(t=>keyOf(t)===key?{...target,position:1,state:"track" as const}:t);displayRef.current=launched;setDisplayTokens(launched);setLaunchingKeys(p=>new Set(p).add(key));if(launchTimersRef.current[key])window.clearTimeout(launchTimersRef.current[key]);launchTimersRef.current[key]=window.setTimeout(()=>{setLaunchingKeys(p=>{const n=new Set(p);n.delete(key);return n});delete launchTimersRef.current[key]},220);emitAudio("move");delete timersRef.current[key];continue;}const direction=to>from?1:-1;const advance=()=>{const live=displayRef.current.find(t=>keyOf(t)===key);if(!live){delete timersRef.current[key];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=to:next<=to,position=reached?to:next,nextState=stateForPosition(position);const nextTokens=displayRef.current.map(t=>keyOf(t)===key?{...t,position,state:nextState}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(position===FINISH_PROGRESS&&previous!==FINISH_PROGRESS)emitAudio("finish");else emitAudio("move");if(reached){delete timersRef.current[key];return;}timersRef.current[key]=window.setTimeout(advance,220)};timersRef.current[key]=window.setTimeout(advance,220);}const reconciled=displayRef.current.filter(t=>incoming.has(keyOf(t)));for(const token of incoming.values())if(!reconciled.some(t=>keyOf(t)===keyOf(token)))reconciled.push(token);displayRef.current=reconciled;setDisplayTokens(reconciled);},[tokens,snapOnUpdate,animateUpdates]);
+ useEffect(()=>{
+   const incoming=new Map(tokens.map(t=>[keyOf(t),t]));
+   if(!mountedRef.current){mountedRef.current=true;displayRef.current=tokens;setDisplayTokens(tokens);return;}
+   if(snapOnUpdate||!animateUpdates){Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout);timersRef.current={};launchTimersRef.current={};setLaunchingKeys(new Set());displayRef.current=Array.from(incoming.values());setDisplayTokens(displayRef.current);return;}
+   const current=new Map(displayRef.current.map(t=>[keyOf(t),t]));
+   const capturePairs:Array<{killerKey:string;killerFrom:number;capturedKey:string;capturedFrom:number}>=[];
+   for(const[key,target]of incoming){
+     const currentToken=current.get(key);if(!currentToken)continue;
+     const from=Number(currentToken.position),to=Number(target.position);
+     if(from===to||timersRef.current[key])continue;
+     if(to===FINISH_PROGRESS&&from>0){
+       const victim=[...current.values()].find(v=>Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);
+       if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});continue;}
+     }
+     if(from===0&&to===1&&target.state==="track"){
+       const launched=displayRef.current.map(t=>keyOf(t)===key?{...target,position:1,state:"track" as const}:t);displayRef.current=launched;setDisplayTokens(launched);setLaunchingKeys(p=>new Set(p).add(key));if(launchTimersRef.current[key])window.clearTimeout(launchTimersRef.current[key]);launchTimersRef.current[key]=window.setTimeout(()=>{setLaunchingKeys(p=>{const n=new Set(p);n.delete(key);return n});delete launchTimersRef.current[key]},220);emitAudio("move");delete timersRef.current[key];continue;
+     }
+     const direction=to>from?1:-1;
+     const advance=()=>{const live=displayRef.current.find(t=>keyOf(t)===key);if(!live){delete timersRef.current[key];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=to:next<=to,position=reached?to:next,nextState=stateForPosition(position);const nextTokens=displayRef.current.map(t=>keyOf(t)===key?{...t,position,state:nextState}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(position===FINISH_PROGRESS&&previous!==FINISH_PROGRESS)emitAudio("finish");else emitAudio("move");if(reached){delete timersRef.current[key];return;}timersRef.current[key]=window.setTimeout(advance,220)};
+     timersRef.current[key]=window.setTimeout(advance,220);
+   }
+   for(const pair of capturePairs){
+     const killer=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!killer)continue;
+     const victim=displayRef.current.find(t=>keyOf(t)===pair.capturedKey);
+     const targetCell=cellPosition({color:killer.color,id:killer.id,position:pair.capturedFrom,state:stateForPosition(pair.capturedFrom)});
+     if(!targetCell){continue;}
+     const direction=pair.capturedFrom>pair.killerFrom?1:-1;
+     const advanceToKill=()=>{
+       const live=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!live){delete timersRef.current[pair.killerKey];return;}
+       const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=pair.capturedFrom:next<=pair.capturedFrom;
+       const position=reached?pair.capturedFrom:next;
+       const nextTokens=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position,state:stateForPosition(position)}:t);
+       displayRef.current=nextTokens;setDisplayTokens(nextTokens);emitAudio("move");
+       if(reached){
+         const finished=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position:FINISH_PROGRESS,state:"finished" as const}:keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);
+         displayRef.current=finished;setDisplayTokens(finished);emitAudio("capture");emitAudio("finish");delete timersRef.current[pair.killerKey];return;
+       }
+       timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220);
+     };
+     timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220);
+   }
+   const reconciled=displayRef.current.filter(t=>incoming.has(keyOf(t)));for(const token of incoming.values())if(!reconciled.some(t=>keyOf(t)===keyOf(token)))reconciled.push(token);displayRef.current=reconciled;setDisplayTokens(reconciled);
+ },[tokens,snapOnUpdate,animateUpdates]);
  useEffect(()=>()=>{Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout)},[]);
  const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
  const boardTokens=useMemo(()=>displayTokens.filter(t=>canonicalTokenState(Number(t.position))!=="yard"&&canonicalTokenState(Number(t.position))!=="finished"&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
@@ -68,7 +110,6 @@ export default function LudoBoardMultiplayer({theme="classic",preview=false,clas
  const yardStyle=(color:DemoToken["color"],id:number,legal:boolean):React.CSSProperties=>{const c=YARD_CENTERS[color]?.[id]||YARD_CENTERS[color]?.[0];return {position:"absolute",left:`${c[1]}%`,top:`${c[0]}%`,width:"9%",aspectRatio:1,borderRadius:"50%",border:"2px solid #222",background:palette[color],transform:"translate(-50%,-50%)",zIndex:30,padding:0,cursor:legal?"pointer":"default",pointerEvents:onTokenClick?"auto":"none"};};
  const renderBoardToken=(token:DemoToken,key:string)=>{const pos=cellPosition(token);if(!pos)return null;const legal=legalSet.has(keyOf(token));return <button key={key} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={tokenStyle(pos,token,legal)}><span style={legal?glowStyle(token.color):{}}/></button>;};
  return <div className="mp-board-wrap" style={{position:"relative",width:"100%",aspectRatio:"1",...style}}>
-  {/* Multiplayer owns the token overlay. LudoBoard must render only the board geometry, otherwise every moving token is painted twice. */}
   <LudoBoard theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={onTokenClick}/>
   <div className="mp-overlay" aria-hidden="true">
    {yardTokens.map(token=>{const legal=legalSet.has(keyOf(token));return <button key={`yard-${keyOf(token)}`} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={yardStyle(token.color,token.id,legal)}><span style={legal?glowStyle(token.color):{}}/></button>})}
