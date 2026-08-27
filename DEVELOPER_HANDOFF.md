@@ -17,6 +17,35 @@ Before changing production behavior, read `ARCHITECTURE.md`, `LEVEL_REWARDS.md` 
 9. When a deployment fails, fix the exact reported error before touching unrelated code.
 10. When a product rule changes, update both `ARCHITECTURE.md` and this handoff document, plus the focused feature MD when one exists.
 
+## Recent multiplayer fixes and contracts
+
+### Multiplayer token rendering and movement
+
+`app/_components/LudoBoardMultiplayer.tsx` owns the multiplayer overlay token presentation and movement interpolation.
+
+- The multiplayer breathing/glow is attached to the same token element rather than rendered as an independent board marker. This keeps the glow locked to the token when it moves.
+- Yard tokens use a **9%** board-relative size. Track and launch tokens retain their existing **5.1%** size.
+- A token leaving the yard uses the existing launch animation and transitions from its yard center to its first track cell without leaving a glow behind in the yard.
+- The existing finish animation is preserved.
+
+### Custom capture/kill rule
+
+This game intentionally uses a custom rule: when a token successfully kills an opponent token, the **killer immediately jumps to finish position `57`**. Do not replace this with standard Ludo capture behavior unless explicitly requested.
+
+- The killed token is reset to position `0` / `yard`.
+- The killer must not animate box-by-box from its capture square through the finish lane.
+- The killer is treated as reaching `57` directly and should use the finish-token sound.
+
+### Finish-lane audio
+
+Positions `52–56` are the colored finish/home lane. Passing through those positions uses the normal **move** sound only.
+
+The **finish** sound is emitted only when the token actually reaches position `57`. It must not fire once per finish-lane step. A custom kill that directly sends the killer to `57` also triggers the finish sound once.
+
+### Online Player navigation
+
+The in-app Back button on the online player page now routes directly to `/home` rather than returning to the lobby. Preserve this behavior unless navigation requirements explicitly change.
+
 ## Gameplay contracts
 
 ### Canonical board/rules
@@ -35,7 +64,7 @@ One player `dice` sound per roll, at roll start. Do not trigger another player d
 
 Supported audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
 
-### Protected reference
+## Protected reference
 
 `app/game/GameBoardContent.tsx` / `/game` is the Bot-vs-Human reference. Do not casually modify it while fixing multiplayer, tournament, Shop, Inventory, admin, or other pages.
 
