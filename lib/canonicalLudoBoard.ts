@@ -7,7 +7,10 @@ export const YARD_PROGRESS = 0;
 export const TRACK_START_PROGRESS = 1;
 export const HOME_START_PROGRESS = rules.HOME_START;
 export const FINISH_PROGRESS = rules.FINISH;
-export const FINISH_CELL = rules.FINISH_CELL;
+// Keep the finish-cell geometry canonical here. ludoRules.js exports the
+// same runtime value, but TypeScript's inferred JS module type does not expose
+// that property reliably during Next.js production builds.
+export const FINISH_CELL: BoardCell = [7, 7];
 export const PHYSICAL_TRACK_LENGTH = rules.PHYSICAL_TRACK_LENGTH;
 export const START_INDEX = rules.START_INDEX;
 export const MAIN_PATH = rules.MAIN_PATH;
