@@ -1,30 +1,24 @@
 "use client";
-import React,{useEffect,useMemo,useRef,useState}from"react";
+import React,{useMemo}from"react";
 import LudoBoardGame,{BOARD_NAMES,BOARD_PALETTES,type BoardThemeId,type DemoToken}from"./LudoBoardGame";
 import{getTokenCell}from"../../lib/canonicalLudoBoard";
-export type{BoardThemeId,DemoToken};export{BOARD_NAMES,BOARD_PALETTES};
+export type{BoardThemeId,DemoToken};
+export{BOARD_NAMES,BOARD_PALETTES};
+
 type Props={theme?:BoardThemeId;preview?:boolean;className?:string;style?:React.CSSProperties;demoTokens?:DemoToken[];onTokenClick?:(color:DemoToken["color"],id:number)=>void;snapOnUpdate?:boolean;finishSound?:boolean;animateUpdates?:boolean;legalTokenKeys?:string[]};
 const COLORS:DemoToken["color"][]=["red","yellow","green","blue"];
 const STATIC_TOKENS:DemoToken[]=COLORS.flatMap(color=>Array.from({length:4},(_,id)=>({color,id,position:0,state:"yard"as const})));
-const FINISH_PROGRESS=57;const MOVE_STEP_MS=220;
 const YARD_CENTERS:Record<DemoToken["color"],Array<[number,number]>>={green:[[13.61,13.61],[13.61,26.39],[26.39,13.61],[26.39,26.39]],yellow:[[13.61,73.61],[13.61,86.39],[26.39,73.61],[26.39,86.39]],red:[[73.61,13.61],[73.61,26.39],[86.39,13.61],[86.39,26.39]],blue:[[73.61,73.61],[73.61,86.39],[86.39,73.61],[86.39,86.39]]};
 const keyOf=(t:DemoToken)=>`${t.color}:${t.id}`;
-function emitStepAudio(){if(typeof window==="undefined")return;requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent("ludo-audio",{detail:"move"})))}
-function emitAudio(kind:"capture"|"home"){if(typeof window==="undefined")return;window.dispatchEvent(new CustomEvent("ludo-audio",{detail:kind}))}
-function cellFor(token:DemoToken){if(token.state==="yard"||token.state==="finished")return null;return getTokenCell(token.color,Number(token.position))}
-function tokenPosition(token:DemoToken){if(token.state==="yard"){const c=YARD_CENTERS[token.color]?.[token.id]||YARD_CENTERS[token.color]?.[0];return c?[c[1],c[0]]:[50,50]}const cell=cellFor(token);return cell?[(cell[1]+.5)*100/15,(cell[0]+.5)*100/15]:[50,50]}
+function cellPosition(t:DemoToken){if(t.state==="yard"){const c=YARD_CENTERS[t.color]?.[t.id]||YARD_CENTERS[t.color]?.[0];return c?[c[1],c[0]]:null}if(t.state==="finished")return null;const cell=getTokenCell(t.color,Number(t.position));return cell?[(cell[1]+.5)*100/15,(cell[0]+.5)*100/15]:null}
+
 export default function LudoBoardMultiplayer({theme="classic",preview=false,className="",style,demoTokens=[],onTokenClick,snapOnUpdate=false,finishSound=false,animateUpdates=true,legalTokenKeys=[]}:Props){
- const[visualTokens,setVisualTokens]=useState<DemoToken[]>(STATIC_TOKENS);const visualRef=useRef(visualTokens);const timers=useRef<Record<string,number>>({});
- useEffect(()=>{visualRef.current=visualTokens},[visualTokens]);
- useEffect(()=>{if(typeof window==="undefined")return;const intercept=(event:Event)=>{const e=event as CustomEvent;if(e.detail!=="move")return;event.stopImmediatePropagation()};window.addEventListener("ludo-audio",intercept,true);return()=>window.removeEventListener("ludo-audio",intercept,true)},[]);
- useEffect(()=>{const targets=new Map(STATIC_TOKENS.map(t=>[keyOf(t),t]));for(const t of demoTokens)targets.set(keyOf(t),t);if(!animateUpdates||snapOnUpdate){Object.values(timers.current).forEach(t=>window.clearTimeout(t));timers.current={};const next=Array.from(targets.values());visualRef.current=next;setVisualTokens(next);return}
-  const current=new Map(visualRef.current.map(t=>[keyOf(t),t]));
-  for(const target of targets.values()){const key=keyOf(target);const live=current.get(key)||STATIC_TOKENS.find(t=>keyOf(t)===key)!;const from=Number(live.position),to=Number(target.position);if(from===to){current.set(key,target);continue}if(timers.current[key])continue;
-   if(target.state==="yard"&&from>0){current.set(key,{...target,position:0,state:"yard"});visualRef.current=Array.from(current.values());setVisualTokens(visualRef.current);emitAudio("capture");continue}
-   const direction=to>from?1:-1;const step=()=>{const now=current.get(key)||live;const nextPosition=Number(now.position)+direction;const reached=direction>0?nextPosition>=to:nextPosition<=to;const position=reached?to:nextPosition;const state=(reached?target.state:(position<=0?"yard":position>=FINISH_PROGRESS?"finished":position>=52?"home":"track")) as DemoToken["state"];const next={...now,position,state};current.set(key,next);visualRef.current=Array.from(current.values());setVisualTokens(visualRef.current);if(position>0)emitStepAudio();if(reached){if(state==="finished"&&target.state==="finished")emitAudio("home");delete timers.current[key];return}timers.current[key]=window.setTimeout(step,MOVE_STEP_MS)};timers.current[key]=window.setTimeout(step,MOVE_STEP_MS);
-  }
-  visualRef.current=Array.from(current.values());setVisualTokens(visualRef.current);
- },[demoTokens,animateUpdates,snapOnUpdate]);
- useEffect(()=>()=>{Object.values(timers.current).forEach(t=>window.clearTimeout(t));timers.current={}},[]);
- const legalSet=useMemo(()=>new Set(legalTokenKeys),[legalTokenKeys]);const pulseTokens=useMemo(()=>visualTokens.filter(t=>legalSet.has(keyOf(t))&&t.state!=="finished"),[visualTokens,legalSet]);const finished=visualTokens.filter(t=>t.state==="finished");
- return <div className="mp-board-wrap" style={{position:"relative",width:"100%",aspectRatio:"1",...style}}><LudoBoardGame theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={[]} snapOnUpdate={true} animateUpdates={false}/>{visualTokens.filter(t=>t.state!=="finished").map(token=>{const [left,top]=tokenPosition(token);const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;return <button key={keyOf(token)} type="button" aria-label={`Move ${token.color} token`} onClick={()=>onTokenClick?.(token.color,token.id)} style={{position:"absolute",left:`${left}%`,top:`${top}%`,width:token.state==="yard"?"11.5%":"7%",aspectRatio:1,transform:"translate(-50%,-50%)",borderRadius:"50%",background:palette[token.color],border:"2px solid rgba(255,255,255,.96)",boxShadow:`0 3px 9px rgba(0,0,0,.38),0 0 10px ${palette[token.color]}`,zIndex:140,pointerEvents:"auto",cursor:"pointer"}}/>})}{finished.map((token,i)=>{const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;return <span key={`finish-${keyOf(token)}`} aria-hidden="true" style={{position:"absolute",left:`${40+(i%4)*5}%`,top:`${40+Math.floor(i/4)*5}%`,width:"4.2%",aspectRatio:1,borderRadius:"50%",background:palette[token.color],border:"1px solid white",boxShadow:"0 2px 5px rgba(0,0,0,.35)",zIndex:150}}/>})}{pulseTokens.map(token=>{const [left,top]=tokenPosition(token);const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;return <span key={`pulse-${keyOf(token)}`} aria-hidden="true" style={{position:"absolute",left:`${left}%`,top:`${top}%`,width:token.state==="yard"?"13.5%":"9%",aspectRatio:1,transform:"translate(-50%,-50%)",borderRadius:"50%",background:"transparent",border:`2px solid ${palette[token.color]}`,boxShadow:`0 0 0 2px ${palette[token.color]},0 0 18px ${palette[token.color]}`,animation:"mpLegalBreath 1.45s ease-in-out infinite",pointerEvents:"none",zIndex:130}}/>})}<style jsx global>{`@keyframes mpLegalBreath{0%,100%{opacity:.3;transform:translate(-50%,-50%) scale(.9)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}}.mp-board-wrap button{font-size:0!important;color:transparent!important;text-indent:-9999px!important}`}</style></div>}
+ const tokens=useMemo(()=>{const map=new Map(STATIC_TOKENS.map(t=>[keyOf(t),t]));for(const t of demoTokens)map.set(keyOf(t),t);return Array.from(map.values())},[demoTokens]);
+ const legal=new Set(legalTokenKeys);
+ const pulse=tokens.filter(t=>legal.has(keyOf(t))&&t.state!=="finished");
+ return <div className="mp-board-wrap" style={{position:"relative",width:"100%",aspectRatio:"1",...style}}>
+   <LudoBoardGame theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={tokens} onTokenClick={onTokenClick} snapOnUpdate={snapOnUpdate} finishSound={finishSound} animateUpdates={animateUpdates}/>
+   {pulse.map(t=>{const pos=cellPosition(t);if(!pos)return null;const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;return <span key={`pulse-${keyOf(t)}`} aria-hidden="true" style={{position:"absolute",left:`${pos[0]}%`,top:`${pos[1]}%`,width:t.state==="yard"?"11.5%":"7%",aspectRatio:1,transform:"translate(-50%,-50%)",borderRadius:"50%",background:"transparent",border:`3px solid ${palette[t.color]}`,boxShadow:`0 0 0 2px rgba(255,255,255,.8),0 0 18px ${palette[t.color]}`,animation:"mpLegalBreath 1.2s ease-in-out infinite",pointerEvents:"none",zIndex:160}}/>})}
+   <style jsx global>{`@keyframes mpLegalBreath{0%,100%{opacity:.35;transform:translate(-50%,-50%) scale(.92)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.12)}}.mp-board-wrap button{font-size:0!important;color:transparent!important;text-indent:-9999px!important}`}</style>
+ </div>
+}
