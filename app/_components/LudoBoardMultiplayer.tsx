@@ -2,13 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import LudoBoard, { BOARD_NAMES, BOARD_PALETTES, type BoardThemeId, type DemoToken } from "./LudoBoard";
-import {
-  FINISH_PROGRESS,
-  HOME_START_PROGRESS,
-  TRACK_LENGTH,
-  getTokenCell as getCanonicalTokenCell,
-  tokenState as canonicalTokenState,
-} from "../../lib/canonicalLudoBoard";
+import { FINISH_PROGRESS, HOME_START_PROGRESS, TRACK_LENGTH, getTokenCell as getCanonicalTokenCell, tokenState as canonicalTokenState } from "../../lib/canonicalLudoBoard";
 
 export type { BoardThemeId, DemoToken };
 export { BOARD_NAMES, BOARD_PALETTES };
@@ -19,82 +13,33 @@ const STATIC_TOKENS: DemoToken[] = COLORS.flatMap(color => Array.from({ length: 
 const YARD_CENTERS: Record<DemoToken["color"], Array<[number, number]>> = { green:[[13.5,13.5],[13.5,26.5],[26.5,13.5],[26.5,26.5]], yellow:[[13.5,73.5],[13.5,86.5],[26.5,73.5],[26.5,86.5]], red:[[73.5,13.5],[73.5,26.5],[86.5,13.5],[86.5,26.5]], blue:[[73.5,73.5],[73.5,86.5],[86.5,73.5],[86.5,86.5]] };
 const CENTER_CELL: readonly [number, number] = [7, 7];
 const keyOf=(t:DemoToken)=>`${t.color}:${t.id}`;
-
-function canonicalCell(t:DemoToken){
-  const position=Number(t.position);
-  if(canonicalTokenState(position)==="yard") return null;
-  if(position===FINISH_PROGRESS) return CENTER_CELL;
-  return getCanonicalTokenCell(t.color,position);
-}
-
-function cellPosition(t:DemoToken):[string,string]|null{
-  if(canonicalTokenState(Number(t.position))==="yard"){
-    const c=YARD_CENTERS[t.color]?.[t.id]||YARD_CENTERS[t.color]?.[0];
-    return c?[`${c[1]}%`,`${c[0]}%`]:null;
-  }
-  const cell=canonicalCell(t);
-  return cell?[`${(cell[1]+.5)*100/15}%`,`${(cell[0]+.5)*100/15}%`]:null;
-}
-
-function stateForPosition(position:number):DemoToken["state"]{
-  return canonicalTokenState(position) as DemoToken["state"];
-}
-
+function canonicalCell(t:DemoToken){const position=Number(t.position);if(canonicalTokenState(position)==="yard")return null;if(position===FINISH_PROGRESS)return CENTER_CELL;return getCanonicalTokenCell(t.color,position);}
+function cellPosition(t:DemoToken):[string,string]|null{if(canonicalTokenState(Number(t.position))==="yard"){const c=YARD_CENTERS[t.color]?.[t.id]||YARD_CENTERS[t.color]?.[0];return c?[`${c[1]}%`,`${c[0]}%`]:null;}const cell=canonicalCell(t);return cell?[`${(cell[1]+.5)*100/15}%`,`${(cell[0]+.5)*100/15}%`]:null;}
+function stateForPosition(position:number):DemoToken["state"]{return canonicalTokenState(position) as DemoToken["state"];}
 function emitAudio(kind:"move"|"capture"|"safe"|"home"|"finish"|"win"){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:kind}));}
 
 export default function LudoBoardMultiplayer({theme="classic",preview=false,className="",style,demoTokens=[],onTokenClick,snapOnUpdate=false,finishSound=false,animateUpdates=true,legalTokenKeys=[]}:Props){
- const tokens=useMemo(()=>{
-   const map=new Map(STATIC_TOKENS.map(t=>[keyOf(t),t]));
-   for(const t of demoTokens){
-     const position=Number(t.position);
-     map.set(keyOf(t),{...t,position,state:stateForPosition(position)});
-   }
-   return Array.from(map.values());
- },[demoTokens]);
+ const tokens=useMemo(()=>{const map=new Map(STATIC_TOKENS.map(t=>[keyOf(t),t]));for(const t of demoTokens){const position=Number(t.position);map.set(keyOf(t),{...t,position,state:stateForPosition(position)});}return Array.from(map.values());},[demoTokens]);
  const[displayTokens,setDisplayTokens]=useState<DemoToken[]>(tokens);const displayRef=useRef(tokens);const timersRef=useRef<Record<string,number>>({});const launchTimersRef=useRef<Record<string,number>>({});const[launchingKeys,setLaunchingKeys]=useState<Set<string>>(new Set());const mountedRef=useRef(false);
  useEffect(()=>{displayRef.current=displayTokens},[displayTokens]);
  useEffect(()=>{
-   const incoming=new Map(tokens.map(t=>[keyOf(t),t]));
-   if(!mountedRef.current){mountedRef.current=true;displayRef.current=tokens;setDisplayTokens(tokens);return;}
-   if(snapOnUpdate||!animateUpdates){Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout);timersRef.current={};launchTimersRef.current={};setLaunchingKeys(new Set());displayRef.current=Array.from(incoming.values());setDisplayTokens(displayRef.current);return;}
-   const current=new Map(displayRef.current.map(t=>[keyOf(t),t]));
-   const capturePairs:Array<{killerKey:string;killerFrom:number;capturedKey:string;capturedFrom:number}>=[];
-   for(const[key,target]of incoming){
-     const currentToken=current.get(key);if(!currentToken)continue;
-     const from=Number(currentToken.position),to=Number(target.position);
-     if(from===to||timersRef.current[key])continue;
-     if(to===FINISH_PROGRESS&&from>0){
-       const victim=[...current.values()].find(v=>Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);
-       if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});continue;}
-     }
-     if(from===0&&to===1&&target.state==="track"){
-       const launched=displayRef.current.map(t=>keyOf(t)===key?{...target,position:1,state:"track" as const}:t);displayRef.current=launched;setDisplayTokens(launched);setLaunchingKeys(p=>new Set(p).add(key));if(launchTimersRef.current[key])window.clearTimeout(launchTimersRef.current[key]);launchTimersRef.current[key]=window.setTimeout(()=>{setLaunchingKeys(p=>{const n=new Set(p);n.delete(key);return n});delete launchTimersRef.current[key]},220);emitAudio("move");delete timersRef.current[key];continue;
-     }
-     const direction=to>from?1:-1;
-     const advance=()=>{const live=displayRef.current.find(t=>keyOf(t)===key);if(!live){delete timersRef.current[key];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=to:next<=to,position=reached?to:next,nextState=stateForPosition(position);const nextTokens=displayRef.current.map(t=>keyOf(t)===key?{...t,position,state:nextState}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(position===FINISH_PROGRESS&&previous!==FINISH_PROGRESS)emitAudio("finish");else emitAudio("move");if(reached){delete timersRef.current[key];return;}timersRef.current[key]=window.setTimeout(advance,220)};
-     timersRef.current[key]=window.setTimeout(advance,220);
-   }
-   for(const pair of capturePairs){
-     const killer=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!killer)continue;
-     const victim=displayRef.current.find(t=>keyOf(t)===pair.capturedKey);
-     const targetCell=cellPosition({color:killer.color,id:killer.id,position:pair.capturedFrom,state:stateForPosition(pair.capturedFrom)});
-     if(!targetCell){continue;}
-     const direction=pair.capturedFrom>pair.killerFrom?1:-1;
-     const advanceToKill=()=>{
-       const live=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!live){delete timersRef.current[pair.killerKey];return;}
-       const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=pair.capturedFrom:next<=pair.capturedFrom;
-       const position=reached?pair.capturedFrom:next;
-       const nextTokens=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position,state:stateForPosition(position)}:t);
-       displayRef.current=nextTokens;setDisplayTokens(nextTokens);emitAudio("move");
-       if(reached){
-         const finished=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position:FINISH_PROGRESS,state:"finished" as const}:keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);
-         displayRef.current=finished;setDisplayTokens(finished);emitAudio("capture");emitAudio("finish");delete timersRef.current[pair.killerKey];return;
-       }
-       timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220);
-     };
-     timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220);
-   }
-   const reconciled=displayRef.current.filter(t=>incoming.has(keyOf(t)));for(const token of incoming.values())if(!reconciled.some(t=>keyOf(t)===keyOf(token)))reconciled.push(token);displayRef.current=reconciled;setDisplayTokens(reconciled);
+  const incoming=new Map(tokens.map(t=>[keyOf(t),t]));
+  if(!mountedRef.current){mountedRef.current=true;displayRef.current=tokens;setDisplayTokens(tokens);return;}
+  if(snapOnUpdate||!animateUpdates){Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout);timersRef.current={};launchTimersRef.current={};setLaunchingKeys(new Set());displayRef.current=Array.from(incoming.values());setDisplayTokens(displayRef.current);return;}
+  const current=new Map(displayRef.current.map(t=>[keyOf(t),t]));
+  const capturePairs:Array<{killerKey:string;killerFrom:number;capturedKey:string;capturedFrom:number}>=[];
+  for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken)continue;const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;
+   if(to===FINISH_PROGRESS&&from>0){const victim=[...current.values()].find(v=>Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});continue;}}
+  }
+  const capturedKeys=new Set(capturePairs.map(p=>p.capturedKey));
+  for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken)continue;const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;
+   if(capturedKeys.has(key))continue;
+   if(from===0&&to===1&&target.state==="track"){const launched=displayRef.current.map(t=>keyOf(t)===key?{...target,position:1,state:"track" as const}:t);displayRef.current=launched;setDisplayTokens(launched);setLaunchingKeys(p=>new Set(p).add(key));if(launchTimersRef.current[key])window.clearTimeout(launchTimersRef.current[key]);launchTimersRef.current[key]=window.setTimeout(()=>{setLaunchingKeys(p=>{const n=new Set(p);n.delete(key);return n});delete launchTimersRef.current[key]},220);emitAudio("move");continue;}
+   if(currentToken.position>0&&target.state==="yard"){current.set(key,target);displayRef.current=Array.from(current.values());setDisplayTokens(displayRef.current);emitAudio("capture");delete timersRef.current[key];continue;}
+   const direction=to>from?1:-1;const advance=()=>{const live=displayRef.current.find(t=>keyOf(t)===key);if(!live){delete timersRef.current[key];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=to:next<=to,position=reached?to:next,nextState=stateForPosition(position);const nextTokens=displayRef.current.map(t=>keyOf(t)===key?{...t,position,state:nextState}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(position===FINISH_PROGRESS&&previous!==FINISH_PROGRESS)emitAudio("finish");else emitAudio("move");if(reached){delete timersRef.current[key];return;}timersRef.current[key]=window.setTimeout(advance,220)};timersRef.current[key]=window.setTimeout(advance,220);
+  }
+  for(const pair of capturePairs){const direction=pair.capturedFrom>pair.killerFrom?1:-1;const advanceToKill=()=>{const live=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!live){delete timersRef.current[pair.killerKey];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=pair.capturedFrom:next<=pair.capturedFrom,position=reached?pair.capturedFrom:next;const nextTokens=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position,state:stateForPosition(position)}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);emitAudio("move");if(reached){const finished=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position:FINISH_PROGRESS,state:"finished" as const}:keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);displayRef.current=finished;setDisplayTokens(finished);emitAudio("capture");emitAudio("finish");delete timersRef.current[pair.killerKey];return;}timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220)};timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220);}
+  const reconciled=displayRef.current.filter(t=>incoming.has(keyOf(t)));for(const token of incoming.values())if(!reconciled.some(t=>keyOf(t)===keyOf(token)))reconciled.push(token);displayRef.current=reconciled;setDisplayTokens(reconciled);
  },[tokens,snapOnUpdate,animateUpdates]);
  useEffect(()=>()=>{Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout)},[]);
  const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
@@ -109,15 +54,9 @@ export default function LudoBoardMultiplayer({theme="classic",preview=false,clas
  const tokenStyle=(pos:[string,string],token:DemoToken,legal:boolean):React.CSSProperties=>({position:"absolute",left:pos[0],top:pos[1],width:"5.1%",aspectRatio:1,borderRadius:"50%",border:"2px solid #222",background:palette[token.color],transform:"translate(-50%,-50%)",zIndex:30,padding:0,cursor:legal?"pointer":"default",pointerEvents:onTokenClick?"auto":"none"});
  const yardStyle=(color:DemoToken["color"],id:number,legal:boolean):React.CSSProperties=>{const c=YARD_CENTERS[color]?.[id]||YARD_CENTERS[color]?.[0];return {position:"absolute",left:`${c[1]}%`,top:`${c[0]}%`,width:"9%",aspectRatio:1,borderRadius:"50%",border:"2px solid #222",background:palette[color],transform:"translate(-50%,-50%)",zIndex:30,padding:0,cursor:legal?"pointer":"default",pointerEvents:onTokenClick?"auto":"none"};};
  const renderBoardToken=(token:DemoToken,key:string)=>{const pos=cellPosition(token);if(!pos)return null;const legal=legalSet.has(keyOf(token));return <button key={key} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={tokenStyle(pos,token,legal)}><span style={legal?glowStyle(token.color):{}}/></button>;};
- return <div className="mp-board-wrap" style={{position:"relative",width:"100%",aspectRatio:"1",...style}}>
-  <LudoBoard theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={onTokenClick}/>
-  <div className="mp-overlay" aria-hidden="true">
-   {yardTokens.map(token=>{const legal=legalSet.has(keyOf(token));return <button key={`yard-${keyOf(token)}`} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={yardStyle(token.color,token.id,legal)}><span style={legal?glowStyle(token.color):{}}/></button>})}
-   {trackTokens.map(token=>renderBoardToken(token,keyOf(token)))}
-   {homeTokens.map(token=>renderBoardToken(token,`home-${keyOf(token)}`))}
-   {finishedTokens.map(token=>renderBoardToken(token,`finish-${keyOf(token)}`))}
-   {launchTokens.map(token=>{const yard=YARD_CENTERS[token.color]?.[token.id];const target=cellPosition({...token,state:"track",position:1});if(!yard||!target)return null;const startX=yard[1],startY=yard[0];const legal=legalSet.has(keyOf(token));return <span key={`launch-${keyOf(token)}`} style={{position:"absolute",left:`${startX}%`,top:`${startY}%`,width:"5.1%",aspectRatio:1,borderRadius:"50%",border:"2px solid #222",background:palette[token.color],transform:"translate(-50%,-50%)",zIndex:30,pointerEvents:"none",animation:"mpLaunch 220ms cubic-bezier(.22,.8,.32,1) forwards",["--launch-start-x" as string]:`${startX}%`,["--launch-start-y" as string]:`${startY}%`,["--launch-end-x" as string]:target[0],["--launch-end-y" as string]:target[1]} as React.CSSProperties}><span style={legal?glowStyle(token.color):{}}/></span>})}
-  </div>
-  <style jsx global>{`@keyframes mpLaunch{from{left:var(--launch-start-x);top:var(--launch-start-y)}to{left:var(--launch-end-x);top:var(--launch-end-y)}}@keyframes mpTokenBreath{0%,100%{opacity:.42;transform:scale(.94)}50%{opacity:.95;transform:scale(1.05)}}`}</style>
- </div>;
+ return <div className="mp-board-wrap" style={{position:"relative",width:"100%",aspectRatio:"1",...style}}><LudoBoard theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={onTokenClick}/><div className="mp-overlay" aria-hidden="true">
+  {yardTokens.map(token=>{const legal=legalSet.has(keyOf(token));return <button key={`yard-${keyOf(token)}`} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={yardStyle(token.color,token.id,legal)}><span style={legal?glowStyle(token.color):{}}/></button>})}
+  {trackTokens.map(token=>renderBoardToken(token,keyOf(token)))}{homeTokens.map(token=>renderBoardToken(token,`home-${keyOf(token)}`))}{finishedTokens.map(token=>renderBoardToken(token,`finish-${keyOf(token)}`))}
+  {launchTokens.map(token=>{const yard=YARD_CENTERS[token.color]?.[token.id];const target=cellPosition({...token,state:"track",position:1});if(!yard||!target)return null;const startX=yard[1],startY=yard[0];const legal=legalSet.has(keyOf(token));return <span key={`launch-${keyOf(token)}`} style={{position:"absolute",left:`${startX}%`,top:`${startY}%`,width:"5.1%",aspectRatio:1,borderRadius:"50%",border:"2px solid #222",background:palette[token.color],transform:"translate(-50%,-50%)",zIndex:30,pointerEvents:"none",animation:"mpLaunch 220ms cubic-bezier(.22,.8,.32,1) forwards",["--launch-start-x" as string]:`${startX}%`,["--launch-start-y" as string]:`${startY}%`,["--launch-end-x" as string]:target[0],["--launch-end-y" as string]:target[1]} as React.CSSProperties}><span style={legal?glowStyle(token.color):{}}/></span>})}
+ </div><style jsx global>{`@keyframes mpLaunch{from{left:var(--launch-start-x);top:var(--launch-start-y)}to{left:var(--launch-end-x);top:var(--launch-end-y)}}@keyframes mpTokenBreath{0%,100%{opacity:.42;transform:scale(.94)}50%{opacity:.95;transform:scale(1.05)}}`}</style></div>;
 }
