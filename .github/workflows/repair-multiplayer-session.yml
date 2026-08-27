@@ -9,61 +9,172 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Repair authoritative room leave lifecycle
+      - name: Repair multiplayer session, dice audio and reconnect hydration
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
 
-          p = Path('server.js')
+          changed = False
+
+          # Multiplayer dice sound: the multiplayer controller already plays the
+          # sound from the authoritative game-dice event. DemoDice must not also
+          # play it locally, otherwise one roll produces two sounds.
+          p = Path('app/_components/DemoDice.tsx')
           s = p.read_text()
+          old = 'const startDiceSound=()=>{if(settings.sound&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:"dice"}))};'
+          new = 'const startDiceSound=()=>{if(!authoritative&&settings.sound&&typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:"dice"}))};'
+          if old in s:
+              s = s.replace(old, new)
+              changed = True
+          # Safety repair for the dice-face definition; this workflow must never
+          # alter the visual pip layout while fixing audio.
+          s = s.replace('5:[0,4,8]', '5:[0,2,4,6,8]')
+          p.write_text(s)
 
-          # The deployed architecture already has a reconnect-aware disconnect
-          # handler. Do not replace it: that path is intentionally different from
-          # an explicit Leave Room action. We only add the authoritative leave event.
-          if 'socket.on("leave-room"' not in s:
-              anchor = ' socket.on("disconnect",()=>{'
-              pos = s.find(anchor)
-              if pos < 0:
-                  raise SystemExit('room disconnect anchor not found')
+          # Reconnect hydration: a reconnect/refresh receives the authoritative
+          # game-state snapshot. That snapshot is a restore, not a new roll, so it
+          # must update the displayed face without replaying the 900ms roll animation
+          # or dice sound. A real roll is only animated after the first state snapshot.
+          p = Path('app/game/MultiplayerGameCanonical.tsx')
+          s = p.read_text()
+          if 'const hydratedRef = useRef(false);' not in s:
+              anchor = '  const winnerSoundRef = useRef<string | null>(null);'
+              replacement = anchor + '\n  const hydratedRef = useRef(false);'
+              if anchor not in s:
+                  raise SystemExit('winner sound ref anchor not found')
+              s = s.replace(anchor, replacement, 1)
+              changed = True
 
-              leave = ''' socket.on("leave-room",()=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room)return socket.emit("room-left",{roomCode:code});const member=room.members.get(socket.id);if(!member)return socket.emit("room-left",{roomCode:code});const wasHost=room.hostId===socket.id||room.hostPlayerId===member.playerId;room.members.delete(socket.id);socket.leave(code);socket.data.roomCode=null;if(room.hostTimer)clearTimeout(room.hostTimer);if(room.members.size===0){rooms.delete(code);broadcastRooms();socket.emit("room-left",{roomCode:code});return}if(wasHost){const next=[...room.members.values()].find(m=>m.socketId||m.id);if(next){for(const m of room.members.values())m.host=false;next.host=true;next.ready=true;room.hostId=next.id;room.hostPlayerId=next.playerId||next.id;room.hostPending=false;room.hostEligible=false}}io.to(code).emit("roster",publicMembers(room));broadcastRooms();socket.emit("room-left",{roomCode:code})});
-'''
-              s = s[:pos] + leave + s[pos:]
-              p.write_text(s)
+          old = '''      nextSocket.on("connect", () => {
+        if (!mounted) return;'''
+          new = '''      nextSocket.on("connect", () => {
+        if (!mounted) return;
+        // Every Socket.IO reconnect must hydrate from the server snapshot before
+        // any subsequent dice event is treated as a new roll.
+        hydratedRef.current = false;'''
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
 
-          # Keep the handoff documentation beside the implementation.
-          Path('MULTIPLAYER_SESSION.md').write_text('''# Multiplayer Session & Reconnect Rules
+          old = '''        setRoll(event.value);
+        setRemoteRolling(true);
+        emitAudio("dice");
+        setNotice('''
+          new = '''        setRoll(event.value);
+        // A game-dice event received before the first authoritative snapshot can
+        // only be a stale/replayed event during reconnect. Restore the face but do
+        // not spend time animating or playing audio for it.
+        if (!hydratedRef.current) {
+          setRemoteRolling(false);
+          return;
+        }
+        setRemoteRolling(true);
+        emitAudio("dice");
+        setNotice('''
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
 
-## Server authority
-The Socket.IO server is authoritative for room membership. `ludo-room` in browser storage is only a convenience cache and never proves that a player is still in a room.
+          old = '''        const accepted = applyServerState(next);
+        if (!accepted) return;
 
-## Explicit Leave Room
-The Leave Room action emits `leave-room` before navigation. The server immediately removes that socket from the room.
+        if (next.dice !== null) setRoll(next.dice);'''
+          new = '''        const accepted = applyServerState(next);
+        if (!accepted) return;
 
-- If the leaving player was the only member, the room is deleted immediately and removed from Online Players.
-- If other players remain and the leaver was host, host authority transfers to a remaining participant.
-- The explicit leave path is intentionally separate from `disconnect`: an accidental network/browser disconnect must remain reconnectable.
-- A room must never remain publicly joinable solely because its former host disconnected intentionally.
+        // This is the authoritative restore point after refresh/reconnect. It is
+        // deliberately not passed through the roll animation path.
+        hydratedRef.current = true;
+        setRemoteRolling(false);
+        if (next.dice !== null) setRoll(next.dice);'''
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
 
-## Accidental disconnect
-The existing disconnect/reconnect lifecycle remains unchanged. Temporary disconnects can preserve the room for reconnection and host replacement according to the existing server rules.
+          # The previous effect returned cleanup from inside an async function,
+          # which React never receives. Keep the actual socket in the effect scope
+          # so unmount cleans it up and cannot leave duplicate listeners/connections.
+          old = '''  useEffect(() => {
+    let mounted = true;
 
-## Room sizes
-The same lifecycle applies to 2-player and 4-player rooms. A 4-player room with only its creator is deleted immediately when that creator explicitly leaves; it is not treated as an active room waiting for a replacement host.
+    const connect = async () => {'''
+          new = '''  useEffect(() => {
+    let mounted = true;
+    let activeSocket: Socket | null = null;
 
-## Voice
-`ChatVoice.tsx` remains the canonical room voice implementation. Do not create a second room voice transport.
-''')
+    const connect = async () => {'''
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
 
-          # Make the workflow idempotent: after the repair commit, a subsequent run
-          # finds the handler and makes no further source change.
-          if git diff --quiet; then
-            echo 'No multiplayer repair changes required.'
+          old = '''      setSocket(nextSocket);
+
+      const clearDiceTimer = () => {'''
+          new = '''      activeSocket = nextSocket;
+      setSocket(nextSocket);
+
+      const clearDiceTimer = () => {'''
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
+
+          old = '''      return () => {
+        clearDiceTimer();
+        clearMoveTimer();
+        nextSocket.disconnect();
+      };
+    };
+
+    void connect();
+
+    return () => {
+      mounted = false;
+    };'''
+          new = '''      return () => {
+        clearDiceTimer();
+        clearMoveTimer();
+        nextSocket.disconnect();
+        if (activeSocket === nextSocket) activeSocket = null;
+      };
+    };
+
+    void connect();
+
+    return () => {
+      mounted = false;
+      clearTimeout(0);
+      if (activeSocket) {
+        activeSocket.disconnect();
+        activeSocket = null;
+      }
+    };'''
+          if old in s:
+              s = s.replace(old, new, 1)
+              changed = True
+          else:
+              # Keep the outer cleanup simple if the inner cleanup has already
+              # been repaired by a previous workflow run.
+              s = s.replace('''    return () => {
+      mounted = false;
+    };
+  }, [applyServerState, isTournament]);''','''    return () => {
+      mounted = false;
+      if (activeSocket) {
+        activeSocket.disconnect();
+        activeSocket = null;
+      }
+    };
+  }, [applyServerState, isTournament]);''',1)
+
+          p.write_text(s)
+
+          if not changed and git diff --quiet; then
+            echo 'No multiplayer session repairs required.'
             exit 0
           fi
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add server.js MULTIPLAYER_SESSION.md
-          git commit -m 'fix: authoritative multiplayer room leave'
+          git add app/_components/DemoDice.tsx app/game/MultiplayerGameCanonical.tsx .github/workflows/repair-multiplayer-session.yml
+          git commit -m 'fix: preserve multiplayer dice state across reconnects'
           git push
