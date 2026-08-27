@@ -5,7 +5,7 @@ import ForfeitControl from "./ForfeitControl";
 
 export default function AppFrame({ children, back = "/home", backLabel = "← Back", hideBack = false }: { children: React.ReactNode; back?: string; backLabel?: string; hideBack?: boolean }) {
   const goBack = () => {
-    if (window.history.length > 1) window.history.back(); else window.location.href = back;
+    window.location.href = "/home";
   };
   return (
     <main style={{ minHeight: "100vh", background: "radial-gradient(circle at top, #10265d 0%, #020817 48%, #01030a 100%)", color: "#fff", padding: "18px 12px 32px" }}>
