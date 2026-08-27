@@ -37,8 +37,9 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
     players: room.players.map(p => ({ playerId: p.playerId, name: p.name, seat: p.seat, colors: p.colors })),
     tokens: room.tokens,
     winnerId: room.winnerId || null,
+    stateRevision: room.stateRevision,
   });
-  const emitState = (socket, room) => socket.nsp.to(room.code).emit("game-state", snapshot(room));
+  const emitState = (socket, room) => { room.stateRevision += 1; socket.nsp.to(room.code).emit("game-state", snapshot(room)); };
   const nextPlayer = room => {
     const index = room.players.findIndex(p => p.playerId === room.currentPlayerId);
     const next = room.players[(index + 1) % room.players.length];
@@ -53,7 +54,7 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
         if (code && pid) {
           let shadow = liveRooms.get(code);
           if (!shadow) {
-            shadow = { code, members: new Map(), players: [], status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, sixStreak: 0, tokens: {}, winnerId: null };
+            shadow = { code, members: new Map(), players: [], status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, sixStreak: 0, tokens: {}, winnerId: null, stateRevision: 0 };
             liveRooms.set(code, shadow);
           }
           shadow.members.set(pid, { playerId: pid, name: String(payload.name || "Player"), id: this.id });
@@ -77,12 +78,7 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
             if (pid) shadow.members.set(pid, { playerId: pid, name: String(s.data?.profileName || shadow.members.get(pid)?.name || "Player"), id: s.id });
           }
           const source = [...shadow.members.values()];
-          const players = source.map((m, seat) => ({
-            playerId: m.playerId,
-            name: m.name,
-            seat,
-            colors: playerColorsForSeats(source.length === 2 ? 2 : 4, seat),
-          }));
+          const players = source.map((m, seat) => ({ playerId: m.playerId, name: m.name, seat, colors: playerColorsForSeats(source.length === 2 ? 2 : 4, seat) }));
           shadow.players = players;
           shadow.status = "playing";
           shadow.currentPlayerId = players[0]?.playerId || null;
@@ -91,7 +87,8 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
           shadow.sixStreak = 0;
           shadow.winnerId = null;
           shadow.tokens = makeTokens();
-          this.nsp.to(code).emit("game-state", snapshot(shadow));
+          shadow.stateRevision = 0;
+          emitState(this, shadow);
         }
         return result;
       });
@@ -104,8 +101,9 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
         const value = 1 + Math.floor(Math.random() * 6);
         room.dice = value;
         room.pendingMove = value;
-        this.nsp.to(code).emit("game-dice", { playerId: pid, value });
-        emitState(this, room);
+        room.stateRevision += 1;
+        this.nsp.to(code).emit("game-dice", { playerId: pid, value, stateRevision: room.stateRevision });
+        this.nsp.to(code).emit("game-state", snapshot(room));
       });
     }
 
@@ -130,12 +128,8 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
           const result = applyMove(all, token, dice);
           if (!result) return;
           syncTokens(room, result.tokens);
-          this.nsp.to(code).emit("game-moved", {
-            playerId: pid,
-            tokenId,
-            to: result.target,
-            captured: result.captured ? { color: result.captured.color, id: result.captured.id } : null,
-          });
+          room.stateRevision += 1;
+          this.nsp.to(code).emit("game-moved", { playerId: pid, tokenId, to: result.target, captured: result.captured ? { color: result.captured.color, id: result.captured.id } : null, stateRevision: room.stateRevision });
           if (hasWon(result.tokens, colors)) {
             room.status = "finished";
             room.winnerId = pid;
