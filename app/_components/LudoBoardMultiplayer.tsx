@@ -68,7 +68,8 @@ export default function LudoBoardMultiplayer({theme="classic",preview=false,clas
  const yardStyle=(color:DemoToken["color"],id:number,legal:boolean):React.CSSProperties=>{const c=YARD_CENTERS[color]?.[id]||YARD_CENTERS[color]?.[0];return {position:"absolute",left:`${c[1]}%`,top:`${c[0]}%`,width:"9%",aspectRatio:1,borderRadius:"50%",border:"2px solid #222",background:palette[color],transform:"translate(-50%,-50%)",zIndex:30,padding:0,cursor:legal?"pointer":"default",pointerEvents:onTokenClick?"auto":"none"};};
  const renderBoardToken=(token:DemoToken,key:string)=>{const pos=cellPosition(token);if(!pos)return null;const legal=legalSet.has(keyOf(token));return <button key={key} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={tokenStyle(pos,token,legal)}><span style={legal?glowStyle(token.color):{}}/></button>;};
  return <div className="mp-board-wrap" style={{position:"relative",width:"100%",aspectRatio:"1",...style}}>
-  <LudoBoard theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={boardTokens} onTokenClick={onTokenClick}/>
+  {/* Multiplayer owns the token overlay. LudoBoard must render only the board geometry, otherwise every moving token is painted twice. */}
+  <LudoBoard theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={onTokenClick}/>
   <div className="mp-overlay" aria-hidden="true">
    {yardTokens.map(token=>{const legal=legalSet.has(keyOf(token));return <button key={`yard-${keyOf(token)}`} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={yardStyle(token.color,token.id,legal)}><span style={legal?glowStyle(token.color):{}}/></button>})}
    {trackTokens.map(token=>renderBoardToken(token,keyOf(token)))}
