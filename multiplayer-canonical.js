@@ -127,9 +127,20 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
           if (!token || !canMove(all, token, dice)) return;
           const result = applyMove(all, token, dice);
           if (!result) return;
+
+          // Capture rule for this multiplayer mode:
+          // the victim returns to its yard, while the killer goes directly to
+          // the center/finish square. The client uses the captured field to play
+          // the capture animation and places the killer in the center grid.
+          if (result.captured) {
+            const killer = result.tokens.find(t => t.color === token.color && t.id === token.id);
+            if (killer) killer.position = 57;
+            result.captured.position = 0;
+          }
+
           syncTokens(room, result.tokens);
           room.stateRevision += 1;
-          this.nsp.to(code).emit("game-moved", { playerId: pid, tokenId, to: result.target, captured: result.captured ? { color: result.captured.color, id: result.captured.id } : null, stateRevision: room.stateRevision });
+          this.nsp.to(code).emit("game-moved", { playerId: pid, tokenId, to: result.target, captured: result.captured ? { color: result.captured.color, id: result.captured.id } : null, captureToCenter: Boolean(result.captured), stateRevision: room.stateRevision });
           if (hasWon(result.tokens, colors)) {
             room.status = "finished";
             room.winnerId = pid;
