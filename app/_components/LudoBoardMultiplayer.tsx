@@ -2,7 +2,13 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import LudoBoard, { BOARD_NAMES, BOARD_PALETTES, type BoardThemeId, type DemoToken } from "./LudoBoard";
-import { getTokenCell as getCanonicalTokenCell } from "../../lib/canonicalLudoBoard";
+import {
+  FINISH_PROGRESS,
+  HOME_START_PROGRESS,
+  TRACK_LENGTH,
+  getTokenCell as getCanonicalTokenCell,
+  tokenState as canonicalTokenState,
+} from "../../lib/canonicalLudoBoard";
 
 export type { BoardThemeId, DemoToken };
 export { BOARD_NAMES, BOARD_PALETTES };
@@ -11,20 +17,18 @@ type Props = { theme?: BoardThemeId; preview?: boolean; className?: string; styl
 const COLORS: DemoToken["color"][] = ["red", "yellow", "green", "blue"];
 const STATIC_TOKENS: DemoToken[] = COLORS.flatMap(color => Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const })));
 const YARD_CENTERS: Record<DemoToken["color"], Array<[number, number]>> = { green:[[13.5,13.5],[13.5,26.5],[26.5,13.5],[26.5,26.5]], yellow:[[13.5,73.5],[13.5,86.5],[26.5,73.5],[26.5,86.5]], red:[[73.5,13.5],[73.5,26.5],[86.5,13.5],[86.5,26.5]], blue:[[73.5,73.5],[73.5,86.5],[86.5,73.5],[86.5,86.5]] };
-const FINISH_POSITION = 57;
-const HOME_START_POSITION = 52;
 const CENTER_CELL: readonly [number, number] = [7, 7];
 const keyOf=(t:DemoToken)=>`${t.color}:${t.id}`;
 
 function canonicalCell(t:DemoToken){
   const position=Number(t.position);
-  if(t.state==="yard" || position<=0) return null;
-  if(position===FINISH_POSITION) return CENTER_CELL;
+  if(canonicalTokenState(position)==="yard") return null;
+  if(position===FINISH_PROGRESS) return CENTER_CELL;
   return getCanonicalTokenCell(t.color,position);
 }
 
 function cellPosition(t:DemoToken):[string,string]|null{
-  if(t.state==="yard" || Number(t.position)<=0){
+  if(canonicalTokenState(Number(t.position))==="yard"){
     const c=YARD_CENTERS[t.color]?.[t.id]||YARD_CENTERS[t.color]?.[0];
     return c?[`${c[1]}%`,`${c[0]}%`]:null;
   }
@@ -33,10 +37,7 @@ function cellPosition(t:DemoToken):[string,string]|null{
 }
 
 function stateForPosition(position:number):DemoToken["state"]{
-  if(position<=0) return "yard";
-  if(position>=FINISH_POSITION) return "finished";
-  if(position>=HOME_START_POSITION) return "home";
-  return "track";
+  return canonicalTokenState(position) as DemoToken["state"];
 }
 
 function emitAudio(kind:"move"|"capture"|"safe"|"home"|"finish"|"win"){if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:kind}));}
@@ -52,14 +53,14 @@ export default function LudoBoardMultiplayer({theme="classic",preview=false,clas
  },[demoTokens]);
  const[displayTokens,setDisplayTokens]=useState<DemoToken[]>(tokens);const displayRef=useRef(tokens);const timersRef=useRef<Record<string,number>>({});const launchTimersRef=useRef<Record<string,number>>({});const[launchingKeys,setLaunchingKeys]=useState<Set<string>>(new Set());const mountedRef=useRef(false);
  useEffect(()=>{displayRef.current=displayTokens},[displayTokens]);
- useEffect(()=>{const incoming=new Map(tokens.map(t=>[keyOf(t),t]));if(!mountedRef.current){mountedRef.current=true;displayRef.current=tokens;setDisplayTokens(tokens);return;}if(snapOnUpdate||!animateUpdates){Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout);timersRef.current={};launchTimersRef.current={};setLaunchingKeys(new Set());displayRef.current=Array.from(incoming.values());setDisplayTokens(displayRef.current);return;}const current=new Map(displayRef.current.map(t=>[keyOf(t),t]));for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken){current.set(key,target);continue;}const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;if(currentToken.position>0&&target.state==="yard"){current.set(key,target);displayRef.current=Array.from(current.values());setDisplayTokens(displayRef.current);emitAudio("capture");delete timersRef.current[key];continue;}if(from===0&&to===1&&target.state==="track"){const launched=displayRef.current.map(t=>keyOf(t)===key?{...target,position:1,state:"track" as const}:t);displayRef.current=launched;setDisplayTokens(launched);setLaunchingKeys(p=>new Set(p).add(key));if(launchTimersRef.current[key])window.clearTimeout(launchTimersRef.current[key]);launchTimersRef.current[key]=window.setTimeout(()=>{setLaunchingKeys(p=>{const n=new Set(p);n.delete(key);return n});delete launchTimersRef.current[key]},220);emitAudio("move");delete timersRef.current[key];continue;}const direction=to>from?1:-1;const advance=()=>{const live=displayRef.current.find(t=>keyOf(t)===key);if(!live){delete timersRef.current[key];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=to:next<=to,position=reached?to:next,nextState=stateForPosition(position);const nextTokens=displayRef.current.map(t=>keyOf(t)===key?{...t,position,state:nextState}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(position>=FINISH_POSITION)emitAudio("finish");else emitAudio("move");if(reached){delete timersRef.current[key];return;}timersRef.current[key]=window.setTimeout(advance,220)};timersRef.current[key]=window.setTimeout(advance,220);}const reconciled=displayRef.current.filter(t=>incoming.has(keyOf(t)));for(const token of incoming.values())if(!reconciled.some(t=>keyOf(t)===keyOf(token)))reconciled.push(token);displayRef.current=reconciled;setDisplayTokens(reconciled);},[tokens,snapOnUpdate,animateUpdates]);
+ useEffect(()=>{const incoming=new Map(tokens.map(t=>[keyOf(t),t]));if(!mountedRef.current){mountedRef.current=true;displayRef.current=tokens;setDisplayTokens(tokens);return;}if(snapOnUpdate||!animateUpdates){Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout);timersRef.current={};launchTimersRef.current={};setLaunchingKeys(new Set());displayRef.current=Array.from(incoming.values());setDisplayTokens(displayRef.current);return;}const current=new Map(displayRef.current.map(t=>[keyOf(t),t]));for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken){current.set(key,target);continue;}const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;if(currentToken.position>0&&target.state==="yard"){current.set(key,target);displayRef.current=Array.from(current.values());setDisplayTokens(displayRef.current);emitAudio("capture");delete timersRef.current[key];continue;}if(from===0&&to===1&&target.state==="track"){const launched=displayRef.current.map(t=>keyOf(t)===key?{...target,position:1,state:"track" as const}:t);displayRef.current=launched;setDisplayTokens(launched);setLaunchingKeys(p=>new Set(p).add(key));if(launchTimersRef.current[key])window.clearTimeout(launchTimersRef.current[key]);launchTimersRef.current[key]=window.setTimeout(()=>{setLaunchingKeys(p=>{const n=new Set(p);n.delete(key);return n});delete launchTimersRef.current[key]},220);emitAudio("move");delete timersRef.current[key];continue;}const direction=to>from?1:-1;const advance=()=>{const live=displayRef.current.find(t=>keyOf(t)===key);if(!live){delete timersRef.current[key];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=to:next<=to,position=reached?to:next,nextState=stateForPosition(position);const nextTokens=displayRef.current.map(t=>keyOf(t)===key?{...t,position,state:nextState}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(position===FINISH_PROGRESS&&previous!==FINISH_PROGRESS)emitAudio("finish");else emitAudio("move");if(reached){delete timersRef.current[key];return;}timersRef.current[key]=window.setTimeout(advance,220)};timersRef.current[key]=window.setTimeout(advance,220);}const reconciled=displayRef.current.filter(t=>incoming.has(keyOf(t)));for(const token of incoming.values())if(!reconciled.some(t=>keyOf(t)===keyOf(token)))reconciled.push(token);displayRef.current=reconciled;setDisplayTokens(reconciled);},[tokens,snapOnUpdate,animateUpdates]);
  useEffect(()=>()=>{Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout)},[]);
  const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
- const boardTokens=useMemo(()=>displayTokens.filter(t=>t.state!=="yard"&&!launchingKeys.has(keyOf(t))&&t.state!=="finished"),[displayTokens,launchingKeys]);
- const yardTokens=useMemo(()=>displayTokens.filter(t=>t.state==="yard"&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
- const trackTokens=useMemo(()=>displayTokens.filter(t=>t.state==="track"&&t.position>=1&&t.position<=51&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
- const homeTokens=useMemo(()=>displayTokens.filter(t=>t.state==="home"&&t.position>=HOME_START_POSITION&&t.position<FINISH_POSITION&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
- const finishedTokens=useMemo(()=>displayTokens.filter(t=>t.state==="finished"&&t.position===FINISH_POSITION&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
+ const boardTokens=useMemo(()=>displayTokens.filter(t=>canonicalTokenState(Number(t.position))!=="yard"&&canonicalTokenState(Number(t.position))!=="finished"&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
+ const yardTokens=useMemo(()=>displayTokens.filter(t=>canonicalTokenState(Number(t.position))==="yard"&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
+ const trackTokens=useMemo(()=>displayTokens.filter(t=>canonicalTokenState(Number(t.position))==="track"&&Number(t.position)>=1&&Number(t.position)<=TRACK_LENGTH&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
+ const homeTokens=useMemo(()=>displayTokens.filter(t=>canonicalTokenState(Number(t.position))==="home"&&Number(t.position)>=HOME_START_PROGRESS&&Number(t.position)<FINISH_PROGRESS&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
+ const finishedTokens=useMemo(()=>displayTokens.filter(t=>canonicalTokenState(Number(t.position))==="finished"&&Number(t.position)===FINISH_PROGRESS&&!launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
  const launchTokens=useMemo(()=>displayTokens.filter(t=>launchingKeys.has(keyOf(t))),[displayTokens,launchingKeys]);
  const legalSet=useMemo(()=>new Set(legalTokenKeys),[legalTokenKeys]);
  const glowStyle=(color:DemoToken["color"]):React.CSSProperties=>({position:"absolute",inset:"-18%",borderRadius:"50%",border:`1.5px solid ${palette[color]}`,boxShadow:`0 0 4px ${palette[color]},0 0 8px ${palette[color]}`,pointerEvents:"none",zIndex:-1,animation:"mpTokenBreath 1.4s ease-in-out infinite"});
