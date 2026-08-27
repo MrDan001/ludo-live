@@ -26,10 +26,7 @@ const STATIC_TOKENS: DemoToken[] = COLORS.flatMap(color =>
   Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const }))
 );
 
-// These coordinates are the canonical board's four yard-slot centers.
-// They are used only for the multiplayer legal-move pulse and the short
-// yard -> first-track launch animation, both of which now share the exact
-// same 15x15 board coordinate system as LudoBoard.
+// Same 15x15 coordinate space as LudoBoard's yard geometry.
 const YARD_CENTERS: Record<DemoToken["color"], Array<[number, number]>> = {
   green: [[13.61, 13.61], [13.61, 26.39], [26.39, 13.61], [26.39, 26.39]],
   yellow: [[13.61, 73.61], [13.61, 86.39], [26.39, 73.61], [26.39, 86.39]],
@@ -44,8 +41,8 @@ function canonicalCell(t: DemoToken) {
   return getCanonicalTokenCell(t.color, Number(t.position));
 }
 
-// Multiplayer server progress is 1-based on the main track; LudoBoard's
-// shared renderer uses 0-based positions for the 51 shared physical cells.
+// The multiplayer server uses progress 1..51 for the shared track, while
+// LudoBoard renders the same physical cells as 0..50.
 function toRenderToken(t: DemoToken): DemoToken {
   if (t.state === "track" && t.position >= 1 && t.position <= 51) {
     return { ...t, position: t.position - 1, state: "track" };
@@ -102,6 +99,7 @@ export default function LudoBoardMultiplayer({
   const [displayTokens, setDisplayTokens] = useState<DemoToken[]>(tokens);
   const displayRef = useRef(tokens);
   const timersRef = useRef<Record<string, number>>({});
+  const launchTimersRef = useRef<Record<string, number>>({});
   const [launchingKeys, setLaunchingKeys] = useState<Set<string>>(new Set());
   const mountedRef = useRef(false);
 
@@ -121,7 +119,9 @@ export default function LudoBoardMultiplayer({
 
     if (snapOnUpdate || !animateUpdates) {
       Object.values(timersRef.current).forEach(timer => window.clearTimeout(timer));
+      Object.values(launchTimersRef.current).forEach(timer => window.clearTimeout(timer));
       timersRef.current = {};
+      launchTimersRef.current = {};
       setLaunchingKeys(new Set());
       displayRef.current = Array.from(incoming.values());
       setDisplayTokens(displayRef.current);
@@ -173,17 +173,15 @@ export default function LudoBoardMultiplayer({
         displayRef.current = nextTokens;
         setDisplayTokens(nextTokens);
 
-        // A token entering the track from the yard gets its own short launch
-        // animation. The underlying board token is hidden for this 220ms so
-        // there is never a double token or a one-cell visual jump.
         if (previousPosition === 0 && position === 1 && nextState === "track") {
           setLaunchingKeys(prev => new Set(prev).add(key));
-          window.setTimeout(() => {
+          launchTimersRef.current[key] = window.setTimeout(() => {
             setLaunchingKeys(prev => {
               const next = new Set(prev);
               next.delete(key);
               return next;
             });
+            delete launchTimersRef.current[key];
           }, 220);
         }
 
@@ -212,13 +210,18 @@ export default function LudoBoardMultiplayer({
 
   useEffect(() => () => {
     Object.values(timersRef.current).forEach(timer => window.clearTimeout(timer));
+    Object.values(launchTimersRef.current).forEach(timer => window.clearTimeout(timer));
     timersRef.current = {};
+    launchTimersRef.current = {};
   }, []);
 
   const renderTokens = useMemo(() => displayTokens.map(toRenderToken), [displayTokens]);
   const legal = new Set(legalTokenKeys);
   const palette = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
 
+  // Use the real shared LudoBoard directly. LudoBoard owns the yard/grid
+  // geometry and the track token size; the multiplayer layer only supplies
+  // synchronized state and the legal-move pulse.
   const boardTokens = useMemo(
     () => renderTokens.filter(t => !launchingKeys.has(keyOf(t))),
     [renderTokens, launchingKeys]
@@ -248,7 +251,12 @@ export default function LudoBoardMultiplayer({
           const yard = YARD_CENTERS[token.color]?.[token.id];
           const start = cellPosition({ ...token, state: "track", position: 1 });
           if (!yard || !start) return null;
-          const from = `${yard[1]}% ${yard[0]}%`;
+
+          const yardX = yard[1];
+          const yardY = yard[0];
+          const startX = Number.parseFloat(start[0]);
+          const startY = Number.parseFloat(start[1]);
+
           return (
             <button
               key={`launch-${keyOf(token)}`}
@@ -256,8 +264,8 @@ export default function LudoBoardMultiplayer({
               onClick={() => onTokenClick?.(token.color, token.id)}
               style={{
                 position: "absolute",
-                left: `${yard[1]}%`,
-                top: `${yard[0]}%`,
+                left: `${yardX}%`,
+                top: `${yardY}%`,
                 width: "5.1%",
                 aspectRatio: 1,
                 borderRadius: "50%",
@@ -269,9 +277,9 @@ export default function LudoBoardMultiplayer({
                 color: "transparent",
                 fontSize: 0,
                 pointerEvents: "none",
-                animation: `mpLaunch 220ms cubic-bezier(.22,.8,.32,1) forwards`,
-                ['--launch-from' as string]: from,
-                ['--launch-to' as string]: `${start[0]} ${start[1]}`,
+                animation: "mpLaunch 220ms cubic-bezier(.22,.8,.32,1) forwards",
+                ["--launch-dx" as string]: `calc(${startX}% - ${yardX}%)`,
+                ["--launch-dy" as string]: `calc(${startY}% - ${yardY}%)`,
               } as React.CSSProperties}
             />
           );
@@ -313,8 +321,8 @@ export default function LudoBoardMultiplayer({
           50% { opacity:1; transform:translate(-50%,-50%) scale(1.04); }
         }
         @keyframes mpLaunch {
-          0% { left:var(--launch-from-x, auto); top:var(--launch-from-y, auto); }
-          100% { left:var(--launch-to-x, auto); top:var(--launch-to-y, auto); }
+          0% { transform:translate(-50%,-50%); }
+          100% { transform:translate(-50%,-50%) translate(var(--launch-dx),var(--launch-dy)); }
         }
         .mp-board-wrap { position:relative; }
         .mp-overlay { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:40; }
