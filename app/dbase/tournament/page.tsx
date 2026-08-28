@@ -1,1 +1,1 @@
-export default function AdminTournamentPage(){return null}
+"use client";import ManagementPage from "../_components/ManagementPage";import TournamentAdminV2 from "../TournamentAdminV2";export default function AdminTournamentPage(){return <ManagementPage title="Tournament Management"><TournamentAdminV2/></ManagementPage>}
