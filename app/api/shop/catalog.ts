@@ -22,6 +22,12 @@ const YARD_ITEMS = [
   { id: "yard-sakura", type: "item" as const, name: "Sakura Yard", description: "A soft pink blossom yard.", icon: "🌸", currency: "coins" as const, price: 1400, rarity: "EPIC" },
   { id: "yard-shadow", type: "item" as const, name: "Shadow Yard", description: "A dark stealth-style yard.", icon: "🖤", currency: "gems" as const, price: 55, rarity: "EPIC" },
   { id: "yard-neon", type: "item" as const, name: "Neon Yard", description: "A bright arcade-style yard.", icon: "⚡", currency: "gems" as const, price: 65, rarity: "EPIC" },
+  { id: "yard-sticker-crown", type: "item" as const, name: "Crown Blaze Sticker", description: "A backgroundless flaming crown sticker.", icon: "👑", currency: "gems" as const, price: 45, rarity: "EPIC" },
+  { id: "yard-sticker-neon", type: "item" as const, name: "Neon Crown Sticker", description: "A backgroundless neon graffiti crown.", icon: "💚", currency: "gems" as const, price: 50, rarity: "EPIC" },
+  { id: "yard-sticker-dragon", type: "item" as const, name: "Ocean Dragon Sticker", description: "A backgroundless electric-blue dragon sticker.", icon: "🐉", currency: "gems" as const, price: 70, rarity: "LEGENDARY" },
+  { id: "yard-sticker-panda", type: "item" as const, name: "Money Panda Sticker", description: "A backgroundless crowned money panda sticker.", icon: "🐼", currency: "gems" as const, price: 80, rarity: "LEGENDARY" },
+  { id: "yard-sticker-sakura", type: "item" as const, name: "Sakura Bloom Sticker", description: "A backgroundless pink blossom sticker.", icon: "🌸", currency: "coins" as const, price: 1800, rarity: "EPIC" },
+  { id: "yard-sticker-bolt", type: "item" as const, name: "Lightning Sticker", description: "A backgroundless golden lightning sticker.", icon: "⚡", currency: "coins" as const, price: 1600, rarity: "RARE" },
 ] as const;
 
 async function ensureAvatarCatalogue() {
