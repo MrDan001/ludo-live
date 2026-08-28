@@ -1,1 +1,1 @@
-export default function AdminEventsPage(){return null}
+"use client";import ManagementPage from "../_components/ManagementPage";import EventAdmin from "../EventAdmin";export default function AdminEventsPage(){return <ManagementPage title="Event Management"><EventAdmin/></ManagementPage>}
