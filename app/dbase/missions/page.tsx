@@ -1,1 +1,1 @@
-export default function AdminMissionsPage(){return null}
+"use client";import ManagementPage from "../_components/ManagementPage";import MissionAdmin from "../MissionAdmin";export default function AdminMissionsPage(){return <ManagementPage title="Mission Management"><MissionAdmin/></ManagementPage>}
