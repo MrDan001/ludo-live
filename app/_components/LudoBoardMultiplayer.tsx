@@ -2,6 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import LudoBoard, { BOARD_NAMES, BOARD_PALETTES, type BoardThemeId, type DemoToken } from "./LudoBoard";
+import YardSkinOverlay from "./YardSkinOverlay";
 import { FINISH_PROGRESS, HOME_START_PROGRESS, TRACK_LENGTH, getTokenCell as getCanonicalTokenCell, tokenState as canonicalTokenState } from "../../lib/canonicalLudoBoard";
 
 export type { BoardThemeId, DemoToken };
@@ -54,7 +55,7 @@ export default function LudoBoardMultiplayer({theme="classic",preview=false,clas
  const yardStyle=(color:DemoToken["color"],id:number,legal:boolean):React.CSSProperties=>{const c=YARD_CENTERS[color]?.[id]||YARD_CENTERS[color]?.[0];return {position:"absolute",left:`${c[1]}%`,top:`${c[0]}%`,width:"9%",aspectRatio:1,borderRadius:"50%",border:"2px solid #222",background:palette[color],transform:"translate(-50%,-50%)",zIndex:30,padding:0,cursor:legal?"pointer":"default",pointerEvents:onTokenClick?"auto":"none"};};
  const renderBoardToken=(token:DemoToken,key:string)=>{const pos=cellPosition(token);if(!pos)return null;const legal=legalSet.has(keyOf(token));return <button key={key} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={tokenStyle(pos,token,legal)}><span style={legal?glowStyle(token.color):{}}/></button>;};
  const finishedSlot=(token:DemoToken):[string,string]|null=>{const slot=CENTER_SLOTS[token.color]?.[token.id];if(!slot)return null;return [`${(slot[1]+.5)*100/15}%`,`${(slot[0]+.5)*100/15}%`];};
- return <div className="mp-board-wrap" style={{position:"relative",width:"100%",aspectRatio:"1",...style}}><LudoBoard theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={onTokenClick}/><div className="mp-overlay" aria-hidden="true">
+ return <div className="mp-board-wrap" style={{position:"relative",width:"100%",aspectRatio:"1",...style}}><LudoBoard theme={theme} preview={preview} className={className} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={onTokenClick}/><YardSkinOverlay/><div className="mp-overlay" aria-hidden="true">
   {yardTokens.map(token=>{const legal=legalSet.has(keyOf(token));return <button key={`yard-${keyOf(token)}`} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={yardStyle(token.color,token.id,legal)}><span style={legal?glowStyle(token.color):{}}/></button>})}
   {trackTokens.map(token=>renderBoardToken(token,keyOf(token)))}{homeTokens.map(token=>renderBoardToken(token,`home-${keyOf(token)}`))}
   {finishedTokens.map(token=>{const pos=finishedSlot(token);if(!pos)return null;const legal=legalSet.has(keyOf(token));const style=tokenStyle(pos,token,legal);return <button key={`finish-${keyOf(token)}`} type="button" aria-label={`${token.color} token ${token.id+1}`} onClick={()=>onTokenClick?.(token.color,token.id)} style={{...style,width:"2.8%",zIndex:35}}><span style={legal?glowStyle(token.color):{}}/></button>})}
