@@ -1,1 +1,1 @@
-export default function AdminSpinPage(){return null}
+"use client";import ManagementPage from "../_components/ManagementPage";import SpinManager from "../SpinManager";export default function AdminSpinPage(){return <ManagementPage title="Spin Wheel Management"><SpinManager/></ManagementPage>}
