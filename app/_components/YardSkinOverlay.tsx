@@ -41,18 +41,21 @@ export default function YardSkinOverlay() {
   const skin = useMemo(() => skinFor(yardId), [yardId]);
   if (!skin) return null;
 
+  // The board has a colored outer yard and a smaller white inner yard.
+  // Skin only the white inner yard so the board's colored frame remains visible.
+  // The four inner yards occupy roughly 28.5% of the 15x15 board, inset about 5.75%.
   const yards = [
-    { left: "0%", top: "0%" },
-    { left: "60%", top: "0%" },
-    { left: "0%", top: "60%" },
-    { left: "60%", top: "60%" },
+    { left: "5.75%", top: "5.75%" },
+    { left: "65.75%", top: "5.75%" },
+    { left: "5.75%", top: "65.75%" },
+    { left: "65.75%", top: "65.75%" },
   ];
 
   return (
     <div aria-hidden="true" style={{ position: "absolute", inset: 0, pointerEvents: "none", zIndex: 2, overflow: "hidden" }}>
       {yards.map((yard, index) => (
-        <div key={index} style={{ position: "absolute", left: yard.left, top: yard.top, width: "40%", height: "40%", boxSizing: "border-box", padding: "3.5%", borderRadius: "7%", background: skin.background, border: `2px solid ${skin.border}`, boxShadow: "inset 0 0 18px rgba(0,0,0,.25), 0 2px 8px rgba(0,0,0,.18)" }}>
-          <div style={{ width: "100%", height: "100%", borderRadius: "6%", border: `1px solid ${skin.border}`, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", padding: "4%", boxSizing: "border-box", color: "rgba(255,255,255,.82)", fontSize: "clamp(10px,2.2vw,22px)", fontWeight: 900, textShadow: "0 1px 4px rgba(0,0,0,.65)" }}>
+        <div key={index} style={{ position: "absolute", left: yard.left, top: yard.top, width: "28.5%", height: "28.5%", boxSizing: "border-box", borderRadius: "5.5%", background: skin.background, border: `2px solid ${skin.border}`, boxShadow: "inset 0 0 18px rgba(0,0,0,.25), 0 2px 8px rgba(0,0,0,.16)" }}>
+          <div style={{ width: "100%", height: "100%", borderRadius: "4.5%", border: `1px solid ${skin.border}`, display: "flex", alignItems: "flex-start", justifyContent: "flex-end", padding: "4%", boxSizing: "border-box", color: "rgba(255,255,255,.82)", fontSize: "clamp(10px,2.2vw,22px)", fontWeight: 900, textShadow: "0 1px 4px rgba(0,0,0,.65)" }}>
             {skin.pattern}
           </div>
         </div>
