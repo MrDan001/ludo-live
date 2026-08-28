@@ -2,11 +2,23 @@
 
 import { useEffect } from "react";
 
-const YARD_NAMES = new Set(["classic yard", "inferno yard", "galaxy yard", "royal yard", "ocean yard", "sakura yard", "shadow yard", "neon yard"]);
+const YARD_NAME_RE = /(yard|sticker)$/i;
 
 function isYardCard(card: HTMLElement) {
-  const title = card.querySelector("h3")?.textContent?.trim().toLowerCase() || "";
-  return YARD_NAMES.has(title);
+  const title = card.querySelector("h3")?.textContent?.trim() || "";
+  return YARD_NAME_RE.test(title) || /yard/i.test(title);
+}
+
+function filterYards(root: HTMLElement) {
+  const simpleGrid = root.querySelector<HTMLElement>(".simple-grid");
+  if (!simpleGrid) return;
+  simpleGrid.style.display = "grid";
+  simpleGrid.querySelectorAll<HTMLElement>(".simple-card").forEach(card => {
+    card.style.display = isYardCard(card) ? "" : "none";
+  });
+  root.querySelectorAll<HTMLElement>(".collection-section").forEach(section => {
+    section.style.display = "none";
+  });
 }
 
 export default function YardShopTab() {
@@ -25,13 +37,7 @@ export default function YardShopTab() {
       itemsButton?.click();
       tabs.querySelectorAll("button").forEach(b => b.classList.remove("active"));
       button.classList.add("active");
-      requestAnimationFrame(() => {
-        const simpleGrid = root.querySelector<HTMLElement>(".simple-grid");
-        if (!simpleGrid) return;
-        simpleGrid.style.display = "grid";
-        simpleGrid.querySelectorAll<HTMLElement>(".simple-card").forEach(card => { card.style.display = isYardCard(card) ? "" : "none"; });
-        root.querySelectorAll<HTMLElement>(".collection-section").forEach(section => { section.style.display = "none"; });
-      });
+      requestAnimationFrame(() => filterYards(root));
     });
     tabs.appendChild(button);
 
@@ -42,9 +48,7 @@ export default function YardShopTab() {
 
     const observer = new MutationObserver(() => {
       if (!button.classList.contains("active")) return;
-      const simpleGrid = root.querySelector<HTMLElement>(".simple-grid");
-      if (!simpleGrid) return;
-      simpleGrid.querySelectorAll<HTMLElement>(".simple-card").forEach(card => { card.style.display = isYardCard(card) ? "" : "none"; });
+      filterYards(root);
     });
     observer.observe(root, { childList: true, subtree: true });
     return () => { observer.disconnect(); button.remove(); style.remove(); };
