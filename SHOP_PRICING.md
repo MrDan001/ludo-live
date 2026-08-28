@@ -14,6 +14,31 @@ The Admin Shop can change **both price and payment currency** for currency packa
 
 The override is keyed by `(item_type,item_id)` and is the source of truth for both display and purchase validation.
 
+## Player Shop categories
+
+The Player Shop includes:
+
+- Coins
+- Gems
+- Items
+- Avatars
+- Boards
+- Dice
+- **Yards**
+
+### Yards category
+
+**Yards is one shared cosmetic category.** It must contain both:
+
+1. **Background Yards** — full artwork covering the existing white inner yard.
+2. **Backgroundless Yard Stickers** — transparent artwork placed inside the existing white yard.
+
+Do not create a separate public Shop category for backgroundless stickers. They are still yard cosmetics and use the same `item` purchase/ownership/equip path.
+
+Current built-in yard product IDs use the `yard-` namespace. Backgroundless stickers use IDs such as `yard-sticker-crown`, `yard-sticker-neon`, `yard-sticker-dragon`, `yard-sticker-panda`, `yard-sticker-sakura`, and `yard-sticker-bolt`.
+
+Yard equipment is a single slot. Equipping one `yard-*` item replaces the previously equipped yard cosmetic, regardless of whether it is a full background or a backgroundless sticker.
+
 ## Currency packages
 
 The shared catalogue contains:
@@ -43,29 +68,32 @@ Default packages are only fallbacks. Admin overrides replace their price/currenc
 - 1,000 Gems — ₦8,000
 - 1,500 Gems — ₦10,000
 
+## Admin and yard-sticker creation
+
+The existing Avatar Management screen creates `avatar` products. It does **not** currently create yard stickers.
+
+The intended production Admin workflow for dynamic yard stickers is documented in `docs/YARD_COSMETICS.md`:
+
+1. Admin chooses **Yard**.
+2. Admin chooses **Backgroundless Sticker**.
+3. Admin uploads transparent PNG/WebP artwork.
+4. The server validates the artwork and preserves transparency.
+5. Admin previews it across all four yards.
+6. Admin sets name, description, rarity, price and currency.
+7. Admin publishes it.
+8. The product enters the same `item` catalogue and normal purchase/ownership/equip flow.
+
+A future implementation must not require editing React source code or hard-coded SVG constants to release a sticker.
+
 ## Player Shop
 
-`app/shop/page.tsx` loads the effective server catalogue through `/api/customization` and `/api/shop/catalog` and renders the returned price/currency for:
-
-- Coins
-- Gems
-- Items
-- Avatars
-- Boards
-- Dice
+`app/shop/page.tsx` loads the effective server catalogue through `/api/customization` and `/api/shop/catalog` and renders the returned price/currency for all supported product categories.
 
 The player Shop must never use a hard-coded product price as the final displayed price after the server catalogue has loaded.
 
 ## Premium and Elite Avatars
 
-The avatar catalogue now includes 10 `PREMIUM` avatars and 20 `ELITE` avatars in addition to the original six avatars.
-
-- Premium IDs: `premium-01` through `premium-10`.
-- Elite IDs: `elite-01` through `elite-20`.
-- All 30 new avatars use Gems by default and have deliberately higher demo prices than the existing avatar tier.
-- Artwork is stored in `public/avatars/premium-elite-atlas.svg` and referenced by `atlas:01` through `atlas:30` catalog icons.
-- The atlas is presentation-only; ownership, equipping and purchase authority remain the existing customization system.
-- Admin can change the price **and payment currency** of every avatar from `/dbase` → Shop Pricing. No avatar price is hard-coded as the final purchase price.
+The avatar catalogue includes the existing avatar catalogue and any database-managed avatar records. Avatar artwork is governed by `docs/AVATAR_CATALOGUE.md` and must not be confused with yard-sticker artwork.
 
 ## Purchase authority
 
@@ -91,8 +119,10 @@ A successful Gem purchase awards **+15 XP**, including Gem packages purchased th
 
 Customization products and currency packages are distinct product types, but they share the same authoritative pricing override mechanism.
 
+Yard backgrounds and backgroundless yard stickers are both customization `item` products. Do not move them into the avatar product system merely because both contain artwork.
+
 Do not move purchased currency packages into Inventory or Award Room; they change wallet balances only.
 
 ## Change discipline
 
-If product IDs, default prices, supported currencies, payment behavior, fulfillment, or XP rules change, update this document together with `ARCHITECTURE.md` and `DEVELOPER_HANDOFF.md`.
+If product IDs, default prices, supported currencies, payment behavior, fulfillment, XP rules, yard-cosmetic types, artwork storage, or Admin sticker workflow change, update `docs/YARD_COSMETICS.md`, `ARCHITECTURE.md`, and `DEVELOPER_HANDOFF.md` together with this document.
