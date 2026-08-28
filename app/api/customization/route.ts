@@ -4,6 +4,7 @@ import { currentUser } from "../../../lib/auth-session";
 import { getShopCatalog, getShopItem } from "../shop/catalog";
 
 const clean = (list: unknown) => (Array.isArray(list) ? list.map(String) : []);
+const isYard = (type: string, id: string) => type === "item" && id.startsWith("yard-");
 
 export async function GET(q: NextRequest) {
   try {
@@ -39,22 +40,37 @@ export async function POST(q: NextRequest) {
     const u = await currentUser(q);
     if (!u || u.is_guest) return NextResponse.json({ error: "A registered account is required." }, { status: 403 });
     const body = await q.json(); const action = String(body.action || ""), id = String(body.id || ""), type = String(body.type || "");
-    const item: any = await getShopItem(type, id);
-    if (!item) return NextResponse.json({ error: "Item not found." }, { status: 404 });
+    const item: any = action === "unequip" ? null : await getShopItem(type, id);
+    if (action !== "unequip" && !item) return NextResponse.json({ error: "Item not found." }, { status: 404 });
     await client.query("BEGIN"); inTx = true;
     const row = await client.query<any>(`SELECT coins,gems,owned_boards,owned_dice,equipped_board,equipped_dice,owned_avatars,equipped_avatar,owned_items,equipped_items FROM ludo_users WHERE id=$1 FOR UPDATE`, [u.id]);
     const cur = row.rows[0]; if (!cur) throw new Error("Account not found.");
     const boards = clean(cur.owned_boards || ["classic"]), dice = clean(cur.owned_dice || ["classic"]), avatars = clean(cur.owned_avatars), items = clean(cur.owned_items), equippedItems = clean(cur.equipped_items);
+
     if (action === "equip") {
       const owned = type === "board" ? boards : type === "dice" ? dice : type === "avatar" ? avatars : items;
       if (!owned.includes(id)) return fail(client, "Purchase this item first.", 403);
       if (type === "board") await client.query("UPDATE ludo_users SET equipped_board=$1 WHERE id=$2", [id, u.id]);
       else if (type === "dice") await client.query("UPDATE ludo_users SET equipped_dice=$1 WHERE id=$2", [id, u.id]);
       else if (type === "avatar") await client.query("UPDATE ludo_users SET equipped_avatar=$1 WHERE id=$2", [id, u.id]);
-      else await client.query("UPDATE ludo_users SET equipped_items=$1::jsonb WHERE id=$2", [JSON.stringify(equippedItems.includes(id) ? equippedItems : [...equippedItems, id]), u.id]);
+      else {
+        // Yards are a single equipment slot: equipping one automatically replaces any other yard.
+        const nextItems = isYard(type, id) ? [...equippedItems.filter((x) => !x.startsWith("yard-")), id] : [...equippedItems.filter((x) => x !== id), id];
+        await client.query("UPDATE ludo_users SET equipped_items=$1::jsonb WHERE id=$2", [JSON.stringify(nextItems), u.id]);
+      }
       await client.query("COMMIT"); inTx = false;
-      return NextResponse.json({ ok: true, equippedBoard: type === "board" ? id : cur.equipped_board, equippedDice: type === "dice" ? id : cur.equipped_dice, equippedAvatar: type === "avatar" ? id : cur.equipped_avatar, equippedItems: type === "item" ? [...equippedItems.filter((x: string) => x !== id), id] : equippedItems });
+      const nextEquippedItems = type === "item" ? (isYard(type, id) ? [...equippedItems.filter((x) => !x.startsWith("yard-")), id] : [...equippedItems.filter((x) => x !== id), id]) : equippedItems;
+      return NextResponse.json({ ok: true, equippedBoard: type === "board" ? id : cur.equipped_board, equippedDice: type === "dice" ? id : cur.equipped_dice, equippedAvatar: type === "avatar" ? id : cur.equipped_avatar, equippedItems: nextEquippedItems });
     }
+
+    if (action === "unequip") {
+      if (type !== "item" || !isYard(type, id)) return fail(client, "Only yard cosmetics can be unequipped this way.", 400);
+      const nextItems = equippedItems.filter((x) => x !== id);
+      await client.query("UPDATE ludo_users SET equipped_items=$1::jsonb WHERE id=$2", [JSON.stringify(nextItems), u.id]);
+      await client.query("COMMIT"); inTx = false;
+      return NextResponse.json({ ok: true, equippedItems: nextItems });
+    }
+
     if (action !== "purchase") return fail(client, "Unknown customization action.", 400);
     const owned = type === "board" ? boards : type === "dice" ? dice : type === "avatar" ? avatars : items;
     if (owned.includes(id)) return fail(client, "You already own this item.", 409);
