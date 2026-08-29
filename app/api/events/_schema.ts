@@ -16,6 +16,9 @@ export function ensureEventsSchema() {
           settled_at TIMESTAMPTZ,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),CHECK (ends_at > starts_at)
         );
         ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ;
+        ALTER TABLE ludo_events ADD COLUMN IF NOT EXISTS name TEXT;
+        UPDATE ludo_events SET title=COALESCE(NULLIF(title,''),name,'Untitled Event') WHERE title IS NULL OR title='';
+        UPDATE ludo_events SET name=COALESCE(NULLIF(name,''),title,'Untitled Event') WHERE name IS NULL OR name='';
         CREATE INDEX IF NOT EXISTS ludo_events_window_idx ON ludo_events(starts_at,ends_at);
         CREATE INDEX IF NOT EXISTS ludo_events_status_idx ON ludo_events(status);
         CREATE TABLE IF NOT EXISTS ludo_event_entries (
