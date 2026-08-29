@@ -68,7 +68,7 @@ export async function POST(q: NextRequest) {
     const amount = Math.trunc(Number(b.amount));
     const reason = String(b.reason || `Admin ${amount > 0 ? "gift" : "adjustment"}`).trim().slice(0,500);
     if (!uid || !currency || !Number.isSafeInteger(amount) || amount === 0) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Player, currency and a non-zero amount are required." }, { status: 400 }); }
-    const r = await client.query<any>(`SELECT id,coins,gems FROM ludo_users WHERE id=$1 FOR UPDATE`, [uid]);
+    const r = await client.query(`SELECT id,coins,gems FROM ludo_users WHERE id=$1 FOR UPDATE`, [uid]);
     if (!r.rowCount) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Player not found." }, { status: 404 }); }
     const before = Number(r.rows[0][currency]); const after = before + amount;
     if (!Number.isSafeInteger(after) || after < 0) { await client.query("ROLLBACK"); return NextResponse.json({ error: "Balance cannot go below zero or exceed the supported limit." }, { status: 400 }); }
