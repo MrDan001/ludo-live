@@ -1,1 +1,0 @@
-"use client";import ManagementPage from "../_components/ManagementPage";import AdminShop from "../AdminShop";export default function Page(){return <ManagementPage title="Shop Management"><AdminShop/></ManagementPage>}

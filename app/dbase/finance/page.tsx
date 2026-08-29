@@ -1,1 +1,0 @@
-"use client";import ManagementPage from "../_components/ManagementPage";import AdminFinance from "../AdminFinance";export default function AdminFinancePage(){return <ManagementPage title="Finance Management"><AdminFinance/></ManagementPage>}

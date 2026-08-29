@@ -1,1 +1,0 @@
-"use client";import ManagementPage from "../_components/ManagementPage";import YardManager from "../YardManager";export default function AdminYardsPage(){return <ManagementPage title="Yard Management"><YardManager/></ManagementPage>}

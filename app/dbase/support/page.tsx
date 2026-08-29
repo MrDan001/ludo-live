@@ -1,1 +1,0 @@
-"use client";import ManagementPage from "../_components/ManagementPage";import SupportAdmin from "../SupportAdmin";export default function AdminSupportPage(){return <ManagementPage title="Support"><SupportAdmin/></ManagementPage>}
