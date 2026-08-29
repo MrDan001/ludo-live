@@ -34,8 +34,10 @@ export async function fulfillPaystackPayment(client: PoolClient, reference: stri
 
     if (String(row.package_id).startsWith("item:")) {
       const [, type, id] = String(row.package_id).split(":");
+      const allowedTypes = new Set(["board", "dice", "avatar", "item"]);
+      if (!allowedTypes.has(type) || !id) throw new Error("Invalid Paystack shop item reference.");
       const item = await getShopItem(type, id);
-      if (!item || item.currency !== "naira") throw new Error("Shop item is no longer available for Naira payment.");
+      const itemName = item?.name || `${type} ${id}`;
       const user = await client.query<any>(
         "SELECT owned_boards,owned_dice,owned_avatars,owned_items FROM ludo_users WHERE id=$1 FOR UPDATE",
         [row.user_id],
@@ -43,18 +45,23 @@ export async function fulfillPaystackPayment(client: PoolClient, reference: stri
       if (!user.rows[0]) throw new Error("Account not found.");
       const field = type === "board" ? "owned_boards" : type === "dice" ? "owned_dice" : type === "avatar" ? "owned_avatars" : "owned_items";
       const rawOwned = user.rows[0][field];
-      const owned = Array.isArray(rawOwned) ? rawOwned.map(String) : JSON.parse(rawOwned || "[]");
+      let owned: string[];
+      try {
+        owned = Array.isArray(rawOwned) ? rawOwned.map(String) : JSON.parse(rawOwned || "[]");
+      } catch {
+        throw new Error(`Invalid ownership data for ${field}.`);
+      }
       if (!owned.includes(id)) {
         await client.query(`UPDATE ludo_users SET ${field}=$1::jsonb WHERE id=$2`, [JSON.stringify([...owned, id]), row.user_id]);
       }
-      await markWalletContext(client, { source: "shop_purchase", sourceRef: reference, reason: `Purchased ${item.name}` });
+      await markWalletContext(client, { source: "shop_purchase", sourceRef: reference, reason: `Purchased ${itemName}` });
     } else if (String(row.package_id).startsWith("package:")) {
       const [, type, id] = String(row.package_id).split(":");
+      const rewardCurrency = type === "gem_package" ? "gems" : type === "coin_package" ? "coins" : "";
+      const reward = Math.max(0, Number(row.gems) || 0);
+      if (!id || !reward || !rewardCurrency) throw new Error("Invalid Paystack package snapshot.");
       const pack = await getShopItem(type, id);
-      if (!pack || pack.currency !== "naira") throw new Error("Package is no longer configured for Naira payment.");
-      const reward = Math.max(0, Number((pack as any).reward) || 0);
-      const rewardCurrency = String((pack as any).rewardCurrency || "") as "coins" | "gems";
-      if (!reward || !["coins", "gems"].includes(rewardCurrency)) throw new Error("Package reward is invalid.");
+      const packName = pack?.name || `${type} ${id}`;
       const user = await client.query<any>("SELECT coins,gems,xp,level FROM ludo_users WHERE id=$1 FOR UPDATE", [row.user_id]);
       if (!user.rows[0]) throw new Error("Account not found.");
       const beforeCoins = Number(user.rows[0].coins) || 0;
@@ -67,11 +74,11 @@ export async function fulfillPaystackPayment(client: PoolClient, reference: stri
       }
       const afterCoins = rewardCurrency === "coins" ? beforeCoins + reward : beforeCoins;
       const afterGems = rewardCurrency === "gems" ? beforeGems + reward : beforeGems;
-      await markWalletContext(client, { source: "shop_purchase", sourceRef: reference, reason: `Purchased ${pack.name}` });
+      await markWalletContext(client, { source: "shop_purchase", sourceRef: reference, reason: `Purchased ${packName}` });
       await client.query("UPDATE ludo_users SET coins=$1,gems=$2,xp=$3,level=$4 WHERE id=$5", [afterCoins, afterGems, xp, level, row.user_id]);
       await client.query(
         "INSERT INTO ludo_admin_ledger(user_id,currency,amount,balance_before,balance_after,reason,source) VALUES($1,$2,$3,$4,$5,$6,'paystack')",
-        [row.user_id, rewardCurrency, reward, rewardCurrency === "coins" ? beforeCoins : beforeGems, rewardCurrency === "coins" ? afterCoins : afterGems, `Purchased ${pack.name}`],
+        [row.user_id, rewardCurrency, reward, rewardCurrency === "coins" ? beforeCoins : beforeGems, rewardCurrency === "coins" ? afterCoins : afterGems, `Purchased ${packName}`],
       );
     } else {
       throw new Error("Unknown Paystack purchase type.");
