@@ -5,6 +5,7 @@ import { fulfillPaystackPayment } from "../fulfill";
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const reference = url.searchParams.get("reference") || "";
+  const successUrl = new URL("/payment/success", request.url);
   const shopUrl = new URL("/shop", request.url);
   if (!reference) {
     shopUrl.searchParams.set("payment", "failed");
@@ -52,12 +53,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    shopUrl.searchParams.set("payment", "success");
-    shopUrl.searchParams.set("reference", reference);
+    successUrl.searchParams.set("reference", reference);
+    return NextResponse.redirect(successUrl);
   } catch (error) {
     console.error("Paystack callback fulfillment failed:", error);
     shopUrl.searchParams.set("payment", "failed");
+    return NextResponse.redirect(shopUrl);
   }
-
-  return NextResponse.redirect(shopUrl);
 }
