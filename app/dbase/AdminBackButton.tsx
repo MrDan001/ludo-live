@@ -7,6 +7,7 @@ export default function AdminBackButton(){
  if(!pathname||pathname==="/dbase"||pathname==="/dbase/")return null;
  return <>
    <style jsx global>{`
+     .dbase-header{padding-left:92px !important}
      .admin-back-dashboard{
        position:fixed !important;
        left:calc(248px + 18px) !important;
@@ -30,6 +31,7 @@ export default function AdminBackButton(){
      .admin-back-dashboard:hover{background:#102943 !important;color:#fff !important;border-color:#4f8fd1 !important}
      .admin-back-dashboard span:first-child{font-size:19px !important;line-height:1}
      @media(max-width:820px){
+       .dbase-header{padding-left:72px !important}
        .admin-back-dashboard{left:12px !important;top:12px !important;min-height:40px !important;padding:0 11px !important}
      }
    `}</style>
