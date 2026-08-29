@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
-import { pool, ensureAuthSchema } from "../auth/_db";
+import { pool, ensureAuthSchema } from "../../auth/_db";
 
 const COOKIE = "ludo_session";
 
