@@ -25,87 +25,66 @@ async function ensureShopTable() {
   await pool.query("ALTER TABLE ludo_shop_catalog_overrides ADD COLUMN IF NOT EXISTS image_url TEXT");
   await pool.query("ALTER TABLE ludo_shop_catalog_overrides ADD COLUMN IF NOT EXISTS category TEXT");
   await pool.query(`CREATE TABLE IF NOT EXISTS ludo_shop_visual_items(id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',kind TEXT NOT NULL CHECK(kind IN ('background','sticker')),rarity TEXT NOT NULL DEFAULT 'COMMON',currency TEXT NOT NULL CHECK(currency IN ('coins','gems','naira')),price INTEGER NOT NULL CHECK(price>=0),stock_quantity INTEGER NOT NULL DEFAULT -1,required_level INTEGER NOT NULL DEFAULT 0,image_url TEXT,icon TEXT NOT NULL DEFAULT '✨',is_published BOOLEAN NOT NULL DEFAULT TRUE,sort_order INTEGER NOT NULL DEFAULT 0,created_by TEXT REFERENCES ludo_users(id) ON DELETE SET NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  await pool.query("ALTER TABLE ludo_shop_visual_items ADD COLUMN IF NOT EXISTS stock_quantity INTEGER NOT NULL DEFAULT -1");
+  await pool.query("ALTER TABLE ludo_shop_visual_items ADD COLUMN IF NOT EXISTS required_level INTEGER NOT NULL DEFAULT 0");
+  await pool.query("ALTER TABLE ludo_shop_visual_items ADD COLUMN IF NOT EXISTS image_url TEXT");
 }
 
-async function pricingUpdatedAt() {
-  const r = await pool.query<{updated_at:string|null}>(`SELECT MAX(updated_at) AS updated_at FROM ludo_shop_catalog_overrides`);
-  return r.rows[0]?.updated_at || null;
+async function ensureAvatarAdminTable() {
+  await pool.query(`CREATE TABLE IF NOT EXISTS ludo_avatar_categories(id TEXT PRIMARY KEY,name TEXT NOT NULL UNIQUE,slug TEXT NOT NULL UNIQUE,description TEXT NOT NULL DEFAULT '',is_active BOOLEAN NOT NULL DEFAULT TRUE,sort_order INTEGER NOT NULL DEFAULT 0,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  await pool.query(`CREATE TABLE IF NOT EXISTS ludo_shop_avatars(id TEXT PRIMARY KEY,name TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',category_id TEXT REFERENCES ludo_avatar_categories(id) ON DELETE SET NULL,rarity TEXT NOT NULL DEFAULT 'COMMON',currency TEXT NOT NULL CHECK(currency IN ('coins','gems','naira')),price INTEGER NOT NULL CHECK(price>=0),is_published BOOLEAN NOT NULL DEFAULT TRUE,sort_order INTEGER NOT NULL DEFAULT 0,icon TEXT,image_data BYTEA,image_type TEXT,created_by TEXT,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`);
+  await pool.query("ALTER TABLE ludo_shop_avatars ADD COLUMN IF NOT EXISTS is_builtin BOOLEAN NOT NULL DEFAULT FALSE");
+  await pool.query("ALTER TABLE ludo_shop_avatars ADD COLUMN IF NOT EXISTS required_level INTEGER NOT NULL DEFAULT 0");
+  await pool.query("ALTER TABLE ludo_shop_avatars ADD COLUMN IF NOT EXISTS image_url TEXT");
+  const cats=[['classic','Classic','classic','Everyday Ludo avatars.'],['heroes','Heroes','heroes','Bold hero-inspired avatars.'],['royal','Royal','royal','Premium royal characters.'],['fantasy','Fantasy','fantasy','Magic and fantasy characters.'],['sports','Sports','sports','Sports and competitive characters.'],['animals','Animals','animals','Animal and creature characters.'],['funny','Funny','funny','Playful characters.'],['seasonal','Seasonal','seasonal','Limited seasonal releases.'],['limited','Limited Edition','limited','Rare releases.']] as const;
+  for(let i=0;i<cats.length;i++){const [id,name,slug,description]=cats[i];await pool.query(`INSERT INTO ludo_avatar_categories(id,name,slug,description,sort_order) VALUES($1,$2,$3,$4,$5) ON CONFLICT(id) DO NOTHING`,[id,name,slug,description,i]);}
 }
+
+async function pricingUpdatedAt() { const r = await pool.query<{updated_at:string|null}>(`SELECT MAX(updated_at) AS updated_at FROM ludo_shop_catalog_overrides`); return r.rows[0]?.updated_at || null; }
 
 export async function GET(q: NextRequest) {
   try {
-    const a = await admin(q);
-    if (!a) return NextResponse.json({error:"Admin access required."},{status:403});
-    await ensureShopTable();
-    const [items, visuals] = await Promise.all([
-      getShopCatalog(),
-      pool.query(`SELECT id,name,description,kind,rarity,currency,price,stock_quantity,required_level,image_url,icon,is_published,sort_order,created_at,updated_at FROM ludo_shop_visual_items ORDER BY sort_order,created_at DESC`)
-    ]);
+    const a = await admin(q); if (!a) return NextResponse.json({error:"Admin access required."},{status:403});
+    await ensureShopTable(); await ensureAvatarAdminTable();
+    const [items, visuals] = await Promise.all([getShopCatalog(),pool.query(`SELECT id,name,description,kind,rarity,currency,price,stock_quantity,required_level,image_url,icon,is_published,sort_order,created_at,updated_at FROM ludo_shop_visual_items ORDER BY sort_order,created_at DESC`) ]);
     return NextResponse.json({ok:true,items,visualItems:visuals.rows,lastUpdated:await pricingUpdatedAt()},{headers:{"Cache-Control":"no-store,no-cache,must-revalidate","Pragma":"no-cache","Expires":"0"}});
-  } catch(e) {
-    console.error(e);
-    return NextResponse.json({error:"Unable to load shop configuration."},{status:500});
-  }
+  } catch(e) { console.error(e); return NextResponse.json({error:"Unable to load shop configuration."},{status:500}); }
 }
 
 export async function POST(q: NextRequest) {
   try {
-    const a = await admin(q);
-    if (!a) return NextResponse.json({error:"Admin access required."},{status:403});
-    await ensureShopTable();
-    const body = await q.json().catch(()=>({}));
-    const action = String(body.action || "save");
+    const a = await admin(q); if (!a) return NextResponse.json({error:"Admin access required."},{status:403});
+    await ensureShopTable(); await ensureAvatarAdminTable();
+    const body = await q.json().catch(()=>({})); const action = String(body.action || "save");
 
-    if (action === "create_visual" || action === "edit_visual") {
-      const id = String(body.id || `shop-${Date.now()}`);
-      const name = String(body.name || "New shop item").trim();
-      const description = String(body.description || "").trim();
-      const kind = body.kind === "sticker" ? "sticker" : "background";
-      const rarity = String(body.rarity || "COMMON").toUpperCase();
-      const currency = String(body.currency || "coins") as ShopCurrency;
-      const price = Math.trunc(Number(body.price));
-      const stock = body.stockQuantity === "" || body.stockQuantity === undefined ? -1 : Math.trunc(Number(body.stockQuantity));
-      const requiredLevel = Math.max(0, Math.trunc(Number(body.requiredLevel) || 0));
-      const imageUrl = String(body.imageUrl || "").trim() || null;
-      const icon = String(body.icon || (kind === "sticker" ? "✨" : "🏠"));
-      if (!name || !["coins","gems","naira"].includes(currency) || !Number.isFinite(price) || price < 0 || !Number.isFinite(stock) || stock < -1) return NextResponse.json({error:"Enter a valid name, currency, price and stock (-1 means unlimited)."},{status:400});
-      await pool.query(`INSERT INTO ludo_shop_visual_items(id,name,description,kind,rarity,currency,price,stock_quantity,required_level,image_url,icon,is_published,created_by,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE,$12,NOW()) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description,kind=EXCLUDED.kind,rarity=EXCLUDED.rarity,currency=EXCLUDED.currency,price=EXCLUDED.price,stock_quantity=EXCLUDED.stock_quantity,required_level=EXCLUDED.required_level,image_url=EXCLUDED.image_url,icon=EXCLUDED.icon,is_published=TRUE,updated_at=NOW()`,[id,name,description,kind,rarity,currency,price,stock,requiredLevel,imageUrl,icon,a.id]);
-      await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'shop_visual_item_save',NULL,$2)`,[a.id,JSON.stringify({id,name,kind,currency,price,stock,requiredLevel})]);
+    if (action === "create_avatar" || action === "edit_avatar") {
+      const id = String(body.id || `avatar-${Date.now()}`), name = String(body.name || "New Avatar").trim(), description=String(body.description||"").trim();
+      const categoryId=String(body.categoryId||"classic"); const rarity=String(body.rarity||"COMMON").toUpperCase(); const currency=String(body.currency||"gems") as ShopCurrency;
+      const price=Math.trunc(Number(body.price)); const requiredLevel=Math.max(0,Math.trunc(Number(body.requiredLevel)||0)); const icon=String(body.icon||"🧑‍🎮"); const imageUrl=String(body.imageUrl||"").trim()||null;
+      if(!name||!["coins","gems","naira"].includes(currency)||!Number.isFinite(price)||price<0) return NextResponse.json({error:"Enter a valid avatar name, category, currency and price."},{status:400});
+      await pool.query(`INSERT INTO ludo_shop_avatars(id,name,description,category_id,rarity,currency,price,is_published,icon,is_builtin,required_level,image_url,created_by,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,TRUE,$8,FALSE,$9,$10,$11,NOW()) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description,category_id=EXCLUDED.category_id,rarity=EXCLUDED.rarity,currency=EXCLUDED.currency,price=EXCLUDED.price,is_published=TRUE,icon=EXCLUDED.icon,required_level=EXCLUDED.required_level,image_url=EXCLUDED.image_url,updated_at=NOW()`,[id,name,description,categoryId,rarity,currency,price,icon,requiredLevel,imageUrl,a.id]);
+      await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'shop_avatar_save',NULL,$2)`,[a.id,JSON.stringify({id,name,categoryId,rarity,currency,price,requiredLevel,imageUrl})]);
       return NextResponse.json({ok:true,id});
     }
 
-    if (action === "delete_visual") {
-      const id = String(body.id || "");
-      if (!id) return NextResponse.json({error:"Item id is required."},{status:400});
-      await pool.query(`UPDATE ludo_shop_visual_items SET is_published=FALSE,updated_at=NOW() WHERE id=$1`,[id]);
-      await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'shop_visual_item_delete',NULL,$2)`,[a.id,JSON.stringify({id})]);
-      return NextResponse.json({ok:true});
+    if (action === "create_visual" || action === "edit_visual") {
+      const id=String(body.id||`shop-${Date.now()}`), name=String(body.name||"New shop item").trim(), description=String(body.description||"").trim();
+      const kind=body.kind==="sticker"?"sticker":"background", rarity=String(body.rarity||"COMMON").toUpperCase(), currency=String(body.currency||"coins") as ShopCurrency;
+      const price=Math.trunc(Number(body.price)), stock=body.stockQuantity===""||body.stockQuantity===undefined?-1:Math.trunc(Number(body.stockQuantity)); const requiredLevel=Math.max(0,Math.trunc(Number(body.requiredLevel)||0));
+      const imageUrl=String(body.imageUrl||"").trim()||null, icon=String(body.icon||(kind==="sticker"?"✨":"🏠"));
+      if(!name||!["coins","gems","naira"].includes(currency)||!Number.isFinite(price)||price<0||!Number.isFinite(stock)||stock<-1) return NextResponse.json({error:"Enter a valid name, currency, price and stock (-1 means unlimited)."},{status:400});
+      await pool.query(`INSERT INTO ludo_shop_visual_items(id,name,description,kind,rarity,currency,price,stock_quantity,required_level,image_url,icon,is_published,created_by,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,TRUE,$12,NOW()) ON CONFLICT(id) DO UPDATE SET name=EXCLUDED.name,description=EXCLUDED.description,kind=EXCLUDED.kind,rarity=EXCLUDED.rarity,currency=EXCLUDED.currency,price=EXCLUDED.price,stock_quantity=EXCLUDED.stock_quantity,required_level=EXCLUDED.required_level,image_url=EXCLUDED.image_url,icon=EXCLUDED.icon,is_published=TRUE,updated_at=NOW()`,[id,name,description,kind,rarity,currency,price,stock,requiredLevel,imageUrl,icon,a.id]);
+      await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'shop_visual_item_save',NULL,$2)`,[a.id,JSON.stringify({id,name,kind,currency,price,stock,requiredLevel})]); return NextResponse.json({ok:true,id});
     }
+    if(action==="delete_visual"||action==="toggle_visual"){const id=String(body.id||"");if(!id)return NextResponse.json({error:"Item id is required."},{status:400});await pool.query(`UPDATE ludo_shop_visual_items SET is_published=${action==="toggle_visual"?"NOT is_published":"FALSE"},updated_at=NOW() WHERE id=$1`,[id]);return NextResponse.json({ok:true});}
 
-    if (action === "toggle_visual") {
-      const id = String(body.id || "");
-      await pool.query(`UPDATE ludo_shop_visual_items SET is_published=NOT is_published,updated_at=NOW() WHERE id=$1`,[id]);
-      return NextResponse.json({ok:true});
-    }
-
-    const type = String(body.type||"");
-    const id = String(body.id||"");
-    const currency = String(body.currency||"") as ShopCurrency;
-    const price = Math.trunc(Number(body.price));
-    const requiredLevel = body.requireLevel === false ? 0 : Math.max(0,Math.trunc(Number(body.requiredLevel)||0));
-    const stock = body.stockQuantity === "" || body.stockQuantity === undefined ? -1 : Math.trunc(Number(body.stockQuantity));
-    const isActive = body.isActive !== false;
-    const imageUrl = String(body.imageUrl || "").trim() || null;
-    const category = String(body.category || "").trim() || null;
-    if (!type || !id || !["coins","gems","naira"].includes(currency) || !Number.isFinite(price) || price<0 || !Number.isFinite(stock) || stock < -1) return NextResponse.json({error:"Valid item, currency, price and stock are required."},{status:400});
-    const catalog = await getShopCatalog();
-    const item:any = catalog.find((x:any)=>x.type===type&&x.id===id);
-    if (!item) return NextResponse.json({error:"Shop item not found."},{status:404});
+    const type=String(body.type||""),id=String(body.id||""),currency=String(body.currency||"") as ShopCurrency,price=Math.trunc(Number(body.price));
+    const requiredLevel=body.requireLevel===false?0:Math.max(0,Math.trunc(Number(body.requiredLevel)||0)),stock=body.stockQuantity===""||body.stockQuantity===undefined?-1:Math.trunc(Number(body.stockQuantity));
+    const isActive=body.isActive!==false,imageUrl=String(body.imageUrl||"").trim()||null,category=String(body.category||"").trim()||null;
+    if(!type||!id||!["coins","gems","naira"].includes(currency)||!Number.isFinite(price)||price<0||!Number.isFinite(stock)||stock<-1)return NextResponse.json({error:"Valid item, currency, price and stock are required."},{status:400});
+    const catalog=await getShopCatalog(),item:any=catalog.find((x:any)=>x.type===type&&x.id===id); if(!item)return NextResponse.json({error:"Shop item not found."},{status:404});
     await pool.query(`INSERT INTO ludo_shop_catalog_overrides(item_type,item_id,currency,price,required_level,stock_quantity,is_active,image_url,category,updated_by,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,NOW()) ON CONFLICT(item_type,item_id) DO UPDATE SET currency=EXCLUDED.currency,price=EXCLUDED.price,required_level=EXCLUDED.required_level,stock_quantity=EXCLUDED.stock_quantity,is_active=EXCLUDED.is_active,image_url=EXCLUDED.image_url,category=EXCLUDED.category,updated_by=EXCLUDED.updated_by,updated_at=NOW()`,[type,id,currency,price,requiredLevel,stock,isActive,imageUrl,category,a.id]);
-    await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'shop_config_update',NULL,$2)`,[a.id,JSON.stringify({type,id,currency,price,requiredLevel,stock,isActive,imageUrl,category,previousCurrency:item.currency,previousPrice:item.price,previousRequiredLevel:item.requiredLevel||0})]);
-    return NextResponse.json({ok:true,item:{...item,currency,price,requiredLevel,stockQuantity:stock,isActive,imageUrl,category},lastUpdated:await pricingUpdatedAt()});
-  } catch(e) {
-    console.error(e);
-    return NextResponse.json({error:"Unable to save Shop configuration."},{status:500});
-  }
+    await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'shop_config_update',NULL,$2)`,[a.id,JSON.stringify({type,id,currency,price,requiredLevel,stock,isActive,imageUrl,category})]);
+    return NextResponse.json({ok:true});
+  } catch(e) { console.error(e); return NextResponse.json({error:"Unable to save Shop configuration."},{status:500}); }
 }
