@@ -8,30 +8,29 @@ export default function AdminBackButton(){
  return <>
    <style jsx global>{`
      .admin-back-dashboard{
-       position:absolute !important;
-       left:0 !important;
-       top:50% !important;
-       transform:translateY(-50%) !important;
-       z-index:31 !important;
+       position:fixed !important;
+       left:calc(248px + 18px) !important;
+       top:18px !important;
+       z-index:60 !important;
        display:flex !important;
        align-items:center !important;
-       min-height:34px !important;
-       padding:0 8px !important;
-       border:0 !important;
-       border-radius:8px !important;
-       background:transparent !important;
-       box-shadow:none !important;
-       backdrop-filter:none !important;
-       color:#8fa7c2 !important;
+       min-height:40px !important;
+       padding:0 12px !important;
+       border:1px solid #2b4d6d !important;
+       border-radius:10px !important;
+       background:rgba(8,23,39,.94) !important;
+       box-shadow:0 8px 24px rgba(0,0,0,.25) !important;
+       backdrop-filter:blur(14px) !important;
+       color:#d7e8ff !important;
        text-decoration:none !important;
        font-size:11px !important;
        font-weight:900 !important;
-       gap:4px !important;
+       gap:5px !important;
      }
-     .admin-back-dashboard:hover{background:#10253c !important;color:#fff !important;transform:translateY(-50%) !important}
-     .admin-back-dashboard span:first-child{font-size:18px !important;line-height:1 !important}
+     .admin-back-dashboard:hover{background:#102943 !important;color:#fff !important;border-color:#4f8fd1 !important}
+     .admin-back-dashboard span:first-child{font-size:19px !important;line-height:1}
      @media(max-width:820px){
-       .admin-back-dashboard{left:0 !important;top:50% !important}
+       .admin-back-dashboard{left:12px !important;top:12px !important;min-height:40px !important;padding:0 11px !important}
      }
    `}</style>
    <Link className="admin-back-dashboard" href="/dbase" aria-label="Back to Admin Dashboard">
