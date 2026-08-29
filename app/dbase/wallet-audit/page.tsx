@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import "../dbase.css";
 
-type Event={id:string;user_id:string|null;username:string|null;email:string|null;currency:string;amount:number|string;balance_before:number|string;balance_after:number|string;source:string;source_ref:string|null;actor_username:string|null;status:string;reason:string|null;ip_address:string|null;user_agent:string|null;created_at:string};
+type Event={id:string;user_id:string|null;username:string|null;email:string|null;currency:string;amount:number;balance_before:number|string;balance_after:number|string;source:string;source_ref:string|null;actor_username:string|null;status:string;reason:string|null;ip_address:string|null;user_agent:string|null;created_at:string};
 const fmt=(v:any)=>Number(v||0).toLocaleString();
 const date=(v:string)=>new Date(v).toLocaleString();
 
