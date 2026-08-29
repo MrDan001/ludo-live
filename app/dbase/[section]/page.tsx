@@ -3,6 +3,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import "../dbase.css";
+import "../players.css";
 
 type R=Record<string,any>;
 const P:Record<string,any>={players:["Players","♟"],economy:["Economy","◈"],visitors:["Visitors","◒"],disputes:["Disputes","⚑"],audit:["Audit Log","◷"],shop:["Shop","▣"],boards:["Boards","▤"],dice:["Dice","◆"],avatars:["Avatars","●"],yards:["Yards","▧"],spin:["Spin Wheel","✦"],missions:["Missions","✓"],events:["Events","◇"],tournament:["Tournament","♛"],finance:["Finance","₦"],support:["Support","?"]};
