@@ -1,0 +1,131 @@
+import { NextRequest, NextResponse } from "next/server";
+import { createHash, randomUUID } from "crypto";
+import { pool, ensureAuthSchema } from "../../auth/_db";
+
+const COOKIE = "ludo_session";
+
+async function admin(q: NextRequest) {
+  const token = q.cookies.get(COOKIE)?.value;
+  if (!token) return null;
+  const hash = createHash("sha256").update(token).digest("hex");
+  const r = await pool.query<any>(`SELECT u.* FROM ludo_users u JOIN ludo_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW() LIMIT 1`, [hash]);
+  const u = r.rows[0];
+  if (!u || u.is_guest || u.is_banned) return null;
+  const allowed = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "").split(",").map(x => x.trim().toLowerCase()).filter(Boolean);
+  return u.email && allowed.includes(u.email.toLowerCase()) ? u : null;
+}
+
+async function ensureModerationSchema() {
+  await pool.query(`
+    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
+    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMPTZ;
+    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
+    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_requested_at TIMESTAMPTZ;
+    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_message TEXT;
+    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_status TEXT NOT NULL DEFAULT 'none';
+    CREATE TABLE IF NOT EXISTS ludo_player_notifications(
+      id BIGSERIAL PRIMARY KEY,
+      user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE,
+      admin_user_id TEXT REFERENCES ludo_users(id) ON DELETE SET NULL,
+      title TEXT NOT NULL,
+      message TEXT NOT NULL,
+      kind TEXT NOT NULL DEFAULT 'admin',
+      read_at TIMESTAMPTZ,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    );
+    CREATE INDEX IF NOT EXISTS ludo_player_notifications_user_idx ON ludo_player_notifications(user_id, created_at DESC);
+  `);
+}
+
+async function audit(a: any, action: string, target: string, details: any) {
+  await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,$2,$3,$4)`, [a.id, action, target || null, JSON.stringify(details || {})]);
+}
+
+export async function GET(q: NextRequest) {
+  try {
+    await ensureAuthSchema();
+    await ensureModerationSchema();
+    const a = await admin(q);
+    if (!a) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+    const r = await pool.query(`SELECT id,username,email,coins,gems,level,is_guest,is_banned,banned_at,ban_reason,suspended_at,suspended_until,suspension_reason,suspension_review_requested_at,suspension_review_message,suspension_review_status,created_at,last_seen_at FROM ludo_users ORDER BY created_at DESC LIMIT 500`);
+    return NextResponse.json({ ok: true, users: r.rows });
+  } catch (e) {
+    console.error("player moderation GET", e);
+    return NextResponse.json({ error: "Moderation service unavailable." }, { status: 500 });
+  }
+}
+
+export async function POST(q: NextRequest) {
+  try {
+    await ensureAuthSchema();
+    await ensureModerationSchema();
+    const a = await admin(q);
+    if (!a) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+    const b = await q.json();
+    const action = String(b.action || "");
+    const uid = String(b.userId || "");
+    if (!uid) return NextResponse.json({ error: "Player is required." }, { status: 400 });
+
+    if (action === "suspend") {
+      if (uid === String(a.id)) return NextResponse.json({ error: "You cannot suspend your own admin account." }, { status: 400 });
+      const days = Math.min(30, Math.max(1, Math.trunc(Number(b.days || 30))));
+      const reason = String(b.reason || "Suspended by an administrator.").trim().slice(0, 1000);
+      const r = await pool.query<any>(`SELECT id,username,email,is_banned FROM ludo_users WHERE id=$1`, [uid]);
+      if (!r.rowCount) return NextResponse.json({ error: "Player not found." }, { status: 404 });
+      if (r.rows[0].is_banned) return NextResponse.json({ error: "Player is already banned." }, { status: 400 });
+      const requestId = randomUUID();
+      await pool.query(`UPDATE ludo_users SET suspended_at=NOW(),suspended_until=NOW()+($2 || ' days')::interval,suspension_reason=$3,suspension_review_requested_at=NULL,suspension_review_message=NULL,suspension_review_status='none' WHERE id=$1`, [uid, days, reason]);
+      await pool.query(`DELETE FROM ludo_sessions WHERE user_id=$1`, [uid]);
+      await audit(a, "suspend_player", uid, { reason, days, requestId });
+      return NextResponse.json({ ok: true, requestId, suspendedUntil: new Date(Date.now() + days * 86400000).toISOString() });
+    }
+
+    if (action === "unsuspend") {
+      await pool.query(`UPDATE ludo_users SET suspended_at=NULL,suspended_until=NULL,suspension_reason=NULL,suspension_review_requested_at=NULL,suspension_review_message=NULL,suspension_review_status='none' WHERE id=$1`, [uid]);
+      await audit(a, "unsuspend_player", uid, {});
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "delete") {
+      const confirm = String(b.confirm || "");
+      if (confirm !== "DELETE") return NextResponse.json({ error: "Type DELETE to permanently remove this player." }, { status: 400 });
+      if (uid === String(a.id)) return NextResponse.json({ error: "You cannot delete your own admin account." }, { status: 400 });
+      const r = await pool.query<any>(`SELECT email,username FROM ludo_users WHERE id=$1`, [uid]);
+      if (!r.rowCount) return NextResponse.json({ error: "Player not found." }, { status: 404 });
+      if (r.rows[0].email) await pool.query(`INSERT INTO ludo_banned_emails(email,reason,admin_user_id) VALUES(LOWER($1),'Deleted by admin',$2) ON CONFLICT(email) DO NOTHING`, [r.rows[0].email, a.id]);
+      await audit(a, "delete_player", uid, { email: r.rows[0].email, username: r.rows[0].username, emailBanned: true });
+      await pool.query(`DELETE FROM ludo_users WHERE id=$1`, [uid]);
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "message") {
+      const title = String(b.title || "Message from Ludo Live").trim().slice(0, 120);
+      const message = String(b.message || "").trim().slice(0, 2000);
+      if (!message) return NextResponse.json({ error: "Message is required." }, { status: 400 });
+      const r = await pool.query(`SELECT id FROM ludo_users WHERE id=$1 AND is_banned=FALSE`, [uid]);
+      if (!r.rowCount) return NextResponse.json({ error: "Player not found or banned." }, { status: 404 });
+      await pool.query(`INSERT INTO ludo_player_notifications(user_id,admin_user_id,title,message,kind) VALUES($1,$2,$3,$4,'admin')`, [uid, a.id, title, message]);
+      await audit(a, "message_player", uid, { title, message });
+      return NextResponse.json({ ok: true });
+    }
+
+    if (action === "review_decision") {
+      const decision = b.decision === "approved" ? "approved" : "denied";
+      const note = String(b.note || "").trim().slice(0, 1000);
+      const r = await pool.query<any>(`SELECT id,username FROM ludo_users WHERE id=$1`, [uid]);
+      if (!r.rowCount) return NextResponse.json({ error: "Player not found." }, { status: 404 });
+      if (decision === "approved") {
+        await pool.query(`UPDATE ludo_users SET suspended_at=NULL,suspended_until=NULL,suspension_reason=NULL,suspension_review_status='approved' WHERE id=$1`, [uid]);
+      } else {
+        await pool.query(`UPDATE ludo_users SET suspension_review_status='denied',suspension_reason=CASE WHEN $2<>'' THEN $2 ELSE suspension_reason END WHERE id=$1`, [uid, note]);
+      }
+      await audit(a, `suspension_review_${decision}`, uid, { note });
+      return NextResponse.json({ ok: true });
+    }
+
+    return NextResponse.json({ error: "Unknown moderation action." }, { status: 400 });
+  } catch (e) {
+    console.error("player moderation POST", e);
+    return NextResponse.json({ error: "Moderation action failed." }, { status: 500 });
+  }
+}
