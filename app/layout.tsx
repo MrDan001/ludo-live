@@ -11,6 +11,9 @@ import XPWinWatcher from "./_components/XPWinWatcher";
 import ActiveSpinRewards from "./_components/ActiveSpinRewards";
 import MissionGameplayTracker from "./_components/MissionGameplayTracker";
 import NotificationGate from "./_components/NotificationGate";
+import SuspendedGate from "./_components/SuspendedGate";
+import PlayerNotificationPopup from "./_components/PlayerNotificationPopup";
+import AdminPlayerModeration from "./_components/AdminPlayerModeration";
 import AppShell from "./AppShell";
 import ServiceWorkerRegistration from "./ServiceWorkerRegistration";
 
@@ -29,5 +32,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({children}:{children:React.ReactNode}){
-  return <html lang="en"><body><ServiceWorkerRegistration /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense><Suspense fallback={null}><LudoAudio /></Suspense><XPLevelCelebration /><XPWinWatcher /><ActiveSpinRewards /><MissionGameplayTracker /><NotificationGate /></body></html>;
+  return <html lang="en"><body><ServiceWorkerRegistration /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense><Suspense fallback={null}><LudoAudio /></Suspense><XPLevelCelebration /><XPWinWatcher /><ActiveSpinRewards /><MissionGameplayTracker /><NotificationGate /><SuspendedGate /><PlayerNotificationPopup /><AdminPlayerModeration /></body></html>;
 }
