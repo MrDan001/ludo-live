@@ -2,97 +2,23 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
-import AppFrame from "../_components/AppFrame";
-import LudoBoard, {
-  BOARD_PALETTES,
-  type BoardThemeId,
-  type DemoToken,
-} from "../_components/LudoBoardMultiplayer";
+import LudoBoard, { BOARD_PALETTES, type BoardThemeId, type DemoToken } from "../_components/LudoBoardMultiplayer";
 import DemoDice from "../_components/DemoDice";
-import {
-  canMove,
-  hasLegalMove,
-  nextProgress,
-  FINISH_PROGRESS,
-  type DiceValue,
-} from "../../lib/ludoEngine";
+import { canMove, hasLegalMove, nextProgress, FINISH_PROGRESS, type DiceValue } from "../../lib/ludoEngine";
 import { playerColorsForSeats } from "../../lib/ludoRules";
 
 type Color = "red" | "yellow" | "green" | "blue";
 type Face = DiceValue;
-
-type Player = {
-  playerId: string;
-  name: string;
-  seat: number;
-  host?: boolean;
-  ready?: boolean;
-  connected?: boolean;
-  colors?: Color[];
-  board?: string;
-};
-
+type Player = { playerId: string; name: string; seat: number; host?: boolean; ready?: boolean; connected?: boolean; colors?: Color[]; board?: string };
 type TokenMap = Record<string, Record<string, { position: number }>>;
-
-type GameState = {
-  status: string;
-  currentPlayerId: string | null;
-  dice: Face | null;
-  pendingMove: Face | null;
-  sixStreak: number;
-  players: Player[];
-  tokens: TokenMap;
-  winnerId?: string | null;
-  stateRevision?: number;
-};
+type GameState = { status: string; currentPlayerId: string | null; dice: Face | null; pendingMove: Face | null; sixStreak: number; players: Player[]; tokens: TokenMap; winnerId?: string | null; stateRevision?: number };
 
 const COLORS: Color[] = ["red", "yellow", "green", "blue"];
 const FINISH = FINISH_PROGRESS;
-
-const initialTokens = (): DemoToken[] =>
-  COLORS.flatMap((color) =>
-    Array.from({ length: 4 }, (_, id) => ({
-      color,
-      id,
-      position: 0,
-      state: "yard" as const,
-    }))
-  );
-
-const displayTheme = (value: string): BoardThemeId =>
-  value === "midnight-live"
-    ? "night"
-    : value in BOARD_PALETTES
-      ? (value as BoardThemeId)
-      : "classic";
-
-const emitAudio = (kind: "dice" | "win") => {
-  if (typeof window !== "undefined") {
-    window.dispatchEvent(new CustomEvent("ludo-audio", { detail: kind }));
-  }
-};
-
-function normalizeTokens(serverTokens: TokenMap): DemoToken[] {
-  return COLORS.flatMap((color) =>
-    Array.from({ length: 4 }, (_, id) => {
-      const raw = serverTokens?.[color]?.[String(id)]?.position;
-      const position = typeof raw === "number" && Number.isFinite(raw) ? raw : 0;
-      return {
-        color,
-        id,
-        position,
-        state:
-          position === 0
-            ? ("yard" as const)
-            : position === FINISH
-              ? ("finished" as const)
-              : position > 51
-                ? ("home" as const)
-                : ("track" as const),
-      };
-    })
-  );
-}
+const initialTokens = (): DemoToken[] => COLORS.flatMap((color) => Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const })));
+const displayTheme = (value: string): BoardThemeId => value === "midnight-live" ? "night" : value in BOARD_PALETTES ? value as BoardThemeId : "classic";
+const emitAudio = (kind: "dice" | "win") => { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ludo-audio", { detail: kind })); };
+function normalizeTokens(serverTokens: TokenMap): DemoToken[] { return COLORS.flatMap((color) => Array.from({ length: 4 }, (_, id) => { const raw = serverTokens?.[color]?.[String(id)]?.position; const position = typeof raw === "number" && Number.isFinite(raw) ? raw : 0; return { color, id, position, state: position === 0 ? "yard" as const : position === FINISH ? "finished" as const : position > 51 ? "home" as const : "track" as const }; })); }
 
 export default function MultiplayerGameCanonical() {
   const [theme, setTheme] = useState<BoardThemeId>("classic");
@@ -107,486 +33,95 @@ export default function MultiplayerGameCanonical() {
   const [animating, setAnimating] = useState(false);
   const [revision, setRevision] = useState(-1);
   const [notice, setNotice] = useState("Connecting…");
-
-  const aliveRef = useRef(true);
-  const revisionRef = useRef(-1);
-  const diceTimerRef = useRef<number | null>(null);
-  const moveTimerRef = useRef<number | null>(null);
-  const paramsRef = useRef<URLSearchParams | null>(null);
-  const winnerSoundRef = useRef<string | null>(null);
-
+  const aliveRef = useRef(true), revisionRef = useRef(-1), diceTimerRef = useRef<number | null>(null), moveTimerRef = useRef<number | null>(null), winnerSoundRef = useRef<string | null>(null);
   const players = game?.players ?? [];
-  const myPlayer = players.find((player) => player.playerId === me);
-  const myColors = useMemo<Color[]>(
-    () =>
-      myPlayer?.colors?.length
-        ? myPlayer.colors
-        : (playerColorsForSeats(
-            players.length === 2 ? 2 : 4,
-            myPlayer?.seat ?? 0
-          ) as Color[]),
-    [myPlayer, players.length]
-  );
-
+  const myPlayer = players.find((p) => p.playerId === me);
+  const myColors = useMemo<Color[]>(() => myPlayer?.colors?.length ? myPlayer.colors : playerColorsForSeats(players.length === 2 ? 2 : 4, myPlayer?.seat ?? 0) as Color[], [myPlayer, players.length]);
   const currentId = game?.currentPlayerId ?? "";
   const myTurn = currentId === me;
-
-  const isTournament =
-    typeof window !== "undefined" &&
-    new URLSearchParams(window.location.search).has("tournament");
-
-  const legalTokenKeys = useMemo(() => {
-    if (pending === null || !myTurn) return [];
-    return tokens
-      .filter(
-        (token) =>
-          myColors.includes(token.color) && canMove(tokens, token, pending)
-      )
-      .map((token) => `${token.color}:${token.id}`);
-  }, [pending, myTurn, tokens, myColors]);
+  const isTournament = typeof window !== "undefined" && new URLSearchParams(window.location.search).has("tournament");
+  const legalTokenKeys = useMemo(() => pending === null || !myTurn ? [] : tokens.filter((t) => myColors.includes(t.color) && canMove(tokens, t, pending)).map((t) => `${t.color}:${t.id}`), [pending, myTurn, tokens, myColors]);
 
   const applyServerState = useCallback((next: GameState) => {
     const nextRevision = Number(next.stateRevision ?? -1);
-    if (
-      nextRevision >= 0 &&
-      revisionRef.current >= 0 &&
-      nextRevision < revisionRef.current
-    ) {
-      return false;
-    }
-
-    if (nextRevision >= 0) {
-      revisionRef.current = nextRevision;
-      setRevision(nextRevision);
-    }
-
-    setGame(next);
-    setTokens(normalizeTokens(next.tokens ?? {}));
-    return true;
+    if (nextRevision >= 0 && revisionRef.current >= 0 && nextRevision < revisionRef.current) return false;
+    if (nextRevision >= 0) { revisionRef.current = nextRevision; setRevision(nextRevision); }
+    setGame(next); setTokens(normalizeTokens(next.tokens ?? {})); return true;
   }, []);
 
-  useEffect(() => {
-    aliveRef.current = true;
-
-    try {
-      const saved = localStorage.getItem("ludo-match-board");
-      if (saved) {
-        setSkinId(saved);
-        setTheme(displayTheme(saved));
-      }
-    } catch {
-      // localStorage is optional.
-    }
-
-    const loadCustomization = async () => {
-      try {
-        const response = await fetch("/api/customization", {
-          cache: "no-store",
-        });
-        const data = await response.json();
-        const equipped = String(data?.equippedBoard || "");
-        if (!equipped || !aliveRef.current) return;
-        setSkinId(equipped);
-        setTheme(displayTheme(equipped));
-        try {
-          localStorage.setItem("ludo-match-board", equipped);
-        } catch {
-          // Ignore storage failures.
-        }
-      } catch {
-        // Keep the default board.
-      }
-    };
-
-    void loadCustomization();
-
-    return () => {
-      aliveRef.current = false;
-    };
-  }, []);
+  useEffect(() => { aliveRef.current = true; try { const saved = localStorage.getItem("ludo-match-board"); if (saved) { setSkinId(saved); setTheme(displayTheme(saved)); } } catch {} const load = async () => { try { const r = await fetch("/api/customization", { cache: "no-store" }); const d = await r.json(); const equipped = String(d?.equippedBoard || ""); if (!equipped || !aliveRef.current) return; setSkinId(equipped); setTheme(displayTheme(equipped)); try { localStorage.setItem("ludo-match-board", equipped); } catch {} } catch {} }; void load(); return () => { aliveRef.current = false; }; }, []);
 
   useEffect(() => {
     let mounted = true;
-
     const connect = async () => {
-      let playerId = "";
-      let profileName = "Player";
-
-      try {
-        const response = await fetch("/api/auth", { cache: "no-store" });
-        const data = await response.json();
-        playerId = String(data?.user?.id || "");
-        profileName = String(data?.user?.username || "Player");
-      } catch {
-        // The server will reject a room join without a valid player id.
-      }
-
+      let playerId = "", profileName = "Player";
+      try { const r = await fetch("/api/auth", { cache: "no-store" }); const d = await r.json(); playerId = String(d?.user?.id || ""); profileName = String(d?.user?.username || "Player"); } catch {}
       if (!mounted || !playerId) return;
-
       setMe(playerId);
-
-      const params = new URLSearchParams(window.location.search);
-      paramsRef.current = params;
-      const roomCode = params.get("room") || "";
-      const roomName = profileName || params.get("name") || "Player";
-
+      const params = new URLSearchParams(window.location.search), roomCode = params.get("room") || "", roomName = profileName || params.get("name") || "Player";
       let roomSize = Number(params.get("size") || 4);
-      try {
-        const savedRoom = JSON.parse(
-          localStorage.getItem("ludo-room") || "null"
-        );
-        if (!params.get("size")) {
-          roomSize = Number(savedRoom?.players) === 2 ? 2 : 4;
-        }
-      } catch {
-        // Keep URL/default size.
-      }
-
-      const nextSocket = io(window.location.origin, {
-        transports: ["websocket", "polling"],
-        reconnection: true,
-        reconnectionAttempts: Infinity,
-        reconnectionDelay: 250,
-      });
-
+      try { const saved = JSON.parse(localStorage.getItem("ludo-room") || "null"); if (!params.get("size")) roomSize = Number(saved?.players) === 2 ? 2 : 4; } catch {}
+      const nextSocket = io(window.location.origin, { transports: ["websocket", "polling"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 250 });
       setSocket(nextSocket);
-
-      const clearDiceTimer = () => {
-        if (diceTimerRef.current !== null) {
-          window.clearTimeout(diceTimerRef.current);
-          diceTimerRef.current = null;
-        }
-      };
-
-      const clearMoveTimer = () => {
-        if (moveTimerRef.current !== null) {
-          window.clearTimeout(moveTimerRef.current);
-          moveTimerRef.current = null;
-        }
-      };
-
-      nextSocket.on("connect", () => {
-        if (!mounted) return;
-        setNotice(
-          isTournament
-            ? "TOURNAMENT MATCH • CONNECTED"
-            : "LIVE MATCH • CONNECTED"
-        );
-
-        if (roomCode) {
-          let board = "classic";
-          try {
-            board = localStorage.getItem("ludo-match-board") || "classic";
-          } catch {
-            // Keep classic.
-          }
-          nextSocket.emit("join-room", {
-            roomCode,
-            name: roomName,
-            roomSize,
-            playerId,
-            board,
-            dice: "classic",
-          });
-        }
-      });
-
-      nextSocket.on("roster", (members: Player[]) => {
-        const host = members.find((member) => member.host);
-        if (!host?.board || !mounted) return;
-        const hostSkin = String(host.board);
-        setSkinId(hostSkin);
-        setTheme(displayTheme(hostSkin));
-      });
-
-      nextSocket.on("start-game", ({ board }: { board?: string }) => {
-        if (!mounted) return;
-        if (board) {
-          const hostSkin = String(board);
-          setSkinId(hostSkin);
-          setTheme(displayTheme(hostSkin));
-        }
-        setNotice(
-          isTournament ? "TOURNAMENT MATCH LIVE" : "LIVE MATCH"
-        );
-      });
-
-      nextSocket.on("start-error", (message: string) => {
-        if (mounted) setNotice(message);
-      });
-
-      nextSocket.on("game-dice", (event: {
-        playerId: string;
-        value: Face;
-        stateRevision?: number;
-      }) => {
-        if (!mounted) return;
-
-        const eventRevision = Number(event.stateRevision ?? -1);
-        if (
-          eventRevision >= 0 &&
-          revisionRef.current >= 0 &&
-          eventRevision < revisionRef.current
-        ) {
-          return;
-        }
-
-        if (eventRevision >= 0) {
-          revisionRef.current = eventRevision;
-          setRevision(eventRevision);
-        }
-
-        setRoll(event.value);
-        setRemoteRolling(true);
-        emitAudio("dice");
-        setNotice(
-          event.playerId === playerId
-            ? `You rolled ${event.value}. Checking legal moves…`
-            : "Opponent is rolling…"
-        );
-
-        clearDiceTimer();
-        diceTimerRef.current = window.setTimeout(() => {
-          if (mounted) setRemoteRolling(false);
-          diceTimerRef.current = null;
-        }, 900);
-      });
-
-      nextSocket.on("game-state", (next: GameState) => {
-        if (!mounted) return;
-        const accepted = applyServerState(next);
-        if (!accepted) return;
-
-        if (next.dice !== null) setRoll(next.dice);
-        setPending(
-          next.currentPlayerId === playerId ? next.pendingMove : null
-        );
-
-        if (
-          next.winnerId &&
-          winnerSoundRef.current !== next.winnerId
-        ) {
-          winnerSoundRef.current = next.winnerId;
-          emitAudio("win");
-        }
-
-        if (next.winnerId) {
-          const winnerName =
-            next.players.find(
-              (player) => player.playerId === next.winnerId
-            )?.name || "Player";
-          setNotice(
-            next.winnerId === playerId
-              ? "🏆 YOU WON THE MATCH!"
-              : `${winnerName} won the match.`
-          );
-        } else if (next.status === "paused") {
-          setNotice("Match paused — waiting for the player to reconnect.");
-        } else if (next.currentPlayerId === playerId) {
-          setNotice(
-            next.pendingMove !== null
-              ? `You rolled ${next.pendingMove}. Pick a token.`
-              : "Your turn — roll the dice."
-          );
-        } else {
-          const currentName =
-            next.players.find(
-              (player) => player.playerId === next.currentPlayerId
-            )?.name || "Player";
-          setNotice(`${currentName}'s turn.`);
-        }
-      });
-
-      nextSocket.on("game-moved", () => {
-        if (!mounted) return;
-        setAnimating(true);
-        clearMoveTimer();
-        moveTimerRef.current = window.setTimeout(() => {
-          if (mounted) setAnimating(false);
-          moveTimerRef.current = null;
-        }, 650);
-      });
-
-      nextSocket.on("disconnect", () => {
-        if (mounted) setNotice("Reconnecting…");
-      });
-
-      return () => {
-        clearDiceTimer();
-        clearMoveTimer();
-        nextSocket.disconnect();
-      };
+      const clearDiceTimer = () => { if (diceTimerRef.current !== null) { window.clearTimeout(diceTimerRef.current); diceTimerRef.current = null; } };
+      const clearMoveTimer = () => { if (moveTimerRef.current !== null) { window.clearTimeout(moveTimerRef.current); moveTimerRef.current = null; } };
+      nextSocket.on("connect", () => { if (!mounted) return; setNotice(isTournament ? "TOURNAMENT MATCH" : "LIVE MATCH"); if (roomCode) { let board = "classic"; try { board = localStorage.getItem("ludo-match-board") || "classic"; } catch {} nextSocket.emit("join-room", { roomCode, name: roomName, roomSize, playerId, board, dice: "classic" }); } });
+      nextSocket.on("roster", (members: Player[]) => { const host = members.find((m) => m.host); if (!host?.board || !mounted) return; const hostSkin = String(host.board); setSkinId(hostSkin); setTheme(displayTheme(hostSkin)); });
+      nextSocket.on("start-game", ({ board }: { board?: string }) => { if (!mounted) return; if (board) { setSkinId(String(board)); setTheme(displayTheme(String(board))); } setNotice(isTournament ? "TOURNAMENT MATCH" : "LIVE MATCH"); });
+      nextSocket.on("start-error", (message: string) => { if (mounted) setNotice(message); });
+      nextSocket.on("game-dice", (event: { playerId: string; value: Face; stateRevision?: number }) => { if (!mounted) return; const r = Number(event.stateRevision ?? -1); if (r >= 0 && revisionRef.current >= 0 && r < revisionRef.current) return; if (r >= 0) { revisionRef.current = r; setRevision(r); } setRoll(event.value); setRemoteRolling(true); emitAudio("dice"); setNotice(event.playerId === playerId ? `You rolled ${event.value}` : "Opponent is rolling…"); clearDiceTimer(); diceTimerRef.current = window.setTimeout(() => { if (mounted) setRemoteRolling(false); diceTimerRef.current = null; }, 900); });
+      nextSocket.on("game-state", (next: GameState) => { if (!mounted) return; if (!applyServerState(next)) return; if (next.dice !== null) setRoll(next.dice); setPending(next.currentPlayerId === playerId ? next.pendingMove : null); if (next.winnerId && winnerSoundRef.current !== next.winnerId) { winnerSoundRef.current = next.winnerId; emitAudio("win"); } if (next.winnerId) { const name = next.players.find((p) => p.playerId === next.winnerId)?.name || "Player"; setNotice(next.winnerId === playerId ? "🏆 YOU WON" : `${name} won`); } else if (next.status === "paused") setNotice("Waiting for reconnection…"); else if (next.currentPlayerId === playerId) setNotice(next.pendingMove !== null ? `Pick a token • ${next.pendingMove}` : "Your turn"); else setNotice(`${next.players.find((p) => p.playerId === next.currentPlayerId)?.name || "Player"}'s turn`); });
+      nextSocket.on("game-moved", () => { if (!mounted) return; setAnimating(true); clearMoveTimer(); moveTimerRef.current = window.setTimeout(() => { if (mounted) setAnimating(false); moveTimerRef.current = null; }, 650); });
+      nextSocket.on("disconnect", () => { if (mounted) setNotice("Reconnecting…"); });
+      return () => { clearDiceTimer(); clearMoveTimer(); nextSocket.disconnect(); };
     };
-
-    void connect();
-
-    return () => {
-      mounted = false;
-    };
+    void connect(); return () => { mounted = false; };
   }, [applyServerState, isTournament]);
 
-  useEffect(() => {
-    if (!socket || !game || !myTurn || pending === null) return;
-    if (hasLegalMove(tokens, myColors, pending)) return;
-
-    setPending(null);
-    socket.emit("game-move", { tokenId: "__skip__", to: 0 });
-  }, [socket, game, myTurn, pending, tokens, myColors]);
-
-  const chooseToken = useCallback(
-    (color: Color, id: number) => {
-      if (
-        !socket ||
-        !game ||
-        !myTurn ||
-        pending === null ||
-        animating
-      ) {
-        return;
-      }
-
-      const token = tokens.find(
-        (candidate) => candidate.color === color && candidate.id === id
-      );
-      if (
-        !token ||
-        !myColors.includes(color) ||
-        !canMove(tokens, token, pending)
-      ) {
-        return;
-      }
-
-      const target = nextProgress(token.position, pending);
-      if (target === null) return;
-
-      setPending(null);
-      setAnimating(true);
-      socket.emit("game-move", {
-        tokenId: `${color}:${id}`,
-        to: target,
-      });
-      setNotice("Moving…");
-    },
-    [socket, game, myTurn, pending, animating, tokens, myColors]
-  );
-
-  const handleRoll = useCallback(() => {
-    if (
-      !socket ||
-      !game ||
-      !myTurn ||
-      pending !== null ||
-      animating ||
-      remoteRolling ||
-      game.status !== "playing"
-    ) {
-      return;
-    }
-
-    // Do not animate or choose a value locally. The server owns the roll.
-    socket.emit("game-roll");
-  }, [socket, game, myTurn, pending, animating, remoteRolling]);
-
+  useEffect(() => { if (!socket || !game || !myTurn || pending === null || hasLegalMove(tokens, myColors, pending)) return; setPending(null); socket.emit("game-move", { tokenId: "__skip__", to: 0 }); }, [socket, game, myTurn, pending, tokens, myColors]);
+  const chooseToken = useCallback((color: Color, id: number) => { if (!socket || !game || !myTurn || pending === null || animating) return; const token = tokens.find((t) => t.color === color && t.id === id); if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return; const target = nextProgress(token.position, pending); if (target === null) return; setPending(null); setAnimating(true); socket.emit("game-move", { tokenId: `${color}:${id}`, to: target }); setNotice("Moving…"); }, [socket, game, myTurn, pending, animating, tokens, myColors]);
+  const handleRoll = useCallback(() => { if (!socket || !game || !myTurn || pending !== null || animating || remoteRolling || game.status !== "playing") return; socket.emit("game-roll"); }, [socket, game, myTurn, pending, animating, remoteRolling]);
   const palette = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
-  const headerMap: Record<string, [string, string, string]> = {
-    classic: ["👑", "TIMELESS CLASSIC", "CLASSIC LUDO"],
-    love: ["💗", "HEART COLLECTION", "LOVE EDITION"],
-    night: ["🌃", "CITY AFTER DARK", "NIGHT CITY"],
-    golden: ["🏆", "ROYAL COLLECTION", "GOLDEN ROYAL"],
-  };
-  const header =
-    headerMap[skinId] || headerMap[theme] || headerMap.classic;
+  const sortedPlayers = [...players].sort((a, b) => a.seat - b.seat);
 
   return (
-    <AppFrame back="/home">
-      <main
-        className="mp-canonical"
-        style={
-          {
-            "--accent": palette.accent,
-            "--bg": palette.bg,
-          } as React.CSSProperties
-        }
-      >
-        <div className="mp-wrap">
-          <header className="mp-head">
-            <div className="mp-icon">{header[0]}</div>
-            <div>
-              <div className="mp-eyebrow">{header[1]}</div>
-              <h1>{header[2]}</h1>
-              <div className="mp-sub">
-                {players.length === 4 ? "4-player" : "2-player"} live
-                multiplayer • server authoritative
-              </div>
-            </div>
-            <div className="mp-live">
-              <span /> LIVE
-            </div>
-          </header>
-
-          <div className="mp-label">
-            <span /> {isTournament ? "TOURNAMENT MATCH" : "LIVE MATCH"}
+    <main className="mp-clean" style={{ "--accent": palette.accent, "--bg": palette.bg } as React.CSSProperties}>
+      <div className="mp-stage">
+        <div className="mp-team">
+          <div className="mp-team-scroll">
+            {sortedPlayers.map((p) => {
+              const active = p.playerId === currentId;
+              const mine = p.playerId === me;
+              const color = p.colors?.[0] || playerColorsForSeats(players.length === 2 ? 2 : 4, p.seat)[0];
+              return <div key={p.playerId} className={`mp-player ${active ? "active" : ""} ${mine ? "mine" : ""}`}><span className={`mp-dot ${color}`} /><div><b>{p.name}{mine ? " · You" : ""}</b><small>{active ? "TURN" : p.connected === false ? "OFFLINE" : p.ready ? "READY" : "IN MATCH"}</small></div>{p.host && <em>♛</em>}</div>;
+            })}
           </div>
-
-          <section className="mp-board">
-            <LudoBoard
-              theme={theme}
-              demoTokens={tokens}
-              onTokenClick={chooseToken}
-              legalTokenKeys={legalTokenKeys}
-              animateUpdates
-              finishSound
-            />
-          </section>
-
-          <section className="mp-controls">
-            <div>
-              <div className="mp-turn">
-                {game?.status === "finished"
-                  ? "MATCH FINISHED"
-                  : myTurn
-                    ? "YOUR TURN"
-                    : currentId
-                      ? `${players.find((player) => player.playerId === currentId)?.name || "PLAYER"} TURN`
-                      : "MATCH"}
-              </div>
-              <b>
-                {game?.winnerId === me
-                  ? "🏆 MATCH WON"
-                  : pending !== null
-                    ? "Pick a token"
-                    : "Roll the dice"}
-              </b>
-              <p>{notice}</p>
-            </div>
-
-            <DemoDice
-              value={roll}
-              onRoll={handleRoll}
-              disabled={
-                !myTurn ||
-                pending !== null ||
-                animating ||
-                remoteRolling ||
-                !game ||
-                game.status !== "playing"
-              }
-              botRolling={remoteRolling}
-            />
-          </section>
         </div>
-      </main>
 
+        <div className="mp-board-wrap">
+          <LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken} legalTokenKeys={legalTokenKeys} animateUpdates finishSound />
+        </div>
+
+        <div className="mp-bottom">
+          <div className="mp-status"><span className="mp-live-dot" /> <b>{game?.winnerId ? "MATCH OVER" : myTurn ? "YOUR TURN" : "OPPONENT TURN"}</b><small>{notice}</small></div>
+          <div className="mp-dice"><DemoDice value={roll} onRoll={handleRoll} disabled={!myTurn || pending !== null || animating || remoteRolling || !game || game.status !== "playing"} botRolling={remoteRolling} /></div>
+        </div>
+      </div>
       <style jsx global>{`
-        .mp-canonical{width:100%;height:100dvh;min-height:100dvh;background:var(--bg);color:#fff;overflow:hidden;overscroll-behavior:none}
-        .mp-wrap{width:100%;max-width:720px;height:100dvh;margin:0 auto;padding:8px 12px;display:grid;grid-template-rows:auto auto minmax(0,1fr) auto;gap:6px;overflow:hidden}
-        .mp-head{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:20px;background:color-mix(in srgb,var(--bg) 75%,white 25%);border:1px solid color-mix(in srgb,var(--accent) 65%,white 35%);box-shadow:0 12px 30px rgba(0,0,0,.22);min-height:70px}
-        .mp-icon{font-size:30px}.mp-eyebrow{font-size:8px;letter-spacing:1.7px;font-weight:900;opacity:.75}.mp-head h1{margin:2px 0;font-size:20px}.mp-sub{font-size:10px;opacity:.7}.mp-live{margin-left:auto;white-space:nowrap;font-weight:900;font-size:11px}.mp-live span,.mp-label span{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--accent);margin-right:6px;box-shadow:0 0 10px var(--accent)}
-        .mp-label{padding:5px 0;font-size:10px;letter-spacing:2.5px;font-weight:900}.mp-board{width:100%;min-height:0;display:grid;place-items:center;padding:4px;border-radius:22px;background:linear-gradient(145deg,color-mix(in srgb,var(--bg) 78%,white 22%),color-mix(in srgb,var(--bg) 94%,black 6%));box-shadow:0 16px 38px rgba(0,0,0,.28);overflow:hidden}.mp-board>section,.mp-board>div{width:min(100%,calc(100dvh - 220px));max-width:100%;aspect-ratio:1/1;max-height:100%;overflow:hidden}
-        .mp-controls{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:9px 12px;border-radius:18px;border:1px solid color-mix(in srgb,var(--accent) 75%,white 25%);background:color-mix(in srgb,var(--bg) 82%,white 18%);box-shadow:0 12px 30px rgba(0,0,0,.2);min-height:68px}.mp-turn{font-size:9px;letter-spacing:1.5px;font-weight:900;opacity:.72}.mp-controls b{display:block;margin-top:4px;font-size:16px}.mp-controls p{margin:3px 0 0;font-size:11px;opacity:.82;max-width:220px}
-        @media(max-height:650px){.mp-head{min-height:58px;padding:7px 10px}.mp-icon{font-size:24px}.mp-head h1{font-size:17px}.mp-sub{font-size:9px}.mp-label{padding:2px 0}.mp-controls{min-height:58px;padding:7px 10px}.mp-controls b{font-size:14px}.mp-controls p{font-size:10px}.mp-board>section,.mp-board>div{width:min(100%,calc(100dvh - 175px))}}
-        @media(max-width:420px){.mp-wrap{padding:6px 8px}.mp-live{display:none}.mp-head{min-height:62px}.mp-board>section,.mp-board>div{width:min(100%,calc(100dvh - 205px))}}
+        html,body{margin:0;padding:0;overflow:hidden;background:#05070b}
+        .mp-clean{position:fixed;inset:0;width:100%;height:100dvh;background:radial-gradient(circle at 50% -15%,color-mix(in srgb,var(--bg) 45%,#10141c 55%),#05070b 55%);color:#fff;overflow:hidden}
+        .mp-stage{width:100%;height:100dvh;max-width:760px;margin:0 auto;display:grid;grid-template-rows:auto minmax(0,1fr) auto;gap:7px;padding:8px;box-sizing:border-box}
+        .mp-team{min-height:58px;border:1px solid color-mix(in srgb,var(--accent) 55%,#fff 45%);border-radius:18px;background:rgba(9,11,16,.78);box-shadow:0 8px 26px rgba(0,0,0,.28);backdrop-filter:blur(14px);overflow:hidden}
+        .mp-team-scroll{height:100%;display:flex;align-items:center;justify-content:center;gap:7px;padding:6px 8px;overflow-x:auto}
+        .mp-player{position:relative;display:flex;align-items:center;gap:7px;min-width:120px;padding:7px 9px;border:1px solid rgba(255,255,255,.09);border-radius:13px;background:rgba(255,255,255,.035)}
+        .mp-player.active{border-color:color-mix(in srgb,var(--accent) 80%,#fff 20%);box-shadow:0 0 16px color-mix(in srgb,var(--accent) 24%,transparent)}
+        .mp-player.mine{background:rgba(255,255,255,.06)}.mp-player b{display:block;font-size:11px;white-space:nowrap;max-width:82px;overflow:hidden;text-overflow:ellipsis}.mp-player small{display:block;margin-top:2px;font-size:7px;letter-spacing:1px;opacity:.58;font-weight:900}.mp-player em{font-style:normal;font-size:12px;margin-left:auto;color:#f0ce67}.mp-dot{width:9px;height:9px;border-radius:50%;flex:none;box-shadow:0 0 8px currentColor}.mp-dot.red{background:#ef3340;color:#ef3340}.mp-dot.yellow{background:#f5c400;color:#f5c400}.mp-dot.green{background:#16b957;color:#16b957}.mp-dot.blue{background:#3977ee;color:#3977ee}
+        .mp-board-wrap{min-height:0;display:grid;place-items:center;overflow:hidden;border-radius:22px}.mp-board-wrap>section,.mp-board-wrap>div{width:min(100%,calc(100dvh - 145px));max-width:100%;aspect-ratio:1/1;max-height:100%;overflow:hidden}
+        .mp-bottom{min-height:70px;display:flex;align-items:center;justify-content:space-between;gap:10px;padding:7px 10px;border:1px solid color-mix(in srgb,var(--accent) 48%,#fff 52%);border-radius:19px;background:rgba(9,11,16,.86);box-shadow:0 -8px 28px rgba(0,0,0,.3);backdrop-filter:blur(14px)}
+        .mp-status{min-width:0}.mp-status b{display:block;font-size:11px;letter-spacing:1px}.mp-status small{display:block;margin-top:3px;font-size:9px;opacity:.6;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px}.mp-live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent);margin-right:5px}.mp-dice{display:flex;align-items:center;justify-content:center;min-width:130px}.mp-dice button{transform:scale(.88);transform-origin:right center}
+        @media(max-width:420px){.mp-stage{padding:6px;gap:5px}.mp-team{min-height:54px;border-radius:16px}.mp-team-scroll{justify-content:flex-start;padding:5px}.mp-player{min-width:106px;padding:6px 7px}.mp-player b{font-size:10px}.mp-board-wrap>section,.mp-board-wrap>div{width:min(100%,calc(100dvh - 132px))}.mp-bottom{min-height:62px;border-radius:16px;padding:6px 8px}.mp-dice{min-width:112px}.mp-dice button{transform:scale(.78)}.mp-status small{max-width:155px}}
+        @media(max-height:650px){.mp-team{min-height:46px}.mp-player{padding:4px 7px}.mp-player small{display:none}.mp-board-wrap>section,.mp-board-wrap>div{width:min(100%,calc(100dvh - 108px))}.mp-bottom{min-height:54px}}
       `}</style>
-    </AppFrame>
+    </main>
   );
 }
