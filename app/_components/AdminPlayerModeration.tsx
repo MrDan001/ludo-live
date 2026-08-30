@@ -4,6 +4,11 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 
 type Player = Record<string, any>;
+type Dialog = { type: "message" | "suspend" | "deny" | "delete" | "success" | "error"; player?: Player; text?: string; title?: string } | null;
+
+const overlay: React.CSSProperties = { position: "fixed", inset: 0, zIndex: 1000000, background: "rgba(2,6,23,.78)", backdropFilter: "blur(12px)", display: "grid", placeItems: "center", padding: 18 };
+const card: React.CSSProperties = { width: "min(520px,100%)", maxHeight: "92vh", overflowY: "auto", background: "linear-gradient(145deg,#111827,#071225)", color: "#fff", border: "1px solid rgba(148,163,184,.2)", borderRadius: 28, padding: 26, boxShadow: "0 30px 100px rgba(0,0,0,.65)" };
+const field: React.CSSProperties = { width: "100%", boxSizing: "border-box", background: "rgba(2,6,23,.72)", color: "#fff", border: "1px solid rgba(148,163,184,.2)", borderRadius: 15, padding: 14, outline: "none", fontSize: 14 };
 
 export default function AdminPlayerModeration() {
   const pathname = usePathname();
@@ -13,6 +18,7 @@ export default function AdminPlayerModeration() {
   const [title, setTitle] = useState("Message from Ludo Live");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
+  const [dialog, setDialog] = useState<Dialog>(null);
 
   const load = async () => {
     try {
@@ -30,133 +36,101 @@ export default function AdminPlayerModeration() {
     return () => window.clearInterval(t);
   }, [pathname]);
 
-  // The Players page renders its cards separately. Use a MutationObserver so
-  // moderation controls are attached after the cards arrive, and re-attached
-  // after client-side pagination/rerenders instead of depending on a race
-  // between this component and the Players page.
   useEffect(() => {
     if (pathname !== "/dbase/players") return;
-
     const attach = () => {
       const rows = Array.from(document.querySelectorAll<HTMLElement>(".case-row"));
       if (!rows.length || !players.length) return;
-
       rows.forEach(row => {
         const text = row.innerText || "";
-        const player = players.find(p =>
-          (p.email && text.includes(String(p.email))) ||
-          (p.username && text.includes(String(p.username)))
-        );
+        const player = players.find(p => (p.email && text.includes(String(p.email))) || (p.username && text.includes(String(p.username))));
         if (!player) return;
-
         const existing = row.querySelector<HTMLElement>("[data-player-moderation]");
         if (existing) existing.remove();
-
         const bar = document.createElement("div");
         bar.setAttribute("data-player-moderation", "true");
         bar.style.cssText = "display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:12px;width:100%;padding-top:4px;";
-
         const add = (label: string, kind: string, danger = false) => {
           const b = document.createElement("button");
-          b.type = "button";
-          b.textContent = label;
-          b.className = danger ? "admin-btn danger-btn" : "admin-btn";
-          b.style.cssText = "min-height:40px;padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:800;";
+          b.type = "button"; b.textContent = label; b.className = danger ? "admin-btn danger-btn" : "admin-btn";
+          b.style.cssText = `min-height:40px;padding:9px 14px;border-radius:12px;cursor:pointer;font-weight:800;border:1px solid ${danger ? "rgba(248,113,113,.3)" : "rgba(96,165,250,.25)"};background:${danger ? "rgba(239,68,68,.12)" : "rgba(59,130,246,.1)"};color:${danger ? "#fca5a5" : "#bfdbfe"};`;
           b.onclick = () => {
-            if (kind === "message") {
-              setSelected(player); setMessage(""); setTitle("Message from Ludo Live"); setReason("");
-            }
-            if (kind === "suspend") {
-              setSelected(player); setReason(""); setMessage(""); setTitle("suspend");
-            }
-            if (kind === "delete") void deletePlayer(player);
+            if (kind === "message") { setSelected(player); setMessage(""); setTitle("Message from Ludo Live"); setReason(""); setDialog({ type: "message", player }); }
+            if (kind === "suspend") { setSelected(player); setReason(""); setMessage(""); setTitle("suspend"); setDialog({ type: "suspend", player }); }
+            if (kind === "delete") setDialog({ type: "delete", player });
             if (kind === "unsuspend") void moderate("unsuspend", player);
             if (kind === "approve") void moderate("review_decision", player, { decision: "approved" });
-            if (kind === "deny") { setSelected(player); setReason(""); setTitle("deny"); }
+            if (kind === "deny") { setSelected(player); setReason(""); setTitle("deny"); setDialog({ type: "deny", player }); }
           };
           bar.appendChild(b);
         };
-
-        if (player.suspended_at) add("Unsuspend", "unsuspend");
-        else add("Suspend", "suspend", true);
-        if (player.suspension_review_status === "pending") {
-          add("Approve Review", "approve");
-          add("Deny Review", "deny", true);
-        }
-        add("Message", "message");
-        add("Delete", "delete", true);
+        if (player.suspended_at) add("Unsuspend", "unsuspend"); else add("Suspend", "suspend", true);
+        if (player.suspension_review_status === "pending") { add("Approve Review", "approve"); add("Deny Review", "deny", true); }
+        add("Message", "message"); add("Delete", "delete", true);
         row.appendChild(bar);
       });
     };
-
     attach();
-    const observer = new MutationObserver(() => {
-      window.requestAnimationFrame(attach);
-    });
+    const observer = new MutationObserver(() => window.requestAnimationFrame(attach));
     observer.observe(document.body, { childList: true, subtree: true });
-
     return () => observer.disconnect();
   }, [players, pathname]);
 
   const moderate = async (action: string, player: Player, extra: Record<string, any> = {}) => {
     setBusy(true);
     try {
-      const r = await fetch("/api/admin/player-moderation", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, userId: player.id, ...extra })
-      });
+      const r = await fetch("/api/admin/player-moderation", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ action, userId: player.id, ...extra }) });
       const d = await r.json();
       if (!r.ok) throw new Error(d?.error || "Action failed.");
       await load();
-      setSelected(null);
-      alert(
-        action === "message" ? "Message sent." :
-        action === "suspend" ? "Player suspended." :
-        action === "unsuspend" ? "Player unsuspended." :
-        action === "review_decision" ? (extra.decision === "approved" ? "Review approved." : "Review denied.") :
-        "Player deleted."
-      );
-    } catch (e: any) {
-      alert(e?.message || "Action failed.");
-    } finally {
-      setBusy(false);
-    }
+      setSelected(null); setDialog({ type: "success", player, text: action === "message" ? "Your message has been sent to this player." : action === "suspend" ? "The player has been suspended for 30 days." : action === "unsuspend" ? "The player has been restored." : action === "review_decision" ? (extra.decision === "approved" ? "The suspension review was approved." : "The suspension review was denied.") : "The player account has been permanently deleted." });
+    } catch (e: any) { setDialog({ type: "error", text: e?.message || "Action failed." }); }
+    finally { setBusy(false); }
   };
 
-  const deletePlayer = async (player: Player) => {
-    const name = player.username || player.email || "this player";
-    if (!window.confirm(`Delete ${name} permanently? This removes the player from the server and cannot be undone.`)) return;
-    const typed = window.prompt(`Type DELETE to permanently delete ${name}.`);
-    if (typed !== "DELETE") return;
-    await moderate("delete", player, { confirm: "DELETE" });
-  };
-
-  const close = () => { if (!busy) setSelected(null); };
-  if (pathname !== "/dbase/players" || !selected) return null;
-  const isSuspend = title === "suspend";
-  const isDeny = title === "deny";
+  const close = () => { if (!busy) { setSelected(null); setDialog(null); } };
+  if (pathname !== "/dbase/players" || !dialog) return null;
+  const player = dialog.player || selected;
+  const name = player?.username || player?.email || "this player";
+  const isSuspend = dialog.type === "suspend";
+  const isDeny = dialog.type === "deny";
+  const icon = dialog.type === "delete" ? "🗑️" : dialog.type === "suspend" ? "🛡️" : dialog.type === "message" ? "✉️" : dialog.type === "success" ? "✓" : dialog.type === "error" ? "!" : "🛡️";
+  const accent = dialog.type === "delete" || dialog.type === "suspend" || dialog.type === "error" ? "#ef4444" : dialog.type === "success" ? "#22c55e" : dialog.type === "message" ? "#38bdf8" : "#a78bfa";
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 1000000, background: "rgba(0,0,0,.68)", display: "grid", placeItems: "center", padding: 20 }} onClick={close}>
-      <div onClick={e => e.stopPropagation()} style={{ width: "min(520px,100%)", background: "#0a1729", color: "#fff", border: "1px solid rgba(255,255,255,.12)", borderRadius: 24, padding: 24, boxShadow: "0 30px 100px rgba(0,0,0,.6)" }}>
-        <div style={{ fontSize: 12, opacity: .6, fontWeight: 800, letterSpacing: 1.5 }}>{isSuspend ? "SUSPEND PLAYER" : isDeny ? "DENY SUSPENSION REVIEW" : "DIRECT PLAYER MESSAGE"}</div>
-        <h2 style={{ margin: "7px 0 4px" }}>{selected.username || selected.email}</h2>
-        <div style={{ opacity: .6, fontSize: 13 }}>{selected.email}</div>
+    <div style={overlay} onClick={close}>
+      <div onClick={e => e.stopPropagation()} style={{ ...card, borderColor: `${accent}55` }}>
+        <button onClick={close} disabled={busy} aria-label="Close" style={{ position: "absolute", opacity: 0, pointerEvents: "none" }}>x</button>
+        <div style={{ textAlign: "center" }}>
+          <div style={{ width: 74, height: 74, margin: "0 auto 16px", borderRadius: "50%", display: "grid", placeItems: "center", fontSize: 34, fontWeight: 900, background: `${accent}18`, border: `1px solid ${accent}88`, boxShadow: `0 0 36px ${accent}33`, color: accent }}>{icon}</div>
+          <div style={{ fontSize: 11, letterSpacing: 2, fontWeight: 900, color: accent }}>{dialog.type === "delete" ? "PERMANENT ACTION" : dialog.type === "suspend" ? "PLAYER MODERATION" : dialog.type === "message" ? "DIRECT MESSAGE" : dialog.type === "success" ? "ACTION COMPLETE" : "ADMIN NOTICE"}</div>
+          <h2 style={{ margin: "7px 0 5px", fontSize: 25 }}>{dialog.type === "delete" ? "Delete Player Account" : dialog.type === "suspend" ? "Suspend Player" : dialog.type === "deny" ? "Deny Suspension Review" : dialog.type === "message" ? "Send Message" : dialog.type === "success" ? "Done!" : "Something went wrong"}</h2>
+          {player && dialog.type !== "error" && <div style={{ opacity: .62, fontSize: 13, marginBottom: 18 }}>{name}{player.email ? ` • ${player.email}` : ""}</div>}
+        </div>
+
         {isSuspend ? <>
-          <p style={{ lineHeight: 1.5, opacity: .8 }}>The player will be blocked immediately. They can apply for review. If the suspension is not approved before 30 days, the account will be permanently banned and deleted.</p>
-          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={4} placeholder="Reason for suspension" style={{ width: "100%", boxSizing: "border-box", background: "#071225", color: "#fff", border: "1px solid rgba(255,255,255,.12)", borderRadius: 14, padding: 13 }} />
-          <button disabled={busy} onClick={() => moderate("suspend", selected, { days: 30, reason: reason.trim() || "Suspended by an administrator." })} style={{ width: "100%", marginTop: 12, padding: 14, border: 0, borderRadius: 14, background: "#ef4444", color: "#fff", fontWeight: 900 }}>{busy ? "Suspending…" : "Suspend for 30 Days"}</button>
+          <div style={{ padding: 14, borderRadius: 16, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.2)", lineHeight: 1.5, fontSize: 14, color: "#fecaca" }}>The player will be blocked immediately and can apply for review. If the suspension is not approved within 30 days, the account will be permanently banned and deleted.</div>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={4} placeholder="Reason for suspension" style={{ ...field, marginTop: 14, resize: "vertical" }} />
+          <button disabled={busy} onClick={() => moderate("suspend", player!, { days: 30, reason: reason.trim() || "Suspended by an administrator." })} style={{ width: "100%", marginTop: 12, padding: 14, border: 0, borderRadius: 15, background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", fontWeight: 900, boxShadow: "0 10px 30px rgba(239,68,68,.22)" }}>{busy ? "Suspending…" : "🛡 Suspend for 30 Days"}</button>
         </> : isDeny ? <>
-          <p style={{ opacity: .8, lineHeight: 1.5 }}>The player requested a suspension review. Add an optional reason for denying the request.</p>
-          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={4} placeholder="Optional denial reason" style={{ width: "100%", boxSizing: "border-box", background: "#071225", color: "#fff", border: "1px solid rgba(255,255,255,.12)", borderRadius: 14, padding: 13 }} />
-          <button disabled={busy} onClick={() => moderate("review_decision", selected, { decision: "denied", note: reason })} style={{ width: "100%", marginTop: 12, padding: 14, border: 0, borderRadius: 14, background: "#ef4444", color: "#fff", fontWeight: 900 }}>{busy ? "Saving…" : "Deny Review"}</button>
+          <p style={{ opacity: .75, lineHeight: 1.5 }}>The player requested a suspension review. Add an optional reason for denying the request.</p>
+          <textarea value={reason} onChange={e => setReason(e.target.value)} rows={4} placeholder="Optional denial reason" style={{ ...field, resize: "vertical" }} />
+          <button disabled={busy} onClick={() => moderate("review_decision", player!, { decision: "denied", note: reason })} style={{ width: "100%", marginTop: 12, padding: 14, border: 0, borderRadius: 15, background: "linear-gradient(135deg,#ef4444,#dc2626)", color: "#fff", fontWeight: 900 }}>{busy ? "Saving…" : "Deny Review"}</button>
+        </> : dialog.type === "message" ? <>
+          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Message title" style={field} />
+          <textarea value={message} onChange={e => setMessage(e.target.value)} rows={6} maxLength={500} placeholder="Write the popup message…" style={{ ...field, marginTop: 10, resize: "vertical" }} />
+          <div style={{ textAlign: "right", fontSize: 11, opacity: .45, marginTop: 5 }}>{message.length}/500</div>
+          <button disabled={busy || !message.trim()} onClick={() => moderate("message", player!, { title, message })} style={{ width: "100%", marginTop: 8, padding: 14, border: 0, borderRadius: 15, background: "linear-gradient(135deg,#38bdf8,#2563eb)", color: "#fff", fontWeight: 900, boxShadow: "0 10px 30px rgba(37,99,235,.2)" }}>{busy ? "Sending…" : "✈ Send Popup Message"}</button>
+        </> : dialog.type === "delete" ? <>
+          <div style={{ padding: 14, borderRadius: 16, background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.22)", color: "#fecaca", fontSize: 14, lineHeight: 1.5, marginBottom: 14 }}>⚠️ This permanently removes <strong>{name}</strong> and its server account. This action cannot be undone.</div>
+          <input value={reason} onChange={e => setReason(e.target.value)} placeholder="Type DELETE to confirm" style={{ ...field, borderColor: reason === "DELETE" ? "#22c55e88" : "rgba(148,163,184,.2)" }} />
+          <button disabled={busy || reason !== "DELETE"} onClick={() => moderate("delete", player!, { confirm: "DELETE" })} style={{ width: "100%", marginTop: 12, padding: 14, border: 0, borderRadius: 15, background: reason === "DELETE" ? "linear-gradient(135deg,#ef4444,#b91c1c)" : "#334155", color: "#fff", fontWeight: 900 }}>{busy ? "Deleting…" : "🗑 Delete Account Forever"}</button>
         </> : <>
-          <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Message title" style={{ width: "100%", boxSizing: "border-box", background: "#071225", color: "#fff", border: "1px solid rgba(255,255,255,.12)", borderRadius: 14, padding: 13, marginTop: 18 }} />
-          <textarea value={message} onChange={e => setMessage(e.target.value)} rows={6} placeholder="Write the popup message…" style={{ width: "100%", boxSizing: "border-box", background: "#071225", color: "#fff", border: "1px solid rgba(255,255,255,.12)", borderRadius: 14, padding: 13, marginTop: 10 }} />
-          <button disabled={busy || !message.trim()} onClick={() => moderate("message", selected, { title, message })} style={{ width: "100%", marginTop: 12, padding: 14, border: 0, borderRadius: 14, background: "#38bdf8", color: "#03101d", fontWeight: 900 }}>{busy ? "Sending…" : "Send Popup Message"}</button>
+          <div style={{ textAlign: "center", padding: "4px 8px 14px", lineHeight: 1.6, opacity: .78 }}>{dialog.text}</div>
+          <button onClick={close} style={{ width: "100%", padding: 14, border: 0, borderRadius: 15, background: `linear-gradient(135deg,${accent},${accent}cc)`, color: "#fff", fontWeight: 900 }}>{dialog.type === "success" ? "✓ Got it" : "Close"}</button>
         </>}
-        <button onClick={close} disabled={busy} style={{ width: "100%", marginTop: 9, padding: 12, border: "1px solid rgba(255,255,255,.12)", borderRadius: 14, background: "transparent", color: "#fff" }}>Cancel</button>
+
+        {dialog.type !== "success" && dialog.type !== "error" && <button onClick={close} disabled={busy} style={{ width: "100%", marginTop: 9, padding: 12, border: "1px solid rgba(148,163,184,.16)", borderRadius: 15, background: "rgba(15,23,42,.55)", color: "#cbd5e1", fontWeight: 700 }}>Cancel</button>}
       </div>
     </div>
   );
