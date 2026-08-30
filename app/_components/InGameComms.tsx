@@ -33,11 +33,14 @@ export default function InGameComms({roomCode,playerId}:{roomCode:string;playerI
   let dead=false;
   const socket=io(window.location.origin,{transports:["websocket","polling"],reconnection:true});
   socketRef.current=socket;
+  try{const cached=JSON.parse(localStorage.getItem("ludo-match-members")||"[]");if(Array.isArray(cached)&&cached.length)setMembers(cached)}catch{}
   const roster=(list:Member[])=>{if(!dead)setMembers(list)};
+  const state=(next:any)=>{if(dead||!Array.isArray(next?.players))return;setMembers(prev=>next.players.map((p:any,i:number)=>{const old=prev.find(m=>m.playerId===p.playerId);return {...old,id:old?.id||String(p.playerId||i),playerId:String(p.playerId||""),name:String(p.name||old?.name||"Player"),host:old?.host,connected:old?.connected!==false}}))};
   const chat=(m:Msg)=>{if(dead)return;setMessages(x=>[...x,m].slice(-80));setUnread(n=>chatOpenRef.current?0:n+1)};
   socket.on("roster",roster);
+  socket.on("game-state",state);
   socket.on("chat",chat);
-  return()=>{dead=true;socket.off("roster",roster);socket.off("chat",chat);socketRef.current=null};
+  return()=>{dead=true;socket.off("roster",roster);socket.off("game-state",state);socket.off("chat",chat);socketRef.current=null};
  },[]);
 
  const refreshProfiles=async()=>{
