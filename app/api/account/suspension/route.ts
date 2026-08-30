@@ -1,80 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { pool, ensureAuthSchema } from "../../auth/_db";
-
-const COOKIE = "ludo_session";
-
-async function currentUser(q: NextRequest) {
-  const token = q.cookies.get(COOKIE)?.value;
-  if (!token) return null;
-  const hash = createHash("sha256").update(token).digest("hex");
-  const r = await pool.query<any>(`SELECT u.* FROM ludo_users u JOIN ludo_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW() LIMIT 1`, [hash]);
-  return r.rows[0] || null;
-}
-
-async function ensureSchema() {
-  await pool.query(`
-    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;
-    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMPTZ;
-    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_reason TEXT;
-    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_requested_at TIMESTAMPTZ;
-    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_message TEXT;
-    ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_status TEXT NOT NULL DEFAULT 'none';
-  `);
-}
-
-export async function GET(q: NextRequest) {
-  try {
-    await ensureAuthSchema();
-    await ensureSchema();
-    const u = await currentUser(q);
-    if (!u) return NextResponse.json({ suspended: false, authenticated: false });
-    if (u.is_banned) return NextResponse.json({ suspended: false, banned: true, authenticated: true });
-    if (u.suspended_until && new Date(u.suspended_until).getTime() <= Date.now()) {
-      const email = String(u.email || "").trim();
-      const client = await pool.connect();
-      try {
-        await client.query("BEGIN");
-        if (email) await client.query(`INSERT INTO ludo_banned_emails(email,reason) VALUES(LOWER($1),'Suspension expired without approved review') ON CONFLICT(email) DO NOTHING`, [email]);
-        await client.query(`UPDATE ludo_users SET is_banned=TRUE,banned_at=NOW(),ban_reason='Suspension expired without approved review' WHERE id=$1`, [u.id]);
-        await client.query(`DELETE FROM ludo_sessions WHERE user_id=$1`, [u.id]);
-        await client.query("COMMIT");
-      } catch (e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
-      return NextResponse.json({ suspended: false, banned: true, expired: true, authenticated: true });
-    }
-    if (!u.suspended_at) return NextResponse.json({ suspended: false, banned: false, authenticated: true });
-    return NextResponse.json({
-      suspended: true,
-      banned: false,
-      authenticated: true,
-      username: u.username,
-      reason: u.suspension_reason || "Your account has been suspended.",
-      suspendedAt: u.suspended_at,
-      suspendedUntil: u.suspended_until,
-      reviewRequestedAt: u.suspension_review_requested_at,
-      reviewMessage: u.suspension_review_message,
-      reviewStatus: u.suspension_review_status || "none"
-    });
-  } catch (e) {
-    console.error("suspension GET", e);
-    return NextResponse.json({ error: "Unable to check account status." }, { status: 500 });
-  }
-}
-
-export async function POST(q: NextRequest) {
-  try {
-    await ensureAuthSchema();
-    await ensureSchema();
-    const u = await currentUser(q);
-    if (!u) return NextResponse.json({ error: "Authentication required." }, { status: 401 });
-    if (!u.suspended_at) return NextResponse.json({ error: "Your account is not suspended." }, { status: 400 });
-    const b = await q.json();
-    const message = String(b.message || "").trim().slice(0, 3000);
-    if (!message) return NextResponse.json({ error: "Please explain why your account should be reviewed." }, { status: 400 });
-    await pool.query(`UPDATE ludo_users SET suspension_review_requested_at=NOW(),suspension_review_message=$2,suspension_review_status='pending' WHERE id=$1`, [u.id, message]);
-    return NextResponse.json({ ok: true, status: "pending" });
-  } catch (e) {
-    console.error("suspension POST", e);
-    return NextResponse.json({ error: "Unable to submit your review request." }, { status: 500 });
-  }
-}
+const COOKIE="ludo_session";
+async function currentUser(q:NextRequest){const token=q.cookies.get(COOKIE)?.value;if(!token)return null;const hash=createHash("sha256").update(token).digest("hex");const r=await pool.query<any>(`SELECT u.* FROM ludo_users u JOIN ludo_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW() LIMIT 1`,[hash]);return r.rows[0]||null;}
+async function ensureSchema(){await pool.query(`ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspended_at TIMESTAMPTZ;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspended_until TIMESTAMPTZ;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_reason TEXT;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_requested_at TIMESTAMPTZ;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_message TEXT;ALTER TABLE ludo_users ADD COLUMN IF NOT EXISTS suspension_review_status TEXT NOT NULL DEFAULT 'none';`);}
+export async function GET(q:NextRequest){try{await ensureAuthSchema();await ensureSchema();const u=await currentUser(q);if(!u)return NextResponse.json({suspended:false,authenticated:false});if(u.is_banned)return NextResponse.json({suspended:false,banned:true,authenticated:true});if(u.suspended_until&&new Date(u.suspended_until).getTime()<=Date.now()){const email=String(u.email||"").trim();const client=await pool.connect();try{await client.query("BEGIN");if(email)await client.query(`INSERT INTO ludo_banned_emails(email,reason) VALUES(LOWER($1),'Suspension expired without approved review') ON CONFLICT(email) DO NOTHING`,[email]);await client.query(`DELETE FROM ludo_users WHERE id=$1`,[u.id]);await client.query("COMMIT");}catch(e){await client.query("ROLLBACK");throw e}finally{client.release()}return NextResponse.json({suspended:false,banned:true,deleted:true,expired:true,authenticated:true});}if(!u.suspended_at)return NextResponse.json({suspended:false,banned:false,authenticated:true});return NextResponse.json({suspended:true,banned:false,authenticated:true,username:u.username,reason:u.suspension_reason||"Your account has been suspended.",suspendedAt:u.suspended_at,suspendedUntil:u.suspended_until,reviewRequestedAt:u.suspension_review_requested_at,reviewMessage:u.suspension_review_message,reviewStatus:u.suspension_review_status||"none"});}catch(e){console.error("suspension GET",e);return NextResponse.json({error:"Unable to check account status."},{status:500});}}
+export async function POST(q:NextRequest){try{await ensureAuthSchema();await ensureSchema();const u=await currentUser(q);if(!u)return NextResponse.json({error:"Authentication required."},{status:401});if(!u.suspended_at)return NextResponse.json({error:"Your account is not suspended."},{status:400});const b=await q.json(),message=String(b.message||"").trim().slice(0,3000);if(!message)return NextResponse.json({error:"Please explain why your account should be reviewed."},{status:400});await pool.query(`UPDATE ludo_users SET suspension_review_requested_at=NOW(),suspension_review_message=$2,suspension_review_status='pending' WHERE id=$1`,[u.id,message]);return NextResponse.json({ok:true,status:"pending"});}catch(e){console.error("suspension POST",e);return NextResponse.json({error:"Unable to submit your review request."},{status:500});}}
