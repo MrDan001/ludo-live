@@ -1,267 +1,113 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { io, type Socket } from "socket.io-client";
-import ChatVoice from "../_components/ChatVoice";
-import AvatarRenderer from "../_components/AvatarRenderer";
-import { AVATAR_ICONS } from "../_components/EquippedAvatar";
+import { useEffect, useState } from "react";
 
-type Member = { id: string; playerId?: string; name: string; host?: boolean; ready?: boolean; connected?: boolean; avatar?: string };
-type Msg = { id: string; name: string; text: string; at: number; type?: string };
-type AvatarProfile = { equipped?: { avatar?: string } };
+type Props = {
+  roomId?: string;
+  playerName?: string;
+  opponentName?: string;
+  playerAvatar?: string;
+  opponentAvatar?: string;
+  playerStars?: number;
+  opponentStars?: number;
+  coins?: number;
+  isMyTurn?: boolean;
+  micOn?: boolean;
+  onToggleMic?: () => void;
+  onOpenChat?: () => void;
+  onOpenPlayers?: () => void;
+  onLeave?: () => void;
+  onToggleSound?: () => void;
+};
 
-const quick = ["👋 Hi!", "😂 LOL", "🔥 Nice!", "👏 Good move", "🎉 GG", "😎"];
-
-function avatar(id?: string, imageUrl?: string | null, size = 38) {
-  const key = String(id || "default");
-  return (
-    <AvatarRenderer
-      avatar={{ id: key, icon: AVATAR_ICONS[key] || "🧑🏽‍🎮", imageUrl: imageUrl || null }}
-      size={size}
-      border="2px solid #d7b94a"
-      background="#251a06"
-      fallback={AVATAR_ICONS[key] || "🧑🏽‍🎮"}
-    />
-  );
-}
-
-export default function InGameComms({ roomCode, playerId }: { roomCode: string; playerId: string }) {
-  const socketRef = useRef<Socket | null>(null);
-  const chatOpenRef = useRef(false);
-  const [members, setMembers] = useState<Member[]>([]);
-  const [messages, setMessages] = useState<Msg[]>([]);
-  const [profiles, setProfiles] = useState<Record<string, AvatarProfile>>({});
-  const [avatarImages, setAvatarImages] = useState<Record<string, string>>({});
-  const [chatOpen, setChatOpen] = useState(false);
-  const [playersOpen, setPlayersOpen] = useState(false);
-  const [voiceOpen, setVoiceOpen] = useState(false);
-  const [text, setText] = useState("");
-  const [speaker, setSpeaker] = useState(true);
-  const [unread, setUnread] = useState(0);
-  const [voiceMuted, setVoiceMuted] = useState<Record<string, boolean>>({});
-  const [voiceVolume, setVoiceVolume] = useState<Record<string, number>>({});
+export default function InGameComms({
+  roomId = "AJSHCM",
+  playerName = "Dbase",
+  opponentName = "Adaugo",
+  playerAvatar = "🧑🏿‍🎮",
+  opponentAvatar = "🎮",
+  playerStars = 24,
+  opponentStars = 18,
+  coins = 2450,
+  isMyTurn = true,
+  micOn = true,
+  onToggleMic,
+  onOpenChat,
+  onOpenPlayers,
+  onLeave,
+  onToggleSound,
+}: Props) {
+  const [showVoiceNotice, setShowVoiceNotice] = useState(false);
 
   useEffect(() => {
-    let dead = false;
-    const socket = io(window.location.origin, {
-      transports: ["websocket", "polling"],
-      reconnection: true,
-      reconnectionAttempts: Infinity,
-      reconnectionDelay: 250,
-      forceNew: false,
-      multiplex: true,
-    });
-    socketRef.current = socket;
+    if (!micOn) return;
+    const t = window.setTimeout(() => setShowVoiceNotice(false), 2500);
+    return () => window.clearTimeout(t);
+  }, [micOn]);
 
-    try {
-      const cached = JSON.parse(localStorage.getItem("ludo-match-members") || "[]");
-      if (Array.isArray(cached) && cached.length) setMembers(cached);
-    } catch {}
-
-    const roster = (list: Member[]) => {
-      if (!dead) setMembers(list);
-    };
-    const state = (next: any) => {
-      if (dead || !Array.isArray(next?.players)) return;
-      setMembers((prev) =>
-        next.players.map((p: any, i: number) => {
-          const old = prev.find((m) => m.playerId === p.playerId);
-          return {
-            ...old,
-            id: old?.id || String(p.playerId || i),
-            playerId: String(p.playerId || ""),
-            name: String(p.name || old?.name || "Player"),
-            host: old?.host,
-            connected: old?.connected !== false,
-          };
-        }),
-      );
-    };
-    const chat = (m: Msg) => {
-      if (dead) return;
-      setMessages((x) => [...x, m].slice(-80));
-      setUnread((n) => (chatOpenRef.current ? 0 : n + 1));
-    };
-
-    socket.on("roster", roster);
-    socket.on("game-state", state);
-    socket.on("chat", chat);
-
-    return () => {
-      dead = true;
-      socket.off("roster", roster);
-      socket.off("game-state", state);
-      socket.off("chat", chat);
-      socketRef.current = null;
-      socket.disconnect();
-    };
-  }, [roomCode, playerId]);
-
-  const refreshProfiles = async () => {
-    const names = [...new Set(members.map((m) => m.name).filter(Boolean))];
-    const rows = await Promise.all(
-      names.map(async (name) => {
-        try {
-          const r = await fetch(`/api/player/${encodeURIComponent(name)}`, { cache: "no-store" });
-          if (!r.ok) return null;
-          const d = await r.json();
-          return [name, { equipped: d.player?.equipped || {} }] as const;
-        } catch {
-          return null;
-        }
-      }),
-    );
-    const next = { ...profiles };
-    for (const row of rows) if (row) next[row[0]] = row[1];
-    setProfiles(next);
+  const react = (emoji: string) => {
+    window.dispatchEvent(new CustomEvent("ludo:quick-reaction", { detail: emoji }));
   };
-
-  useEffect(() => {
-    if (members.length) void refreshProfiles();
-  }, [members.length]);
-
-  useEffect(() => {
-    const timer = window.setInterval(() => {
-      if (members.length) void refreshProfiles();
-    }, 5000);
-    return () => window.clearInterval(timer);
-  }, [members.length]);
-
-  useEffect(() => {
-    let dead = false;
-    fetch("/api/shop/catalog", { cache: "no-store" })
-      .then((r) => r.json())
-      .then((c) => {
-        const map: Record<string, string> = {};
-        for (const item of Array.isArray(c?.items) ? c.items : []) {
-          if (item?.type === "avatar" && item?.id && item?.imageUrl) map[String(item.id)] = String(item.imageUrl);
-        }
-        if (!dead) setAvatarImages(map);
-      })
-      .catch(() => {});
-    return () => {
-      dead = true;
-    };
-  }, []);
-
-  const audioFor = (pid: string) =>
-    document.getElementById(
-      `chat-remote-ludo-chat-${String(roomCode).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32)}-${String(pid).replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 32)}`,
-    ) as HTMLAudioElement | null;
-
-  useEffect(() => {
-    members.forEach((m) => {
-      if (m.playerId === playerId) return;
-      const a = audioFor(String(m.playerId));
-      if (a) {
-        a.muted = !speaker || !!voiceMuted[String(m.playerId)];
-        a.volume = Math.max(0, Math.min(1, voiceVolume[String(m.playerId)] ?? 1));
-      }
-    });
-  }, [speaker, voiceMuted, voiceVolume, members, roomCode, playerId]);
-
-  const visibleMembers = members.slice(0, 4);
-  const send = (value = text) => {
-    const v = value.trim();
-    if (!v) return;
-    socketRef.current?.emit("chat", { text: v });
-    setText("");
-  };
-  const voiceMembers = useMemo(
-    () => members.filter((m) => m.playerId).map((m) => ({ id: String(m.playerId), name: m.name, role: m.host ? "owner" : "member", online: m.connected !== false })),
-    [members],
-  );
-  const closeChat = () => {
-    chatOpenRef.current = false;
-    setChatOpen(false);
-    setUnread(0);
-  };
-  const openChat = () => {
-    chatOpenRef.current = true;
-    setChatOpen(true);
-    setUnread(0);
-  };
-  const setPlayerMute = (pid: string) => setVoiceMuted((v) => ({ ...v, [pid]: !v[pid] }));
-  const setPlayerVolume = (pid: string, value: number) => setVoiceVolume((v) => ({ ...v, [pid]: value }));
 
   return (
-    <>
-      <div className="ig-top-players">
-        {visibleMembers.map((m, i) => {
-          const id = profiles[m.name]?.equipped?.avatar || m.avatar || "default";
-          return (
-            <button key={m.id} type="button" className={`ig-avatar ${m.playerId === playerId ? "me" : ""}`} onClick={() => setPlayersOpen(true)} aria-label={m.name}>
-              {avatar(id, avatarImages[id], 34)}
-              <span className="ig-seat">{i + 1}</span>
-              {m.connected !== false && <i />}
-            </button>
-          );
-        })}
+    <section className="premium-hud" aria-label="In-game controls">
+      <div className="hud-players">
+        <div className="hud-player active">
+          <span className="crown">♛</span>
+          <div className="avatar"><span>{playerAvatar}</span><i /></div>
+          <div className="player-copy"><strong>{playerName} (You)</strong><small><b /> Your Turn</small></div>
+          <em>YOU</em>
+          <label>★ {playerStars}</label>
+        </div>
+        <div className="hud-logo" aria-label="Ludo Live"><span>♛</span><strong>LUDO</strong><b>LIVE</b></div>
+        <div className="hud-player opponent">
+          <div className="avatar"><span>{opponentAvatar}</span><i /></div>
+          <div className="player-copy"><strong>{opponentName}</strong><small><b /> IN MATCH</small></div>
+          <label>★ {opponentStars}</label>
+        </div>
+        <button className="menu-btn" aria-label="Menu">☰</button>
       </div>
 
-      <div className="ig-actions">
-        <div className="ig-mic-slot"><ChatVoice roomCode={roomCode} playerId={playerId} members={voiceMembers} /></div>
-        <button type="button" className={`ig-action ${unread ? "notify" : ""}`} onClick={openChat}><span>💬</span><small>Chat</small>{unread > 0 && <b>{Math.min(unread, 9)}</b>}</button>
-        <button type="button" className="ig-action" onClick={() => setPlayersOpen(true)}><span>👥</span><small>Players</small></button>
-        <button type="button" className={`ig-action ${speaker ? "on" : ""}`} onClick={() => setVoiceOpen(true)}><span>{speaker ? "🔊" : "🔇"}</span><small>Voice</small></button>
+      <div className="hud-bottom">
+        <div className="profile-card">
+          <div className="profile-avatar"><span>{playerAvatar}</span><i /></div>
+          <button className="edit" aria-label="Edit profile">✎</button>
+          <strong>{playerName}</strong>
+          <div className="stars">★ {playerStars}</div>
+          <div className="coin-row"><span>◉</span>{coins.toLocaleString()}<button>+</button></div>
+        </div>
+
+        <div className="turn-card">
+          <div className={isMyTurn ? "turn-title mine" : "turn-title"}><i />{isMyTurn ? "YOUR TURN" : "OPPONENT TURN"}</div>
+          <p>{isMyTurn ? "Roll the dice and make your move" : "Waiting for opponent..."}</p>
+          <button className="dice-result" aria-label="Dice result">6</button>
+          <small>Tap the dice to roll</small>
+          <div className="dice" aria-hidden="true">⚄</div>
+        </div>
+
+        <div className="comm-actions">
+          <button onClick={onOpenChat} aria-label="Chat"><span>💬</span><b>Chat</b></button>
+          <button onClick={onToggleMic} aria-label={micOn ? "Turn mic off" : "Turn mic on"} className={micOn ? "mic-on" : ""}><span>♩</span><b>Mic {micOn ? "On" : "Off"}</b></button>
+        </div>
       </div>
 
-      {chatOpen && (
-        <div className="ig-sheet-backdrop" onClick={closeChat}>
-          <section className="ig-chat-sheet" onClick={(e) => e.stopPropagation()}>
-            <header><div><strong>💬 In-game Chat</strong><small>All players can see messages</small></div><button type="button" onClick={closeChat}>✕</button></header>
-            <div className="ig-messages">
-              {messages.length === 0 ? <span className="ig-empty">No messages yet.</span> : messages.map((m, i) => {
-                const id = profiles[m.name]?.equipped?.avatar || "default";
-                return <div className="ig-message" key={`${m.id}-${i}`}>{avatar(id, avatarImages[id], 32)}<div><b>{m.name}</b><p>{m.text}</p></div></div>;
-              })}
-            </div>
-            <div className="ig-quick">{quick.map((q) => <button type="button" key={q} onClick={() => send(q)}>{q}</button>)}</div>
-            <div className="ig-composer"><input value={text} onChange={(e) => setText(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") send(); }} placeholder="Type a message…"/><button type="button" onClick={() => send()}>➤</button></div>
-          </section>
-        </div>
-      )}
+      <div className="reaction-row">
+        {["👋 Hi!", "😂 LOL", "🔥 Nice!", "👋 Good move", "🎉 GG", "😎"].map((x) => <button key={x} onClick={() => react(x)}>{x}</button>)}
+      </div>
 
-      {playersOpen && (
-        <div className="ig-sheet-backdrop" onClick={() => setPlayersOpen(false)}>
-          <section className="ig-players-sheet" onClick={(e) => e.stopPropagation()}>
-            <header><strong>👥 Players</strong><button type="button" onClick={() => setPlayersOpen(false)}>✕</button></header>
-            {visibleMembers.map((m) => {
-              const id = profiles[m.name]?.equipped?.avatar || m.avatar || "default";
-              return <div className="ig-player-row" key={m.id}>{avatar(id, avatarImages[id], 42)}<div><b>{m.name}{m.playerId === playerId ? " (You)" : ""}</b><small>{m.connected === false ? "Disconnected" : "Online"}</small></div><span>{m.host ? "👑" : ""}</span></div>;
-            })}
-          </section>
-        </div>
-      )}
+      <div className="utility-row">
+        <button className="leave" onClick={onLeave}>⇥ <span>Leave Match</span></button>
+        <button onClick={onOpenPlayers}>👥 <span>Players</span></button>
+        <button onClick={onToggleSound}>🔊 <span>Sound</span></button>
+        <button className="room">🛡 <span>Room ID: {roomId}</span> <b>▣</b></button>
+      </div>
 
-      {voiceOpen && (
-        <div className="ig-sheet-backdrop" onClick={() => setVoiceOpen(false)}>
-          <section className="ig-voice-sheet" onClick={(e) => e.stopPropagation()}>
-            <header><div><strong>🔊 Voice</strong><small>Control what you hear from each player</small></div><button type="button" onClick={() => setVoiceOpen(false)}>✕</button></header>
-            <div className="ig-master-voice"><div><b>Match voice</b><small>{speaker ? "Voice audio enabled" : "All voice muted"}</small></div><button type="button" className={speaker ? "enabled" : ""} onClick={() => setSpeaker((v) => !v)}>{speaker ? "🔊 On" : "🔇 Muted"}</button></div>
-            <div className="ig-voice-list">
-              {visibleMembers.filter((m) => m.playerId !== playerId).map((m) => {
-                const pid = String(m.playerId);
-                const muted = !speaker || !!voiceMuted[pid];
-                const volume = voiceVolume[pid] ?? 1;
-                const id = profiles[m.name]?.equipped?.avatar || m.avatar || "default";
-                return <div className="ig-voice-row" key={m.id}>{avatar(id, avatarImages[id], 40)}<div className="ig-voice-info"><b>{m.name}</b><small>{muted ? "Muted" : "Voice enabled"}</small><input aria-label={`Volume for ${m.name}`} type="range" min="0" max="1" step="0.05" value={volume} onChange={(e) => setPlayerVolume(pid, Number(e.target.value))}/></div><button type="button" className={`ig-player-mute ${muted ? "muted" : ""}`} onClick={() => setPlayerMute(pid)}>{muted ? "🔇" : "🔊"}</button></div>;
-              })}
-            </div>
-          </section>
-        </div>
-      )}
+      {showVoiceNotice && <div className="voice-notice">Voice is connecting…</div>}
 
-      <style jsx global>{`
-        .ig-top-players{position:fixed;z-index:40;top:10px;left:50%;transform:translateX(-50%);display:flex;gap:8px;padding:6px 10px;border:1px solid rgba(215,185,74,.42);border-radius:999px;background:rgba(19,12,3,.82);box-shadow:0 8px 24px rgba(0,0,0,.3);backdrop-filter:blur(14px)}
-        .ig-avatar{position:relative;width:46px;height:46px;padding:4px;border:1px solid rgba(215,185,74,.42);border-radius:50%;background:linear-gradient(145deg,#3a2708,#120c02);display:grid;place-items:center}.ig-avatar.me{border-color:#f3d36b}.ig-avatar i{position:absolute;right:0;bottom:1px;width:9px;height:9px;border-radius:50%;background:#45e27d;border:2px solid #160e03}.ig-seat{position:absolute;left:-3px;top:-3px;min-width:16px;height:16px;padding:0 3px;border-radius:999px;background:#d7b94a;color:#170d00;font:900 9px/16px system-ui;text-align:center}
-        .ig-actions{position:fixed;z-index:40;left:50%;bottom:14px;transform:translateX(-50%);display:flex;gap:8px;padding:8px 10px;border:1px solid rgba(215,185,74,.5);border-radius:22px;background:linear-gradient(145deg,rgba(31,20,6,.96),rgba(9,7,4,.94));box-shadow:0 14px 34px rgba(0,0,0,.42);max-width:calc(100vw - 18px)}
-        .ig-action,.ig-mic-slot{width:58px;height:56px;border-radius:16px;border:1px solid rgba(215,185,74,.26);background:linear-gradient(145deg,#2a1b07,#100b03);color:#f9e7a6;display:flex;flex-direction:column;align-items:center;justify-content:center;position:relative}.ig-action{cursor:pointer}.ig-action span{font-size:21px}.ig-action small{margin-top:4px;font-size:8px;font-weight:900;color:#d9c47b}.ig-action.on{border-color:rgba(87,230,126,.65)}.ig-action.notify{border-color:#e2b93f}.ig-action b{position:absolute;right:-3px;top:-5px;min-width:18px;height:18px;padding:0 4px;border-radius:999px;background:#c8322e;color:#fff;font:900 10px/18px system-ui}.ig-mic-slot{padding:0;overflow:hidden}.ig-mic-slot>div{width:100%;height:100%;display:flex;align-items:center;justify-content:center}.ig-mic-slot button{width:100%!important;height:100%!important;border:0!important;border-radius:16px!important;padding:0!important;background:linear-gradient(145deg,#2a1b07,#100b03)!important;color:#f9e7a6!important;font:900 8px system-ui!important}
-        .ig-sheet-backdrop{position:fixed;inset:0;z-index:80;background:rgba(0,0,0,.62);display:flex;align-items:flex-end;justify-content:center;padding:10px;backdrop-filter:blur(4px)}.ig-chat-sheet,.ig-players-sheet,.ig-voice-sheet{width:min(520px,100%);max-height:78dvh;border:1px solid rgba(215,185,74,.62);border-radius:24px 24px 16px 16px;background:linear-gradient(155deg,#1d1305,#090704 70%);padding:14px;display:flex;flex-direction:column;color:#fff}.ig-chat-sheet header,.ig-players-sheet header,.ig-voice-sheet header{display:flex;align-items:center;justify-content:space-between;padding:3px 2px 10px}.ig-chat-sheet header strong,.ig-players-sheet header strong,.ig-voice-sheet header strong{font-size:16px;color:#f7df8b}.ig-chat-sheet header small,.ig-voice-sheet header small{display:block;margin-top:3px;color:#9e8d62;font-size:9px}.ig-chat-sheet header button,.ig-players-sheet header button,.ig-voice-sheet header button{width:34px;height:34px;border-radius:50%;border:1px solid rgba(215,185,74,.35);background:#160e03;color:#f9e7a6}
-        .ig-messages{overflow:auto;min-height:130px;max-height:45dvh}.ig-empty{display:block;color:#887b5c;text-align:center;padding:40px 0}.ig-message{display:flex;gap:9px;align-items:flex-start;padding:7px 2px}.ig-message b{font-size:11px;color:#f0d36f}.ig-message p{margin:3px 0;padding:8px 10px;border-radius:12px;background:#171108;color:#eee2c2;font-size:12px}.ig-quick{display:flex;gap:5px;overflow:auto;padding:7px 0}.ig-quick button{white-space:nowrap;border:1px solid rgba(215,185,74,.2);background:#171006;color:#dfcf9b;border-radius:999px;padding:7px 9px;font-size:10px}.ig-composer{display:flex;gap:7px}.ig-composer input{min-width:0;flex:1;border:1px solid rgba(215,185,74,.35);background:#0d0903;color:#fff;border-radius:13px;padding:11px}.ig-composer button{width:46px;border:0;border-radius:13px;background:linear-gradient(145deg,#e7c85d,#a47b18);color:#160d00;font-size:19px}.ig-players-sheet{max-height:60dvh}.ig-player-row{display:flex;align-items:center;gap:10px;padding:10px 4px;border-top:1px solid rgba(215,185,74,.12)}.ig-player-row>div{display:flex;flex-direction:column;flex:1}.ig-player-row b{font-size:13px;color:#f4df9b}.ig-player-row small{color:#8f815f;font-size:9px}
-        .ig-master-voice{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:11px 4px 13px;border-bottom:1px solid rgba(215,185,74,.16)}.ig-master-voice div{display:flex;flex-direction:column}.ig-master-voice b{font-size:13px;color:#f4df9b}.ig-master-voice small{font-size:9px;color:#8f815f;margin-top:3px}.ig-master-voice button,.ig-player-mute{border:1px solid rgba(215,185,74,.35);background:#160e03;color:#f4df9b;border-radius:12px;padding:9px 12px;font-weight:900}.ig-master-voice button.enabled{border-color:rgba(87,230,126,.6);box-shadow:0 0 12px rgba(87,230,126,.12)}.ig-voice-list{overflow:auto}.ig-voice-row{display:flex;align-items:center;gap:10px;padding:11px 2px;border-bottom:1px solid rgba(215,185,74,.1)}.ig-voice-info{min-width:0;flex:1;display:flex;flex-direction:column}.ig-voice-info b{font-size:12px;color:#f4df9b}.ig-voice-info small{font-size:9px;color:#8f815f;margin-top:2px}.ig-voice-info input{width:100%;margin-top:7px;accent-color:#d7b94a}.ig-player-mute{width:40px;height:38px;padding:0}.ig-player-mute.muted{opacity:.65;border-color:rgba(180,90,70,.45)}
-        @media(max-width:420px){.ig-top-players{top:7px;gap:5px;padding:5px 7px}.ig-avatar{width:41px;height:41px}.ig-actions{bottom:8px;gap:5px;padding:7px}.ig-action,.ig-mic-slot{width:53px;height:52px;border-radius:15px}.ig-action span{font-size:19px}.ig-action small{font-size:7px}.ig-chat-sheet,.ig-players-sheet,.ig-voice-sheet{border-radius:22px 22px 14px 14px;padding:12px}.ig-messages{max-height:42dvh}}
+      <style jsx>{`
+        .premium-hud{width:100%;max-width:1000px;margin:0 auto;padding:10px 18px 18px;color:#f7edcf;font-family:inherit}.hud-players{display:grid;grid-template-columns:1fr 150px 1fr 62px;gap:14px;align-items:center}.hud-player{position:relative;min-height:88px;border:1px solid rgba(212,167,48,.65);border-radius:25px;background:linear-gradient(145deg,rgba(29,24,12,.94),rgba(6,6,5,.96));display:flex;align-items:center;padding:10px 14px;gap:12px;box-shadow:inset 0 1px rgba(255,255,255,.06),0 8px 24px rgba(0,0,0,.35)}.hud-player.active{box-shadow:inset 0 1px rgba(255,255,255,.08),0 0 22px rgba(212,167,48,.12)}.crown{position:absolute;left:-5px;top:-19px;font-size:32px;color:#f3c63e;transform:rotate(-18deg)}.avatar,.profile-avatar{position:relative;display:grid;place-items:center;border:2px solid #d9b445;border-radius:50%;background:#111;width:64px;height:64px;flex:none;overflow:hidden}.avatar span,.profile-avatar span{font-size:35px}.avatar i,.profile-avatar i{position:absolute;right:0;bottom:1px;width:12px;height:12px;border-radius:50%;background:#19df72;border:2px solid #111}.player-copy{min-width:0;display:flex;flex-direction:column;gap:7px}.player-copy strong{font-size:18px;white-space:nowrap}.player-copy small{font-size:12px;font-weight:800;letter-spacing:.8px;color:#19e66e}.opponent .player-copy small{color:#ff4554}.player-copy small b{display:inline-block;width:10px;height:10px;border-radius:50%;background:currentColor;margin-right:7px}.hud-player em{font-style:normal;font-size:10px;font-weight:900;padding:5px 7px;background:#f1c536;color:#211900;border-radius:7px;margin-left:auto}.hud-player label{position:absolute;left:45px;bottom:-12px;background:#0b0906;border:1px solid #cfa63b;border-radius:14px;padding:3px 9px;font-size:12px}.hud-logo{display:flex;flex-direction:column;align-items:center;justify-content:center;line-height:.8;text-shadow:0 0 18px #d4a82d}.hud-logo span{font-size:28px;color:#f7cf56}.hud-logo strong{font-family:Georgia,serif;font-size:31px;color:#f5d36a}.hud-logo b{font-family:Georgia,serif;font-size:22px;color:#fff}.menu-btn{height:62px;border:1px solid #b98d28;border-radius:18px;background:#100e09;color:#f5c940;font-size:30px}.hud-bottom{display:grid;grid-template-columns:250px 1fr 96px;gap:12px;margin-top:24px}.profile-card,.turn-card{position:relative;border:1px solid rgba(191,147,38,.5);border-radius:22px;background:linear-gradient(145deg,rgba(18,15,9,.97),rgba(4,4,3,.98));box-shadow:inset 0 1px rgba(255,255,255,.05);min-height:210px}.profile-card{padding:16px}.profile-card .profile-avatar{width:78px;height:78px;float:left;margin-right:12px}.profile-card strong{display:block;font-size:22px;padding-top:15px}.stars{font-size:18px;color:#f2c33b;margin-top:8px}.edit{position:absolute;right:13px;top:10px;background:none;border:0;color:#f1ca58;font-size:20px}.coin-row{position:absolute;left:14px;right:14px;bottom:14px;border:1px solid rgba(205,159,48,.5);border-radius:18px;padding:10px 12px;font-size:21px;font-weight:800;display:flex;align-items:center;gap:9px}.coin-row span{color:#f2c33b}.coin-row button{margin-left:auto;width:32px;height:32px;border-radius:50%;border:1px solid #24d96b;background:#0e1b11;color:#25dc6d;font-size:22px}.turn-card{padding:18px 150px 18px 24px}.turn-title{font-size:24px;font-weight:950;color:#f0bd37}.turn-title.mine{color:#19e66e}.turn-title i{display:inline-block;width:14px;height:14px;border-radius:50%;background:currentColor;margin-right:9px;box-shadow:0 0 14px currentColor}.turn-card p{font-size:16px;color:#aaa;margin:13px 0}.dice{position:absolute;right:24px;top:20px;font-size:82px;color:#8c76ff;text-shadow:0 7px 20px #000}.dice-result{position:absolute;left:25px;bottom:38px;width:110px;height:45px;border-radius:25px;border:1px solid #9d7b2c;background:#17130b;color:#fff;font-size:24px}.turn-card small{position:absolute;left:43px;bottom:13px;color:#999}.comm-actions{display:flex;flex-direction:column;gap:10px}.comm-actions button{border:1px solid rgba(199,154,40,.65);border-radius:20px;background:linear-gradient(145deg,#17130a,#060605);color:#f5e4a7;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:5px;font-size:25px}.comm-actions button b{font-size:14px}.comm-actions .mic-on b{color:#19e66e}.comm-actions .mic-on span{color:#19e66e}.reaction-row,.utility-row{display:flex;gap:10px;margin-top:12px}.reaction-row button,.utility-row button{flex:1;min-height:42px;border:1px solid rgba(194,150,39,.52);border-radius:22px;background:#0c0b08;color:#f2d47a;font-weight:800;font-size:13px;white-space:nowrap}.utility-row .leave{color:#ff4554}.utility-row .room{flex:1.7;color:#999}.utility-row .room b{float:right;font-size:19px;color:#e9d47e}.voice-notice{position:fixed;right:18px;bottom:145px;background:#17130a;border:1px solid #9f7a2d;border-radius:15px;padding:13px;color:#e8d6a2;z-index:50}
+        @media(max-width:700px){.premium-hud{padding:6px 8px 12px}.hud-players{grid-template-columns:1fr 1fr 44px;gap:6px}.hud-logo{display:none}.hud-player{min-height:66px;border-radius:18px;padding:7px;gap:7px}.hud-player .avatar{width:47px;height:47px}.hud-player .avatar span{font-size:25px}.player-copy strong{font-size:13px}.player-copy small{font-size:9px;gap:3px}.hud-player em{display:none}.hud-player label{left:35px;font-size:10px}.menu-btn{height:48px;font-size:24px}.hud-bottom{grid-template-columns:112px 1fr 62px;gap:7px;margin-top:17px}.profile-card,.turn-card{min-height:150px;border-radius:16px}.profile-card{padding:9px}.profile-card .profile-avatar{width:53px;height:53px;margin-right:7px}.profile-avatar span{font-size:26px}.profile-card strong{font-size:14px;padding-top:7px}.stars{font-size:12px;margin-top:5px}.coin-row{left:8px;right:8px;bottom:8px;padding:6px;font-size:13px;border-radius:12px}.coin-row button{width:23px;height:23px;font-size:16px}.turn-card{padding:13px 74px 10px 12px}.turn-title{font-size:15px}.turn-title i{width:8px;height:8px}.turn-card p{font-size:10px;margin:7px 0}.dice{font-size:49px;right:6px;top:25px}.dice-result{left:12px;bottom:26px;width:65px;height:31px;font-size:17px}.turn-card small{left:18px;bottom:8px;font-size:8px}.comm-actions button{border-radius:15px;font-size:19px}.comm-actions button b{font-size:10px}.reaction-row{overflow:hidden;gap:5px}.reaction-row button{min-width:76px;font-size:10px;min-height:36px}.utility-row{gap:5px}.utility-row button{font-size:10px;min-height:38px;padding:0 6px}.utility-row button span{font-size:9px}.utility-row .room{display:none}}
       `}</style>
-    </>
+    </section>
   );
 }
