@@ -3,13 +3,20 @@ import {useEffect,useRef,useState} from "react";import AppFrame from "../_compon
 type Prize={id:string;label:string;icon:string;kind:string;amount:number;probability?:number;itemType?:string;itemId?:string};
 const colors=["#efad18","#1977d5","#8a38b6","#efad18","#2aa05a","#1977d5","#efad18","#6b38d8"];
 function formatGMT1(ms:number){const d=new Date(ms+60*60*1000);return `${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}:${String(d.getUTCSeconds()).padStart(2,"0")}`}
-function segmentLayout(list:Prize[]){const weights=list.map(p=>Math.max(0,Number(p.probability)||0));const total=weights.reduce((s,w)=>s+w,0);if(!list.length)return [];const unit=total>0?360/total:360/list.length;let cursor=0;return list.map((p,i)=>{const span=total>0?weights[i]*unit:unit;const start=cursor;const center=start+span/2;cursor+=span;return{start,span,center}})}
+// The wheel is a visual selector, so every configured reward gets the same
+// amount of space. Probability is used only by the server when selecting the
+// actual winner; it must never distort the visual wheel or its labels.
+function segmentLayout(list:Prize[]){if(!list.length)return [];const unit=360/list.length;return list.map((p,i)=>{const start=i*unit;const center=start+unit/2;return{start,span:unit,center}})}
 export default function SpinPage(){const[spins,setSpins]=useState(0),[spinning,setSpinning]=useState(false),[rotation,setRotation]=useState(0),[rewards,setRewards]=useState<Prize[]>([]),[result,setResult]=useState<Prize|null>(null),[serverNow,setServerNow]=useState(Date.now()),[error,setError]=useState("");const ref=useRef(0),timer=useRef<number|null>(null);
  const load=async()=>{try{const r=await fetch("/api/spin",{cache:"no-store"}),d=await r.json();if(!r.ok)throw Error(d.error||"Unable to load Spin Wheel");setSpins(Number(d.spins)||0);setRewards(Array.isArray(d.rewards)?d.rewards:[]);if(d.serverTime)setServerNow(new Date(d.serverTime).getTime());setError("")}catch(e){setError(e instanceof Error?e.message:"Spin wheel unavailable")}};
  useEffect(()=>{void load();const i=window.setInterval(()=>setServerNow(v=>v+1000),1000),refresh=()=>void load(),poll=window.setInterval(refresh,15000);window.addEventListener("ludo-spin-updated",refresh);window.addEventListener("focus",refresh);return()=>{clearInterval(i);clearInterval(poll);window.removeEventListener("ludo-spin-updated",refresh);window.removeEventListener("focus",refresh);if(timer.current)clearTimeout(timer.current)}},[]);
  const spin=async()=>{if(spinning||spins<1)return;setError("");setSpinning(true);setResult(null);try{
+   // Take a fresh snapshot immediately before the server selects the winner.
    const sync=await fetch("/api/spin",{cache:"no-store"}),syncData=await sync.json();if(!sync.ok)throw Error(syncData.error||"Unable to sync Spin Wheel");const syncedRewards:Array<Prize>=Array.isArray(syncData.rewards)?syncData.rewards:[];setSpins(Number(syncData.spins)||0);setRewards(syncedRewards);if(!syncedRewards.length)throw Error("No Spin rewards are configured.");
    const r=await fetch("/api/spin",{method:"POST",cache:"no-store"}),d=await r.json();if(!r.ok)throw Error(d.error||"Could not spin");
+   // Always resolve the winning slice by its stable reward ID from the exact
+   // reward snapshot returned with the spin response. This keeps the animation,
+   // displayed slice and actual server reward locked to the same item.
    const snapshot:Array<Prize>=Array.isArray(d.rewards)?d.rewards:syncedRewards;setRewards(snapshot);const winnerId=d.prize?.id;const winner=winnerId? snapshot.findIndex(p=>p.id===winnerId):Number(d.prizeIndex);if(winner<0||winner>=snapshot.length)throw Error("Spin reward changed before the spin completed. Please try again.");
    const layout=segmentLayout(snapshot),target=layout[winner];if(!target)throw Error("Unable to position the selected Spin reward.");const landing=360-target.center,next=ref.current+360*7+landing;ref.current=next;setRotation(next);setSpins(Number(d.spins)||0);
    timer.current=window.setTimeout(()=>{setSpinning(false);setResult(d.prize);window.dispatchEvent(new Event("ludo-wallet-updated"));window.dispatchEvent(new Event("ludo-spin-updated"))},5900)
