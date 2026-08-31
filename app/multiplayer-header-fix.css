@@ -1,10 +1,20 @@
-/* Multiplayer header: authoritative override for the live game-online HUD only. */
+/*
+ * Regular multiplayer header — authoritative final override.
+ *
+ * IMPORTANT: this file is intentionally scoped to .ludo-live-wrapper so it
+ * cannot affect tournament UI. The rules below are deliberately stronger
+ * than the responsive/legacy multiplayer rules that can be injected during
+ * client hydration by the canonical component's styled-jsx block.
+ */
+.ludo-live-wrapper .ludo-live-container header.ll-header,
 .ludo-live-wrapper .ludo-live-container .ll-header {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
   align-items: center !important;
   visibility: visible !important;
   opacity: 1 !important;
+  position: relative !important;
+  z-index: 100 !important;
 }
 
 .ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card {
@@ -12,7 +22,7 @@
   visibility: visible !important;
   opacity: 1 !important;
   position: relative !important;
-  z-index: 50 !important;
+  z-index: 110 !important;
   min-width: 0 !important;
 }
 
@@ -22,11 +32,12 @@
 }
 
 .ludo-live-wrapper .ludo-live-container .ll-header > .ll-brand {
+  display: block !important;
   grid-column: 2 !important;
   visibility: visible !important;
   opacity: 1 !important;
   position: relative !important;
-  z-index: 60 !important;
+  z-index: 120 !important;
 }
 
 .ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card.right {
@@ -35,17 +46,21 @@
 }
 
 @media (max-width: 520px) {
+  .ludo-live-wrapper .ludo-live-container header.ll-header,
   .ludo-live-wrapper .ludo-live-container .ll-header {
+    display: grid !important;
     grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr) !important;
     column-gap: 6px !important;
   }
 
   .ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card {
+    display: flex !important;
     min-width: 0 !important;
     max-width: none !important;
   }
 
   .ludo-live-wrapper .ludo-live-container .ll-header > .ll-brand {
+    display: block !important;
     width: 82px !important;
   }
 }
