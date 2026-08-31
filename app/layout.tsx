@@ -4,6 +4,7 @@ import "./globals.css";
 import "./home.css";
 import "./board-skin-overlay.css";
 import "./ludo-mobile-polish.css";
+import "./ludo-multiplayer-reference.css";
 import GameSocialOverlay from "./_components/GameSocialOverlay";
 import LudoAudio from "./_components/LudoAudio";
 import SessionResume from "./_components/SessionResume";
