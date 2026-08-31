@@ -274,12 +274,6 @@ function GameContent() {
               <span className="ll-level">★ {opponent.level || 18}</span>
             </div>
           </div>
-
-          <button type="button" className="ll-menu-btn" aria-label="Menu">
-            <span />
-            <span />
-            <span />
-          </button>
         </header>
 
         <div className="ll-board-stage">
@@ -410,7 +404,7 @@ function GameContent() {
         .ll-header {
           position: relative;
           display: grid;
-          grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 58px;
+          grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
           align-items: center;
           gap: 12px;
           width: 100%;
@@ -511,22 +505,6 @@ function GameContent() {
           -webkit-text-fill-color: transparent;
         }
         .ll-logo-sub { font-size: 13px; font-weight: 950; letter-spacing: 4px; color: #fff; opacity: .9; }
-
-        .ll-menu-btn {
-          width: 58px;
-          height: 58px;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-          align-items: center;
-          gap: 6px;
-          border: 1px solid rgba(212,175,55,.65);
-          border-radius: 17px;
-          background: linear-gradient(145deg, #171208, #070705);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.5);
-          cursor: default;
-        }
-        .ll-menu-btn span { display: block; width: 27px; height: 4px; border-radius: 99px; background: #d4af37; box-shadow: 0 0 8px rgba(212,175,55,.35); }
 
         .ll-board-stage {
           min-height: 0;
@@ -636,7 +614,7 @@ function GameContent() {
 
         @media (max-width: 700px) {
           .ludo-live-container { padding: 14px 12px 12px; }
-          .ll-header { grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr) 48px; gap: 7px; min-height: 92px; padding-bottom: 9px; }
+          .ll-header { grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr); gap: 7px; min-height: 92px; padding-bottom: 9px; }
           .ll-player-card { min-height: 72px; padding: 8px; gap: 6px; border-radius: 19px; }
           .ll-avatar-wrap { flex-basis: 44px; width: 44px; height: 44px; }
           .ll-avatar-img { font-size: 20px; }
@@ -649,8 +627,6 @@ function GameContent() {
           .ll-crown { font-size: 17px; }
           .ll-logo-text { font-size: 23px; }
           .ll-logo-sub { font-size: 9px; letter-spacing: 3px; }
-          .ll-menu-btn { width: 48px; height: 48px; border-radius: 14px; }
-          .ll-menu-btn span { width: 22px; height: 3px; }
           .ll-board-frame { width: min(100%, calc(100dvh - 420px)); padding: 5px; border-radius: 23px; }
           .ll-board-frame > div { border-radius: 18px; }
           .ll-controls-row { grid-template-columns: minmax(135px, .85fr) minmax(0, 1.5fr) 58px; gap: 6px; min-height: 116px; }
