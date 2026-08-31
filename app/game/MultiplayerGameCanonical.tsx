@@ -245,12 +245,6 @@ export default function MultiplayerGameCanonical() {
               <span className="ll-level">★ {opponent.level || 18}</span>
             </div>
           </div>
-
-          <button type="button" className="ll-menu-btn" aria-label="Menu">
-            <span />
-            <span />
-            <span />
-          </button>
         </header>
 
         <div className="ll-board-stage">
@@ -365,7 +359,7 @@ export default function MultiplayerGameCanonical() {
         .ll-header {
           position: relative;
           display: grid;
-          grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 58px;
+          grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
           align-items: center;
           gap: 12px;
           width: 100%;
@@ -409,9 +403,6 @@ export default function MultiplayerGameCanonical() {
         .ll-crown { font-size: 25px; line-height: 1; margin-bottom: -4px; }
         .ll-logo-text { margin: 0; font-size: 31px; font-weight: 950; line-height: .92; letter-spacing: 1px; background: linear-gradient(180deg, #fff3a4 0%, #d4af37 55%, #8e6417 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .ll-logo-sub { font-size: 13px; font-weight: 950; letter-spacing: 4px; color: #fff; opacity: .9; }
-
-        .ll-menu-btn { width: 58px; height: 58px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 6px; border: 1px solid rgba(212,175,55,.65); border-radius: 17px; background: linear-gradient(145deg, #171208, #070705); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.5); cursor: default; }
-        .ll-menu-btn span { display: block; width: 27px; height: 4px; border-radius: 99px; background: #d4af37; box-shadow: 0 0 8px rgba(212,175,55,.35); }
 
         .ll-board-stage { min-height: 0; display: flex; align-items: center; justify-content: center; padding: 2px 0 12px; }
         .ll-board-frame { width: min(100%, 680px, calc(100dvh - 475px)); aspect-ratio: 1; padding: 7px; border-radius: 30px; background: linear-gradient(145deg, #f6da82 0%, #8d6819 43%, #e7c970 100%); box-shadow: 0 14px 38px rgba(0,0,0,.8), 0 0 0 1px rgba(212,175,55,.35); }
@@ -460,7 +451,7 @@ export default function MultiplayerGameCanonical() {
 
         @media (max-width: 700px) {
           .ludo-live-container { padding: 14px 12px 12px; }
-          .ll-header { grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr) 48px; gap: 7px; min-height: 92px; padding-bottom: 9px; }
+          .ll-header { grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr); gap: 7px; min-height: 92px; padding-bottom: 9px; }
           .ll-player-card { min-height: 72px; padding: 8px; gap: 6px; border-radius: 19px; }
           .ll-avatar-wrap { flex-basis: 44px; width: 44px; height: 44px; }
           .ll-avatar-img { font-size: 20px; }
@@ -473,8 +464,6 @@ export default function MultiplayerGameCanonical() {
           .ll-crown { font-size: 17px; }
           .ll-logo-text { font-size: 23px; }
           .ll-logo-sub { font-size: 9px; letter-spacing: 3px; }
-          .ll-menu-btn { width: 48px; height: 48px; border-radius: 14px; }
-          .ll-menu-btn span { width: 22px; height: 3px; }
           .ll-board-frame { width: min(100%, calc(100dvh - 420px)); padding: 5px; border-radius: 23px; }
           .ll-board-frame > div { border-radius: 18px; }
           .ll-controls-row { grid-template-columns: minmax(135px, .85fr) minmax(0, 1.5fr) 58px; gap: 6px; min-height: 116px; }
