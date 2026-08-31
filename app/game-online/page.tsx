@@ -235,51 +235,18 @@ function GameContent() {
   return (
     <main className="ludo-live-wrapper">
       <div className="ludo-live-container">
-        <header className="ll-header">
-          <div className="ll-player-card left">
-            <div className="ll-avatar-wrap">
-              <div className="ll-avatar-img">
-                <PlayerAvatar src={mine.avatar} fallback="👑" />
-              </div>
-              <span className="ll-level">★ {mine.level || 24}</span>
-            </div>
-            <div className="ll-player-meta">
-              <div className="ll-player-name-row">
-                <b>{mine.name}</b>
-                <span className="ll-badge-you">YOU</span>
-              </div>
-              <div className="ll-turn-status active">
-                <span className="dot" /> Your Turn
-              </div>
+        <header className="multiplayer-topbar">
+          <div className="multiplayer-topbar-title">
+            <span className="multiplayer-topbar-mark" aria-hidden="true">L</span>
+            <div>
+              <strong>Ludo Live</strong>
+              <span>Multiplayer Match</span>
             </div>
           </div>
-
-          <div className="ll-brand" aria-label="Ludo Live">
-            <div className="ll-crown">👑</div>
-            <h1 className="ll-logo-text">LUDO</h1>
-            <div className="ll-logo-sub">LIVE</div>
+          <div className="multiplayer-topbar-room" aria-label={`Room ${roomCode}`}>
+            <span>ROOM</span>
+            <b>{roomCode}</b>
           </div>
-
-          <div className="ll-player-card right">
-            <div className="ll-player-meta align-right">
-              <b>{opponent.name}</b>
-              <div className="ll-turn-status in-match">
-                <span className="dot red" /> IN MATCH
-              </div>
-            </div>
-            <div className="ll-avatar-wrap">
-              <div className="ll-avatar-img">
-                <PlayerAvatar src={opponent.avatar} fallback="🎮" />
-              </div>
-              <span className="ll-level">★ {opponent.level || 18}</span>
-            </div>
-          </div>
-
-          <button type="button" className="ll-menu-btn" aria-label="Menu">
-            <span />
-            <span />
-            <span />
-          </button>
         </header>
 
         <div className="ll-board-stage">
@@ -407,126 +374,83 @@ function GameContent() {
           overflow: hidden;
         }
 
-        .ll-header {
+        .multiplayer-topbar {
           position: relative;
-          display: grid;
-          grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 58px;
+          display: flex;
           align-items: center;
-          gap: 12px;
+          justify-content: space-between;
+          gap: 16px;
           width: 100%;
-          min-height: 112px;
-          padding: 4px 0 14px;
+          min-height: 68px;
+          padding: 8px 2px 14px;
           z-index: 50;
         }
 
-        .ll-player-card {
-          min-width: 0;
-          min-height: 92px;
+        .multiplayer-topbar-title {
           display: flex;
           align-items: center;
-          gap: 10px;
-          padding: 12px 14px;
-          border: 1px solid rgba(212,175,55,.58);
-          border-radius: 25px;
-          background: linear-gradient(145deg, rgba(24,19,9,.94), rgba(5,5,4,.98));
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 10px 28px rgba(0,0,0,.5);
+          gap: 11px;
+          min-width: 0;
         }
 
-        .ll-player-card.right { justify-content: flex-end; }
-
-        .ll-avatar-wrap {
-          position: relative;
-          flex: 0 0 60px;
-          width: 60px;
-          height: 60px;
-        }
-
-        .ll-avatar-img {
-          width: 100%;
-          height: 100%;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #2a2215, #110e08);
-          border: 2px solid #d4af37;
+        .multiplayer-topbar-mark {
+          width: 42px;
+          height: 42px;
+          flex: 0 0 42px;
           display: grid;
           place-items: center;
-          font-size: 26px;
-          overflow: hidden;
-        }
-
-        .ll-avatar-img-element { width: 100%; height: 100%; object-fit: cover; }
-
-        .ll-level {
-          position: absolute;
-          left: 50%;
-          bottom: -7px;
-          transform: translateX(-50%);
-          min-width: 52px;
-          text-align: center;
-          background: #18140c;
-          border: 1px solid #d4af37;
+          border: 1px solid rgba(212,175,55,.65);
+          border-radius: 13px;
+          background: linear-gradient(145deg, #171208, #070705);
           color: #d4af37;
-          font-size: 11px;
-          font-weight: 900;
-          padding: 2px 7px;
-          border-radius: 10px;
-          white-space: nowrap;
+          font-size: 20px;
+          font-weight: 950;
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.5);
         }
 
-        .ll-player-meta { min-width: 0; }
-        .ll-player-meta b { display: block; font-size: 17px; line-height: 1.15; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .ll-player-name-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
-
-        .ll-badge-you {
-          background: #e8bc35;
-          color: #070604;
-          font-size: 10px;
+        .multiplayer-topbar-title strong {
+          display: block;
+          color: #fff;
+          font-size: 18px;
+          line-height: 1.05;
           font-weight: 950;
-          padding: 3px 7px;
-          border-radius: 7px;
+        }
+
+        .multiplayer-topbar-title span:not(.multiplayer-topbar-mark) {
+          display: block;
+          margin-top: 3px;
+          color: #777;
+          font-size: 10px;
+          font-weight: 750;
+          letter-spacing: .8px;
           text-transform: uppercase;
         }
 
-        .ll-turn-status { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; margin-top: 5px; font-weight: 750; }
-        .ll-turn-status.active { color: #4ade80; }
-        .ll-turn-status.in-match { color: #ef4444; }
-        .ll-turn-status .dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 9px #4ade80; flex: 0 0 auto; }
-        .ll-turn-status .dot.red { background: #ef4444; box-shadow: 0 0 9px #ef4444; }
-        .align-right { text-align: right; }
-        .align-right .ll-turn-status { justify-content: flex-end; }
-
-        .ll-brand {
-          min-width: 120px;
-          text-align: center;
-          filter: drop-shadow(0 6px 16px rgba(212,175,55,.2));
-        }
-        .ll-crown { font-size: 25px; line-height: 1; margin-bottom: -4px; }
-        .ll-logo-text {
-          margin: 0;
-          font-size: 31px;
-          font-weight: 950;
-          line-height: .92;
-          letter-spacing: 1px;
-          background: linear-gradient(180deg, #fff3a4 0%, #d4af37 55%, #8e6417 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
-        .ll-logo-sub { font-size: 13px; font-weight: 950; letter-spacing: 4px; color: #fff; opacity: .9; }
-
-        .ll-menu-btn {
-          width: 58px;
-          height: 58px;
+        .multiplayer-topbar-room {
           display: flex;
-          flex-direction: column;
-          justify-content: center;
           align-items: center;
-          gap: 6px;
-          border: 1px solid rgba(212,175,55,.65);
-          border-radius: 17px;
-          background: linear-gradient(145deg, #171208, #070705);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.5);
-          cursor: default;
+          gap: 8px;
+          min-width: 0;
+          padding: 9px 13px;
+          border: 1px solid rgba(80,62,27,.72);
+          border-radius: 15px;
+          background: linear-gradient(145deg, rgba(20,16,10,.98), rgba(7,7,5,.98));
+          box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 8px 20px rgba(0,0,0,.35);
         }
-        .ll-menu-btn span { display: block; width: 27px; height: 4px; border-radius: 99px; background: #d4af37; box-shadow: 0 0 8px rgba(212,175,55,.35); }
+
+        .multiplayer-topbar-room span {
+          color: #777;
+          font-size: 9px;
+          font-weight: 850;
+          letter-spacing: 1px;
+        }
+
+        .multiplayer-topbar-room b {
+          color: #d4af37;
+          font-size: 12px;
+          font-weight: 950;
+          letter-spacing: 1px;
+        }
 
         .ll-board-stage {
           min-height: 0;
@@ -636,21 +560,14 @@ function GameContent() {
 
         @media (max-width: 700px) {
           .ludo-live-container { padding: 14px 12px 12px; }
-          .ll-header { grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr) 48px; gap: 7px; min-height: 92px; padding-bottom: 9px; }
-          .ll-player-card { min-height: 72px; padding: 8px; gap: 6px; border-radius: 19px; }
-          .ll-avatar-wrap { flex-basis: 44px; width: 44px; height: 44px; }
-          .ll-avatar-img { font-size: 20px; }
-          .ll-level { min-width: 42px; font-size: 9px; bottom: -6px; }
-          .ll-player-meta b { font-size: 12px; }
-          .ll-badge-you { font-size: 7px; padding: 2px 4px; }
-          .ll-turn-status { font-size: 8px; gap: 4px; margin-top: 3px; }
-          .ll-turn-status .dot { width: 6px; height: 6px; }
-          .ll-brand { min-width: 92px; }
-          .ll-crown { font-size: 17px; }
-          .ll-logo-text { font-size: 23px; }
-          .ll-logo-sub { font-size: 9px; letter-spacing: 3px; }
-          .ll-menu-btn { width: 48px; height: 48px; border-radius: 14px; }
-          .ll-menu-btn span { width: 22px; height: 3px; }
+          .multiplayer-topbar { min-height: 58px; padding-bottom: 9px; gap: 8px; }
+          .multiplayer-topbar-mark { width: 36px; height: 36px; flex-basis: 36px; border-radius: 11px; font-size: 17px; }
+          .multiplayer-topbar-title { gap: 8px; }
+          .multiplayer-topbar-title strong { font-size: 14px; }
+          .multiplayer-topbar-title span:not(.multiplayer-topbar-mark) { font-size: 7px; margin-top: 2px; letter-spacing: .6px; }
+          .multiplayer-topbar-room { padding: 7px 9px; border-radius: 12px; gap: 5px; }
+          .multiplayer-topbar-room span { font-size: 7px; }
+          .multiplayer-topbar-room b { font-size: 9px; }
           .ll-board-frame { width: min(100%, calc(100dvh - 420px)); padding: 5px; border-radius: 23px; }
           .ll-board-frame > div { border-radius: 18px; }
           .ll-controls-row { grid-template-columns: minmax(135px, .85fr) minmax(0, 1.5fr) 58px; gap: 6px; min-height: 116px; }
@@ -686,9 +603,7 @@ function GameContent() {
 
         @media (max-height: 760px) {
           .ludo-live-container { padding-top: 8px; padding-bottom: 8px; }
-          .ll-header { min-height: 78px; padding-bottom: 5px; }
-          .ll-player-card { min-height: 60px; }
-          .ll-avatar-wrap { flex-basis: 38px; width: 38px; height: 38px; }
+          .multiplayer-topbar { min-height: 52px; padding-bottom: 5px; }
           .ll-board-frame { width: min(100%, calc(100dvh - 355px)); }
           .ll-controls-row { min-height: 100px; }
         }
