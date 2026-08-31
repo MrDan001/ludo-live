@@ -7,8 +7,9 @@ export default function MultiplayerGame() {
     <div className="premium-multiplayer-route">
       <MultiplayerGameCanonical />
       <style jsx global>{`
-        /* CANONICAL MULTIPLAYER BOARD PAGE ONLY.
-           The game component stays mounted for multiplayer state/input; this route exposes only the board. */
+        /* MULTIPLAYER PAGE ONLY.
+           Keep the rest of the application untouched. The board is sized from the
+           mobile viewport width so every phone gets the same responsive scale. */
         html, body {
           margin: 0 !important;
           padding: 0 !important;
@@ -33,7 +34,6 @@ export default function MultiplayerGame() {
           overflow: hidden !important;
         }
 
-        /* Board-only canvas. */
         .premium-multiplayer-route .pg-shell {
           position: absolute !important;
           inset: 0 !important;
@@ -49,7 +49,7 @@ export default function MultiplayerGame() {
           overflow: hidden !important;
         }
 
-        /* Nothing from the old HUD/header is allowed to affect board layout. */
+        /* Multiplayer HUD is hidden on this board-only route and cannot constrain it. */
         .premium-multiplayer-route .pg-shell > .pg-header,
         .premium-multiplayer-route .pg-shell > .pg-bottom,
         .premium-multiplayer-route .pg-shell > .pg-reaction-row,
@@ -86,22 +86,25 @@ export default function MultiplayerGame() {
         }
 
         /*
-          IMPORTANT: size from WIDTH only.
-          Do not use viewport height to scale the board: phones have very different
-          aspect ratios, and height-based sizing was what made one player's board tiny.
-          The board therefore has the same width-driven scale rule on every phone.
+          RESPONSIVE MULTIPLAYER BOARD:
+          - Width is the source of truth on portrait phones.
+          - Height follows width exactly, preserving the square board.
+          - 94vw leaves a small breathing margin instead of allowing another
+            device's height/layout rules to make the board tiny.
+          - 760px caps very large screens without affecting normal phones.
         */
         .premium-multiplayer-route .pg-board-frame {
           position: relative !important;
-          width: min(96vw, 760px) !important;
-          height: min(96vw, 760px) !important;
-          max-width: none !important;
-          max-height: none !important;
+          width: min(94vw, 760px) !important;
+          height: min(94vw, 760px) !important;
+          max-width: 760px !important;
+          max-height: 760px !important;
           min-width: 0 !important;
           min-height: 0 !important;
           margin: 0 !important;
           padding: 0 !important;
           flex: 0 0 auto !important;
+          flex-shrink: 0 !important;
           aspect-ratio: 1 / 1 !important;
           border: 0 !important;
           border-radius: 0 !important;
@@ -121,6 +124,18 @@ export default function MultiplayerGame() {
           margin: 0 !important;
           border-radius: 0 !important;
           overflow: hidden !important;
+        }
+
+        /* Explicit mobile override: never let a phone-specific inherited rule
+           shrink the multiplayer board below the viewport-width calculation. */
+        @media (max-width: 900px) {
+          .premium-multiplayer-route .pg-board-frame {
+            width: calc(100vw - 12px) !important;
+            height: calc(100vw - 12px) !important;
+            max-width: calc(100vw - 12px) !important;
+            max-height: calc(100vw - 12px) !important;
+            flex: 0 0 calc(100vw - 12px) !important;
+          }
         }
       `}</style>
     </div>
