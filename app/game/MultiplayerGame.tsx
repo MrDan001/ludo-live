@@ -23,6 +23,26 @@ export default function MultiplayerGame() {
           height: 100vh !important;
           overflow: hidden !important;
         }
+
+        /* Multiplayer has no page header. Remove every legacy header layer
+           and collapse its reserved space without touching game controls. */
+        .multiplayer-route-shell .ll-header,
+        .multiplayer-route-shell .ll-brand,
+        .multiplayer-route-shell .ll-menu-btn,
+        .multiplayer-route-shell .skin-header,
+        .multiplayer-route-shell .live-pill,
+        .multiplayer-route-shell .live-match {
+          display: none !important;
+        }
+
+        .multiplayer-route-shell .ludo-live-container {
+          padding-top: 0 !important;
+        }
+
+        .multiplayer-route-shell .ll-board-stage {
+          margin-top: 0 !important;
+          padding-top: 0 !important;
+        }
       `}</style>
     </div>
   );
