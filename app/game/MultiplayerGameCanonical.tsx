@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import LudoBoard, { type BoardThemeId, type DemoToken } from "../_components/LudoBoardMultiplayer";
 import DemoDice from "../_components/DemoDice";
-import { canMove, nextProgress, FINISH_PROGRESS, type DiceValue } from "../../lib/ludoEngine";
+import { canMove, hasLegalMove, nextProgress, FINISH_PROGRESS, type DiceValue } from "../../lib/ludoEngine";
 import { playerColorsForSeats } from "../../lib/ludoRules";
 import { BOARD_PALETTES } from "../_components/LudoBoardMultiplayer";
 
@@ -19,7 +19,7 @@ type Player = {
   colors?: Color[]; 
   board?: string; 
   level?: number; 
-  avatar?: string; 
+  avatar?: string 
 };
 type TokenMap = Record<string, Record<string, { position: number }>>;
 type GameState = { 
@@ -32,7 +32,7 @@ type GameState = {
   tokens: TokenMap; 
   winnerId?: string | null; 
   stateRevision?: number; 
-  startedAt?: number; 
+  startedAt?: number 
 };
 type ChatMessage = { id: string; name: string; text: string; at: number };
 
@@ -44,6 +44,7 @@ const normalizeTokens = (serverTokens: TokenMap): DemoToken[] => COLORS.flatMap(
   const position = typeof raw === "number" && Number.isFinite(raw) ? raw : 0; 
   return { color, id, position, state: position === 0 ? ("yard" as const) : position === FINISH ? ("finished" as const) : position > 51 ? ("home" as const) : ("track" as const) }; 
 }));
+const audioEvent = (kind: "dice" | "win") => { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ludo-audio", { detail: kind })); };
 
 function PlayerAvatar({ src, fallback }: { src?: string; fallback: string }) {
   const isImageUrl = src && (src.startsWith("http") || src.startsWith("/") || src.startsWith("data:"));
@@ -53,12 +54,13 @@ function PlayerAvatar({ src, fallback }: { src?: string; fallback: string }) {
   return <span>{src || fallback}</span>;
 }
 
-const QUICK_REACTIONS = ["👋 Hi!", "😂 LOL", "🔥 Nice!", "👍 Good move", "🏆 GG"];
+const QUICK_REACTIONS = ["👋 Hi!", "😂 LOL", "🔥 Nice!", "👍 Good move", "🏆 GG", "😜"];
 
 export default function MultiplayerGameCanonical() {
   const [theme] = useState<BoardThemeId>("classic");
   const [socket, setSocket] = useState<Socket | null>(null);
   const [me, setMe] = useState("");
+  const [myAvatarUrl, setMyAvatarUrl] = useState("");
   const [game, setGame] = useState<GameState | null>(null);
   const [tokens, setTokens] = useState<DemoToken[]>(initialTokens);
   const [roll, setRoll] = useState<DiceValue>(6);
@@ -74,6 +76,7 @@ export default function MultiplayerGameCanonical() {
 
   const diceTimer = useRef<number | null>(null);
   const moveTimer = useRef<number | null>(null);
+  const winnerRef = useRef<string | null>(null);
   const revisionRef = useRef(-1);
 
   useEffect(() => {
@@ -86,10 +89,10 @@ export default function MultiplayerGameCanonical() {
   const players = useMemo(() => {
     if (game?.players?.length) return game.players;
     return [
-      { playerId: me || "1", name: "Bambiii", level: 24, avatar: "👑", seat: 0 },
+      { playerId: me || "1", name: "Bambiii", level: 24, avatar: myAvatarUrl || "👑", seat: 0 },
       { playerId: "2", name: "Adaugo", level: 18, avatar: "🎮", seat: 1 }
     ];
-  }, [game?.players, me]);
+  }, [game?.players, me, myAvatarUrl]);
 
   const mine = players.find((p) => String(p.playerId) === String(me)) || players[0];
   const opponent = players.find((p) => String(p.playerId) !== String(mine.playerId)) || players[1];
@@ -127,6 +130,7 @@ export default function MultiplayerGameCanonical() {
       } catch {} 
       if (!mounted) return;
       if (playerId) setMe(playerId); 
+      if (profileAvatar) setMyAvatarUrl(profileAvatar);
 
       const params = new URLSearchParams(window.location.search); 
       const room = params.get("room") || roomCode; 
@@ -146,6 +150,7 @@ export default function MultiplayerGameCanonical() {
       localSocket.on("game-dice", (e: { value: DiceValue }) => { 
         setRoll(e.value); 
         setRemoteRolling(true); 
+        audioEvent("dice"); 
         if (diceTimer.current) window.clearTimeout(diceTimer.current); 
         diceTimer.current = window.setTimeout(() => setRemoteRolling(false), 900); 
       }); 
@@ -153,6 +158,10 @@ export default function MultiplayerGameCanonical() {
         if (!mounted || !applyState(next)) return; 
         if (next.dice !== null) setRoll(next.dice); 
         setPending(next.currentPlayerId === playerId ? next.pendingMove : null); 
+        if (next.winnerId && winnerRef.current !== next.winnerId) { 
+          winnerRef.current = next.winnerId; 
+          audioEvent("win"); 
+        } 
       }); 
     }; 
     void connect(); 
@@ -188,12 +197,18 @@ export default function MultiplayerGameCanonical() {
     if (socket) socket.emit("chat", { text });
   };
 
+  const copyRoomId = () => {
+    if (typeof navigator !== "undefined") {
+      navigator.clipboard.writeText(roomCode);
+    }
+  };
+
   return (
     <main className="ludo-live-wrapper">
       <div className="ludo-live-container">
         {/* TOP HEADER */}
         <header className="ll-header">
-          {/* Player Left (Self) */}
+          {/* Left Player (Self) */}
           <div className="ll-player-card left">
             <div className="ll-avatar-wrap">
               <div className="ll-avatar-img">
@@ -219,7 +234,7 @@ export default function MultiplayerGameCanonical() {
             <div className="ll-logo-sub">LIVE</div>
           </div>
 
-          {/* Player Right (Opponent) */}
+          {/* Right Player (Opponent) */}
           <div className="ll-player-card right">
             <div className="ll-player-meta align-right">
               <b>{opponent.name}</b>
@@ -243,10 +258,10 @@ export default function MultiplayerGameCanonical() {
           </div>
         </div>
 
-        {/* BOTTOM CONTROL PANEL */}
+        {/* BOTTOM PANEL */}
         <div className="ll-bottom-panel">
           <div className="ll-controls-row">
-            {/* Player Info Box */}
+            {/* User Info Box */}
             <div className="ll-user-box">
               <div className="ll-user-header">
                 <div className="ll-user-avatar">
@@ -264,17 +279,16 @@ export default function MultiplayerGameCanonical() {
               </div>
             </div>
 
-            {/* Turn & Dice Box */}
+            {/* Turn Box */}
             <div className="ll-dice-box">
               <div className="ll-turn-title">
                 <span className="dot green" /> YOUR TURN
               </div>
               <div className="ll-turn-sub">{notice}</div>
-              <div className="ll-dice-val">{roll}</div>
               <div className="ll-dice-hint">Tap the dice to roll</div>
             </div>
 
-            {/* Floating 3D Dice */}
+            {/* Scaled Floating 3D Dice */}
             <div className="ll-dice-container">
               <DemoDice 
                 value={roll} 
@@ -284,7 +298,7 @@ export default function MultiplayerGameCanonical() {
               />
             </div>
 
-            {/* Side Actions */}
+            {/* Side Action Buttons */}
             <div className="ll-side-actions">
               <button type="button" className="ll-action-btn" onClick={() => setChatOpen((v) => !v)}>
                 💬
@@ -313,7 +327,7 @@ export default function MultiplayerGameCanonical() {
             <button type="button" className="ll-foot-btn" onClick={() => setSoundEnabled((v) => !v)}>
               {soundEnabled ? "🔊 Sound" : "🔇 Sound"}
             </button>
-            <div className="ll-room-chip">
+            <div className="ll-room-chip" onClick={copyRoomId}>
               <span className="shield">🛡️</span>
               <small>Room ID: {roomCode}</small>
             </div>
@@ -355,16 +369,15 @@ export default function MultiplayerGameCanonical() {
           overflow: hidden;
         }
 
-        /* HEADER STYLING FIXES */
+        /* HEADER FIXES */
         .ll-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           width: 100%;
-          height: 52px;
-          flex-shrink: 0; /* Prevents board from shrinking the header */
+          height: 50px;
+          flex-shrink: 0;
           z-index: 50;
-          margin-bottom: 6px;
         }
 
         .ll-player-card {
@@ -461,9 +474,7 @@ export default function MultiplayerGameCanonical() {
         .align-right { text-align: right; }
 
         /* BRAND CENTER */
-        .ll-brand {
-          text-align: center;
-        }
+        .ll-brand { text-align: center; }
         .ll-crown { font-size: 12px; line-height: 1; margin-bottom: -2px; }
         .ll-logo-text {
           font-size: 16px;
@@ -489,8 +500,8 @@ export default function MultiplayerGameCanonical() {
           display: flex;
           align-items: center;
           justify-content: center;
-          min-height: 0; /* Ensures flex container recalculates bounds properly */
-          padding: 4px 0;
+          min-height: 0;
+          padding: 6px 0;
         }
 
         .ll-board-frame {
@@ -509,7 +520,7 @@ export default function MultiplayerGameCanonical() {
           overflow: hidden;
         }
 
-        /* BOTTOM PANEL FIXES */
+        /* BOTTOM CONTROL PANEL */
         .ll-bottom-panel {
           flex-shrink: 0;
           display: flex;
@@ -605,15 +616,23 @@ export default function MultiplayerGameCanonical() {
         }
 
         .ll-turn-sub { font-size: 7px; color: #777; margin-top: 1px; }
-        .ll-dice-val { font-size: 14px; font-weight: 900; color: #fff; margin-top: 2px; }
-        .ll-dice-hint { font-size: 7px; color: #555; }
+        .ll-dice-hint { font-size: 7px; color: #555; margin-top: 14px; }
 
+        /* SCALED FLOATING DICE */
         .ll-dice-container {
           position: absolute;
           left: 50%;
-          top: 50%;
-          transform: translate(-50%, -50%);
+          top: 48%;
+          transform: translate(-50%, -50%) scale(0.62);
           z-index: 30;
+          transform-origin: center center;
+          pointer-events: auto;
+        }
+
+        .ll-dice-container :global(canvas),
+        .ll-dice-container :global(svg) {
+          max-width: 50px !important;
+          max-height: 50px !important;
         }
 
         .ll-side-actions {
@@ -686,6 +705,7 @@ export default function MultiplayerGameCanonical() {
           display: flex;
           align-items: center;
           gap: 3px;
+          cursor: pointer;
         }
         .ll-room-chip small { font-size: 8px; color: #4ade80; font-weight: 700; }
         .ll-room-chip .shield { font-size: 8px; }
