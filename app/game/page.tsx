@@ -9,18 +9,135 @@ import { BOARD_PALETTES, type BoardThemeId } from "../_components/LudoBoardGame"
 
 type SkinHeader = { icon: string; title: string; subtitle: string; eyebrow: string };
 const SKIN_HEADERS: Record<string, SkinHeader> = {
-  classic:{icon:"👑",eyebrow:"TIMELESS CLASSIC",title:"CLASSIC LUDO",subtitle:"The original board • Pure Ludo tradition"}, golden:{icon:"🏆",eyebrow:"ROYAL COLLECTION",title:"GOLDEN ROYAL",subtitle:"Luxury gold • Play like a champion"}, neon:{icon:"⚡",eyebrow:"AFTER DARK",title:"NEON GLOW",subtitle:"Electric lights • Neon energy"}, beach:{icon:"🌴",eyebrow:"TROPICAL ESCAPE",title:"BEACH VIBES",subtitle:"Sun • Sand • Sea • Let the game begin"}, galaxy:{icon:"🌌",eyebrow:"DEEP SPACE",title:"GALAXY SPACE",subtitle:"Starlight journey • Beyond the board"}, wood:{icon:"🪵",eyebrow:"NATURAL COLLECTION",title:"WOOD CLASSIC",subtitle:"Warm timber • Crafted for the table"}, dragon:{icon:"🐉",eyebrow:"LEGENDARY REALM",title:"DRAGON",subtitle:"Ancient power • Enter the realm"}, christmas:{icon:"🎄",eyebrow:"HOLIDAY EDITION",title:"CHRISTMAS",subtitle:"Festive lights • Merry moves"}, football:{icon:"⚽",eyebrow:"MATCH DAY",title:"FOOTBALL",subtitle:"Kick off • Every move counts"}, candy:{icon:"🍭",eyebrow:"SWEET WORLD",title:"CANDY LAND",subtitle:"Sugar rush • Colorful fun"}, marble:{icon:"💎",eyebrow:"LUXE COLLECTION",title:"MARBLE LUXE",subtitle:"Polished style • Premium play"}, nature:{icon:"🌿",eyebrow:"WILD & NATURAL",title:"NATURE WOOD",subtitle:"Forest calm • Natural strategy"}, space:{icon:"🚀",eyebrow:"COSMIC FLIGHT",title:"SPACE GALAXY",subtitle:"Launch into orbit • Own the stars"}, crystal:{icon:"❄️",eyebrow:"FROZEN COLLECTION",title:"CRYSTAL ICE",subtitle:"Frozen brilliance • Cool precision"}, fireice:{icon:"🔥❄️",eyebrow:"ELEMENTAL",title:"FIRE & ICE",subtitle:"Two forces • One battlefield"}, jungle:{icon:"🌿",eyebrow:"WILD ADVENTURE",title:"JUNGLE QUEST",subtitle:"Untamed paths • Hunt for victory"}, love:{icon:"💗",eyebrow:"HEART COLLECTION",title:"LOVE EDITION",subtitle:"Hearts • Romance • Play with feeling"}, night:{icon:"🌃",eyebrow:"CITY AFTER DARK",title:"NIGHT CITY",subtitle:"Midnight lights • Own the night"}, arabian:{icon:"🏜️",eyebrow:"ROYAL DESERT",title:"ARABIAN PALACE",subtitle:"Golden sands • Palace of strategy"}, "midnight-live":{icon:"🌙",eyebrow:"LUDO LIVE EXCLUSIVE",title:"MIDNIGHT LIVE",subtitle:"Live after dark • Your game, your night"}
+  classic:{icon:"👑",eyebrow:"TIMELESS CLASSIC",title:"CLASSIC LUDO",subtitle:"The original board • Pure Ludo tradition"},
+  golden:{icon:"🏆",eyebrow:"ROYAL COLLECTION",title:"GOLDEN ROYAL",subtitle:"Luxury gold • Play like a champion"},
+  neon:{icon:"⚡",eyebrow:"AFTER DARK",title:"NEON GLOW",subtitle:"Electric lights • Neon energy"},
+  beach:{icon:"🌴",eyebrow:"TROPICAL ESCAPE",title:"BEACH VIBES",subtitle:"Sun • Sand • Sea • Let the game begin"},
+  galaxy:{icon:"🌌",eyebrow:"DEEP SPACE",title:"GALAXY SPACE",subtitle:"Starlight journey • Beyond the board"},
+  wood:{icon:"🪵",eyebrow:"NATURAL COLLECTION",title:"WOOD CLASSIC",subtitle:"Warm timber • Crafted for the table"},
+  dragon:{icon:"🐉",eyebrow:"LEGENDARY REALM",title:"DRAGON",subtitle:"Ancient power • Enter the realm"},
+  christmas:{icon:"🎄",eyebrow:"HOLIDAY EDITION",title:"CHRISTMAS",subtitle:"Festive lights • Merry moves"},
+  football:{icon:"⚽",eyebrow:"MATCH DAY",title:"FOOTBALL",subtitle:"Kick off • Every move counts"},
+  candy:{icon:"🍭",eyebrow:"SWEET WORLD",title:"CANDY LAND",subtitle:"Sugar rush • Colorful fun"},
+  marble:{icon:"💎",eyebrow:"LUXE COLLECTION",title:"MARBLE LUXE",subtitle:"Polished style • Premium play"},
+  nature:{icon:"🌿",eyebrow:"WILD & NATURAL",title:"NATURE WOOD",subtitle:"Forest calm • Natural strategy"},
+  space:{icon:"🚀",eyebrow:"COSMIC FLIGHT",title:"SPACE GALAXY",subtitle:"Launch into orbit • Own the stars"},
+  crystal:{icon:"❄️",eyebrow:"FROZEN COLLECTION",title:"CRYSTAL ICE",subtitle:"Frozen brilliance • Cool precision"},
+  fireice:{icon:"🔥❄️",eyebrow:"ELEMENTAL",title:"FIRE & ICE",subtitle:"Two forces • One battlefield"},
+  jungle:{icon:"🌿",eyebrow:"WILD ADVENTURE",title:"JUNGLE QUEST",subtitle:"Untamed paths • Hunt for victory"},
+  love:{icon:"💗",eyebrow:"HEART COLLECTION",title:"LOVE EDITION",subtitle:"Hearts • Romance • Play with feeling"},
+  night:{icon:"🌃",eyebrow:"CITY AFTER DARK",title:"NIGHT CITY",subtitle:"Midnight lights • Own the night"},
+  arabian:{icon:"🏜️",eyebrow:"ROYAL DESERT",title:"ARABIAN PALACE",subtitle:"Golden sands • Palace of strategy"},
+  "midnight-live":{icon:"🌙",eyebrow:"LUDO LIVE EXCLUSIVE",title:"MIDNIGHT LIVE",subtitle:"Live after dark • Your game, your night"}
 };
 const resolveTheme=(value:unknown):BoardThemeId=>{const id=String(value||"");if(id==="midnight-live")return "night";return id in BOARD_PALETTES?(id as BoardThemeId):"classic";};
 
 export default function GamePage(){
- const searchParams=useSearchParams();
- const isTournament=searchParams.has("tournament")&&searchParams.has("match");
- const [theme,setTheme]=useState<BoardThemeId>("classic"); const [skinId,setSkinId]=useState("classic"); const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic; const header=SKIN_HEADERS[skinId]||SKIN_HEADERS[theme]||SKIN_HEADERS.classic;
- useEffect(()=>{if(isTournament)return;let active=true;const load=async()=>{try{const saved=localStorage.getItem("ludo-match-board");if(saved&&(saved==="midnight-live"||saved in BOARD_PALETTES)&&active){setSkinId(saved);setTheme(resolveTheme(saved));}}catch{}try{const response=await fetch("/api/customization",{cache:"no-store"});if(!response.ok)return;const data=await response.json();const equipped=String(data?.equippedBoard||"");if(!active||!equipped||!(equipped==="midnight-live"||equipped in BOARD_PALETTES))return;setSkinId(equipped);setTheme(resolveTheme(equipped));try{localStorage.setItem("ludo-match-board",equipped);}catch{}}catch{}};load();return()=>{active=false;};},[isTournament]);
- useEffect(()=>{if(isTournament)return;const previousBody=document.body.style.background,previousHtml=document.documentElement.style.background;document.body.style.background=palette.bg;document.documentElement.style.background=palette.bg;return()=>{document.body.style.background=previousBody;document.documentElement.style.background=previousHtml;};},[isTournament,palette.bg]);
- if(isTournament)return <MultiplayerGame/>;
- return <main className="game-shell" data-game-theme={theme} style={{"--skin-accent":palette.accent,"--skin-bg":palette.bg,"--skin-pattern":palette.pattern,"--skin-shadow":palette.shadow} as React.CSSProperties}><BotSessionExpiry/><div className="skin-page-pattern" aria-hidden="true"/><div className="skin-page-glow" aria-hidden="true"/><div className="game-content"><header className="skin-header"><div className="skin-header-icon" aria-hidden="true">{header.icon}</div><div className="skin-header-copy"><div className="skin-eyebrow">{header.eyebrow}</div><div className="skin-title">{header.title}</div><div className="skin-subtitle">{header.subtitle}</div></div><div className="live-pill"><span/> LIVE</div></header><div className="live-match"><span/> LIVE MATCH</div><section className="board-host" aria-label="Ludo game"><GameBoardContent themeOverride={theme}/></section></div><style jsx global>{`
-*{box-sizing:border-box}html,body{height:100%;min-height:100%;margin:0;overflow:hidden!important;overscroll-behavior:none;touch-action:manipulation}body{overflow-x:hidden!important}.game-shell{position:relative;width:100%;height:100dvh;min-height:100dvh;color:#fff;overflow:hidden!important;overscroll-behavior:none;isolation:isolate;background:var(--skin-bg);transition:background .35s ease}.skin-page-pattern{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:var(--skin-pattern);background-size:520px 520px;background-repeat:repeat;opacity:.34}.skin-page-glow{position:fixed;left:50%;top:-160px;width:min(900px,170vw);height:440px;transform:translateX(-50%);border-radius:50%;background:var(--skin-accent);opacity:.24;filter:blur(100px);pointer-events:none;z-index:0}.game-content{position:relative;z-index:1;width:100%;max-width:720px;height:100dvh;min-height:100dvh;margin:0 auto;padding:12px 24px 32px;overflow:hidden}.skin-header{position:relative;overflow:hidden;width:100%;min-height:138px;display:flex;align-items:center;gap:18px;padding:18px 20px;border:1px solid color-mix(in srgb,var(--skin-accent) 65%,white 35%);border-radius:30px;background:linear-gradient(135deg,color-mix(in srgb,var(--skin-bg) 78%,white 22%),color-mix(in srgb,var(--skin-accent) 16%,var(--skin-bg) 84%));box-shadow:var(--skin-shadow),0 20px 46px color-mix(in srgb,var(--skin-accent) 18%,transparent);backdrop-filter:blur(18px);isolation:isolate}.skin-header:before{content:"";position:absolute;inset:1px;border-radius:inherit;pointer-events:none;background:linear-gradient(135deg,color-mix(in srgb,white 24%,transparent),transparent 34%,transparent 68%,color-mix(in srgb,white 12%,transparent));box-shadow:inset 0 1px 0 color-mix(in srgb,white 42%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--skin-accent) 28%,transparent);z-index:-1}.skin-header:after{content:"";position:absolute;right:-70px;top:-120px;width:270px;height:270px;border-radius:50%;background:var(--skin-accent);opacity:.2;filter:blur(22px);pointer-events:none;z-index:-1}.skin-header-icon{position:relative;z-index:1;width:82px;height:82px;flex:0 0 82px;display:grid;place-items:center;border-radius:24px;border:2px solid color-mix(in srgb,var(--skin-accent) 72%,white 28%);background:linear-gradient(145deg,color-mix(in srgb,white 26%,transparent),color-mix(in srgb,var(--skin-accent) 12%,transparent));font-size:40px;box-shadow:inset 0 2px 12px color-mix(in srgb,white 32%,transparent),0 10px 26px color-mix(in srgb,var(--skin-accent) 18%,transparent)}.skin-header-copy{position:relative;z-index:1;min-width:0;flex:1}.skin-eyebrow{font-size:9px;font-weight:950;letter-spacing:3px;color:color-mix(in srgb,var(--skin-accent) 72%,white 28%)}.skin-title{margin-top:5px;font-size:24px;line-height:1.02;font-weight:1000;letter-spacing:1.7px;color:color-mix(in srgb,var(--skin-accent) 32%,var(--skin-bg) 68%);text-shadow:0 3px 16px color-mix(in srgb,var(--skin-accent) 20%,transparent)}.skin-subtitle{margin-top:9px;font-size:12px;color:color-mix(in srgb,var(--skin-bg) 28%,white 72%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.live-pill{position:relative;z-index:2;display:flex;align-items:center;gap:8px;padding:11px 15px;border-radius:999px;border:1px solid color-mix(in srgb,white 42%,var(--skin-accent) 58%);background:color-mix(in srgb,var(--skin-accent) 14%,transparent);color:color-mix(in srgb,var(--skin-bg) 22%,white 78%);font-weight:950;letter-spacing:1px;font-size:11px;box-shadow:inset 0 1px 0 color-mix(in srgb,white 22%,transparent),0 7px 18px color-mix(in srgb,var(--skin-accent) 16%,transparent)}.live-pill span,.live-match span{width:10px;height:10px;display:inline-block;border-radius:50%;background:color-mix(in srgb,var(--skin-accent) 78%,white 22%);box-shadow:0 0 14px color-mix(in srgb,var(--skin-accent) 52%,transparent)}.live-match{display:flex;justify-content:center;align-items:center;gap:10px;margin:18px 0 16px;font-weight:950;letter-spacing:4px;font-size:15px;color:color-mix(in srgb,var(--skin-bg) 24%,white 76%);text-shadow:0 2px 12px color-mix(in srgb,var(--skin-accent) 24%,transparent)}.board-host{position:relative;z-index:1;width:100%}.board-host section{width:100%}.board-host section[aria-label="Dice and turn controls"]{margin-top:14px!important}@media(max-width:560px){.game-content{padding:10px 12px 28px}.skin-header{min-height:128px;padding:14px;gap:12px;border-radius:25px}.skin-header-icon{width:68px;height:68px;flex-basis:68px;font-size:31px;border-radius:20px}.skin-eyebrow{font-size:7px;letter-spacing:2.1px}.skin-title{font-size:18px;letter-spacing:1.1px}.skin-subtitle{margin-top:7px;font-size:11px}.live-pill{padding:9px 10px;font-size:10px}.live-pill span{width:8px;height:8px}.live-match{margin:16px 0 14px;font-size:13px;letter-spacing:3px}}
-`}</style></main>;
+  const searchParams=useSearchParams();
+  const isTournament=searchParams.has("tournament")&&searchParams.has("match");
+  const [theme,setTheme]=useState<BoardThemeId>("classic");
+  const [skinId,setSkinId]=useState("classic");
+  const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
+  const header=SKIN_HEADERS[skinId]||SKIN_HEADERS[theme]||SKIN_HEADERS.classic;
+
+  useEffect(()=>{
+    if(isTournament)return;
+    let active=true;
+    const load=async()=>{
+      try{
+        const saved=localStorage.getItem("ludo-match-board");
+        if(saved&&(saved==="midnight-live"||saved in BOARD_PALETTES)&&active){setSkinId(saved);setTheme(resolveTheme(saved));}
+      }catch{}
+      try{
+        const response=await fetch("/api/customization",{cache:"no-store"});
+        if(!response.ok)return;
+        const data=await response.json();
+        const equipped=String(data?.equippedBoard||"");
+        if(!active||!equipped||!(equipped==="midnight-live"||equipped in BOARD_PALETTES))return;
+        setSkinId(equipped);setTheme(resolveTheme(equipped));
+        try{localStorage.setItem("ludo-match-board",equipped);}catch{}
+      }catch{}
+    };
+    load();
+    return()=>{active=false;};
+  },[isTournament]);
+
+  useEffect(()=>{
+    if(isTournament)return;
+    const previousBody=document.body.style.background,previousHtml=document.documentElement.style.background;
+    document.body.style.background=palette.bg;document.documentElement.style.background=palette.bg;
+    return()=>{document.body.style.background=previousBody;document.documentElement.style.background=previousHtml;};
+  },[isTournament,palette.bg]);
+
+  if(isTournament)return <MultiplayerGame/>;
+  return <main className="game-shell" data-game-theme={theme} style={{"--skin-accent":palette.accent,"--skin-bg":palette.bg,"--skin-pattern":palette.pattern,"--skin-shadow":palette.shadow} as React.CSSProperties}>
+    <BotSessionExpiry/><div className="skin-page-pattern" aria-hidden="true"/><div className="skin-page-glow" aria-hidden="true"/>
+    <div className="game-content">
+      <header className="skin-header">
+        <div className="skin-header-icon" aria-hidden="true">{header.icon}</div>
+        <div className="skin-header-copy"><div className="skin-eyebrow">{header.eyebrow}</div><div className="skin-title">{header.title}</div><div className="skin-subtitle">{header.subtitle}</div></div>
+        <div className="live-pill"><span/> LIVE</div>
+      </header>
+      <div className="live-match"><span/> LIVE MATCH</div>
+      <section className="board-host" aria-label="Ludo game"><GameBoardContent themeOverride={theme}/></section>
+    </div>
+    <style jsx global>{`
+*{box-sizing:border-box}
+html,body{height:100%;min-height:100%;margin:0;overflow:hidden!important;overscroll-behavior:none;touch-action:manipulation}
+body{overflow-x:hidden!important}
+.game-shell{position:relative;width:100%;height:100dvh;min-height:100dvh;color:#fff;overflow:hidden!important;overscroll-behavior:none;isolation:isolate;background:var(--skin-bg);transition:background .35s ease}
+.skin-page-pattern{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:var(--skin-pattern);background-size:520px 520px;background-repeat:repeat;opacity:.34}
+.skin-page-glow{position:fixed;left:50%;top:-160px;width:min(900px,170vw);height:440px;transform:translateX(-50%);border-radius:50%;background:var(--skin-accent);opacity:.24;filter:blur(100px);pointer-events:none;z-index:0}
+.game-content{position:relative;z-index:1;width:100%;max-width:720px;height:100dvh;min-height:0;margin:0 auto;padding:12px 24px 32px;overflow:hidden;display:flex;flex-direction:column}
+.skin-header{position:relative;overflow:hidden;width:100%;min-height:138px;flex:0 0 auto;display:flex;align-items:center;gap:18px;padding:18px 20px;border:1px solid color-mix(in srgb,var(--skin-accent) 65%,white 35%);border-radius:30px;background:linear-gradient(135deg,color-mix(in srgb,var(--skin-bg) 78%,white 22%),color-mix(in srgb,var(--skin-accent) 16%,var(--skin-bg) 84%));box-shadow:var(--skin-shadow),0 20px 46px color-mix(in srgb,var(--skin-accent) 18%,transparent);backdrop-filter:blur(18px);isolation:isolate}
+.skin-header:before{content:"";position:absolute;inset:1px;border-radius:inherit;pointer-events:none;background:linear-gradient(135deg,color-mix(in srgb,white 24%,transparent),transparent 34%,transparent 68%,color-mix(in srgb,white 12%,transparent));box-shadow:inset 0 1px 0 color-mix(in srgb,white 42%,transparent),inset 0 -1px 0 color-mix(in srgb,var(--skin-accent) 28%,transparent);z-index:-1}
+.skin-header:after{content:"";position:absolute;right:-70px;top:-120px;width:270px;height:270px;border-radius:50%;background:var(--skin-accent);opacity:.2;filter:blur(22px);pointer-events:none;z-index:-1}
+.skin-header-icon{position:relative;z-index:1;width:82px;height:82px;flex:0 0 82px;display:grid;place-items:center;border-radius:24px;border:2px solid color-mix(in srgb,var(--skin-accent) 72%,white 28%);background:linear-gradient(145deg,color-mix(in srgb,white 26%,transparent),color-mix(in srgb,var(--skin-accent) 12%,transparent));font-size:40px;box-shadow:inset 0 2px 12px color-mix(in srgb,white 32%,transparent),0 10px 26px color-mix(in srgb,var(--skin-accent) 18%,transparent)}
+.skin-header-copy{position:relative;z-index:1;min-width:0;flex:1}
+.skin-eyebrow{font-size:9px;font-weight:950;letter-spacing:3px;color:color-mix(in srgb,var(--skin-accent) 72%,white 28%)}
+.skin-title{margin-top:5px;font-size:24px;line-height:1.02;font-weight:1000;letter-spacing:1.7px;color:color-mix(in srgb,var(--skin-accent) 32%,var(--skin-bg) 68%);text-shadow:0 3px 16px color-mix(in srgb,var(--skin-accent) 20%,transparent)}
+.skin-subtitle{margin-top:9px;font-size:12px;color:color-mix(in srgb,var(--skin-bg) 28%,white 72%);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.live-pill{position:relative;z-index:2;display:flex;align-items:center;gap:8px;flex:0 0 auto;padding:11px 15px;border-radius:999px;border:1px solid color-mix(in srgb,white 42%,var(--skin-accent) 58%);background:color-mix(in srgb,var(--skin-accent) 14%,transparent);color:color-mix(in srgb,var(--skin-bg) 22%,white 78%);font-weight:950;letter-spacing:1px;font-size:11px;box-shadow:inset 0 1px 0 color-mix(in srgb,white 22%,transparent),0 7px 18px color-mix(in srgb,var(--skin-accent) 16%,transparent)}
+.live-pill span,.live-match span{width:10px;height:10px;display:inline-block;flex:0 0 auto;border-radius:50%;background:color-mix(in srgb,var(--skin-accent) 78%,white 22%);box-shadow:0 0 14px color-mix(in srgb,var(--skin-accent) 52%,transparent)}
+.live-match{display:flex;justify-content:center;align-items:center;gap:10px;flex:0 0 auto;margin:18px 0 16px;font-weight:950;letter-spacing:4px;font-size:15px;color:color-mix(in srgb,var(--skin-bg) 24%,white 76%);text-shadow:0 2px 12px color-mix(in srgb,var(--skin-accent) 24%,transparent)}
+.board-host{position:relative;z-index:1;width:100%;min-height:0;flex:1 1 auto;display:flex;flex-direction:column;align-items:center;overflow:hidden}
+.board-host>section{width:100%;min-width:0}
+.board-host>section:first-child{flex:0 1 auto;width:min(100%,620px,calc(100dvh - 315px));margin:0 auto}
+.board-host>section:first-child>div{width:100%!important;max-width:none!important}
+.board-host section[aria-label="Dice and turn controls"]{flex:0 0 auto;margin:14px auto 0!important;width:min(100%,620px);max-width:620px}
+@media(max-width:560px){
+  .game-content{padding:10px 12px 18px}
+  .skin-header{min-height:128px;padding:14px;gap:10px;border-radius:25px}
+  .skin-header-icon{width:64px;height:64px;flex-basis:64px;font-size:29px;border-radius:19px}
+  .skin-eyebrow{font-size:7px;letter-spacing:2px}
+  .skin-title{font-size:18px;letter-spacing:1.1px}
+  .skin-subtitle{margin-top:7px;font-size:10.5px}
+  .live-pill{padding:8px 9px;font-size:9px;gap:6px}
+  .live-pill span{width:7px;height:7px}
+  .live-match{margin:12px 0 10px;font-size:12px;letter-spacing:3px}
+  .board-host>section:first-child{width:min(100%,calc(100dvh - 300px))}
+  .board-host section[aria-label="Dice and turn controls"]{margin-top:10px!important}
+}
+@media(max-width:380px){
+  .game-content{padding-left:8px;padding-right:8px;padding-bottom:12px}
+  .skin-header{min-height:116px;padding:11px;gap:8px;border-radius:21px}
+  .skin-header-icon{width:56px;height:56px;flex-basis:56px;font-size:25px;border-radius:16px}
+  .skin-eyebrow{font-size:6px;letter-spacing:1.5px}
+  .skin-title{font-size:16px;letter-spacing:.8px}
+  .skin-subtitle{margin-top:5px;font-size:9.5px}
+  .live-pill{padding:7px 8px;font-size:8px}
+  .live-match{margin:9px 0 8px;font-size:11px;letter-spacing:2.5px}
+  .board-host>section:first-child{width:min(100%,calc(100dvh - 272px))}
+}
+@media(max-height:620px) and (max-width:560px){
+  .skin-header{min-height:104px}
+  .skin-header-icon{width:52px;height:52px;flex-basis:52px;font-size:24px}
+  .skin-title{font-size:16px}
+  .skin-subtitle{font-size:9px;margin-top:4px}
+  .live-match{margin:7px 0 6px}
+  .board-host>section:first-child{width:min(100%,calc(100dvh - 245px))}
+  .board-host section[aria-label="Dice and turn controls"]{margin-top:7px!important}
+}
+`}</style>
+  </main>;
 }
