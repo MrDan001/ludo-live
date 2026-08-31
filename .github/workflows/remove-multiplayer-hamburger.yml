@@ -1,0 +1,62 @@
+name: Remove multiplayer hamburger
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  remove-hamburger:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove hamburger from multiplayer header
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          p = Path('app/game/MultiplayerGameCanonical.tsx')
+          s = p.read_text(encoding='utf-8')
+
+          s, n = re.subn(
+              r'\n\s*<button type="button" className="ll-menu-btn" aria-label="Menu">\s*<span />\s*<span />\s*<span />\s*</button>',
+              '',
+              s,
+              count=1,
+          )
+
+          s = s.replace(
+              'grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 58px;',
+              'grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);',
+              1,
+          )
+          s = s.replace(
+              'grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr) 48px;',
+              'grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);',
+              1,
+          )
+
+          s = re.sub(r'\n\s*\.ll-menu-btn \{[^}]*\}', '', s, count=1)
+          s = re.sub(r'\n\s*\.ll-menu-btn span \{[^}]*\}', '', s, count=1)
+          s = re.sub(r'\n\s*\.ll-menu-btn \{[^}]*\}', '', s, count=1)
+          s = re.sub(r'\n\s*\.ll-menu-btn span \{[^}]*\}', '', s, count=1)
+
+          if 'll-menu-btn' in s:
+              raise SystemExit('Hamburger selector/markup still present; refusing to commit')
+          if n != 1:
+              raise SystemExit(f'Expected to remove exactly one hamburger button, removed {n}')
+
+          p.write_text(s, encoding='utf-8')
+
+      - name: Commit and push
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add app/game/MultiplayerGameCanonical.tsx .github/workflows/remove-multiplayer-hamburger.yml
+          git rm .github/workflows/remove-multiplayer-hamburger.yml
+          git commit -m 'fix: remove multiplayer hamburger menu' || exit 0
+          git push origin HEAD:main
