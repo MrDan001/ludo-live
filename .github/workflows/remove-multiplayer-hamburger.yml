@@ -1,0 +1,54 @@
+name: Remove multiplayer hamburger
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  remove-hamburger:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Remove all multiplayer hamburger implementations
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p = Path('app/game-online/page.tsx')
+          s = p.read_text()
+          s = s.replace('''\n          <button type="button" className="ll-menu-btn" aria-label="Menu">\n            <span />\n            <span />\n            <span />\n          </button>''', '')
+          s = s.replace('grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) 58px;', 'grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);')
+          s = s.replace('''\n        .ll-menu-btn {\n          width: 58px;\n          height: 58px;\n          display: flex;\n          flex-direction: column;\n          justify-content: center;\n          align-items: center;\n          gap: 6px;\n          border: 1px solid rgba(212,175,55,.65);\n          border-radius: 17px;\n          background: linear-gradient(145deg, #171208, #070705);\n          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.5);\n          cursor: default;\n        }\n        .ll-menu-btn span { display: block; width: 27px; height: 4px; border-radius: 99px; background: #d4af37; box-shadow: 0 0 8px rgba(212,175,55,.35); }''', '')
+          s = s.replace('grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr) 48px;', 'grid-template-columns: minmax(0, 1fr) 92px minmax(0, 1fr);')
+          s = s.replace('          .ll-menu-btn { width: 48px; height: 48px; border-radius: 14px; }\n          .ll-menu-btn span { width: 22px; height: 3px; }\n', '')
+          p.write_text(s)
+
+          p = Path('app/_components/InGameComms.tsx')
+          s = p.read_text()
+          s = s.replace('''      <button className="menu-btn" aria-label="Menu">☰</button>\n''', '')
+          s = s.replace('grid-template-columns:1fr 150px 1fr 62px;', 'grid-template-columns:1fr 150px 1fr;')
+          s = s.replace('grid-template-columns:1fr 1fr 44px;', 'grid-template-columns:1fr 1fr;')
+          s = s.replace(' .menu-btn{height:48px;font-size:24px}', '')
+          s = s.replace('.menu-btn{height:62px;border:1px solid #b98d28;border-radius:18px;background:#100e09;color:#f5c940;font-size:30px}', '')
+          p.write_text(s)
+          PY
+
+          if grep -RniE 'll-menu-btn|className="menu-btn"|\.menu-btn|☰' app/game app/game-online app/_components 2>/dev/null; then
+            echo 'Hamburger implementation still present.'
+            exit 1
+          fi
+
+      - name: Commit and remove this workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/game-online/page.tsx app/_components/InGameComms.tsx .github/workflows/remove-multiplayer-hamburger.yml
+          git commit -m "fix: remove all multiplayer hamburger implementations"
+          git rm .github/workflows/remove-multiplayer-hamburger.yml
+          git commit -m "chore: remove temporary hamburger cleanup workflow"
+          git push origin HEAD:main
