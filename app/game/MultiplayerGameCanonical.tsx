@@ -14,7 +14,7 @@ type Color = "red" | "yellow" | "green" | "blue";
 type Face = DiceValue;
 type Player = { playerId: string; name: string; seat: number; host?: boolean; ready?: boolean; connected?: boolean; colors?: Color[]; board?: string };
 type TokenMap = Record<string, Record<string, { position: number }>>;
-type GameState = { status: string; currentPlayerId: string | null; dice: Face | null; pendingMove: Face | null; sixStreak: number; players: Player[]; tokens: TokenMap; winnerId?: string | null; stateRevision?: number };
+type GameState = { status: string; currentPlayerId: string | null; dice: Face | null; pendingMove: Face | null; sixStreak: number; players: Player[]; tokens: TokenMap; winnerId?: string | null; stateRevision?: number; startedAt?: number };
 type Msg = { id?: string; name?: string; text?: string; at?: number; type?: string };
 type Profile = { equipped?: { avatar?: string } };
 
@@ -97,6 +97,13 @@ export default function MultiplayerGameCanonical() {
     };
     void connect(); return () => { mounted = false; };
   }, [applyServerState, isTournament, roomCode]);
+
+  useEffect(() => {
+    if (!game?.winnerId || !me || isTournament) return;
+    const winnerId = String(game.winnerId);
+    const matchKey = `multiplayer:${roomCode || "room"}:winner:${winnerId}:revision:${revision >= 0 ? revision : "final"}`;
+    void fetch("/api/progress", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ source: "game_win", eventKey: matchKey }) }).catch(() => {});
+  }, [game?.winnerId, me, isTournament, roomCode, revision]);
 
   useEffect(() => { if (!socket || !game || !myTurn || pending === null || hasLegalMove(tokens, myColors, pending)) return; setPending(null); socket.emit("game-move", { tokenId: "__skip__", to: 0 }); }, [socket, game, myTurn, pending, tokens, myColors]);
   const chooseToken = useCallback((color: Color, id: number) => { if (!socket || !game || !myTurn || pending === null || animating) return; const token = tokens.find((t) => t.color === color && t.id === id); if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return; const target = nextProgress(token.position, pending); if (target === null) return; setPending(null); setAnimating(true); socket.emit("game-move", { tokenId: `${color}:${id}`, to: target }); setNotice("Moving…"); }, [socket, game, myTurn, pending, animating, tokens, myColors]);
