@@ -3,7 +3,7 @@ import { getShopItem } from "../shop/catalog";
 import { ensureWalletAudit, markWalletContext } from "../lib/wallet-audit";
 
 const XP_PER_DIAMOND_PURCHASE = 15;
-const levelRequired = (level: number) => 10 + Math.max(0, level) * 5;
+const levelRequired = (level: number) => 10 + Math.max(1, Math.floor(Number(level) || 1)) * 5;
 
 type PaymentRow = {
   reference: string;
@@ -67,7 +67,7 @@ export async function fulfillPaystackPayment(client: PoolClient, reference: stri
       const beforeCoins = Number(user.rows[0].coins) || 0;
       const beforeGems = Number(user.rows[0].gems) || 0;
       let xp = Math.max(0, Number(user.rows[0].xp) || 0);
-      let level = Math.max(0, Number(user.rows[0].level) || 0);
+      let level = Math.max(1, Math.floor(Number(user.rows[0].level) || 1));
       if (rewardCurrency === "gems") {
         xp += XP_PER_DIAMOND_PURCHASE;
         while (xp >= levelRequired(level)) { xp -= levelRequired(level); level += 1; }
