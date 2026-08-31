@@ -2,7 +2,6 @@
 
 import MultiplayerGameCanonical from "./MultiplayerGameCanonical";
 
-/** Board-first multiplayer route. */
 export default function MultiplayerGame() {
   return (
     <div className="clean-multiplayer-route">
@@ -16,8 +15,46 @@ export default function MultiplayerGame() {
           overflow: hidden !important;
           background: #050505 !important;
         }
-
-        .clean-multiplayer-route,
+        .clean-multiplayer-route {
+          position: fixed !important;
+          inset: 0 !important;
+          width: 100vw !important;
+          height: 100% !important;
+          overflow: hidden !important;
+          background:
+            radial-gradient(circle at 50% 50%, rgba(150,100,30,.10), transparent 34%),
+            radial-gradient(circle at 12% 18%, rgba(255,255,255,.035), transparent 22%),
+            radial-gradient(circle at 88% 82%, rgba(255,255,255,.025), transparent 24%),
+            #050505 !important;
+        }
+        .clean-multiplayer-route::before {
+          content: "";
+          position: absolute;
+          inset: 0;
+          pointer-events: none;
+          opacity: .22;
+          background-image:
+            linear-gradient(45deg, transparent 48%, rgba(255,255,255,.025) 49%, transparent 51%),
+            linear-gradient(-45deg, transparent 48%, rgba(255,255,255,.018) 49%, transparent 51%);
+          background-size: 72px 72px;
+          mask-image: radial-gradient(circle at center, black, transparent 78%);
+          z-index: 0;
+        }
+        .clean-multiplayer-route::after {
+          content: "✦     ·     ✧     ·     ✦";
+          position: absolute;
+          left: 50%;
+          top: 50%;
+          transform: translate(-50%, -50%);
+          width: min(92vw, 900px);
+          text-align: center;
+          font-size: clamp(18px, 3vw, 34px);
+          letter-spacing: clamp(12px, 4vw, 42px);
+          color: rgba(255,215,120,.16);
+          pointer-events: none;
+          z-index: 1;
+          white-space: nowrap;
+        }
         .clean-multiplayer-route .live-page {
           position: fixed !important;
           inset: 0 !important;
@@ -25,11 +62,9 @@ export default function MultiplayerGame() {
           height: 100% !important;
           min-height: 0 !important;
           overflow: hidden !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: #050505 !important;
+          background: transparent !important;
+          z-index: 2 !important;
         }
-
         .clean-multiplayer-route .board-stage {
           position: absolute !important;
           inset: 0 !important;
@@ -40,10 +75,6 @@ export default function MultiplayerGame() {
           padding: 0 !important;
           overflow: hidden !important;
         }
-
-        /* The board gets the largest safe square available. Use viewport
-           dimensions directly instead of mixing svh/dvh, which varies between
-           mobile browser chrome states. */
         .clean-multiplayer-route .board-wrap {
           width: min(100vw, 100vh, 760px) !important;
           height: min(100vw, 100vh, 760px) !important;
@@ -53,39 +84,29 @@ export default function MultiplayerGame() {
           min-height: 0 !important;
           aspect-ratio: 1 / 1 !important;
           flex: none !important;
+          z-index: 3 !important;
+          filter: drop-shadow(0 18px 38px rgba(0,0,0,.55));
         }
-
         .clean-multiplayer-route .board-frame {
           width: 100% !important;
           height: 100% !important;
           min-width: 0 !important;
           min-height: 0 !important;
-          padding: 3px !important;
-          border-radius: 18px !important;
-          background: #151515 !important;
-          box-shadow: 0 12px 35px rgba(0,0,0,.45) !important;
         }
-
         .clean-multiplayer-route .board-frame > div {
           width: 100% !important;
           height: 100% !important;
           min-width: 0 !important;
           min-height: 0 !important;
           aspect-ratio: 1 / 1 !important;
-          border-radius: 15px !important;
           overflow: hidden !important;
         }
-
-        /* Only the board and playable dice remain visible. */
         .clean-multiplayer-route .match-badge,
         .clean-multiplayer-route .turn-pill,
         .clean-multiplayer-route .board-glow,
         .clean-multiplayer-route .chat-tool,
         .clean-multiplayer-route .mic-tool,
-        .clean-multiplayer-route .chat-panel {
-          display: none !important;
-        }
-
+        .clean-multiplayer-route .chat-panel { display: none !important; }
         .clean-multiplayer-route .floating-tools {
           position: absolute !important;
           inset: auto 0 0 0 !important;
@@ -94,7 +115,6 @@ export default function MultiplayerGame() {
           pointer-events: none !important;
           z-index: 50 !important;
         }
-
         .clean-multiplayer-route .dice-float {
           position: absolute !important;
           left: 50% !important;
@@ -103,9 +123,9 @@ export default function MultiplayerGame() {
           pointer-events: auto !important;
           z-index: 60 !important;
         }
-
-        /* On very short landscape screens, reserve a small amount for the
-           browser-safe edge while still maximizing board size. */
+        @media (max-aspect-ratio: 1/1) {
+          .clean-multiplayer-route::after { top: 10%; }
+        }
         @media (orientation: landscape) and (max-height: 520px) {
           .clean-multiplayer-route .board-wrap {
             width: min(100vw, calc(100vh - 8px), 620px) !important;
