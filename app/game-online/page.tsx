@@ -403,7 +403,7 @@ function GameContent() {
 
         .ll-header {
           position: relative;
-          display: grid;
+          display: grid !important;
           grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
           align-items: center;
           gap: 12px;
@@ -411,12 +411,14 @@ function GameContent() {
           min-height: 112px;
           padding: 4px 0 14px;
           z-index: 50;
+          visibility: visible !important;
+          opacity: 1 !important;
         }
 
         .ll-player-card {
           min-width: 0;
           min-height: 92px;
-          display: flex;
+          display: flex !important;
           align-items: center;
           gap: 10px;
           padding: 12px 14px;
@@ -424,62 +426,20 @@ function GameContent() {
           border-radius: 25px;
           background: linear-gradient(145deg, rgba(24,19,9,.94), rgba(5,5,4,.98));
           box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 10px 28px rgba(0,0,0,.5);
+          visibility: visible !important;
+          opacity: 1 !important;
         }
 
         .ll-player-card.right { justify-content: flex-end; }
 
-        .ll-avatar-wrap {
-          position: relative;
-          flex: 0 0 60px;
-          width: 60px;
-          height: 60px;
-        }
-
-        .ll-avatar-img {
-          width: 100%;
-          height: 100%;
-          border-radius: 50%;
-          background: linear-gradient(135deg, #2a2215, #110e08);
-          border: 2px solid #d4af37;
-          display: grid;
-          place-items: center;
-          font-size: 26px;
-          overflow: hidden;
-        }
-
+        .ll-avatar-wrap { position: relative; flex: 0 0 60px; width: 60px; height: 60px; }
+        .ll-avatar-img { width: 100%; height: 100%; border-radius: 50%; background: linear-gradient(135deg, #2a2215, #110e08); border: 2px solid #d4af37; display: grid; place-items: center; font-size: 26px; overflow: hidden; }
         .ll-avatar-img-element { width: 100%; height: 100%; object-fit: cover; }
-
-        .ll-level {
-          position: absolute;
-          left: 50%;
-          bottom: -7px;
-          transform: translateX(-50%);
-          min-width: 52px;
-          text-align: center;
-          background: #18140c;
-          border: 1px solid #d4af37;
-          color: #d4af37;
-          font-size: 11px;
-          font-weight: 900;
-          padding: 2px 7px;
-          border-radius: 10px;
-          white-space: nowrap;
-        }
-
+        .ll-level { position: absolute; left: 50%; bottom: -7px; transform: translateX(-50%); min-width: 52px; text-align: center; background: #18140c; border: 1px solid #d4af37; color: #d4af37; font-size: 11px; font-weight: 900; padding: 2px 7px; border-radius: 10px; white-space: nowrap; }
         .ll-player-meta { min-width: 0; }
         .ll-player-meta b { display: block; font-size: 17px; line-height: 1.15; color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ll-player-name-row { display: flex; align-items: center; gap: 7px; min-width: 0; }
-
-        .ll-badge-you {
-          background: #e8bc35;
-          color: #070604;
-          font-size: 10px;
-          font-weight: 950;
-          padding: 3px 7px;
-          border-radius: 7px;
-          text-transform: uppercase;
-        }
-
+        .ll-badge-you { background: #e8bc35; color: #070604; font-size: 10px; font-weight: 950; padding: 3px 7px; border-radius: 7px; text-transform: uppercase; }
         .ll-turn-status { font-size: 12px; color: #888; display: flex; align-items: center; gap: 6px; margin-top: 5px; font-weight: 750; }
         .ll-turn-status.active { color: #4ade80; }
         .ll-turn-status.in-match { color: #ef4444; }
@@ -488,122 +448,48 @@ function GameContent() {
         .align-right { text-align: right; }
         .align-right .ll-turn-status { justify-content: flex-end; }
 
-        .ll-brand {
-          min-width: 120px;
-          text-align: center;
-          filter: drop-shadow(0 6px 16px rgba(212,175,55,.2));
-        }
+        .ll-brand { min-width: 120px; text-align: center; filter: drop-shadow(0 6px 16px rgba(212,175,55,.2)); }
         .ll-crown { font-size: 25px; line-height: 1; margin-bottom: -4px; }
-        .ll-logo-text {
-          margin: 0;
-          font-size: 31px;
-          font-weight: 950;
-          line-height: .92;
-          letter-spacing: 1px;
-          background: linear-gradient(180deg, #fff3a4 0%, #d4af37 55%, #8e6417 100%);
-          -webkit-background-clip: text;
-          -webkit-text-fill-color: transparent;
-        }
+        .ll-logo-text { margin: 0; font-size: 31px; font-weight: 950; line-height: .92; letter-spacing: 1px; background: linear-gradient(180deg, #fff3a4 0%, #d4af37 55%, #8e6417 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
         .ll-logo-sub { font-size: 13px; font-weight: 950; letter-spacing: 4px; color: #fff; opacity: .9; }
 
-        .ll-board-stage {
-          min-height: 0;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          padding: 2px 0 12px;
-        }
+        .ll-board-stage { min-height: 0; display: flex; align-items: center; justify-content: center; padding: 2px 0 12px; }
+        .ll-board-frame { width: min(100%, 680px, calc(100dvh - 475px)); aspect-ratio: 1; padding: 7px; border-radius: 30px; background: linear-gradient(145deg, #f6da82 0%, #8d6819 43%, #e7c970 100%); box-shadow: 0 14px 38px rgba(0,0,0,.8), 0 0 0 1px rgba(212,175,55,.35); }
+        .ll-board-frame > div { width: 100% !important; height: 100% !important; border-radius: 23px; overflow: hidden; }
 
-        .ll-board-frame {
-          width: min(100%, 680px, calc(100dvh - 475px));
-          aspect-ratio: 1;
-          padding: 7px;
-          border-radius: 30px;
-          background: linear-gradient(145deg, #f6da82 0%, #8d6819 43%, #e7c970 100%);
-          box-shadow: 0 14px 38px rgba(0,0,0,.8), 0 0 0 1px rgba(212,175,55,.35);
-        }
-
-        .ll-board-frame > div {
-          width: 100% !important;
-          height: 100% !important;
-          border-radius: 23px;
-          overflow: hidden;
-        }
-
-        .ll-bottom-panel {
-          flex-shrink: 0;
-          display: flex;
-          flex-direction: column;
-          gap: 9px;
-          width: 100%;
-        }
-
-        .ll-controls-row {
-          display: grid;
-          grid-template-columns: minmax(175px, .82fr) minmax(300px, 1.5fr) 82px;
-          gap: 10px;
-          min-height: 156px;
-        }
-
-        .ll-user-box, .ll-dice-box, .ll-action-btn {
-          background: linear-gradient(145deg, rgba(20,16,10,.98), rgba(7,7,5,.98));
-          border: 1px solid rgba(80,62,27,.72);
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 10px 24px rgba(0,0,0,.42);
-        }
-
-        .ll-user-box {
-          min-width: 0;
-          border-radius: 19px;
-          padding: 14px;
-          display: flex;
-          flex-direction: column;
-          justify-content: space-between;
-        }
-
+        .ll-bottom-panel { flex-shrink: 0; display: flex; flex-direction: column; gap: 9px; width: 100%; }
+        .ll-controls-row { display: grid; grid-template-columns: minmax(175px, .82fr) minmax(300px, 1.5fr) 82px; gap: 10px; min-height: 156px; }
+        .ll-user-box, .ll-dice-box, .ll-action-btn { background: linear-gradient(145deg, rgba(20,16,10,.98), rgba(7,7,5,.98)); border: 1px solid rgba(80,62,27,.72); box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 10px 24px rgba(0,0,0,.42); }
+        .ll-user-box { min-width: 0; border-radius: 19px; padding: 14px; display: flex; flex-direction: column; justify-content: space-between; }
         .ll-user-header { position: relative; display: flex; align-items: center; gap: 10px; min-width: 0; }
         .ll-user-avatar { width: 52px; height: 52px; flex: 0 0 52px; border-radius: 50%; background: #21190e; border: 1.5px solid #d4af37; display: grid; place-items: center; font-size: 22px; overflow: hidden; }
         .ll-user-copy { min-width: 0; }
         .ll-u-name { font-size: 15px; color: #fff; display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .ll-u-level { font-size: 12px; color: #d4af37; margin-top: 3px; font-weight: 850; }
         .ll-edit-mark { margin-left: auto; color: #d4af37; font-size: 16px; }
-
         .ll-coins-pill { display: flex; align-items: center; gap: 8px; min-height: 43px; background: #090806; border: 1px solid #302513; border-radius: 22px; padding: 5px 8px 5px 11px; }
         .coin-icon { font-size: 19px; line-height: 1; }
         .ll-coins-pill b { font-size: 16px; color: #fff; }
         .plus-btn { margin-left: auto; background: #22c55e; color: #fff; border: none; border-radius: 50%; width: 28px; height: 28px; font-size: 21px; line-height: 1; cursor: pointer; }
 
-        .ll-dice-box {
-          min-width: 0;
-          border-radius: 19px;
-          padding: 12px 15px;
-          position: relative;
-          overflow: hidden;
-          display: flex;
-          align-items: stretch;
-          justify-content: space-between;
-        }
-
+        .ll-dice-box { min-width: 0; border-radius: 19px; padding: 12px 15px; position: relative; overflow: hidden; display: flex; align-items: stretch; justify-content: space-between; }
         .ll-turn-copy { min-width: 155px; padding: 6px 0 0 4px; display: flex; flex-direction: column; align-items: flex-start; }
         .ll-turn-title { font-size: 16px; font-weight: 950; color: #39e87a; display: flex; align-items: center; gap: 7px; }
         .ll-turn-title .dot { width: 10px; height: 10px; border-radius: 50%; background: #4ade80; box-shadow: 0 0 10px #4ade80; }
         .ll-turn-sub { font-size: 12px; line-height: 1.35; color: #747474; margin-top: 5px; }
         .ll-dice-result { width: 108px; height: 42px; margin-top: auto; border-radius: 21px; border: 1px solid #392c16; background: linear-gradient(180deg, #171207, #090805); display: grid; place-items: center; color: #fff; font-size: 25px; font-weight: 950; box-shadow: inset 0 1px 8px rgba(0,0,0,.5); }
         .ll-dice-hint { font-size: 10px; color: #555; margin-top: 4px; width: 108px; text-align: center; }
-
         .ll-dice-slot { position: relative; flex: 1; min-width: 130px; display: flex; align-items: center; justify-content: center; }
         .ll-dice-slot :global(.dice-area) { min-width: 150px !important; transform: scale(.93); transform-origin: center center; }
         .ll-dice-slot :global(.dice-button) { width: 138px !important; height: 124px !important; }
-
         .ll-side-actions { display: flex; flex-direction: column; gap: 9px; }
         .ll-action-btn { width: 82px; height: calc((100% - 9px)/2); min-height: 70px; border-radius: 18px; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; font-size: 12px; cursor: pointer; }
         .ll-action-btn span:last-child { font-size: 12px; color: #d0c6ae; font-weight: 750; }
         .action-icon { font-size: 20px !important; color: #f2dfaa !important; letter-spacing: 1px; }
         .ll-action-btn.off { border-color: rgba(239,68,68,.5); }
-
         .ll-reactions-bar { display: flex; gap: 9px; overflow-x: auto; scrollbar-width: none; }
         .ll-reactions-bar::-webkit-scrollbar { display: none; }
         .ll-pill-btn { flex: 0 0 auto; background: linear-gradient(145deg, #17130b, #090805); border: 1px solid #3a2d16; color: #f0d477; border-radius: 18px; padding: 10px 18px; font-size: 12px; font-weight: 800; white-space: nowrap; cursor: pointer; }
-
         .ll-footer { display: grid; grid-template-columns: auto auto auto minmax(170px, 1fr); align-items: center; gap: 10px; }
         .ll-foot-btn, .ll-room-chip { min-height: 43px; background: linear-gradient(145deg, #17130b, #090805); border: 1px solid #3a2d16; color: #cfc6b0; border-radius: 17px; padding: 9px 16px; font-size: 12px; font-weight: 800; cursor: pointer; }
         .ll-foot-btn.exit { color: #ef5555; border-color: rgba(239,68,68,.35); }
