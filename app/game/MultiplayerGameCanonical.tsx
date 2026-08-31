@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { io, type Socket } from "socket.io-client";
 import LudoBoard, { type BoardThemeId, type DemoToken } from "../_components/LudoBoardMultiplayer";
 import DemoDice from "../_components/DemoDice";
-import { canMove, hasLegalMove, nextProgress, FINISH_PROGRESS, type DiceValue } from "../../lib/ludoEngine";
+import { canMove, nextProgress, FINISH_PROGRESS, type DiceValue } from "../../lib/ludoEngine";
 import { playerColorsForSeats } from "../../lib/ludoRules";
 import { BOARD_PALETTES } from "../_components/LudoBoardMultiplayer";
 
@@ -19,7 +19,7 @@ type Player = {
   colors?: Color[]; 
   board?: string; 
   level?: number; 
-  avatar?: string 
+  avatar?: string; 
 };
 type TokenMap = Record<string, Record<string, { position: number }>>;
 type GameState = { 
@@ -32,25 +32,31 @@ type GameState = {
   tokens: TokenMap; 
   winnerId?: string | null; 
   stateRevision?: number; 
-  startedAt?: number 
+  startedAt?: number; 
 };
 type ChatMessage = { id: string; name: string; text: string; at: number };
 
 const COLORS: Color[] = ["red", "yellow", "green", "blue"];
 const FINISH = FINISH_PROGRESS;
 const initialTokens = (): DemoToken[] => COLORS.flatMap((color) => Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const })));
-const displayTheme = (value: string): BoardThemeId => value === "midnight-live" ? "night" : value in BOARD_PALETTES ? (value as BoardThemeId) : "classic";
 const normalizeTokens = (serverTokens: TokenMap): DemoToken[] => COLORS.flatMap((color) => Array.from({ length: 4 }, (_, id) => { 
   const raw = serverTokens?.[color]?.[String(id)]?.position; 
   const position = typeof raw === "number" && Number.isFinite(raw) ? raw : 0; 
   return { color, id, position, state: position === 0 ? ("yard" as const) : position === FINISH ? ("finished" as const) : position > 51 ? ("home" as const) : ("track" as const) }; 
 }));
-const audioEvent = (kind: "dice" | "win") => { if (typeof window !== "undefined") window.dispatchEvent(new CustomEvent("ludo-audio", { detail: kind })); };
 
-const QUICK_REACTIONS = ["👋 Hi!", "😂 LOL", "🔥 Nice!", "👍 Good move", "🏆 GG", "😜"];
+function PlayerAvatar({ src, fallback }: { src?: string; fallback: string }) {
+  const isImageUrl = src && (src.startsWith("http") || src.startsWith("/") || src.startsWith("data:"));
+  if (isImageUrl) {
+    return <img src={src} alt="Player avatar" className="ll-avatar-img-element" />;
+  }
+  return <span>{src || fallback}</span>;
+}
+
+const QUICK_REACTIONS = ["👋 Hi!", "😂 LOL", "🔥 Nice!", "👍 Good move", "🏆 GG"];
 
 export default function MultiplayerGameCanonical() {
-  const [theme, setTheme] = useState<BoardThemeId>("classic");
+  const [theme] = useState<BoardThemeId>("classic");
   const [socket, setSocket] = useState<Socket | null>(null);
   const [me, setMe] = useState("");
   const [game, setGame] = useState<GameState | null>(null);
@@ -59,31 +65,28 @@ export default function MultiplayerGameCanonical() {
   const [pending, setPending] = useState<DiceValue | null>(null);
   const [remoteRolling, setRemoteRolling] = useState(false);
   const [animating, setAnimating] = useState(false);
-  const [notice, setNotice] = useState("Roll the dice and make your move");
-  const [chatOpen, setChatOpen] = useState(false);
-  const [chatText, setChatText] = useState("");
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [notice] = useState("Roll the dice and make your move");
+  const [, setChatOpen] = useState(false);
   const [muted, setMuted] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
-  const [roomCode, setRoomCode] = useState("AJ5HCM");
-  const [coins, setCoins] = useState(2450);
+  const [roomCode, setRoomCode] = useState("W100NB");
+  const [coins] = useState(2450);
 
   const diceTimer = useRef<number | null>(null);
   const moveTimer = useRef<number | null>(null);
-  const winnerRef = useRef<string | null>(null);
   const revisionRef = useRef(-1);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      if (params.get("room")) setRoomCode(params.get("room") || "AJ5HCM");
+      if (params.get("room")) setRoomCode(params.get("room") || "W100NB");
     }
   }, []);
 
   const players = useMemo(() => {
     if (game?.players?.length) return game.players;
     return [
-      { playerId: me || "1", name: "Dbase", level: 24, avatar: "👑", seat: 0 },
+      { playerId: me || "1", name: "Bambiii", level: 24, avatar: "👑", seat: 0 },
       { playerId: "2", name: "Adaugo", level: 18, avatar: "🎮", seat: 1 }
     ];
   }, [game?.players, me]);
@@ -114,12 +117,13 @@ export default function MultiplayerGameCanonical() {
     let mounted = true; 
     let localSocket: Socket | null = null; 
     const connect = async () => { 
-      let playerId = "", profileName = "Dbase"; 
+      let playerId = "", profileName = "Bambiii", profileAvatar = ""; 
       try { 
         const r = await fetch("/api/auth", { cache: "no-store" }); 
         const d = await r.json(); 
         playerId = String(d?.user?.id || ""); 
-        profileName = String(d?.user?.username || "Dbase"); 
+        profileName = String(d?.user?.username || "Bambiii"); 
+        profileAvatar = String(d?.user?.avatar || d?.user?.image || "");
       } catch {} 
       if (!mounted) return;
       if (playerId) setMe(playerId); 
@@ -133,7 +137,7 @@ export default function MultiplayerGameCanonical() {
 
       localSocket.on("connect", () => { 
         if (room && playerId) { 
-          localSocket?.emit("join-room", { roomCode: room, name: profileName, roomSize, playerId }); 
+          localSocket?.emit("join-room", { roomCode: room, name: profileName, avatar: profileAvatar, roomSize, playerId }); 
         } 
       }); 
       localSocket.on("roster", (members: Player[]) => { 
@@ -142,7 +146,6 @@ export default function MultiplayerGameCanonical() {
       localSocket.on("game-dice", (e: { value: DiceValue }) => { 
         setRoll(e.value); 
         setRemoteRolling(true); 
-        audioEvent("dice"); 
         if (diceTimer.current) window.clearTimeout(diceTimer.current); 
         diceTimer.current = window.setTimeout(() => setRemoteRolling(false), 900); 
       }); 
@@ -150,12 +153,7 @@ export default function MultiplayerGameCanonical() {
         if (!mounted || !applyState(next)) return; 
         if (next.dice !== null) setRoll(next.dice); 
         setPending(next.currentPlayerId === playerId ? next.pendingMove : null); 
-        if (next.winnerId && winnerRef.current !== next.winnerId) { 
-          winnerRef.current = next.winnerId; 
-          audioEvent("win"); 
-        } 
       }); 
-      localSocket.on("chat", (m: ChatMessage) => setMessages((old) => [...old.slice(-49), m])); 
     }; 
     void connect(); 
     return () => { 
@@ -190,26 +188,22 @@ export default function MultiplayerGameCanonical() {
     if (socket) socket.emit("chat", { text });
   };
 
-  const copyRoomId = () => {
-    if (typeof navigator !== "undefined") {
-      navigator.clipboard.writeText(roomCode);
-    }
-  };
-
   return (
     <main className="ludo-live-wrapper">
       <div className="ludo-live-container">
-        {/* Top Header */}
+        {/* TOP HEADER */}
         <header className="ll-header">
           {/* Player Left (Self) */}
           <div className="ll-player-card left">
             <div className="ll-avatar-wrap">
-              <div className="ll-avatar-img">👑</div>
+              <div className="ll-avatar-img">
+                <PlayerAvatar src={mine.avatar} fallback="👑" />
+              </div>
               <span className="ll-level">★ {mine.level || 24}</span>
             </div>
             <div className="ll-player-meta">
               <div className="ll-player-name-row">
-                <b>{mine.name} (You)</b>
+                <b>{mine.name}</b>
                 <span className="ll-badge-you">you</span>
               </div>
               <div className="ll-turn-status active">
@@ -234,34 +228,34 @@ export default function MultiplayerGameCanonical() {
               </div>
             </div>
             <div className="ll-avatar-wrap">
-              <div className="ll-avatar-img">🎮</div>
+              <div className="ll-avatar-img">
+                <PlayerAvatar src={opponent.avatar} fallback="🎮" />
+              </div>
               <span className="ll-level">★ {opponent.level || 18}</span>
             </div>
-            <button type="button" className="ll-menu-btn" aria-label="Menu">
-              <span /><span /><span />
-            </button>
           </div>
         </header>
 
-        {/* Board Stage */}
+        {/* BOARD STAGE */}
         <div className="ll-board-stage">
           <div className="ll-board-frame">
             <LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken} legalTokenKeys={legalTokenKeys} animateUpdates finishSound />
           </div>
         </div>
 
-        {/* Bottom Panel */}
+        {/* BOTTOM CONTROL PANEL */}
         <div className="ll-bottom-panel">
           <div className="ll-controls-row">
             {/* Player Info Box */}
             <div className="ll-user-box">
               <div className="ll-user-header">
-                <div className="ll-user-avatar">👑</div>
+                <div className="ll-user-avatar">
+                  <PlayerAvatar src={mine.avatar} fallback="👑" />
+                </div>
                 <div>
                   <b className="ll-u-name">{mine.name}</b>
                   <div className="ll-u-level">★ {mine.level || 24}</div>
                 </div>
-                <button type="button" className="ll-edit-icon">✏️</button>
               </div>
               <div className="ll-coins-pill">
                 <span className="coin-icon">🟡</span>
@@ -290,7 +284,7 @@ export default function MultiplayerGameCanonical() {
               />
             </div>
 
-            {/* Chat & Mic Side Actions */}
+            {/* Side Actions */}
             <div className="ll-side-actions">
               <button type="button" className="ll-action-btn" onClick={() => setChatOpen((v) => !v)}>
                 💬
@@ -310,24 +304,18 @@ export default function MultiplayerGameCanonical() {
                 {text}
               </button>
             ))}
-            <button type="button" className="ll-pill-btn emoji" onClick={() => setChatOpen((v) => !v)}>💬</button>
           </div>
 
-          {/* Bottom Footer Actions */}
+          {/* Footer */}
           <footer className="ll-footer">
-            <button type="button" className="ll-foot-btn exit">
-              🚪 Leave Match
-            </button>
-            <button type="button" className="ll-foot-btn">
-              👥 Players
-            </button>
+            <button type="button" className="ll-foot-btn exit">🚪 Leave Match</button>
+            <button type="button" className="ll-foot-btn">👥 Players</button>
             <button type="button" className="ll-foot-btn" onClick={() => setSoundEnabled((v) => !v)}>
               {soundEnabled ? "🔊 Sound" : "🔇 Sound"}
             </button>
-            <div className="ll-room-chip" onClick={copyRoomId}>
+            <div className="ll-room-chip">
               <span className="shield">🛡️</span>
               <small>Room ID: {roomCode}</small>
-              <span className="copy">📋</span>
             </div>
           </footer>
         </div>
@@ -341,7 +329,7 @@ export default function MultiplayerGameCanonical() {
           height: 100%;
           overflow: hidden !important;
           background: #000 !important;
-          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+          font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         }
         * { box-sizing: border-box; }
 
@@ -351,30 +339,32 @@ export default function MultiplayerGameCanonical() {
           display: flex;
           justify-content: center;
           align-items: center;
-          background: #0a0a0a;
+          background: #000;
         }
 
         .ludo-live-container {
           position: relative;
           width: 100%;
-          max-width: 480px;
+          max-width: 440px;
           height: 100dvh;
-          background: #050505;
+          background: #000;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
-          padding: max(10px, env(safe-area-inset-top)) 14px max(10px, env(safe-area-inset-bottom));
+          padding: 12px 14px 16px;
           overflow: hidden;
-          box-shadow: 0 0 60px rgba(0,0,0,0.9);
         }
 
-        /* Top Header */
+        /* HEADER STYLING FIXES */
         .ll-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
-          z-index: 20;
-          padding-top: 4px;
+          width: 100%;
+          height: 52px;
+          flex-shrink: 0; /* Prevents board from shrinking the header */
+          z-index: 50;
+          margin-bottom: 6px;
         }
 
         .ll-player-card {
@@ -385,8 +375,8 @@ export default function MultiplayerGameCanonical() {
 
         .ll-avatar-wrap {
           position: relative;
-          width: 42px;
-          height: 42px;
+          width: 38px;
+          height: 38px;
         }
 
         .ll-avatar-img {
@@ -397,7 +387,14 @@ export default function MultiplayerGameCanonical() {
           border: 1.5px solid #d4af37;
           display: grid;
           place-items: center;
-          font-size: 20px;
+          font-size: 18px;
+          overflow: hidden;
+        }
+
+        .ll-avatar-img-element {
+          width: 100%;
+          height: 100%;
+          object-fit: cover;
         }
 
         .ll-level {
@@ -434,7 +431,6 @@ export default function MultiplayerGameCanonical() {
           font-weight: 900;
           padding: 1px 4px;
           border-radius: 4px;
-          text-transform: lowercase;
         }
 
         .ll-turn-status {
@@ -464,13 +460,13 @@ export default function MultiplayerGameCanonical() {
 
         .align-right { text-align: right; }
 
-        /* Brand Center */
+        /* BRAND CENTER */
         .ll-brand {
           text-align: center;
         }
-        .ll-crown { font-size: 14px; line-height: 1; margin-bottom: -2px; }
+        .ll-crown { font-size: 12px; line-height: 1; margin-bottom: -2px; }
         .ll-logo-text {
-          font-size: 18px;
+          font-size: 16px;
           font-weight: 900;
           letter-spacing: 1px;
           background: linear-gradient(180deg, #fff2a3 0%, #d4af37 100%);
@@ -480,61 +476,45 @@ export default function MultiplayerGameCanonical() {
           line-height: 1;
         }
         .ll-logo-sub {
-          font-size: 8px;
+          font-size: 7px;
           font-weight: 800;
-          letter-spacing: 3px;
+          letter-spacing: 2px;
           color: #fff;
           opacity: 0.8;
         }
 
-        .ll-menu-btn {
-          background: none;
-          border: none;
-          display: flex;
-          flex-direction: column;
-          gap: 3px;
-          padding: 4px;
-          cursor: pointer;
-          margin-left: 2px;
-        }
-        .ll-menu-btn span {
-          width: 16px;
-          height: 2px;
-          background: #d4af37;
-          border-radius: 2px;
-        }
-
-        /* Central Board */
+        /* BOARD STAGE FLEX FIX */
         .ll-board-stage {
           flex: 1;
-          display: grid;
-          place-items: center;
-          padding: 10px 0;
-          z-index: 10;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          min-height: 0; /* Ensures flex container recalculates bounds properly */
+          padding: 4px 0;
         }
 
         .ll-board-frame {
-          width: min(92vw, 420px);
-          height: min(92vw, 420px);
-          padding: 6px;
-          border-radius: 24px;
+          width: min(84vw, 360px);
+          height: min(84vw, 360px);
+          padding: 5px;
+          border-radius: 20px;
           background: linear-gradient(145deg, #f5d77f, #8c6819, #e6c86e);
-          box-shadow: 0 12px 40px rgba(0,0,0,0.8), inset 0 0 0 1px rgba(255,255,255,0.2);
+          box-shadow: 0 10px 30px rgba(0,0,0,0.8);
         }
 
         .ll-board-frame > div {
           width: 100% !important;
           height: 100% !important;
-          border-radius: 18px;
+          border-radius: 16px;
           overflow: hidden;
         }
 
-        /* Bottom Control Panel */
+        /* BOTTOM PANEL FIXES */
         .ll-bottom-panel {
-          z-index: 20;
+          flex-shrink: 0;
           display: flex;
           flex-direction: column;
-          gap: 10px;
+          gap: 8px;
         }
 
         .ll-controls-row {
@@ -542,15 +522,15 @@ export default function MultiplayerGameCanonical() {
           display: flex;
           justify-content: space-between;
           align-items: stretch;
-          gap: 8px;
+          gap: 6px;
         }
 
         .ll-user-box {
           flex: 1;
           background: #110e0a;
           border: 1px solid #2a2215;
-          border-radius: 16px;
-          padding: 10px;
+          border-radius: 14px;
+          padding: 8px;
           display: flex;
           flex-direction: column;
           justify-content: space-between;
@@ -559,64 +539,55 @@ export default function MultiplayerGameCanonical() {
         .ll-user-header {
           display: flex;
           align-items: center;
-          gap: 8px;
+          gap: 6px;
         }
 
         .ll-user-avatar {
-          width: 32px;
-          height: 32px;
+          width: 28px;
+          height: 28px;
           border-radius: 50%;
           background: #21190e;
           border: 1px solid #d4af37;
           display: grid;
           place-items: center;
-          font-size: 16px;
+          font-size: 14px;
+          overflow: hidden;
         }
 
-        .ll-u-name { font-size: 11px; color: #fff; display: block; }
-        .ll-u-level { font-size: 9px; color: #d4af37; }
-
-        .ll-edit-icon {
-          margin-left: auto;
-          background: none;
-          border: none;
-          font-size: 10px;
-          cursor: pointer;
-          opacity: 0.6;
-        }
+        .ll-u-name { font-size: 10px; color: #fff; display: block; }
+        .ll-u-level { font-size: 8px; color: #d4af37; }
 
         .ll-coins-pill {
-          margin-top: 8px;
+          margin-top: 6px;
           background: #080604;
           border: 1px solid #261e12;
-          border-radius: 20px;
-          padding: 4px 8px;
+          border-radius: 16px;
+          padding: 3px 6px;
           display: flex;
           align-items: center;
-          gap: 6px;
+          gap: 4px;
         }
 
-        .ll-coins-pill b { font-size: 11px; color: #fff; }
+        .ll-coins-pill b { font-size: 10px; color: #fff; }
         .plus-btn {
           margin-left: auto;
           background: #22c55e;
           color: #fff;
           border: none;
           border-radius: 50%;
-          width: 16px;
-          height: 16px;
-          font-size: 11px;
+          width: 14px;
+          height: 14px;
+          font-size: 10px;
           line-height: 1;
           cursor: pointer;
         }
 
-        /* Center Dice Box */
         .ll-dice-box {
           flex: 1.2;
           background: #110e0a;
           border: 1px solid #2a2215;
-          border-radius: 16px;
-          padding: 10px;
+          border-radius: 14px;
+          padding: 8px;
           text-align: center;
           display: flex;
           flex-direction: column;
@@ -625,7 +596,7 @@ export default function MultiplayerGameCanonical() {
         }
 
         .ll-turn-title {
-          font-size: 10px;
+          font-size: 9px;
           font-weight: 900;
           color: #4ade80;
           display: flex;
@@ -633,8 +604,8 @@ export default function MultiplayerGameCanonical() {
           gap: 4px;
         }
 
-        .ll-turn-sub { font-size: 8px; color: #777; margin-top: 1px; }
-        .ll-dice-val { font-size: 16px; font-weight: 900; color: #fff; margin-top: 4px; }
+        .ll-turn-sub { font-size: 7px; color: #777; margin-top: 1px; }
+        .ll-dice-val { font-size: 14px; font-weight: 900; color: #fff; margin-top: 2px; }
         .ll-dice-hint { font-size: 7px; color: #555; }
 
         .ll-dice-container {
@@ -643,39 +614,35 @@ export default function MultiplayerGameCanonical() {
           top: 50%;
           transform: translate(-50%, -50%);
           z-index: 30;
-          pointer-events: auto;
         }
 
-        /* Side Action Buttons */
         .ll-side-actions {
           display: flex;
           flex-direction: column;
-          gap: 6px;
+          gap: 4px;
         }
 
         .ll-action-btn {
-          width: 44px;
-          height: 44px;
+          width: 40px;
+          height: 40px;
           background: #110e0a;
           border: 1px solid #2a2215;
-          border-radius: 14px;
+          border-radius: 12px;
           color: #fff;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: center;
-          font-size: 14px;
+          font-size: 12px;
           cursor: pointer;
         }
-        .ll-action-btn span { font-size: 7px; color: #aaa; margin-top: 2px; }
+        .ll-action-btn span { font-size: 7px; color: #aaa; margin-top: 1px; }
         .ll-action-btn.off { border-color: #ef4444; }
 
-        /* Reactions Bar */
         .ll-reactions-bar {
           display: flex;
-          gap: 6px;
+          gap: 4px;
           overflow-x: auto;
-          padding-bottom: 2px;
           scrollbar-width: none;
         }
         .ll-reactions-bar::-webkit-scrollbar { display: none; }
@@ -684,34 +651,28 @@ export default function MultiplayerGameCanonical() {
           background: #110e0a;
           border: 1px solid #2a2215;
           color: #d4af37;
-          border-radius: 12px;
-          padding: 6px 10px;
-          font-size: 9px;
+          border-radius: 10px;
+          padding: 5px 8px;
+          font-size: 8px;
           font-weight: 700;
           white-space: nowrap;
           cursor: pointer;
         }
 
-        .ll-pill-btn.emoji {
-          padding: 6px 8px;
-        }
-
-        /* Footer */
         .ll-footer {
           display: flex;
           align-items: center;
           justify-content: space-between;
-          gap: 6px;
-          padding-top: 2px;
+          gap: 4px;
         }
 
         .ll-foot-btn {
           background: #110e0a;
           border: 1px solid #2a2215;
           color: #aaa;
-          border-radius: 10px;
-          padding: 6px 8px;
-          font-size: 9px;
+          border-radius: 8px;
+          padding: 5px 6px;
+          font-size: 8px;
           font-weight: 600;
           cursor: pointer;
         }
@@ -720,16 +681,14 @@ export default function MultiplayerGameCanonical() {
         .ll-room-chip {
           background: #0f1710;
           border: 1px solid #15803d;
-          border-radius: 10px;
-          padding: 5px 8px;
+          border-radius: 8px;
+          padding: 4px 6px;
           display: flex;
           align-items: center;
-          gap: 4px;
-          cursor: pointer;
+          gap: 3px;
         }
         .ll-room-chip small { font-size: 8px; color: #4ade80; font-weight: 700; }
         .ll-room-chip .shield { font-size: 8px; }
-        .ll-room-chip .copy { font-size: 8px; opacity: 0.7; }
       `}</style>
     </main>
   );
