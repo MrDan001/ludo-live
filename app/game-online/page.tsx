@@ -236,17 +236,10 @@ function GameContent() {
     <main className="ludo-live-wrapper">
       <div className="ludo-live-container">
         <header className="multiplayer-topbar">
-          <div className="multiplayer-topbar-title">
-            <span className="multiplayer-topbar-mark" aria-hidden="true">L</span>
-            <div>
-              <strong>Ludo Live</strong>
-              <span>Multiplayer Match</span>
-            </div>
-          </div>
-          <div className="multiplayer-topbar-room" aria-label={`Room ${roomCode}`}>
-            <span>ROOM</span>
-            <b>{roomCode}</b>
-          </div>
+          <div className="multiplayer-player-card multiplayer-player-card-you"><div className="multiplayer-player-avatar"><PlayerAvatar src={mine.avatar} fallback="👑" /></div><div className="multiplayer-player-copy"><div className="multiplayer-player-name-row"><strong>{mine.name}</strong><span className="multiplayer-you-badge">YOU</span></div><div className="multiplayer-player-status multiplayer-player-status-you"><span className="multiplayer-status-dot" />{myTurn ? "Your Turn" : "Waiting"}</div></div><span className="multiplayer-level-badge">★ {mine.level || 24}</span></div>
+          <div className="multiplayer-topbar-logo" aria-label="Ludo Live"><span className="multiplayer-logo-crown">♛</span><strong>LUDO</strong><span>LIVE</span></div>
+          <div className="multiplayer-player-card multiplayer-player-card-opponent"><div className="multiplayer-player-avatar"><PlayerAvatar src={opponent.avatar} fallback="🎮" /></div><div className="multiplayer-player-copy"><div className="multiplayer-player-name-row"><strong>{opponent.name}</strong></div><div className="multiplayer-player-status multiplayer-player-status-opponent"><span className="multiplayer-status-dot" />IN MATCH</div></div><span className="multiplayer-level-badge">★ {opponent.level || 18}</span></div>
+          <button type="button" className="multiplayer-menu-btn" aria-label="Open game menu"><span/><span/><span/></button>
         </header>
 
         <div className="ll-board-stage">
@@ -374,84 +367,7 @@ function GameContent() {
           overflow: hidden;
         }
 
-        .multiplayer-topbar {
-          position: relative;
-          display: flex;
-          align-items: center;
-          justify-content: space-between;
-          gap: 16px;
-          width: 100%;
-          min-height: 68px;
-          padding: 8px 2px 14px;
-          z-index: 50;
-        }
-
-        .multiplayer-topbar-title {
-          display: flex;
-          align-items: center;
-          gap: 11px;
-          min-width: 0;
-        }
-
-        .multiplayer-topbar-mark {
-          width: 42px;
-          height: 42px;
-          flex: 0 0 42px;
-          display: grid;
-          place-items: center;
-          border: 1px solid rgba(212,175,55,.65);
-          border-radius: 13px;
-          background: linear-gradient(145deg, #171208, #070705);
-          color: #d4af37;
-          font-size: 20px;
-          font-weight: 950;
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 8px 22px rgba(0,0,0,.5);
-        }
-
-        .multiplayer-topbar-title strong {
-          display: block;
-          color: #fff;
-          font-size: 18px;
-          line-height: 1.05;
-          font-weight: 950;
-        }
-
-        .multiplayer-topbar-title span:not(.multiplayer-topbar-mark) {
-          display: block;
-          margin-top: 3px;
-          color: #777;
-          font-size: 10px;
-          font-weight: 750;
-          letter-spacing: .8px;
-          text-transform: uppercase;
-        }
-
-        .multiplayer-topbar-room {
-          display: flex;
-          align-items: center;
-          gap: 8px;
-          min-width: 0;
-          padding: 9px 13px;
-          border: 1px solid rgba(80,62,27,.72);
-          border-radius: 15px;
-          background: linear-gradient(145deg, rgba(20,16,10,.98), rgba(7,7,5,.98));
-          box-shadow: inset 0 1px 0 rgba(255,255,255,.035), 0 8px 20px rgba(0,0,0,.35);
-        }
-
-        .multiplayer-topbar-room span {
-          color: #777;
-          font-size: 9px;
-          font-weight: 850;
-          letter-spacing: 1px;
-        }
-
-        .multiplayer-topbar-room b {
-          color: #d4af37;
-          font-size: 12px;
-          font-weight: 950;
-          letter-spacing: 1px;
-        }
-
+        .multiplayer-topbar{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 150px minmax(0,1fr) 72px;align-items:center;gap:12px;width:100%;min-height:116px;padding:4px 0 14px;z-index:50}.multiplayer-player-card{position:relative;min-width:0;height:92px;display:flex;align-items:center;gap:12px;padding:10px 16px 10px 12px;border:1px solid rgba(102,76,25,.9);border-radius:31px;background:linear-gradient(145deg,#130f08,#060604);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 25px rgba(0,0,0,.5)}.multiplayer-player-avatar{width:66px;height:66px;flex:0 0 66px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#0a0906;border:3px solid #d4af37;font-size:27px}.multiplayer-player-avatar img{width:100%;height:100%;object-fit:cover}.multiplayer-player-copy{min-width:0;flex:1}.multiplayer-player-name-row{display:flex;align-items:center;gap:8px}.multiplayer-player-name-row strong{color:#f7f3ea;font-size:clamp(13px,1.7vw,19px);font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.multiplayer-you-badge{padding:4px 8px;border-radius:7px;background:linear-gradient(#ffd85a,#e9a817);color:#181105;font-size:10px;font-weight:1000}.multiplayer-player-status{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:clamp(11px,1.45vw,16px);font-weight:850}.multiplayer-player-status-you{color:#22e875}.multiplayer-player-status-opponent{color:#ff3347}.multiplayer-status-dot{width:16px;height:16px;border-radius:50%}.multiplayer-player-status-you .multiplayer-status-dot{background:#16e76b;box-shadow:0 0 12px #16e76b}.multiplayer-player-status-opponent .multiplayer-status-dot{background:#ff263e;box-shadow:0 0 12px #ff263e}.multiplayer-level-badge{position:absolute;left:58px;bottom:-13px;min-width:60px;padding:5px 9px;border:1px solid #b48722;border-radius:15px;background:#090806;color:#f1ca51;font-size:13px;font-weight:950;text-align:center}.multiplayer-topbar-logo{width:132px;height:104px;justify-self:center;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#f5cf61;text-align:center;filter:drop-shadow(0 0 12px rgba(212,175,55,.35))}.multiplayer-logo-crown{font-size:33px;line-height:.7}.multiplayer-topbar-logo strong{font-family:Georgia,serif;font-size:32px;line-height:.9;color:#f7d56d;text-shadow:0 2px #6d4500}.multiplayer-topbar-logo>span:last-child{font-size:19px;font-weight:1000;letter-spacing:1px;color:#e9b52e}.multiplayer-menu-btn{width:72px;height:72px;border-radius:22px;border:1px solid #665019;background:linear-gradient(145deg,#17130b,#090805);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px}.multiplayer-menu-btn span{width:36px;height:5px;border-radius:99px;background:#e0a916}
         .ll-board-stage {
           min-height: 0;
           display: flex;
@@ -599,6 +515,10 @@ function GameContent() {
           .ll-foot-btn, .ll-room-chip { min-height: 34px; padding: 6px 8px; font-size: 8px; border-radius: 11px; }
           .ll-room-chip small { font-size: 7px; }
           .shield, .copy-icon { font-size: 9px; }
+        }
+
+        @media (max-width: 700px) {
+          .multiplayer-topbar{grid-template-columns:minmax(0,1fr) 82px minmax(0,1fr) 46px;gap:5px;min-height:78px;padding-bottom:8px}.multiplayer-player-card{height:62px;gap:5px;padding:5px 7px;border-radius:20px}.multiplayer-player-avatar{width:43px;height:43px;flex-basis:43px;border-width:2px;font-size:18px}.multiplayer-player-name-row{gap:3px}.multiplayer-player-name-row strong{font-size:9px}.multiplayer-you-badge{padding:2px 4px;font-size:6px}.multiplayer-player-status{gap:4px;margin-top:4px;font-size:7px}.multiplayer-status-dot{width:7px;height:7px}.multiplayer-level-badge{left:34px;bottom:-9px;min-width:36px;padding:2px 5px;font-size:8px}.multiplayer-topbar-logo{width:78px;height:68px}.multiplayer-logo-crown{font-size:20px}.multiplayer-topbar-logo strong{font-size:21px}.multiplayer-topbar-logo>span:last-child{font-size:11px}.multiplayer-menu-btn{width:46px;height:46px;border-radius:14px;gap:5px}.multiplayer-menu-btn span{width:23px;height:3px}
         }
 
         @media (max-height: 760px) {
