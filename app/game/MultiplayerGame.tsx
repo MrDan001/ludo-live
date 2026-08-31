@@ -2,27 +2,31 @@
 
 import MultiplayerGameCanonical from "./MultiplayerGameCanonical";
 
+/**
+ * Multiplayer route shell.
+ *
+ * This route intentionally contains only the live Ludo board and the minimum
+ * control needed to play it (the dice). Match chat, voice controls, badges,
+ * turn/status pills and decorative page chrome are hidden here only.
+ */
 export default function MultiplayerGame() {
   return (
-    <div className="premium-multiplayer-route">
+    <div className="clean-multiplayer-route">
       <MultiplayerGameCanonical />
       <style jsx global>{`
-        /* MULTIPLAYER PAGE ONLY.
-           Keep the rest of the application untouched. The board is sized from the
-           mobile viewport width so every phone gets the same responsive scale. */
-        html, body {
+        html,
+        body {
           margin: 0 !important;
           padding: 0 !important;
           width: 100% !important;
           height: 100% !important;
-          background: #000 !important;
           overflow: hidden !important;
+          background: #050505 !important;
         }
 
-        *, *::before, *::after { box-sizing: border-box; }
-
-        .premium-multiplayer-route,
-        .premium-multiplayer-route .pg-game {
+        .clean-multiplayer-route,
+        .clean-multiplayer-route .live-page,
+        .clean-multiplayer-route .board-stage {
           position: fixed !important;
           inset: 0 !important;
           width: 100% !important;
@@ -30,111 +34,112 @@ export default function MultiplayerGame() {
           min-height: 100dvh !important;
           margin: 0 !important;
           padding: 0 !important;
-          background: #000 !important;
           overflow: hidden !important;
         }
 
-        .premium-multiplayer-route .pg-shell {
-          position: absolute !important;
-          inset: 0 !important;
-          width: 100% !important;
-          height: 100% !important;
-          min-height: 100% !important;
-          max-width: none !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          overflow: hidden !important;
-        }
-
-        /* Multiplayer HUD is hidden on this board-only route and cannot constrain it. */
-        .premium-multiplayer-route .pg-shell > .pg-header,
-        .premium-multiplayer-route .pg-shell > .pg-bottom,
-        .premium-multiplayer-route .pg-shell > .pg-reaction-row,
-        .premium-multiplayer-route .pg-shell > .pg-utility-row,
-        .premium-multiplayer-route .pg-shell > .lux-modal-bg,
-        .premium-multiplayer-route .pg-header,
-        .premium-multiplayer-route .pg-bottom,
-        .premium-multiplayer-route .pg-reaction-row,
-        .premium-multiplayer-route .pg-utility-row,
-        .premium-multiplayer-route .lux-modal-bg {
+        /* The multiplayer route is intentionally board-only. */
+        .clean-multiplayer-route .match-badge,
+        .clean-multiplayer-route .turn-pill,
+        .clean-multiplayer-route .chat-panel,
+        .clean-multiplayer-route .chat-tool,
+        .clean-multiplayer-route .mic-tool {
           display: none !important;
           visibility: hidden !important;
-          width: 0 !important;
-          height: 0 !important;
-          min-height: 0 !important;
-          max-height: 0 !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          overflow: hidden !important;
+          pointer-events: none !important;
         }
 
-        .premium-multiplayer-route .lux-board-zone {
-          position: absolute !important;
-          inset: 0 !important;
-          width: 100% !important;
-          height: 100% !important;
-          min-height: 100% !important;
-          margin: 0 !important;
-          padding: 0 !important;
+        .clean-multiplayer-route .board-stage {
           display: flex !important;
           align-items: center !important;
           justify-content: center !important;
-          overflow: visible !important;
+          background: #050505 !important;
         }
 
-        /*
-          RESPONSIVE MULTIPLAYER BOARD:
-          - Width is the source of truth on portrait phones.
-          - Height follows width exactly, preserving the square board.
-          - 94vw leaves a small breathing margin instead of allowing another
-            device's height/layout rules to make the board tiny.
-          - 760px caps very large screens without affecting normal phones.
-        */
-        .premium-multiplayer-route .pg-board-frame {
+        .clean-multiplayer-route .board-wrap {
           position: relative !important;
-          width: min(94vw, 760px) !important;
-          height: min(94vw, 760px) !important;
+          width: min(96vw, 96svh, 760px) !important;
+          height: min(96vw, 96svh, 760px) !important;
           max-width: 760px !important;
           max-height: 760px !important;
           min-width: 0 !important;
           min-height: 0 !important;
           margin: 0 !important;
           padding: 0 !important;
-          flex: 0 0 auto !important;
-          flex-shrink: 0 !important;
+          display: block !important;
           aspect-ratio: 1 / 1 !important;
-          border: 0 !important;
-          border-radius: 0 !important;
-          box-shadow: none !important;
-          background: transparent !important;
-          transform: none !important;
         }
 
-        .premium-multiplayer-route .pg-board-frame > div {
+        .clean-multiplayer-route .board-glow {
+          display: none !important;
+        }
+
+        /* Remove the old decorative gold container. The board itself is the UI. */
+        .clean-multiplayer-route .board-frame {
+          position: absolute !important;
+          inset: 0 !important;
           width: 100% !important;
           height: 100% !important;
-          min-width: 0 !important;
-          min-height: 0 !important;
           max-width: none !important;
           max-height: none !important;
-          aspect-ratio: 1 / 1 !important;
           margin: 0 !important;
+          padding: 0 !important;
+          border: 0 !important;
           border-radius: 0 !important;
-          overflow: hidden !important;
+          background: transparent !important;
+          box-shadow: none !important;
         }
 
-        /* Explicit mobile override: never let a phone-specific inherited rule
-           shrink the multiplayer board below the viewport-width calculation. */
-        @media (max-width: 900px) {
-          .premium-multiplayer-route .pg-board-frame {
-            width: calc(100vw - 12px) !important;
-            height: calc(100vw - 12px) !important;
-            max-width: calc(100vw - 12px) !important;
-            max-height: calc(100vw - 12px) !important;
-            flex: 0 0 calc(100vw - 12px) !important;
+        .clean-multiplayer-route .board-frame > div {
+          width: 100% !important;
+          height: 100% !important;
+          max-width: none !important;
+          max-height: none !important;
+          margin: 0 !important;
+          border-radius: 0 !important;
+          overflow: visible !important;
+        }
+
+        /* Keep the playable dice, but make it a compact board control rather
+           than another page-level panel. */
+        .clean-multiplayer-route .floating-tools {
+          position: absolute !important;
+          inset: 0 !important;
+          width: 100% !important;
+          height: 100% !important;
+          margin: 0 !important;
+          padding: 0 !important;
+          pointer-events: none !important;
+        }
+
+        .clean-multiplayer-route .dice-float {
+          position: absolute !important;
+          left: 50% !important;
+          bottom: 3% !important;
+          transform: translateX(-50%) !important;
+          z-index: 100 !important;
+          pointer-events: auto !important;
+        }
+
+        .clean-multiplayer-route .dice-float > * {
+          max-width: 64px !important;
+          max-height: 64px !important;
+        }
+
+        @media (max-width: 600px) {
+          .clean-multiplayer-route .board-wrap {
+            width: min(100vw, 100svh) !important;
+            height: min(100vw, 100svh) !important;
+          }
+
+          .clean-multiplayer-route .dice-float {
+            bottom: 2.5% !important;
+          }
+        }
+
+        @media (max-height: 620px) and (orientation: landscape) {
+          .clean-multiplayer-route .board-wrap {
+            width: min(100svh, 100vw) !important;
+            height: min(100svh, 100vw) !important;
           }
         }
       `}</style>
