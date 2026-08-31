@@ -7,18 +7,25 @@
   isolation: isolate !important;
 }
 
-/* The regular multiplayer header must always occupy the top grid row. */
+/* Force the regular multiplayer header into a visible top layer. */
 .ludo-live-wrapper .ludo-live-container > .ll-header {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
   align-items: center !important;
   width: 100% !important;
   min-width: 0 !important;
+  min-height: 92px !important;
   visibility: visible !important;
   opacity: 1 !important;
-  position: relative !important;
-  z-index: 1000 !important;
+  position: fixed !important;
+  top: 10px !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+  width: min(calc(100% - 24px), 716px) !important;
+  padding: 4px 0 10px !important;
   overflow: visible !important;
+  z-index: 99999 !important;
+  pointer-events: auto !important;
 }
 
 /* Both player cards are the only header columns. */
@@ -27,7 +34,7 @@
   visibility: visible !important;
   opacity: 1 !important;
   position: relative !important;
-  z-index: 1010 !important;
+  z-index: 100000 !important;
   min-width: 0 !important;
   max-width: none !important;
 }
@@ -42,7 +49,7 @@
   justify-self: stretch !important;
 }
 
-/* Remove the old centered LUDO/LIVE brand completely from regular multiplayer. */
+/* Remove the centered LUDO/LIVE brand from regular multiplayer completely. */
 .ludo-live-wrapper .ludo-live-container > .ll-header > .ll-brand,
 .ludo-live-wrapper .ludo-live-container > .ll-header .ll-brand,
 .ludo-live-wrapper .ludo-live-container > .ll-header .ll-logo-text,
@@ -57,13 +64,8 @@
   pointer-events: none !important;
 }
 
-/* Never let the board stage paint above the header. */
-.ludo-live-wrapper .ludo-live-container > .ll-board-stage {
-  position: relative !important;
-  z-index: 1 !important;
-  min-width: 0 !important;
-}
-
+/* Keep the board and controls below the header stacking layer. */
+.ludo-live-wrapper .ludo-live-container > .ll-board-stage,
 .ludo-live-wrapper .ludo-live-container > .ll-board-stage .ll-board-frame {
   position: relative !important;
   z-index: 1 !important;
@@ -73,7 +75,13 @@
   .ludo-live-wrapper .ludo-live-container > .ll-header {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     gap: 7px !important;
-    min-height: 92px !important;
+    min-height: 76px !important;
+    width: calc(100% - 16px) !important;
+    top: 6px !important;
+  }
+
+  .ludo-live-wrapper .ludo-live-container > .ll-header > .ll-player-card {
+    min-height: 72px !important;
   }
 }
 
@@ -81,5 +89,7 @@
   .ludo-live-wrapper .ludo-live-container > .ll-header {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     column-gap: 6px !important;
+    width: calc(100% - 12px) !important;
+    top: 4px !important;
   }
 }
