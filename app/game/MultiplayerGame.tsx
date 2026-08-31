@@ -40,7 +40,7 @@ export default function MultiplayerGame() {
         .lux-modal-bg{z-index:100!important}
 
         @media(max-width:700px){
-          .pg-shell{width:calc(100vw - 32px)!important;padding-top:120px!important;gap:7px!important}
+          .pg-shell{width:calc(100vw - 32px)!important;padding-top:70px!important;gap:7px!important}
           .pg-header{height:96px!important;min-height:96px!important;padding:7px 54px 7px 7px!important;border-radius:23px!important;gap:46px!important}
           .pg-player{height:82px!important;border-radius:18px!important}
           .pg-avatar-btn,.pg-avatar{width:50px!important;height:50px!important;flex-basis:50px!important}
@@ -56,7 +56,7 @@ export default function MultiplayerGame() {
           .pg-reaction-row,.pg-utility-row{height:44px!important;min-height:44px!important}.pg-reaction-row button{font-size:9px!important;padding:6px 3px!important}.pg-utility-row button{font-size:9px!important;min-height:40px!important}.pg-room{font-size:8px!important}
         }
         @media(max-width:520px){
-          .pg-shell{width:calc(100vw - 24px)!important;padding-top:112px!important}
+          .pg-shell{width:calc(100vw - 24px)!important;padding-top:58px!important}
           .pg-header{height:92px!important;min-height:92px!important;padding:6px 50px 6px 6px!important;gap:38px!important}
           .pg-player{height:80px!important;padding:6px!important}
           .pg-avatar-btn,.pg-avatar{width:46px!important;height:46px!important;flex-basis:46px!important}
@@ -69,7 +69,7 @@ export default function MultiplayerGame() {
           .pg-turn-title{font-size:14px!important}.pg-dice{right:2px!important;transform:translateY(-50%) scale(.59)!important}.pg-reaction-row button{font-size:8px!important}.pg-utility-row button{font-size:8px!important}
         }
         @media(max-height:900px){
-          .pg-shell{padding-top:92px!important}
+          .pg-shell{padding-top:24px!important}
           .pg-header{height:92px!important;min-height:92px!important}.pg-player{height:76px!important}.pg-avatar-btn,.pg-avatar{width:46px!important;height:46px!important;flex-basis:46px!important}
           .pg-board-frame{width:min(calc(100vw - 32px),calc(100dvh - 330px))!important}.pg-bottom{height:160px!important;min-height:160px!important}.pg-profile-card,.pg-turn-card{min-height:160px!important}.pg-reaction-row{height:40px!important;min-height:40px!important}.pg-utility-row{height:42px!important;min-height:42px!important}
           .pg-dice{transform:translateY(-50%) scale(.58)!important}
