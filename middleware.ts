@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Preserve the existing home/dashboard routing. Multiplayer /game URLs must
-// render app/game/page.tsx so the authoritative MultiplayerGame header/UI is used.
+// Preserve the existing home/dashboard routing. Multiplayer room URLs use the
+// dedicated multiplayer UI at /game-online. Tournament URLs are left alone.
 export function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
 
   if (pathname === "/home") {
     return NextResponse.redirect(new URL("/dashboard", request.url));
@@ -12,6 +12,16 @@ export function middleware(request: NextRequest) {
   if (pathname === "/dashboard") {
     const url = request.nextUrl.clone();
     url.pathname = "/home";
+    return NextResponse.rewrite(url);
+  }
+
+  if (
+    pathname === "/game" &&
+    searchParams.has("room") &&
+    !(searchParams.has("tournament") && searchParams.has("match"))
+  ) {
+    const url = request.nextUrl.clone();
+    url.pathname = "/game-online";
     return NextResponse.rewrite(url);
   }
 
