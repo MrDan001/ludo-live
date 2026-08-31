@@ -1,63 +1,85 @@
 /*
- * Regular multiplayer header — authoritative final override.
- *
- * This file is intentionally scoped to .ludo-live-wrapper so it cannot
- * affect tournament UI.
+ * Regular multiplayer header — final authoritative override.
+ * Scoped ONLY to .ludo-live-wrapper so tournament UI is untouched.
  */
-.ludo-live-wrapper .ludo-live-container header.ll-header,
-.ludo-live-wrapper .ludo-live-container .ll-header {
+.ludo-live-wrapper .ludo-live-container {
+  position: relative !important;
+  isolation: isolate !important;
+}
+
+/* The regular multiplayer header must always occupy the top grid row. */
+.ludo-live-wrapper .ludo-live-container > .ll-header {
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
   align-items: center !important;
+  width: 100% !important;
+  min-width: 0 !important;
   visibility: visible !important;
   opacity: 1 !important;
   position: relative !important;
-  z-index: 100 !important;
+  z-index: 1000 !important;
+  overflow: visible !important;
 }
 
-.ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card {
+/* Both player cards are the only header columns. */
+.ludo-live-wrapper .ludo-live-container > .ll-header > .ll-player-card {
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
   position: relative !important;
-  z-index: 110 !important;
+  z-index: 1010 !important;
   min-width: 0 !important;
+  max-width: none !important;
 }
 
-.ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card.left {
+.ludo-live-wrapper .ludo-live-container > .ll-header > .ll-player-card.left {
   grid-column: 1 !important;
   justify-self: stretch !important;
 }
 
-/* The centered LUDO/LIVE brand was covering the multiplayer header. */
-.ludo-live-wrapper .ludo-live-container .ll-header > .ll-brand {
-  display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  pointer-events: none !important;
-}
-
-.ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card.right {
+.ludo-live-wrapper .ludo-live-container > .ll-header > .ll-player-card.right {
   grid-column: 2 !important;
   justify-self: stretch !important;
 }
 
+/* Remove the old centered LUDO/LIVE brand completely from regular multiplayer. */
+.ludo-live-wrapper .ludo-live-container > .ll-header > .ll-brand,
+.ludo-live-wrapper .ludo-live-container > .ll-header .ll-brand,
+.ludo-live-wrapper .ludo-live-container > .ll-header .ll-logo-text,
+.ludo-live-wrapper .ludo-live-container > .ll-header .ll-logo-sub,
+.ludo-live-wrapper .ludo-live-container > .ll-header .ll-crown {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Never let the board stage paint above the header. */
+.ludo-live-wrapper .ludo-live-container > .ll-board-stage {
+  position: relative !important;
+  z-index: 1 !important;
+  min-width: 0 !important;
+}
+
+.ludo-live-wrapper .ludo-live-container > .ll-board-stage .ll-board-frame {
+  position: relative !important;
+  z-index: 1 !important;
+}
+
+@media (max-width: 700px) {
+  .ludo-live-wrapper .ludo-live-container > .ll-header {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
+    gap: 7px !important;
+    min-height: 92px !important;
+  }
+}
+
 @media (max-width: 520px) {
-  .ludo-live-wrapper .ludo-live-container header.ll-header,
-  .ludo-live-wrapper .ludo-live-container .ll-header {
-    display: grid !important;
+  .ludo-live-wrapper .ludo-live-container > .ll-header {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     column-gap: 6px !important;
-  }
-
-  .ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card {
-    display: flex !important;
-    min-width: 0 !important;
-    max-width: none !important;
-  }
-
-  .ludo-live-wrapper .ludo-live-container .ll-header > .ll-brand {
-    display: none !important;
-    width: 0 !important;
   }
 }
