@@ -1,0 +1,51 @@
+/* Multiplayer header: authoritative override for the live game-online HUD only. */
+.ludo-live-wrapper .ludo-live-container .ll-header {
+  display: grid !important;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) !important;
+  align-items: center !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 50 !important;
+  min-width: 0 !important;
+}
+
+.ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card.left {
+  grid-column: 1 !important;
+  justify-self: stretch !important;
+}
+
+.ludo-live-wrapper .ludo-live-container .ll-header > .ll-brand {
+  grid-column: 2 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  position: relative !important;
+  z-index: 60 !important;
+}
+
+.ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card.right {
+  grid-column: 3 !important;
+  justify-self: stretch !important;
+}
+
+@media (max-width: 520px) {
+  .ludo-live-wrapper .ludo-live-container .ll-header {
+    grid-template-columns: minmax(0, 1fr) 82px minmax(0, 1fr) !important;
+    column-gap: 6px !important;
+  }
+
+  .ludo-live-wrapper .ludo-live-container .ll-header > .ll-player-card {
+    min-width: 0 !important;
+    max-width: none !important;
+  }
+
+  .ludo-live-wrapper .ludo-live-container .ll-header > .ll-brand {
+    width: 82px !important;
+  }
+}
