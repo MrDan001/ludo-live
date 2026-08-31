@@ -36,3 +36,6 @@
  .premium-multiplayer-route .pg-game .pg-turn-card p{width:60%!important;max-width:60%!important;font-size:8px!important;margin-top:2px!important}
  .premium-multiplayer-route .pg-game .pg-dice{right:-6px!important;transform:translateY(-50%) scale(.40)!important}
 }
+
+/* Multiplayer top bar: remove only the centered Ludo Live brand and hamburger. */
+.ll-brand,.ll-menu-btn{display:none!important}
