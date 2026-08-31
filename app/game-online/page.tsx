@@ -180,7 +180,7 @@ function GameContent() {
   return (
     <main className="ludo-live-wrapper">
       <div className="ludo-live-container">
-        {/* TOP HEADER CARDS */}
+        {/* HEADER BAR */}
         <header className="ll-header">
           <div className="ll-player-card left">
             <div className="ll-avatar-wrap">
@@ -232,7 +232,7 @@ function GameContent() {
         {/* BOTTOM HUD PANEL */}
         <div className="ll-bottom-panel">
           <div className="ll-controls-row">
-            {/* User Box */}
+            {/* User Info */}
             <div className="ll-user-box">
               <div className="ll-user-header">
                 <div className="ll-user-avatar">
@@ -250,23 +250,25 @@ function GameContent() {
               </div>
             </div>
 
-            {/* Turn & Dice Box */}
+            {/* Turn / Dice Box */}
             <div className="ll-dice-box">
               <div className="ll-turn-title">
                 <span className="dot green" /> YOUR TURN
               </div>
               <div className="ll-dice-slot">
-                <DemoDice 
-                  value={roll} 
-                  onRoll={handleRoll} 
-                  disabled={!myTurn || pending !== null || animating || remoteRolling} 
-                  botRolling={remoteRolling} 
-                />
+                <div className="ll-dice-scaler">
+                  <DemoDice 
+                    value={roll} 
+                    onRoll={handleRoll} 
+                    disabled={!myTurn || pending !== null || animating || remoteRolling} 
+                    botRolling={remoteRolling} 
+                  />
+                </div>
               </div>
               <div className="ll-dice-hint">Tap dice to roll</div>
             </div>
 
-            {/* Actions */}
+            {/* Side Actions */}
             <div className="ll-side-actions">
               <button type="button" className="ll-action-btn">💬<span>Chat</span></button>
               <button type="button" className={`ll-action-btn ${muted ? "off" : ""}`} onClick={() => setMuted((v) => !v)}>
@@ -284,7 +286,7 @@ function GameContent() {
             ))}
           </div>
 
-          {/* Footer */}
+          {/* Footer Bar */}
           <footer className="ll-footer">
             <button type="button" className="ll-foot-btn exit">🚪 Leave</button>
             <button type="button" className="ll-foot-btn">👥 Players</button>
@@ -328,18 +330,19 @@ function GameContent() {
           background: #000;
           display: flex;
           flex-direction: column;
-          justify-content: space-between;
-          padding: 8px 12px 12px;
+          padding: 12px 12px 10px;
           overflow: hidden;
         }
 
+        /* FIXED VISIBLE HEADER */
         .ll-header {
           display: flex;
           justify-content: space-between;
           align-items: center;
           width: 100%;
-          height: 48px;
+          height: 52px;
           flex-shrink: 0;
+          margin-bottom: 6px;
         }
 
         .ll-player-card { display: flex; align-items: center; gap: 6px; }
@@ -428,19 +431,19 @@ function GameContent() {
         }
         .ll-logo-sub { font-size: 7px; font-weight: 800; letter-spacing: 2px; color: #fff; opacity: 0.8; }
 
-        /* ELIMINATE EXTRA TOP & BOTTOM MARGINS AROUND BOARD */
+        /* FLEX BOARD AREA */
         .ll-board-stage {
           flex: 1;
           display: flex;
           align-items: center;
           justify-content: center;
           min-height: 0;
-          padding: 0;
+          padding: 4px 0;
         }
 
         .ll-board-frame {
-          width: min(90vw, 360px);
-          height: min(90vw, 360px);
+          width: min(82vw, 340px);
+          height: min(82vw, 340px);
           padding: 4px;
           border-radius: 18px;
           background: linear-gradient(145deg, #f5d77f, #8c6819, #e6c86e);
@@ -454,6 +457,7 @@ function GameContent() {
           overflow: hidden;
         }
 
+        /* HUD PANEL */
         .ll-bottom-panel {
           flex-shrink: 0;
           display: flex;
@@ -466,7 +470,7 @@ function GameContent() {
           justify-content: space-between;
           align-items: stretch;
           gap: 6px;
-          height: 84px;
+          height: 82px;
         }
 
         .ll-user-box {
@@ -480,7 +484,7 @@ function GameContent() {
           justify-content: space-between;
         }
 
-        .ll-user-header { display: flex; items-center; gap: 6px; }
+        .ll-user-header { display: flex; align-items: center; gap: 6px; }
 
         .ll-user-avatar {
           width: 26px;
@@ -520,27 +524,42 @@ function GameContent() {
           cursor: pointer;
         }
 
-        /* INLINE SCALED DICE BOX */
+        /* FIXED DICE CONTAINER & CENTERING */
         .ll-dice-box {
           flex: 1.2;
           background: #110e0a;
           border: 1px solid #2a2215;
           border-radius: 12px;
-          padding: 6px;
+          padding: 4px 6px;
           display: flex;
           flex-direction: column;
           align-items: center;
           justify-content: space-between;
+          position: relative;
+          overflow: hidden;
         }
 
         .ll-turn-title { font-size: 8px; font-weight: 900; color: #4ade80; display: flex; align-items: center; gap: 4px; }
+
         .ll-dice-slot {
-          width: 44px;
+          position: relative;
+          width: 48px;
           height: 44px;
-          display: grid;
-          place-items: center;
-          transform: scale(0.65);
+          display: flex;
+          align-items: center;
+          justify-content: center;
         }
+
+        .ll-dice-scaler {
+          transform: scale(0.48);
+          transform-origin: center center;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 100%;
+          height: 100%;
+        }
+
         .ll-dice-hint { font-size: 7px; color: #666; }
 
         .ll-side-actions { display: flex; flex-direction: column; gap: 4px; }
