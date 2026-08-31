@@ -69,7 +69,7 @@ export default function MultiplayerGame() {
         .pg-logo b { font-size: 10px !important; }
         .pg-menu { display: none !important; }
 
-        /* Keep the board below the header/HUD line. Size is width-driven, never height-driven. */
+        /* Keep the board centered inside the same shell on every device. */
         .lux-board-zone {
           min-height: 0 !important;
           width: 100% !important;
@@ -80,7 +80,7 @@ export default function MultiplayerGame() {
           padding-top: 9px !important;
         }
         .pg-board-frame {
-          width: min(calc(100vw - 12px), 620px) !important;
+          width: min(calc(100% - 24px), 620px) !important;
           max-width: 100% !important;
           height: auto !important;
           aspect-ratio: 1 / 1 !important;
@@ -133,7 +133,7 @@ export default function MultiplayerGame() {
           .pg-player-copy small { font-size: 6px !important; }
           .pg-star { font-size: 7px !important; }
           .lux-board-zone { padding-top: 10px !important; }
-          .pg-board-frame { width: calc(100vw - 12px) !important; }
+          .pg-board-frame { width: min(calc(100% - 24px), 620px) !important; }
           .pg-bottom, .pg-profile-card, .pg-turn-card, .pg-comm-actions { height: 120px !important; min-height: 120px !important; }
           .pg-profile-card { grid-template-columns: 42px minmax(0,1fr) !important; grid-template-rows: 38px 1fr 23px !important; padding: 7px !important; }
           .pg-profile-avatar { width: 33px !important; height: 33px !important; }
@@ -158,7 +158,7 @@ export default function MultiplayerGame() {
           .pg-avatar-btn, .pg-avatar { width: 27px !important; height: 27px !important; flex-basis: 27px !important; }
           .pg-player-copy b { font-size: 8px !important; }
           .pg-player-copy small { font-size: 5px !important; }
-          .pg-board-frame { width: calc(100vw - 8px) !important; }
+          .pg-board-frame { width: min(calc(100% - 24px), 620px) !important; }
           .lux-board-zone { padding-top: 9px !important; }
           .pg-bottom, .pg-profile-card, .pg-turn-card, .pg-comm-actions { height: 112px !important; min-height: 112px !important; }
           .pg-profile-card { grid-template-columns: 38px minmax(0,1fr) !important; grid-template-rows: 34px 1fr 21px !important; }
