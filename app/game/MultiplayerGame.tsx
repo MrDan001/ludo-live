@@ -2,18 +2,13 @@
 
 import MultiplayerGameCanonical from "./MultiplayerGameCanonical";
 
-/**
- * Multiplayer route shell.
- * The multiplayer route is deliberately board-first: the live board and its
- * playable dice remain, while secondary HUD/chat/voice chrome is hidden.
- */
+/** Board-first multiplayer route. */
 export default function MultiplayerGame() {
   return (
     <div className="clean-multiplayer-route">
       <MultiplayerGameCanonical />
       <style jsx global>{`
-        html,
-        body {
+        html, body {
           margin: 0 !important;
           padding: 0 !important;
           width: 100% !important;
@@ -22,25 +17,16 @@ export default function MultiplayerGame() {
           background: #050505 !important;
         }
 
-        .clean-multiplayer-route {
-          position: fixed !important;
-          inset: 0 !important;
-          width: 100vw !important;
-          height: 100dvh !important;
-          min-height: 100dvh !important;
-          overflow: hidden !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: #050505 !important;
-        }
-
+        .clean-multiplayer-route,
         .clean-multiplayer-route .live-page {
           position: fixed !important;
           inset: 0 !important;
-          width: 100vw !important;
-          height: 100dvh !important;
-          min-height: 100dvh !important;
+          width: 100% !important;
+          height: 100% !important;
+          min-height: 0 !important;
           overflow: hidden !important;
+          margin: 0 !important;
+          padding: 0 !important;
           background: #050505 !important;
         }
 
@@ -49,18 +35,18 @@ export default function MultiplayerGame() {
           inset: 0 !important;
           width: 100% !important;
           height: 100% !important;
-          min-height: 0 !important;
           display: grid !important;
           place-items: center !important;
-          padding: max(8px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)) !important;
+          padding: 0 !important;
           overflow: hidden !important;
         }
 
-        /* One sizing authority: the board is always a square and fits both
-           viewport dimensions. This avoids mobile browser vh/svh conflicts. */
+        /* The board gets the largest safe square available. Use viewport
+           dimensions directly instead of mixing svh/dvh, which varies between
+           mobile browser chrome states. */
         .clean-multiplayer-route .board-wrap {
-          width: min(calc(100vw - 16px), calc(100dvh - 16px), 760px) !important;
-          height: min(calc(100vw - 16px), calc(100dvh - 16px), 760px) !important;
+          width: min(100vw, 100vh, 760px) !important;
+          height: min(100vw, 100vh, 760px) !important;
           max-width: 760px !important;
           max-height: 760px !important;
           min-width: 0 !important;
@@ -90,7 +76,7 @@ export default function MultiplayerGame() {
           overflow: hidden !important;
         }
 
-        /* Remove page chrome. */
+        /* Only the board and playable dice remain visible. */
         .clean-multiplayer-route .match-badge,
         .clean-multiplayer-route .turn-pill,
         .clean-multiplayer-route .board-glow,
@@ -100,7 +86,6 @@ export default function MultiplayerGame() {
           display: none !important;
         }
 
-        /* Keep only the playable dice control, directly attached to the board. */
         .clean-multiplayer-route .floating-tools {
           position: absolute !important;
           inset: auto 0 0 0 !important;
@@ -113,16 +98,18 @@ export default function MultiplayerGame() {
         .clean-multiplayer-route .dice-float {
           position: absolute !important;
           left: 50% !important;
-          bottom: max(10px, env(safe-area-inset-bottom)) !important;
+          bottom: 8px !important;
           transform: translateX(-50%) !important;
           pointer-events: auto !important;
           z-index: 60 !important;
         }
 
+        /* On very short landscape screens, reserve a small amount for the
+           browser-safe edge while still maximizing board size. */
         @media (orientation: landscape) and (max-height: 520px) {
           .clean-multiplayer-route .board-wrap {
-            width: min(calc(100vw - 12px), calc(100dvh - 12px), 620px) !important;
-            height: min(calc(100vw - 12px), calc(100dvh - 12px), 620px) !important;
+            width: min(100vw, calc(100vh - 8px), 620px) !important;
+            height: min(100vw, calc(100vh - 8px), 620px) !important;
           }
         }
       `}</style>
