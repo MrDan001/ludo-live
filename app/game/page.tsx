@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import GameBoardContent from "./GameBoardContent";
 import MultiplayerGame from "./MultiplayerGame";
+import MultiplayerGameCanonical from "./MultiplayerGameCanonical";
 import BotSessionExpiry from "./BotSessionExpiry";
 import { BOARD_PALETTES, type BoardThemeId } from "../_components/LudoBoardGame";
 
@@ -40,13 +41,14 @@ const resolveTheme = (value: unknown): BoardThemeId => {
 export default function GamePage() {
   const searchParams = useSearchParams();
   const isTournament = searchParams.has("tournament") && searchParams.has("match");
+  const isMultiplayer = searchParams.has("room") && !isTournament;
   const [theme, setTheme] = useState<BoardThemeId>("classic");
   const [skinId, setSkinId] = useState("classic");
   const palette = BOARD_PALETTES[theme] || BOARD_PALETTES.classic;
   const header = SKIN_HEADERS[skinId] || SKIN_HEADERS[theme] || SKIN_HEADERS.classic;
 
   useEffect(() => {
-    if (isTournament) return;
+    if (isTournament || isMultiplayer) return;
     let active = true;
     const load = async () => {
       try {
@@ -73,10 +75,10 @@ export default function GamePage() {
     return () => {
       active = false;
     };
-  }, [isTournament]);
+  }, [isTournament, isMultiplayer]);
 
   useEffect(() => {
-    if (isTournament) return;
+    if (isTournament || isMultiplayer) return;
     const previousBody = document.body.style.background;
     const previousHtml = document.documentElement.style.background;
     document.body.style.background = palette.bg;
@@ -85,9 +87,10 @@ export default function GamePage() {
       document.body.style.background = previousBody;
       document.documentElement.style.background = previousHtml;
     };
-  }, [isTournament, palette.bg]);
+  }, [isTournament, isMultiplayer, palette.bg]);
 
   if (isTournament) return <MultiplayerGame />;
+  if (isMultiplayer) return <MultiplayerGameCanonical />;
 
   return (
     <main
