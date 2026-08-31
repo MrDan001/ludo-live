@@ -1,74 +1,76 @@
-/*
- * Regular multiplayer header — final authoritative override.
- * Scoped ONLY to .ludo-live-wrapper so tournament UI is untouched.
+/* Regular multiplayer header — authoritative layout.
+ * Scoped ONLY to .ludo-live-wrapper. Tournament UI is untouched.
  */
 .ludo-live-wrapper .ludo-live-container {
   position: relative !important;
+  display: grid !important;
+  grid-template-rows: auto minmax(0, 1fr) auto !important;
+  padding-top: 20px !important;
   isolation: isolate !important;
 }
 
-/* Force the regular multiplayer header into a visible top layer. */
+/* Keep the header in the container's first grid row. Do NOT use fixed positioning. */
 .ludo-live-wrapper .ludo-live-container > .ll-header {
+  position: relative !important;
+  inset: auto !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
   display: grid !important;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
-  align-items: center !important;
+  grid-column: 1 !important;
+  grid-row: 1 !important;
   width: 100% !important;
   min-width: 0 !important;
   min-height: 92px !important;
+  padding: 4px 0 10px !important;
+  align-items: center !important;
   visibility: visible !important;
   opacity: 1 !important;
-  position: fixed !important;
-  top: 10px !important;
-  left: 50% !important;
-  transform: translateX(-50%) !important;
-  width: min(calc(100% - 24px), 716px) !important;
-  padding: 4px 0 10px !important;
   overflow: visible !important;
-  z-index: 99999 !important;
-  pointer-events: auto !important;
+  z-index: 100 !important;
 }
 
-/* Both player cards are the only header columns. */
 .ludo-live-wrapper .ludo-live-container > .ll-header > .ll-player-card {
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
   position: relative !important;
-  z-index: 100000 !important;
+  z-index: 101 !important;
   min-width: 0 !important;
   max-width: none !important;
 }
 
 .ludo-live-wrapper .ludo-live-container > .ll-header > .ll-player-card.left {
   grid-column: 1 !important;
+  grid-row: 1 !important;
   justify-self: stretch !important;
 }
 
 .ludo-live-wrapper .ludo-live-container > .ll-header > .ll-player-card.right {
   grid-column: 2 !important;
+  grid-row: 1 !important;
   justify-self: stretch !important;
 }
 
-/* Remove the centered LUDO/LIVE brand from regular multiplayer completely. */
-.ludo-live-wrapper .ludo-live-container > .ll-header > .ll-brand,
-.ludo-live-wrapper .ludo-live-container > .ll-header .ll-brand,
-.ludo-live-wrapper .ludo-live-container > .ll-header .ll-logo-text,
-.ludo-live-wrapper .ludo-live-container > .ll-header .ll-logo-sub,
-.ludo-live-wrapper .ludo-live-container > .ll-header .ll-crown {
+/* Remove the centered LUDO/LIVE brand so it cannot block the two player cards. */
+.ludo-live-wrapper .ludo-live-container > .ll-header > .ll-brand {
   display: none !important;
-  visibility: hidden !important;
-  opacity: 0 !important;
-  width: 0 !important;
-  height: 0 !important;
-  min-width: 0 !important;
-  pointer-events: none !important;
 }
 
-/* Keep the board and controls below the header stacking layer. */
-.ludo-live-wrapper .ludo-live-container > .ll-board-stage,
-.ludo-live-wrapper .ludo-live-container > .ll-board-stage .ll-board-frame {
+.ludo-live-wrapper .ludo-live-container > .ll-board-stage {
+  grid-column: 1 !important;
+  grid-row: 2 !important;
   position: relative !important;
   z-index: 1 !important;
+  min-height: 0 !important;
+}
+
+.ludo-live-wrapper .ludo-live-container > .ll-bottom-panel {
+  grid-column: 1 !important;
+  grid-row: 3 !important;
+  position: relative !important;
+  z-index: 2 !important;
 }
 
 @media (max-width: 700px) {
@@ -76,8 +78,6 @@
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     gap: 7px !important;
     min-height: 76px !important;
-    width: calc(100% - 16px) !important;
-    top: 6px !important;
   }
 
   .ludo-live-wrapper .ludo-live-container > .ll-header > .ll-player-card {
@@ -89,7 +89,6 @@
   .ludo-live-wrapper .ludo-live-container > .ll-header {
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) !important;
     column-gap: 6px !important;
-    width: calc(100% - 12px) !important;
-    top: 4px !important;
+    min-height: 72px !important;
   }
 }
