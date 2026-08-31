@@ -1,0 +1,72 @@
+name: Apply multiplayer header reference
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: "!contains(github.event.head_commit.message, '[header-bot]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply header
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+          p=Path('app/game-online/page.tsx')
+          s=p.read_text()
+          h='''        <header className="multiplayer-topbar">
+          <div className="multiplayer-player-card multiplayer-player-card-you">
+            <div className="multiplayer-player-avatar"><PlayerAvatar src={mine.avatar} fallback="👑" /></div>
+            <div className="multiplayer-player-copy">
+              <div className="multiplayer-player-name-row"><strong>{mine.name}</strong><span className="multiplayer-you-badge">YOU</span></div>
+              <div className="multiplayer-player-status multiplayer-player-status-you"><span className="multiplayer-status-dot" />{myTurn ? "Your Turn" : "Waiting"}</div>
+            </div>
+            <span className="multiplayer-level-badge">★ {mine.level || 24}</span>
+          </div>
+          <div className="multiplayer-topbar-logo" aria-label="Ludo Live"><span className="multiplayer-logo-crown">♛</span><strong>LUDO</strong><span>LIVE</span></div>
+          <div className="multiplayer-player-card multiplayer-player-card-opponent">
+            <div className="multiplayer-player-avatar"><PlayerAvatar src={opponent.avatar} fallback="🎮" /></div>
+            <div className="multiplayer-player-copy">
+              <div className="multiplayer-player-name-row"><strong>{opponent.name}</strong></div>
+              <div className="multiplayer-player-status multiplayer-player-status-opponent"><span className="multiplayer-status-dot" />IN MATCH</div>
+            </div>
+            <span className="multiplayer-level-badge">★ {opponent.level || 18}</span>
+          </div>
+          <button type="button" className="multiplayer-menu-btn" aria-label="Open game menu"><span /><span /><span /></button>
+        </header>'''
+          s,n=re.subn(r'        <header className="multiplayer-topbar">.*?</header>',h,s,1,re.S)
+          assert n==1, 'header not found'
+          css='''        .multiplayer-topbar{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 150px minmax(0,1fr) 72px;align-items:center;gap:12px;width:100%;min-height:116px;padding:4px 0 14px;z-index:50}
+        .multiplayer-player-card{position:relative;min-width:0;height:92px;display:flex;align-items:center;gap:12px;padding:10px 16px 10px 12px;border:1px solid rgba(102,76,25,.9);border-radius:31px;background:linear-gradient(145deg,rgba(19,15,8,.98),rgba(6,6,4,.98));box-shadow:inset 0 1px 0 rgba(255,255,255,.045),0 10px 25px rgba(0,0,0,.5)}
+        .multiplayer-player-card-you{border-color:rgba(212,175,55,.78)}
+        .multiplayer-player-avatar{width:66px;height:66px;flex:0 0 66px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#0a0906;border:3px solid #d4af37;box-shadow:0 0 18px rgba(212,175,55,.16);font-size:27px}.multiplayer-player-avatar img{width:100%;height:100%;object-fit:cover;display:block}
+        .multiplayer-player-copy{min-width:0;flex:1}.multiplayer-player-name-row{display:flex;align-items:center;gap:8px;min-width:0}.multiplayer-player-name-row strong{color:#f7f3ea;font-size:clamp(13px,1.7vw,19px);line-height:1.1;font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.multiplayer-you-badge{padding:4px 8px;border-radius:7px;background:linear-gradient(180deg,#ffd85a,#e9a817);color:#181105;font-size:10px;font-weight:1000}.multiplayer-player-status{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:clamp(11px,1.45vw,16px);font-weight:850;white-space:nowrap}.multiplayer-player-status-you{color:#22e875}.multiplayer-player-status-opponent{color:#ff3347}.multiplayer-status-dot{width:16px;height:16px;border-radius:50%;flex:0 0 16px}.multiplayer-player-status-you .multiplayer-status-dot{background:#16e76b;box-shadow:0 0 12px rgba(22,231,107,.65)}.multiplayer-player-status-opponent .multiplayer-status-dot{background:#ff263e;box-shadow:0 0 12px rgba(255,38,62,.55)}
+        .multiplayer-level-badge{position:absolute;left:58px;bottom:-13px;min-width:60px;padding:5px 9px;border:1px solid #b48722;border-radius:15px;background:#090806;color:#f1ca51;font-size:13px;font-weight:950;text-align:center;box-shadow:0 4px 10px rgba(0,0,0,.5)}
+        .multiplayer-topbar-logo{width:132px;height:104px;justify-self:center;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#f5cf61;text-align:center;filter:drop-shadow(0 0 12px rgba(212,175,55,.35))}.multiplayer-logo-crown{font-size:33px;line-height:.7}.multiplayer-topbar-logo strong{font-family:Georgia,"Times New Roman",serif;font-size:32px;line-height:.9;letter-spacing:-1.5px;color:#f7d56d;text-shadow:0 2px 0 #6d4500,0 0 10px rgba(255,210,80,.45)}.multiplayer-topbar-logo>span:last-child{font-size:19px;line-height:1;font-weight:1000;letter-spacing:1px;color:#e9b52e}
+        .multiplayer-menu-btn{width:72px;height:72px;border-radius:22px;border:1px solid rgba(102,76,25,.95);background:linear-gradient(145deg,#17130b,#090805);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;cursor:pointer}.multiplayer-menu-btn span{width:36px;height:5px;border-radius:99px;background:#e0a916;box-shadow:0 0 7px rgba(224,169,22,.25)}
+'''
+          s,n=re.subn(r'        \.multiplayer-topbar \{.*?        \.ll-board-stage \{',css+'        .ll-board-stage {',s,1,re.S)
+          assert n==1, 'topbar css not found'
+          old=[r'          \.multiplayer-topbar \{[^}]*\}\n',r'          \.multiplayer-topbar-mark \{[^}]*\}\n',r'          \.multiplayer-topbar-title \{[^}]*\}\n',r'          \.multiplayer-topbar-title strong \{[^}]*\}\n',r'          \.multiplayer-topbar-title span:not\(\.multiplayer-topbar-mark\) \{[^}]*\}\n',r'          \.multiplayer-topbar-room \{[^}]*\}\n',r'          \.multiplayer-topbar-room span \{[^}]*\}\n',r'          \.multiplayer-topbar-room b \{[^}]*\}\n']
+          for x in old:s=re.sub(x,'',s)
+          mob='''          .multiplayer-topbar{grid-template-columns:minmax(0,1fr) 88px minmax(0,1fr) 48px;gap:5px;min-height:78px;padding-bottom:8px}.multiplayer-player-card{height:62px;gap:6px;padding:6px 8px 6px 6px;border-radius:21px}.multiplayer-player-avatar{width:45px;height:45px;flex-basis:45px;border-width:2px;font-size:19px}.multiplayer-player-name-row{gap:4px}.multiplayer-player-name-row strong{font-size:10px}.multiplayer-you-badge{padding:2px 5px;font-size:7px}.multiplayer-player-status{gap:5px;margin-top:5px;font-size:8px}.multiplayer-status-dot{width:8px;height:8px;flex-basis:8px}.multiplayer-level-badge{left:36px;bottom:-9px;min-width:38px;padding:3px 5px;font-size:8px;border-radius:10px}.multiplayer-topbar-logo{width:82px;height:70px}.multiplayer-logo-crown{font-size:22px}.multiplayer-topbar-logo strong{font-size:22px}.multiplayer-topbar-logo>span:last-child{font-size:12px}.multiplayer-menu-btn{width:48px;height:48px;border-radius:15px;gap:5px}.multiplayer-menu-btn span{width:24px;height:3px}
+'''
+          marker='          .ll-board-frame { width: min(100%, calc(100dvh - 420px));'
+          assert marker in s, 'mobile marker missing'
+          s=s.replace(marker,mob+marker,1)
+          s=s.replace('          .multiplayer-topbar { min-height: 52px; padding-bottom: 5px; }','          .multiplayer-topbar { min-height: 68px; padding-bottom: 4px; }',1)
+          p.write_text(s)
+      - name: Commit and remove one-shot workflow
+        run: |
+          rm .github/workflows/apply-multiplayer-header.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/game-online/page.tsx .github/workflows/apply-multiplayer-header.yml
+          git commit -m "Polish multiplayer header to source-of-truth" -m "[header-bot]"
+          git push
