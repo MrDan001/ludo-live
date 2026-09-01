@@ -7,6 +7,7 @@ const { applyMove, canMove, hasLegalMove, hasWon, playerColorsForSeats, tokenSta
 if (!Socket.prototype.__ludoAuthorityPatched) {
   const originalOn = Socket.prototype.on;
   const liveRooms = new Map();
+  const leaveHandlers = new WeakMap();
   Socket.prototype.__ludoAuthorityPatched = true;
 
   const roomOf = socket => String(socket?.data?.roomCode || "").trim().toUpperCase();
@@ -47,10 +48,32 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
   };
 
   Socket.prototype.on = function(event, listener) {
+    if (event === "leave-room") {
+      leaveHandlers.set(this, listener);
+      return originalOn.call(this, event, listener);
+    }
+
     if (event === "join-room") {
       return originalOn.call(this, event, function(payload = {}) {
         const code = String(payload.roomCode || "").trim().toUpperCase();
         const pid = String(payload.playerId || "").trim();
+        const previousCode = roomOf(this);
+
+        // A player is allowed to switch rooms immediately. If this socket still
+        // belongs to another room, run that room's real server-side leave handler
+        // before the normal join handler so the authoritative rooms map is freed.
+        if (previousCode && code && previousCode !== code) {
+          const leave = leaveHandlers.get(this);
+          if (leave) {
+            leave.call(this);
+          }
+          const previousShadow = liveRooms.get(previousCode);
+          if (previousShadow && pid) {
+            previousShadow.members.delete(pid);
+            if (previousShadow.members.size === 0) liveRooms.delete(previousCode);
+          }
+        }
+
         if (code && pid) {
           let shadow = liveRooms.get(code);
           if (!shadow) {
