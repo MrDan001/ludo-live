@@ -8,7 +8,7 @@ export function ensureEventsSchema() {
       await ensureAuthSchema();
       await pool.query(`
         CREATE TABLE IF NOT EXISTS ludo_events (
-          id TEXT PRIMARY KEY,title TEXT NOT NULL,description TEXT NOT NULL DEFAULT '',icon TEXT NOT NULL DEFAULT '🎉',color TEXT NOT NULL DEFAULT 'purple',
+          id TEXT PRIMARY KEY,title TEXT NOT NULL,name TEXT,description TEXT NOT NULL DEFAULT '',icon TEXT NOT NULL DEFAULT '🎉',color TEXT NOT NULL DEFAULT 'purple',
           reward TEXT NOT NULL DEFAULT '🎁',reward_coins INTEGER NOT NULL DEFAULT 0,reward_gems INTEGER NOT NULL DEFAULT 0,event_type TEXT NOT NULL DEFAULT 'challenge',
           mission_kind TEXT NOT NULL DEFAULT 'win_games',mission_target INTEGER NOT NULL DEFAULT 1 CHECK (mission_target > 0),
           modes JSONB NOT NULL DEFAULT '["bot","2p","4p","tournament"]'::jsonb,boards JSONB NOT NULL DEFAULT '["classic"]'::jsonb,
@@ -66,14 +66,14 @@ export function ensureEventsSchema() {
         ALTER TABLE ludo_event_rewards ADD COLUMN IF NOT EXISTS settled_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
         CREATE INDEX IF NOT EXISTS ludo_event_rewards_user_idx ON ludo_event_rewards(user_id,settled_at DESC);
 
-        INSERT INTO ludo_events(id,title,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status)
+        INSERT INTO ludo_events(id,title,name,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status)
         SELECT * FROM (VALUES
-          ('daily-domination','Daily Domination','Win matches across the Ludo Live game modes.','🏆','purple','🪙 2,500',2500,0,'challenge','win_games',3,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '30 minutes',NOW()+INTERVAL '2 hours 30 minutes','published'),
-          ('dice-frenzy','Dice Frenzy','Roll, move and win before the clock runs out.','⚄','blue','💎 25',0,25,'challenge','roll_dice',20,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '15 minutes',NOW()+INTERVAL '3 hours','published'),
-          ('ludo-live-rush','Ludo Live Rush','Complete games in any supported mood and board.','🔥','purple','🪙 5,000',5000,0,'challenge','complete_games',5,'["bot","2p","4p","tournament"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '4 hours','published'),
-          ('midnight-masters','Midnight Masters','A scheduled night-mode challenge is opening soon.','🌙','blue','💎 50',0,50,'challenge','win_games',5,'["bot","2p","4p"]'::jsonb,'["midnight"]'::jsonb,NOW()+INTERVAL '20 minutes',NOW()+INTERVAL '2 hours 20 minutes','published'),
-          ('royal-road','Royal Road','Prepare for a royal-board winning streak.','👑','purple','🪙 7,500',7500,0,'challenge','win_games',7,'["2p","4p"]'::jsonb,'["royal"]'::jsonb,NOW()+INTERVAL '60 minutes',NOW()+INTERVAL '4 hours','published')
-        ) AS seed(id,title,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status)
+          ('daily-domination','Daily Domination','Daily Domination','Win matches across the Ludo Live game modes.','🏆','purple','🪙 2,500',2500,0,'challenge','win_games',3,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '30 minutes',NOW()+INTERVAL '2 hours 30 minutes','published'),
+          ('dice-frenzy','Dice Frenzy','Dice Frenzy','Roll, move and win before the clock runs out.','⚄','blue','💎 25',0,25,'challenge','roll_dice',20,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '15 minutes',NOW()+INTERVAL '3 hours','published'),
+          ('ludo-live-rush','Ludo Live Rush','Ludo Live Rush','Complete games in any supported mood and board.','🔥','purple','🪙 5,000',5000,0,'challenge','complete_games',5,'["bot","2p","4p","tournament"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '4 hours','published'),
+          ('midnight-masters','Midnight Masters','Midnight Masters','A scheduled night-mode challenge is opening soon.','🌙','blue','💎 50',0,50,'challenge','win_games',5,'["bot","2p","4p"]'::jsonb,'["midnight"]'::jsonb,NOW()+INTERVAL '20 minutes',NOW()+INTERVAL '2 hours 20 minutes','published'),
+          ('royal-road','Royal Road','Royal Road','Prepare for a royal-board winning streak.','👑','purple','🪙 7,500',7500,0,'challenge','win_games',7,'["2p","4p"]'::jsonb,'["royal"]'::jsonb,NOW()+INTERVAL '60 minutes',NOW()+INTERVAL '4 hours','published')
+        ) AS seed(id,title,name,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status)
         WHERE NOT EXISTS (SELECT 1 FROM ludo_events)
       `);
     })().catch((error) => { ready = null; throw error; });
