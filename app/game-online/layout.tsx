@@ -51,12 +51,12 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
         /* Short portrait screens: the available middle-stage height becomes the limit. */
         @media (orientation: portrait) and (max-width: 700px) and (max-height: 900px) {
           .ludo-live-wrapper .ll-board-frame {
-            width: min(90vw, calc(100dvh - 410px), 600px) !important;
+            width: min(90vw, calc(100dvh - 360px), 600px) !important;
             max-height: calc(100% - 4px) !important;
           }
         }
 
-        /* Tall/narrow Android portrait screens: keep the complete HUD visible and let the board use the remaining width. */
+        /* Tall/narrow Android portrait screens: compact the bottom HUD so the board gets the freed height. */
         @media (orientation: portrait) and (max-width: 900px) and (max-aspect-ratio: 1 / 2) {
           .ludo-live-wrapper .ludo-live-container {
             padding: 10px 12px 8px !important;
@@ -86,87 +86,95 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
           .ludo-live-wrapper .multiplayer-topbar-logo strong { font-size: 27px !important; }
           .ludo-live-wrapper .multiplayer-topbar-logo span:last-child { font-size: 15px !important; }
 
+          /* No opponent data = no stale level badge. The name element is intentionally empty while waiting. */
+          .ludo-live-wrapper .multiplayer-player-card-opponent:has(.multiplayer-player-name-row strong:empty) .multiplayer-level-badge {
+            display: none !important;
+          }
+
           .ludo-live-wrapper .ll-bottom-panel {
-            height: 300px !important;
-            min-height: 300px !important;
-            max-height: 300px !important;
-            gap: 6px !important;
+            height: 248px !important;
+            min-height: 248px !important;
+            max-height: 248px !important;
+            gap: 5px !important;
             overflow: hidden !important;
           }
 
           .ludo-live-wrapper .ll-controls-row {
-            height: 205px !important;
-            min-height: 205px !important;
-            grid-template-columns: minmax(118px, .82fr) minmax(0, 1.4fr) 62px !important;
-            gap: 7px !important;
+            height: 162px !important;
+            min-height: 162px !important;
+            grid-template-columns: minmax(112px, .82fr) minmax(0, 1.4fr) 56px !important;
+            gap: 6px !important;
           }
 
           .ludo-live-wrapper .ll-user-box,
           .ludo-live-wrapper .ll-dice-box {
             min-height: 0 !important;
-            padding: 9px !important;
-            border-radius: 16px !important;
-          }
-
-          .ludo-live-wrapper .ll-user-header { gap: 7px !important; }
-          .ludo-live-wrapper .ll-user-avatar {
-            width: 50px !important;
-            height: 50px !important;
-            flex-basis: 50px !important;
-          }
-
-          .ludo-live-wrapper .ll-u-name { font-size: 13px !important; }
-          .ludo-live-wrapper .ll-u-level { font-size: 10px !important; }
-          .ludo-live-wrapper .ll-coins-pill { min-height: 36px !important; padding: 7px 10px !important; }
-
-          .ludo-live-wrapper .ll-dice-box { grid-template-columns: minmax(0, 1fr) 88px !important; gap: 4px !important; }
-          .ludo-live-wrapper .ll-turn-copy { min-width: 0 !important; padding-top: 2px !important; }
-          .ludo-live-wrapper .ll-turn-title { font-size: 12px !important; }
-          .ludo-live-wrapper .ll-turn-sub { font-size: 10px !important; line-height: 1.25 !important; }
-          .ludo-live-wrapper .ll-dice-result { width: 66px !important; height: 30px !important; font-size: 17px !important; }
-          .ludo-live-wrapper .ll-dice-hint { width: 76px !important; font-size: 8px !important; }
-          .ludo-live-wrapper .ll-dice-slot { min-width: 78px !important; overflow: visible !important; }
-          .ludo-live-wrapper .ll-dice-slot :global(.dice-area) { transform: scale(.68) !important; transform-origin: center !important; }
-
-          .ludo-live-wrapper .ll-side-actions { gap: 6px !important; }
-          .ludo-live-wrapper .ll-action-btn {
-            width: 62px !important;
-            height: 99px !important;
-            min-height: 99px !important;
-            border-radius: 14px !important;
-            gap: 3px !important;
-          }
-          .ludo-live-wrapper .action-icon { font-size: 16px !important; }
-          .ludo-live-wrapper .ll-action-btn span:last-child { font-size: 9px !important; }
-
-          .ludo-live-wrapper .ll-reactions-bar {
-            height: 38px !important;
-            min-height: 38px !important;
-            gap: 6px !important;
-            overflow: hidden !important;
-          }
-          .ludo-live-wrapper .ll-pill-btn {
-            min-height: 38px !important;
-            padding: 7px 12px !important;
-            font-size: 10px !important;
+            height: 162px !important;
+            padding: 8px !important;
             border-radius: 15px !important;
           }
 
+          .ludo-live-wrapper .ll-user-header { gap: 6px !important; }
+          .ludo-live-wrapper .ll-user-avatar {
+            width: 46px !important;
+            height: 46px !important;
+            flex-basis: 46px !important;
+          }
+
+          .ludo-live-wrapper .ll-u-name { font-size: 12px !important; }
+          .ludo-live-wrapper .ll-u-level { font-size: 9px !important; }
+          .ludo-live-wrapper .ll-coins-pill { min-height: 32px !important; height: 32px !important; padding: 6px 9px !important; }
+
+          /* Keep the whole dice inside its column. DemoDice has a 150px intrinsic width, so both its layout width and visual size are reduced here. */
+          .ludo-live-wrapper .ll-dice-box { grid-template-columns: minmax(0, 1fr) 76px !important; gap: 2px !important; overflow: hidden !important; }
+          .ludo-live-wrapper .ll-turn-copy { min-width: 0 !important; padding-top: 1px !important; }
+          .ludo-live-wrapper .ll-turn-title { font-size: 11px !important; white-space: nowrap !important; }
+          .ludo-live-wrapper .ll-turn-sub { font-size: 9px !important; line-height: 1.2 !important; }
+          .ludo-live-wrapper .ll-dice-result { width: 58px !important; height: 27px !important; font-size: 16px !important; }
+          .ludo-live-wrapper .ll-dice-hint { width: 68px !important; font-size: 7px !important; white-space: nowrap !important; }
+          .ludo-live-wrapper .ll-dice-slot { min-width: 70px !important; width: 76px !important; overflow: visible !important; display: grid !important; place-items: center !important; }
+          .ludo-live-wrapper .ll-dice-slot .dice-area { min-width: 0 !important; width: 110px !important; transform: scale(.55) !important; transform-origin: center center !important; }
+
+          .ludo-live-wrapper .ll-side-actions { gap: 6px !important; }
+          .ludo-live-wrapper .ll-action-btn {
+            width: 56px !important;
+            height: 78px !important;
+            min-height: 78px !important;
+            border-radius: 13px !important;
+            gap: 2px !important;
+          }
+          .ludo-live-wrapper .action-icon { font-size: 15px !important; }
+          .ludo-live-wrapper .ll-action-btn span:last-child { font-size: 8px !important; }
+
+          .ludo-live-wrapper .ll-reactions-bar {
+            height: 34px !important;
+            min-height: 34px !important;
+            gap: 5px !important;
+            overflow: hidden !important;
+          }
+          .ludo-live-wrapper .ll-pill-btn {
+            min-height: 34px !important;
+            height: 34px !important;
+            padding: 6px 10px !important;
+            font-size: 9px !important;
+            border-radius: 14px !important;
+          }
+
           .ludo-live-wrapper .ll-footer {
-            height: 38px !important;
-            min-height: 38px !important;
-            gap: 7px !important;
+            height: 34px !important;
+            min-height: 34px !important;
+            gap: 6px !important;
             overflow: hidden !important;
           }
           .ludo-live-wrapper .ll-foot-btn,
           .ludo-live-wrapper .ll-room-chip {
-            min-height: 38px !important;
-            padding: 7px 11px !important;
-            font-size: 10px !important;
-            border-radius: 14px !important;
+            min-height: 34px !important;
+            height: 34px !important;
+            padding: 6px 10px !important;
+            font-size: 9px !important;
+            border-radius: 13px !important;
           }
 
-          /* Board is width-led on tall phones, but still capped by the actual middle stage. */
           .ludo-live-wrapper .ll-board-frame {
             width: min(90vw, 600px) !important;
             height: auto !important;
