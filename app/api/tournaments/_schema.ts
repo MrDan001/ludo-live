@@ -12,30 +12,6 @@ export function ensureTournamentV2Schema() {
       ALTER TABLE ludo_tournaments ADD COLUMN IF NOT EXISTS funding_reserved_coins BIGINT NOT NULL DEFAULT 0;
       ALTER TABLE ludo_tournaments ADD COLUMN IF NOT EXISTS funding_reserved_gems BIGINT NOT NULL DEFAULT 0;
 
-      CREATE TABLE IF NOT EXISTS ludo_admin_wallets (
-        id TEXT PRIMARY KEY,
-        money_bank_coins BIGINT NOT NULL DEFAULT 0,
-        money_bank_gems BIGINT NOT NULL DEFAULT 0,
-        treasury_coins BIGINT NOT NULL DEFAULT 0,
-        treasury_gems BIGINT NOT NULL DEFAULT 0,
-        revenue_coins BIGINT NOT NULL DEFAULT 0,
-        revenue_gems BIGINT NOT NULL DEFAULT 0,
-        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-      INSERT INTO ludo_admin_wallets(id) VALUES('platform') ON CONFLICT(id) DO NOTHING;
-
-      CREATE TABLE IF NOT EXISTS ludo_admin_wallet_ledger (
-        id BIGSERIAL PRIMARY KEY,
-        admin_user_id TEXT REFERENCES ludo_users(id) ON DELETE SET NULL,
-        wallet_from TEXT,
-        wallet_to TEXT NOT NULL,
-        currency TEXT NOT NULL CHECK(currency IN ('coins','gems')),
-        amount BIGINT NOT NULL CHECK(amount > 0),
-        reason TEXT NOT NULL,
-        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-      );
-      CREATE INDEX IF NOT EXISTS ludo_admin_wallet_ledger_created_idx ON ludo_admin_wallet_ledger(created_at DESC);
-
       CREATE TABLE IF NOT EXISTS ludo_tournament_entry_payments (
         id BIGSERIAL PRIMARY KEY,
         tournament_id TEXT NOT NULL REFERENCES ludo_tournaments(id) ON DELETE CASCADE,
