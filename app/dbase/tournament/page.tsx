@@ -75,6 +75,7 @@ export default function TournamentAdmin() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<Tournament | null>(null);
   const [now, setNow] = useState(Date.now());
 
   const load = async () => {
@@ -97,6 +98,15 @@ export default function TournamentAdmin() {
     const timer = setInterval(() => setNow(Date.now()), 30000);
     return () => clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!deleteTarget) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !deletingId) setDeleteTarget(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [deleteTarget, deletingId]);
 
   const counts = useMemo(() => {
     const result: Record<Phase, number> = {
@@ -170,10 +180,10 @@ export default function TournamentAdmin() {
 
   const removeTournament = async (tournament: Tournament) => {
     const name = String(tournament.name || "this tournament");
-    if (!window.confirm(`Delete tournament “${name}”? This cannot be undone.`)) return;
 
     setError("");
     setNotice("");
+    setDeleteTarget(null);
     setDeletingId(String(tournament.id));
 
     try {
@@ -320,7 +330,7 @@ export default function TournamentAdmin() {
                       <button
                         className="admin-btn"
                         disabled={isDeleting}
-                        onClick={() => void removeTournament(tournament)}
+                        onClick={() => setDeleteTarget(tournament)}
                       >
                         {isDeleting ? "Deleting…" : "Delete"}
                       </button>
@@ -372,6 +382,106 @@ export default function TournamentAdmin() {
           )}
         </div>
       </section>
+
+      {deleteTarget && (
+        <div
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setDeleteTarget(null);
+          }}
+          style={{
+            position: "fixed",
+            inset: 0,
+            zIndex: 1000,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "20px",
+            background: "rgba(8, 12, 24, 0.72)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-tournament-title"
+            style={{
+              width: "min(440px, 100%)",
+              borderRadius: "24px",
+              padding: "26px",
+              background: "linear-gradient(180deg, #171b2b 0%, #101321 100%)",
+              border: "1px solid rgba(255,255,255,.10)",
+              boxShadow: "0 28px 90px rgba(0,0,0,.48)",
+              color: "#fff",
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: "15px" }}>
+              <div
+                aria-hidden="true"
+                style={{
+                  flex: "0 0 48px",
+                  width: "48px",
+                  height: "48px",
+                  display: "grid",
+                  placeItems: "center",
+                  borderRadius: "16px",
+                  background: "rgba(239, 68, 68, .14)",
+                  border: "1px solid rgba(239, 68, 68, .24)",
+                  fontSize: "22px",
+                }}
+              >
+                ⚠️
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <h3 id="delete-tournament-title" style={{ margin: "2px 0 7px", fontSize: "20px", lineHeight: 1.2 }}>
+                  Delete tournament?
+                </h3>
+                <p style={{ margin: 0, color: "rgba(255,255,255,.68)", lineHeight: 1.55, fontSize: "14px" }}>
+                  You are about to permanently delete <strong style={{ color: "#fff" }}>{String(deleteTarget.name || "this tournament")}</strong>.
+                </p>
+              </div>
+            </div>
+
+            <div
+              style={{
+                marginTop: "20px",
+                padding: "13px 15px",
+                borderRadius: "14px",
+                background: "rgba(255,255,255,.045)",
+                border: "1px solid rgba(255,255,255,.07)",
+                color: "rgba(255,255,255,.60)",
+                fontSize: "13px",
+                lineHeight: 1.5,
+              }}
+            >
+              This action cannot be undone. Any eligible player entry refunds and reserved tournament funds will be handled safely by the server.
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "22px", flexWrap: "wrap" }}>
+              <button
+                className="admin-btn"
+                onClick={() => setDeleteTarget(null)}
+                style={{ minWidth: "96px" }}
+              >
+                Cancel
+              </button>
+              <button
+                className="admin-btn"
+                onClick={() => void removeTournament(deleteTarget)}
+                style={{
+                  minWidth: "128px",
+                  background: "#dc2626",
+                  borderColor: "#dc2626",
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+              >
+                Delete tournament
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
