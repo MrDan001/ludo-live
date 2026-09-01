@@ -34,13 +34,28 @@ const { Socket } = require('socket.io');
 if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
   Socket.prototype.__ludoImmediateRoomLifecyclePatched = true;
   const previousOn = Socket.prototype.on;
+  const emitRoomList = socket => {
+    try {
+      socket.nsp.emit('room-list', [...roomIndex.values()]
+        .map(x => x.room)
+        .filter(Boolean)
+        .map(r => ({
+          code: r.code,
+          players: r.members.size,
+          roomSize: r.roomSize,
+          hostName: r.members.get(r.hostId)?.name || 'Host',
+          board: r.members.get(r.hostId)?.board || 'classic'
+        }))
+        .filter(r => r.players > 0 && r.players < r.roomSize));
+    } catch {}
+  };
+
   Socket.prototype.on = function patchedSocketOn(event, listener) {
     if (event === 'join-room') {
       return previousOn.call(this, event, (...args) => {
         const payload = args[0] || {};
         // server.js currently references `avatar` in the join handler without
-        // destructuring it. Provide the request value for that existing handler
-        // without changing the room/game architecture.
+        // destructuring it. Provide the request value for that existing handler.
         const previousAvatar = global.avatar;
         global.avatar = String(payload.avatar || '');
         try {
@@ -60,7 +75,6 @@ if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
       const member = room?.members?.get(this.id);
       const wasHost = !!member && (room.hostId === this.id || room.hostPlayerId === (member.playerId || member.id));
 
-      // Keep the remaining player in a 2-player room when its host disconnects.
       const originalSize = room?.roomSize;
       if (wasHost && room && originalSize === 2) room.roomSize = 3;
 
@@ -72,14 +86,18 @@ if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
       }
 
       const current = code ? roomIndex.get(code)?.room : null;
-      if (!current) return result;
+      if (!current) {
+        emitRoomList(this);
+        return result;
+      }
 
-      // No players remain: remove the room immediately.
+      // No players remain: remove the room immediately and publish the
+      // remaining real rooms, never a stale 0/N entry.
       if (current.members.size === 0) {
         const parent = roomIndex.get(code)?.parent;
         if (parent) originalMapDelete.call(parent, code);
         roomIndex.delete(code);
-        try { this.nsp.emit('room-list', []); } catch {}
+        emitRoomList(this);
         return result;
       }
 
@@ -99,28 +117,18 @@ if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
           current.hostId = nextHost.id;
           current.hostPlayerId = nextHost.playerId || nextHost.id;
           try {
-            const io = this.nsp;
-            io.to(code).emit('host-transferred', {
+            this.nsp.to(code).emit('host-transferred', {
               roomCode: code,
               hostId: nextHost.id,
               hostPlayerId: nextHost.playerId || nextHost.id,
               reason: 'The previous host left. Host ownership was transferred immediately.'
             });
-            io.to(code).emit('roster', [...current.members.values()]);
-            io.emit('room-list', [...roomIndex.values()]
-              .map(x => x.room)
-              .filter(Boolean)
-              .map(r => ({
-                code: r.code,
-                players: r.members.size,
-                roomSize: r.roomSize,
-                hostName: r.members.get(r.hostId)?.name || 'Host',
-                board: r.members.get(r.hostId)?.board || 'classic'
-              }))
-              .filter(r => r.players > 0 && r.players < r.roomSize));
+            this.nsp.to(code).emit('roster', [...current.members.values()]);
           } catch {}
         }
       }
+
+      emitRoomList(this);
       return result;
     });
   };
