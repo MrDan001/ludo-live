@@ -15,9 +15,12 @@ const handlerPositions = () => {
   return out;
 };
 
-const hasLeave = source.includes('socket.on("leave-room"') || source.includes("socket.on('leave-room'");
+const hasCanonicalLifecycle =
+  source.includes('member.connected=false') &&
+  source.includes('host-transferred') &&
+  source.includes('30000');
 let positions = handlerPositions();
-if (hasLeave && positions.length === 1) {
+if (hasCanonicalLifecycle && positions.length === 1) {
   console.log('Multiplayer room lifecycle already prepared successfully.');
   process.exit(0);
 }
