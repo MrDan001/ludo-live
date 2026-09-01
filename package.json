@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "prestart": "node scripts/prepare-multiplayer-room.js",
-    "start": "node -r ./room-refresh-persistence.js -r ./empty-room-cleanup.js -r ./multiplayer-canonical.js -r ./mission-rules.js -r ./forfeit-rules.js -r ./event-settler.js server.js",
+    "start": "node -r ./room-refresh-persistence.js -r ./empty-room-cleanup.js -r ./room-join-runtime-fix.js -r ./multiplayer-canonical.js -r ./mission-rules.js -r ./forfeit-rules.js -r ./event-settler.js server.js",
     "vercel-build": "next build",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android"
@@ -28,7 +28,7 @@
     "@capacitor/cli": "^7.4.3",
     "typescript": "5.6.3",
     "@types/node": "20.17.30",
-    "@types/pg": "^8.15.5",
+    "@types/pg": "^8.17.0",
     "@types/react": "18.3.18",
     "@types/react-dom": "18.3.1"
   }
