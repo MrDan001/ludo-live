@@ -1,0 +1,35 @@
+name: Fix chat state build
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: "!contains(github.event.head_commit.message, '[chat-state-fix-bot]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix chat state updater and remove workflow
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/game-online/page.tsx')
+          s = p.read_text()
+          old = '''      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""); const name = String(message.name || "Player"); const text = String(message.text); const at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicateLocal = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicateLocal) return duplicateLocal ? items : [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); if (!chatOpen) setChatUnread(true); });'''
+          new = '''      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""); const name = String(message.name || "Player"); const text = String(message.text); const at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicateLocal = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicateLocal) return items; return [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); if (!chatOpen) setChatUnread(true); });'''
+          if old not in s:
+              raise SystemExit('expected chat updater pattern not found')
+          p.write_text(s.replace(old, new, 1))
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/game-online/page.tsx
+          git rm .github/workflows/fix-chat-state-build.yml
+          git commit -m "Fix game-online chat state updater" -m "[chat-state-fix-bot]"
+          git push
