@@ -9,7 +9,7 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
       if (!(stage instanceof HTMLElement)) return;
 
       const rect = stage.getBoundingClientRect();
-      const size = Math.min(rect.width, rect.height);
+      const size = Math.max(0, Math.min(rect.width, rect.height) - 16);
       if (Number.isFinite(size) && size > 0) {
         stage.style.setProperty("--ll-board-size", `${size}px`);
       }
