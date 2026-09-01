@@ -7,7 +7,7 @@ import { AccountGateModal, useAccountGate } from "../_components/AccountGate";
 type OpenRoom={code:string;players:number;roomSize:number;hostName:string};
 export default function LobbyPage(){
  const [rooms,setRooms]=useState<OpenRoom[]>([]);const [connected,setConnected]=useState(false);const gate=useAccountGate();
- useEffect(()=>{const socket:Socket=io(window.location.origin,{transports:["websocket","polling"]});const refresh=(list:OpenRoom[])=>setRooms(list);socket.on("connect",()=>{setConnected(true);socket.emit("list-rooms")});socket.on("disconnect",()=>setConnected(false));socket.on("room-list",refresh);return()=>{socket.disconnect()}},[]);
+ useEffect(()=>{const socket:Socket=io(window.location.origin,{transports:["websocket","polling"]});const refresh=(list:OpenRoom[])=>setRooms((Array.isArray(list)?list:[]).filter(room=>Number(room.players)>0&&Number(room.players)<Number(room.roomSize)));socket.on("connect",()=>{setConnected(true);socket.emit("list-rooms")});socket.on("disconnect",()=>setConnected(false));socket.on("room-list",refresh);return()=>{socket.disconnect()}},[]);
  const openRoom=(href:string)=>{gate.check(()=>{window.location.href=href})};
  return <AppFrame><div style={{maxWidth:900,margin:"0 auto",paddingBottom:40}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}><div><h1 style={{fontSize:40,marginBottom:6}}>🌐 Online Players</h1><p style={{color:"#94a3b8",marginTop:0}}>See players who are waiting right now and jump into an open game.</p></div><span style={{padding:"7px 11px",borderRadius:999,background:connected?"rgba(34,197,94,.12)":"rgba(245,158,11,.12)",color:connected?"#4ade80":"#fbbf24",fontSize:12,fontWeight:900}}>{connected?"● LIVE":"○ CONNECTING"}</span></div>
