@@ -1,0 +1,60 @@
+name: One-shot game-online board rendering fix
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: "!contains(github.event.head_commit.message, '[game-online-board-fix]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply rendering-only board sizing fix
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p = Path('app/game-online/page.tsx')
+          s = p.read_text()
+          marker = '/* FINAL MOBILE BOARD RENDER GUARD */'
+          if marker not in s:
+              fix = '''<style jsx global>{`/* FINAL MOBILE BOARD RENDER GUARD */
+@media (max-width:700px) {
+  .ll-board-stage { min-width:0 !important; min-height:0 !important; overflow:hidden !important; }
+  .ll-board-frame {
+    flex:0 0 auto !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    width:min(calc(100vw - 20px), calc(100svh - 230px)) !important;
+    height:auto !important;
+    aspect-ratio:1 / 1 !important;
+    max-width:100% !important;
+    max-height:none !important;
+  }
+  .ll-board-frame > div {
+    width:100% !important;
+    height:100% !important;
+    min-width:0 !important;
+    min-height:0 !important;
+    aspect-ratio:1 / 1 !important;
+  }
+}
+@media (max-width:380px) {
+  .ll-board-frame { width:calc(100vw - 16px) !important; }
+}`}</style>'''
+              needle = '      </style>\\n    </div></main>'
+              if needle not in s:
+                  needle = '      </style>\n    </div></main>'
+              if needle not in s:
+                  raise SystemExit('page style terminator not found')
+              s = s.replace(needle, '      ' + fix + '\n' + needle, 1)
+              p.write_text(s)
+          PY
+          git diff --check
+          rm .github/workflows/one-shot-game-online-board-fix.yml
+          git add app/game-online/page.tsx .github/workflows/one-shot-game-online-board-fix.yml
+          git commit -m "Fix game-online mobile board sizing" -m "[game-online-board-fix]"
+          git push
