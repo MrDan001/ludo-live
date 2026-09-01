@@ -338,7 +338,7 @@ function GameContent() {
                 <span>Chat</span>
               </button>
               <div className="ll-action-btn ll-voice-host">
-                <ChatVoice roomCode={roomCode} playerId={me} members={players.map((p) => ({ playerId: p.playerId, name: p.name }))} />
+                <ChatVoice roomCode={roomCode} playerId={me} members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true }))} />
               </div>
             </div>
           </div>
