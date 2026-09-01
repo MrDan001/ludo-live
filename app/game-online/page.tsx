@@ -12,7 +12,7 @@ import { playerColorsForSeats } from "../../lib/ludoRules";
 export const dynamic = "force-dynamic";
 
 type Color = "red" | "yellow" | "green" | "blue";
-type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number };
+type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number; peerId?: string };
 type TokenMap = Record<string, Record<string, { position: number }>>;
 type GameState = { status: string; currentPlayerId: string | null; dice: DiceValue | null; pendingMove: DiceValue | null; players: Player[]; tokens: TokenMap; winnerId?: string | null; stateRevision?: number };
 
@@ -41,6 +41,7 @@ function GameContent() {
   const [animating, setAnimating] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [chatOpen, setChatOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
   const [chatText, setChatText] = useState("");
   const [chatMessages, setChatMessages] = useState<Array<{id:string;name:string;text:string;at:number}>>([]);
@@ -60,7 +61,7 @@ function GameContent() {
   const mine = players.find((p) => String(p.playerId) === String(me)) || players[0];
   const opponent = players.find((p) => String(p.playerId) !== String(mine?.playerId));
   const myColors = useMemo<Color[]>(() => mine?.colors?.length ? mine.colors : (playerColorsForSeats(players.length === 2 ? 2 : 4, mine?.seat ?? 0) as Color[]), [mine, players.length]);
-  const myTurn = game ? String(game.currentPlayerId || "") === String(me) : true;
+  const myTurn = game ? String(game.currentPlayerId || "") === String(me) : false;
   const legalTokenKeys = useMemo(() => pending === null || !myTurn ? [] : tokens.filter((t) => myColors.includes(t.color) && canMove(tokens, t, pending)).map((t) => `${t.color}:${t.id}`), [pending, myTurn, tokens, myColors]);
   const applyState = useCallback((next: GameState) => { const r = Number(next.stateRevision ?? -1); if (r >= 0 && revisionRef.current >= 0 && r < revisionRef.current) return false; if (r >= 0) revisionRef.current = r; setGame(next); setTokens(normalizeTokens(next.tokens || {})); return true; }, []);
 
@@ -84,9 +85,9 @@ function GameContent() {
       const room = params.get("room") || roomCode; const roomSize = Number(params.get("size") || 2);
       localSocket = io(window.location.origin, { transports: ["websocket", "polling"], reconnection: true }); setSocket(localSocket);
       localSocket.on("connect", () => { if (room && playerId) localSocket?.emit("join-room", { roomCode: room, name: profileName, avatar: profileAvatar, level: profileLevel, coins: profileCoins, roomSize, playerId }); });
-      localSocket.on("roster", (members: Player[]) => { setGame((g) => (g ? { ...g, players: members } : { status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, players: members, tokens: {} })); });
+      localSocket.on("roster", (members: Player[]) => { setGame((g) => { const previous = g?.players || []; const merged = members.map((incoming) => { const old = previous.find((p) => String(p.playerId) === String(incoming.playerId)); return { ...old, ...incoming, name: incoming.name || old?.name || "Player", avatar: incoming.avatar ?? old?.avatar, level: incoming.level ?? old?.level, coins: incoming.coins ?? old?.coins, peerId: incoming.peerId ?? old?.peerId }; }); return g ? { ...g, players: merged } : { status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, players: merged, tokens: {} }; }); });
       localSocket.on("game-dice", (e: { value: DiceValue }) => { setRoll(e.value); setRemoteRolling(true); if (diceTimer.current) window.clearTimeout(diceTimer.current); diceTimer.current = window.setTimeout(() => setRemoteRolling(false), 900); });
-      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""); const name = String(message.name || "Player"); const text = String(message.text); const at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicateLocal = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicateLocal) return items; return [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); });
+      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""); const name = String(message.name || "Player"); const text = String(message.text); const at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicateLocal = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicateLocal) return duplicateLocal ? items : [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); if (!chatOpen) setChatUnread(true); });
       localSocket.on("game-state", (next: GameState) => { if (!mounted || !applyState(next)) return; if (next.dice !== null) setRoll(next.dice); setPending(next.currentPlayerId === playerId ? next.pendingMove : null); setAnimating(false); });
     };
     void connect();
@@ -100,9 +101,9 @@ function GameContent() {
   }, [socket, game, myTurn, pending, animating, tokens, myColors]);
 
   const chooseToken = useCallback((color: Color, id: number) => { if (!socket || !game || !myTurn || pending === null || animating) return; const token = tokens.find((t) => t.color === color && t.id === id); if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return; const target = nextProgress(token.position, pending); if (target === null) return; setPending(null); setAnimating(true); socket.emit("game-move", { tokenId: `${color}:${id}`, to: target }); }, [socket, game, myTurn, pending, animating, tokens, myColors]);
-  const handleRoll = useCallback(() => { if (!socket || !game) { setRoll((Math.floor(Math.random() * 6) + 1) as DiceValue); return; } if (!myTurn || pending !== null || animating || remoteRolling) return; socket.emit("game-roll"); }, [socket, game, myTurn, pending, animating, remoteRolling]);
-  const sendQuickReaction = (text: string) => { setChatText(text); setChatOpen(true); };
-  const sendChatMessage = () => { const text = chatText.trim(); if (!text || !socket?.connected) return; const now = Date.now(); setChatMessages((items) => [...items.slice(-99), { id: `local-${now}`, name: mine?.name || myName || "Player", text, at: now }]); socket.emit("chat", { text }); setChatText(""); };
+  const handleRoll = useCallback(() => { if (!socket?.connected || !game) return; if (!myTurn || pending !== null || animating || remoteRolling) return; socket.emit("game-roll"); }, [socket, game, myTurn, pending, animating, remoteRolling]);
+  const sendQuickReaction = (text: string) => { setChatText(text); setChatOpen(true); setChatUnread(false); };
+  const sendChatMessage = () => { const text = chatText.trim(); if (!text || !socket?.connected) return; const now = Date.now(); setChatMessages((items) => [...items.slice(-99), { id: `local-${now}`, name: mine?.name || myName || "Player", text, at: now }]); socket.emit("chat", { text }); setChatText(""); setChatUnread(false); };
   const toggleSound = () => { const next = !soundEnabled; setSoundEnabled(next); try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); localStorage.setItem("ludo-settings", JSON.stringify({ ...saved, sound: next })); } catch {} window.dispatchEvent(new CustomEvent("ludo-settings-updated", { detail: { sound: next } })); };
   const leaveRoom = () => { if (!window.confirm("Are you sure you want to leave this match?")) return; try { localStorage.removeItem("ludo-room"); } catch {} if (!socket?.connected) { window.location.href = "/lobby"; return; } const go = () => { window.location.href = "/lobby"; }; socket.once("room-left", go); socket.emit("leave-room"); window.setTimeout(go, 900); };
 
@@ -117,7 +118,7 @@ function GameContent() {
       <div className="ll-bottom-panel"><div className="ll-controls-row">
         <div className="ll-user-box"><div className="ll-user-header"><div className="ll-user-avatar"><PlayerAvatar src={mine?.avatar} fallback="👤" /></div><div className="ll-user-copy"><b className="ll-u-name">{mine?.name || myName || ""}</b><div className="ll-u-level">★ {mine?.level || myLevel}</div></div><span className="ll-edit-mark">✎</span></div><div className="ll-coins-pill"><span className="coin-icon">🟡</span><b>{(mine?.coins ?? myCoins).toLocaleString()}</b></div></div>
         <div className="ll-dice-box"><div className="ll-turn-copy"><div className="ll-turn-title"><span className="dot green" /> {myTurn ? "YOUR TURN" : "OPPONENT'S TURN"}</div><div className="ll-turn-sub">{myTurn ? <>Roll the dice and<br />make your move</> : <>Wait for the other<br />player to move</>}</div><div className="ll-dice-result">{roll}</div><div className="ll-dice-hint">{myTurn ? "Tap the dice to roll" : "Waiting for turn"}</div></div><div className="ll-dice-slot"><DemoDice value={roll} onRoll={handleRoll} disabled={!myTurn || pending !== null || animating || remoteRolling} botRolling={remoteRolling} /></div></div>
-        <div className="ll-side-actions"><button type="button" className="ll-action-btn" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen}><span className="action-icon">•••</span><span>Chat</span></button><div className="ll-action-btn ll-voice-host"><ChatVoice roomCode={roomCode} playerId={me} members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true }))} /></div></div>
+        <div className="ll-side-actions"><button type="button" className="ll-action-btn" onClick={() => setChatOpen((v) => { const next = !v; if (next) setChatUnread(false); return next; })} aria-expanded={chatOpen}><span className="action-icon">•••</span><span>Chat{chatUnread && <span className="ll-chat-unread" aria-label="New message">●</span>}</span></button><div className="ll-action-btn ll-voice-host"><ChatVoice socket={socket} roomCode={roomCode} playerId={me} members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true, peerId: p.peerId }))} /></div></div>
       </div>
       <div className="ll-reactions-bar">{QUICK_REACTIONS.map((text, idx) => <button key={idx} type="button" className="ll-pill-btn" onClick={() => sendQuickReaction(text)}>{text}</button>)}</div>
       <footer className="ll-footer"><button type="button" className="ll-foot-btn exit" onClick={leaveRoom}>↪ Leave Match</button><button type="button" className="ll-foot-btn" onClick={() => setPlayersOpen((v) => !v)}>👥 Players</button><button type="button" className="ll-foot-btn" onClick={toggleSound}>{soundEnabled ? "🔊 Sound" : "🔇 Sound"}</button><div className="ll-room-chip"><span className="shield">🛡️</span><small>Room ID: {roomCode}</small><span className="copy-icon">▢</span></div></footer>
