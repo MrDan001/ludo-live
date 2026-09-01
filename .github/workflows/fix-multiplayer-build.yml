@@ -13,46 +13,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Patch actual game-online UI
+      - name: Patch actual game-online UI and multiplayer metadata
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('app/game-online/page.tsx')
           s=p.read_text()
 
-          old='''  const sendQuickReaction = (text: string) => {\n    if (socket?.connected) socket.emit("chat", { text });\n  };'''
-          new='''  const sendQuickReaction = (text: string) => {\n    setChatText(text);\n    setChatOpen(true);\n  };'''
-          if old not in s:
-              raise SystemExit('quick reaction handler not found')
-          s=s.replace(old,new,1)
+          replacements = [
+            ('''type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number };''', '''type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number; peerId?: string };'''),
+            ('''  const [chatOpen, setChatOpen] = useState(false);''', '''  const [chatOpen, setChatOpen] = useState(false);\n  const [chatUnread, setChatUnread] = useState(false);'''),
+            ('''      localSocket.on("roster", (members: Player[]) => { setGame((g) => (g ? { ...g, players: members } : { status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, players: members, tokens: {} })); });''', '''      localSocket.on("roster", (members: Player[]) => { setGame((g) => { const previous = g?.players || []; const merged = members.map((incoming) => { const old = previous.find((p) => String(p.playerId) === String(incoming.playerId)); return { ...old, ...incoming, name: incoming.name || old?.name || "Player", avatar: incoming.avatar ?? old?.avatar, level: incoming.level ?? old?.level, coins: incoming.coins ?? old?.coins, peerId: incoming.peerId ?? old?.peerId }; }); return g ? { ...g, players: merged } : { status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, players: merged, tokens: {} }; }); });'''),
+            ('''      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""); const name = String(message.name || "Player"); const text = String(message.text); const at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicateLocal = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicateLocal) return items; return [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); });''', '''      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""); const name = String(message.name || "Player"); const text = String(message.text); const at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicateLocal = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicateLocal) return items; return [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); if (!chatOpen) setChatUnread(true); });'''),
+            ('''  const sendQuickReaction = (text: string) => { setChatText(text); setChatOpen(true); };''', '''  const sendQuickReaction = (text: string) => { setChatText(text); setChatOpen(true); setChatUnread(false); };'''),
+            ('''  const sendChatMessage = () => { const text = chatText.trim(); if (!text || !socket?.connected) return; const now = Date.now(); setChatMessages((items) => [...items.slice(-99), { id: `local-${now}`, name: mine?.name || myName || "Player", text, at: now }]); socket.emit("chat", { text }); setChatText(""); };''', '''  const sendChatMessage = () => { const text = chatText.trim(); if (!text || !socket?.connected) return; const now = Date.now(); setChatMessages((items) => [...items.slice(-99), { id: `local-${now}`, name: mine?.name || myName || "Player", text, at: now }]); socket.emit("chat", { text }); setChatText(""); setChatUnread(false); };'''),
+            ('''onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen}''', '''onClick={() => setChatOpen((v) => { const next = !v; if (next) setChatUnread(false); return next; })} aria-expanded={chatOpen}'''),
+            ('''<span>Chat</span>''', '''<span>Chat{chatUnread && <span className="ll-chat-unread" aria-label="New message">●</span>}</span>'''),
+            ('''<ChatVoice roomCode={roomCode} playerId={me} members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true }))} />''', '''<ChatVoice socket={socket} roomCode={roomCode} playerId={me} members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true, peerId: p.peerId }))} />'''),
+          ]
+          for old,new in replacements:
+              if old not in s:
+                  raise SystemExit(f'expected game-online pattern not found: {old[:90]}')
+              s=s.replace(old,new,1)
 
           old='''.ludo-live-container {\n          position: relative;\n          width: 100%;\n          max-width: 760px;'''
           new='''.ludo-live-container {\n          position: relative;\n          width: 100%;\n          max-width: none;'''
-          if old not in s:
-              raise SystemExit('container sizing rule not found')
-          s=s.replace(old,new,1)
+          if old in s: s=s.replace(old,new,1)
 
           old='''.ll-board-stage {\n          min-height: 0;\n          display: flex;\n          align-items: center;\n          justify-content: center;\n          padding: 2px 0 12px;\n        }'''
           new='''.ll-board-stage {\n          min-height: 0;\n          width: 100%;\n          display: flex;\n          align-items: center;\n          justify-content: center;\n          padding: 2px 0 12px;\n        }'''
-          if old not in s:
-              raise SystemExit('board stage rule not found')
-          s=s.replace(old,new,1)
+          if old in s: s=s.replace(old,new,1)
 
           old='''.ll-board-frame {\n          width: min(100%, 100%, calc(100dvh - 290px));\n          aspect-ratio: 1;'''
           new='''.ll-board-frame {\n          width: min(100%, calc(100dvh - 290px));\n          max-width: 100%;\n          margin-inline: auto;\n          aspect-ratio: 1;'''
-          if old not in s:
-              raise SystemExit('board frame rule not found')
-          s=s.replace(old,new,1)
-
-          old='''.mp-chat-compose input{flex:1;min-width:0;border:1px solid rgba(212,175,55,.35);border-radius:10px;background:#080705;color:#fff;padding:9px}.mp-chat-compose button{'''
-          new='''.mp-chat-compose input{flex:1;min-width:0;border:1px solid rgba(212,175,55,.35);border-radius:10px;background:#080705;color:#fff;padding:9px}.mp-chat-compose input:focus{outline:2px solid rgba(212,175,55,.35);outline-offset:1px}.mp-chat-compose button{'''
-          if old not in s:
-              raise SystemExit('chat compose rule not found')
-          s=s.replace(old,new,1)
+          if old in s: s=s.replace(old,new,1)
 
           p.write_text(s)
           PY
           git diff --check
           git add app/game-online/page.tsx
-          git commit -m "Fix game-online board layout and quick chat" -m "[layout-chat-fix-bot]"
+          git commit -m "Fix game-online multiplayer metadata and chat" -m "[layout-chat-fix-bot]"
           git push
