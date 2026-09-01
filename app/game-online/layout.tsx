@@ -5,7 +5,7 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
     <>
       {children}
       <style dangerouslySetInnerHTML={{ __html: `
-        /* Responsive game-online composition: the board and HUD share the viewport instead of fighting for it. */
+        /* Route-scoped responsive composition for /game-online. */
         html, body { overflow: hidden !important; }
 
         .ludo-live-wrapper { height: 100dvh !important; min-height: 0 !important; }
@@ -32,11 +32,11 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
 
         .ludo-live-wrapper .ll-board-frame {
           box-sizing: border-box !important;
-          width: min(78vw, 500px) !important;
+          width: min(90vw, 600px) !important;
           height: auto !important;
           aspect-ratio: 1 / 1 !important;
           max-width: 100% !important;
-          max-height: calc(100% - 2px) !important;
+          max-height: calc(100% - 4px) !important;
           flex: 0 0 auto !important;
           margin: 0 auto !important;
         }
@@ -48,28 +48,15 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
           max-height: 100% !important;
         }
 
-        @media (max-width: 700px) {
+        /* Short portrait screens: the available middle-stage height becomes the limit. */
+        @media (orientation: portrait) and (max-width: 700px) and (max-height: 900px) {
           .ludo-live-wrapper .ll-board-frame {
-            width: min(78vw, 500px) !important;
-            height: auto !important;
-            max-width: 100% !important;
-            max-height: calc(100% - 2px) !important;
+            width: min(90vw, calc(100dvh - 410px), 600px) !important;
+            max-height: calc(100% - 4px) !important;
           }
         }
 
-        @media (max-width: 700px) and (max-height: 760px) {
-          .ludo-live-wrapper .ll-board-frame {
-            width: min(78vw, calc(100dvh - 430px), 500px) !important;
-            max-height: calc(100% - 2px) !important;
-          }
-        }
-
-        /*
-         * Tall/narrow Android portrait screens need their own composition.
-         * The previous 700px breakpoint missed devices whose CSS viewport is
-         * around 720px wide, leaving the desktop-sized HUD to overflow below
-         * the viewport and making the dice/card area disappear.
-         */
+        /* Tall/narrow Android portrait screens: keep the complete HUD visible and let the board use the remaining width. */
         @media (orientation: portrait) and (max-width: 900px) and (max-aspect-ratio: 1 / 2) {
           .ludo-live-wrapper .ludo-live-container {
             padding: 10px 12px 8px !important;
@@ -96,7 +83,6 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
           .ludo-live-wrapper .multiplayer-player-name-row strong { font-size: 13px !important; }
           .ludo-live-wrapper .multiplayer-player-status { font-size: 10px !important; }
           .ludo-live-wrapper .multiplayer-level-badge { font-size: 11px !important; }
-
           .ludo-live-wrapper .multiplayer-topbar-logo strong { font-size: 27px !important; }
           .ludo-live-wrapper .multiplayer-topbar-logo span:last-child { font-size: 15px !important; }
 
@@ -180,9 +166,9 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
             border-radius: 14px !important;
           }
 
-          /* Let the board use the real middle-stage space, but never steal HUD height. */
+          /* Board is width-led on tall phones, but still capped by the actual middle stage. */
           .ludo-live-wrapper .ll-board-frame {
-            width: min(82vw, 540px) !important;
+            width: min(90vw, 600px) !important;
             height: auto !important;
             max-width: 100% !important;
             max-height: calc(100% - 4px) !important;
