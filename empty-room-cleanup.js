@@ -1,7 +1,7 @@
 // ROOM_LIFECYCLE_CLEANUP
 // Keeps abandoned multiplayer rooms from lingering and transfers host ownership
 // immediately when the current host leaves before the match starts.
-// This preload intentionally does not change Ludo movement/rules or bet settlement.
+// This preload intentionally does not change Ludo movement/rules.
 
 const roomParents = new WeakMap();
 const roomIndex = new Map();
@@ -35,6 +35,22 @@ if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
   Socket.prototype.__ludoImmediateRoomLifecyclePatched = true;
   const previousOn = Socket.prototype.on;
   Socket.prototype.on = function patchedSocketOn(event, listener) {
+    if (event === 'join-room') {
+      return previousOn.call(this, event, (...args) => {
+        const payload = args[0] || {};
+        // server.js currently references `avatar` in the join handler without
+        // destructuring it. Provide the request value for that existing handler
+        // without changing the room/game architecture.
+        const previousAvatar = global.avatar;
+        global.avatar = String(payload.avatar || '');
+        try {
+          return listener.apply(this, args);
+        } finally {
+          global.avatar = previousAvatar;
+        }
+      });
+    }
+
     if (event !== 'disconnect') return previousOn.call(this, event, listener);
 
     return previousOn.call(this, event, (...args) => {
@@ -44,9 +60,7 @@ if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
       const member = room?.members?.get(this.id);
       const wasHost = !!member && (room.hostId === this.id || room.hostPlayerId === (member.playerId || member.id));
 
-      // server.js has an old special-case that closes 2-player rooms when the
-      // host disconnects. Temporarily avoid that branch so the remaining player
-      // can become host immediately, which is the intended room contract now.
+      // Keep the remaining player in a 2-player room when its host disconnects.
       const originalSize = room?.roomSize;
       if (wasHost && room && originalSize === 2) room.roomSize = 3;
 
@@ -60,16 +74,16 @@ if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
       const current = code ? roomIndex.get(code)?.room : null;
       if (!current) return result;
 
-      // No members remain: delete the room registry entry immediately.
+      // No players remain: remove the room immediately.
       if (current.members.size === 0) {
         const parent = roomIndex.get(code)?.parent;
         if (parent) originalMapDelete.call(parent, code);
         roomIndex.delete(code);
+        try { this.nsp.emit('room-list', []); } catch {}
         return result;
       }
 
-      // A non-empty pre-game room gets a new host immediately. There is no
-      // five-second host-pending window anymore.
+      // A non-empty pre-game room gets a new host immediately.
       if (wasHost && current.members.size > 0 && !current.game) {
         if (current.hostTimer) clearTimeout(current.hostTimer);
         current.hostTimer = null;
@@ -77,7 +91,7 @@ if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
         current.hostEligible = false;
 
         const candidates = [...current.members.values()];
-        const nextHost = candidates[Math.floor(Math.random() * candidates.length)];
+        const nextHost = candidates[0];
         if (nextHost) {
           for (const m of candidates) m.host = false;
           nextHost.host = true;
@@ -103,7 +117,7 @@ if (!Socket.prototype.__ludoImmediateRoomLifecyclePatched) {
                 hostName: r.members.get(r.hostId)?.name || 'Host',
                 board: r.members.get(r.hostId)?.board || 'classic'
               }))
-              .filter(r => r.players < r.roomSize));
+              .filter(r => r.players > 0 && r.players < r.roomSize));
           } catch {}
         }
       }
