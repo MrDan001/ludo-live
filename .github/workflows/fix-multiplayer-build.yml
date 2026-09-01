@@ -38,18 +38,13 @@ jobs:
 
           p.write_text(s)
 
-          # The online page already sends avatar/level/coins. The Socket.IO
-          # server must accept and persist the same metadata; otherwise the
-          # join-room handler references an undefined avatar and the roster
-          # loses profile fields. Keep this patch narrowly scoped to the
-          # multiplayer room contract.
           sp=Path('server.js')
           ss=sp.read_text()
           server_replacements = [
             ('''socket.on('join-room',({roomCode,name,roomSize,playerId,board,dice,host}={})=>{''', '''socket.on('join-room',({roomCode,name,roomSize,playerId,avatar,level,coins,board,dice,host}={})=>{'''),
-            ('''member.name=String(name).slice(0,24);member.avatar=String(avatar||member.avatar||'');member.board=''','''member.name=String(name).slice(0,24);member.avatar=String(avatar??member.avatar??'');member.level=Number(level)||member.level||1;member.coins=Number.isFinite(Number(coins))?Number(coins):(member.coins??0);member.board='''),
-            ('''socket.id,playerId:pid,name:String(name).slice(0,24),avatar:String(avatar||''),host:''','''socket.id,playerId:pid,name:String(name).slice(0,24),avatar:String(avatar||''),level:Number(level)||1,coins:Number.isFinite(Number(coins))?Number(coins):0,host:'''),
-            ('''players:members.map((m,i)=>({playerId:m.playerId||m.id,name:m.name,avatar:m.avatar||'',seat:i}))''','''players:members.map((m,i)=>({playerId:m.playerId||m.id,name:m.name,avatar:m.avatar||'',level:Number(m.level)||1,coins:Number.isFinite(Number(m.coins))?Number(m.coins):0,peerId:m.peerId||null,seat:i}))'''),
+            ('''member.name=String(name).slice(0,24);member.avatar=String(avatar||member.avatar||'');member.board=''', '''member.name=String(name).slice(0,24);member.avatar=String(avatar??member.avatar??'');member.level=Number(level)||member.level||1;member.coins=Number.isFinite(Number(coins))?Number(coins):(member.coins??0);member.board='''),
+            ('''socket.id,playerId:pid,name:String(name).slice(0,24),avatar:String(avatar||''),host:''', '''socket.id,playerId:pid,name:String(name).slice(0,24),avatar:String(avatar||''),level:Number(level)||1,coins:Number.isFinite(Number(coins))?Number(coins):0,host:'''),
+            ('''players:members.map((m,i)=>({playerId:m.playerId||m.id,name:m.name,avatar:m.avatar||'',seat:i}))''', '''players:members.map((m,i)=>({playerId:m.playerId||m.id,name:m.name,avatar:m.avatar||'',level:Number(m.level)||1,coins:Number.isFinite(Number(m.coins))?Number(m.coins):0,peerId:m.peerId||null,seat:i}))'''),
           ]
           for old,new in server_replacements:
               if old not in ss:
