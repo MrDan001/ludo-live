@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, type ReactNode } from "react";
 
-export default function GameOnlineLayout({ children }: { children: React.ReactNode }) {
+export default function GameOnlineLayout({ children }: { children: ReactNode }) {
   useEffect(() => {
     const updateBoardSize = () => {
       const stage = document.querySelector(".ludo-live-wrapper .ll-board-stage");
