@@ -4,10 +4,8 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
   return (
     <>
       {children}
-      <style jsx global>{`
-        /* /game-online only: the board is sized by the visible game stage.
-           Do not use JS measurement or container-query units here; both can
-           transiently resolve to zero during a mobile refresh/reflow. */
+      <style>{`
+        /* /game-online only: one authoritative, refresh-safe board rule. */
         .ludo-live-wrapper .ll-board-stage {
           min-width: 0 !important;
           min-height: 0 !important;
@@ -23,8 +21,8 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
           flex: none !important;
           flex-shrink: 0 !important;
           box-sizing: border-box !important;
-          width: min(92vw, 680px) !important;
-          height: auto !important;
+          width: auto !important;
+          height: min(92vw, 680px, calc(100% - 16px)) !important;
           aspect-ratio: 1 / 1 !important;
           min-width: 0 !important;
           min-height: 0 !important;
@@ -43,7 +41,7 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
 
         @media (max-width: 700px) {
           .ludo-live-wrapper .ll-board-frame {
-            width: 96vw !important;
+            height: min(96vw, 680px, calc(100% - 12px)) !important;
             max-width: calc(100% - 12px) !important;
             max-height: calc(100% - 12px) !important;
           }
