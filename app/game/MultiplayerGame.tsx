@@ -1,10 +1,27 @@
 "use client";
 
 import MultiplayerGameCanonical from "./MultiplayerGameCanonical";
+import MultiplayerChatOverlay from "./MultiplayerChatOverlay";
 
 export default function MultiplayerGame() {
   return (
-    <div className="multiplayer-route-shell">
+    <div
+      className="multiplayer-route-shell"
+      onClickCapture={(event) => {
+        const target = event.target as HTMLElement | null;
+        const button = target?.closest("button");
+        if (!button) return;
+        if (button.classList.contains("ll-pill-btn")) {
+          event.preventDefault();
+          event.stopPropagation();
+          window.dispatchEvent(new CustomEvent("ludo-quick-chat", { detail: button.textContent?.trim() || "" }));
+        } else if (button.classList.contains("ll-action-btn") && button.textContent?.trim().toLowerCase() === "chat") {
+          event.preventDefault();
+          event.stopPropagation();
+          window.dispatchEvent(new CustomEvent("ludo-open-chat"));
+        }
+      }}
+    >
       <div className="multiplayer-fresh-header" aria-label="Multiplayer match header">
         <div className="multiplayer-fresh-player multiplayer-fresh-player-left">
           <div className="multiplayer-fresh-avatar">👑</div>
@@ -29,6 +46,8 @@ export default function MultiplayerGame() {
         <MultiplayerGameCanonical />
       </div>
 
+      <MultiplayerChatOverlay roomCode="W100NB" />
+
       <style jsx global>{`
         html,
         body {
@@ -49,8 +68,6 @@ export default function MultiplayerGame() {
           background: #030303 !important;
         }
 
-        /* The canonical component still contains its historical header.
-           Keep that legacy layer completely out of the render surface. */
         .multiplayer-route-shell .ll-header,
         .multiplayer-route-shell .ll-brand,
         .multiplayer-route-shell .ll-menu-btn,
@@ -168,13 +185,24 @@ export default function MultiplayerGame() {
         }
 
         .multiplayer-game-layer .ludo-live-container {
+          width: 100% !important;
+          max-width: none !important;
           height: 100% !important;
           padding-top: 0 !important;
         }
 
         .multiplayer-game-layer .ll-board-stage {
           margin-top: 0 !important;
-          padding-top: 0 !important;
+          padding: 0 !important;
+          width: 100% !important;
+          justify-content: center !important;
+          align-items: center !important;
+        }
+
+        .multiplayer-game-layer .ll-board-frame {
+          width: 100% !important;
+          max-width: min(100%, calc(100dvh - 430px)) !important;
+          margin-inline: auto !important;
         }
 
         @media (max-width: 560px) {
@@ -202,6 +230,7 @@ export default function MultiplayerGame() {
           .multiplayer-fresh-player-copy strong { font-size: 13px !important; }
           .multiplayer-fresh-player-copy span { font-size: 8px !important; margin-top: 3px !important; }
           .multiplayer-game-layer { inset: 78px 0 0 !important; }
+          .multiplayer-game-layer .ll-board-frame { max-width: calc(100dvh - 420px) !important; }
         }
       `}</style>
     </div>
