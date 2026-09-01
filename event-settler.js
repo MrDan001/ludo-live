@@ -3,10 +3,6 @@ const { Pool } = require('pg');
 function databaseConnectionString() {
   const raw = process.env.DATABASE_URL;
   if (!raw) return raw;
-  // pg connection-string parameters can override the explicit `ssl` option.
-  // Railway may provide sslmode=require/verify-full in DATABASE_URL, which can
-  // force certificate-chain validation and produce SELF_SIGNED_CERT_IN_CHAIN.
-  // Remove only sslmode so our explicit Railway-safe TLS policy below wins.
   return raw.replace(/([?&])sslmode=[^&]*&?/i, (match, prefix) => prefix === '?' ? '?' : '').replace(/[?&]$/, '');
 }
 
@@ -61,6 +57,24 @@ async function settleExpiredEvents() {
         console.error('event settlement', event.id, error);
       } finally {
         client.release();
+      }
+    }
+
+    const tournamentSecret = process.env.TOURNAMENT_SETTLE_SECRET || '';
+    if (tournamentSecret) {
+      const tournaments = await pool.query(`SELECT id FROM ludo_tournaments WHERE status NOT IN ('finished','cancelled','draft') AND ends_at<=NOW() ORDER BY ends_at ASC LIMIT 20`);
+      const port = Number(process.env.PORT || 3000);
+      for (const tournament of tournaments.rows) {
+        try {
+          const response = await fetch(`http://127.0.0.1:${port}/api/tournaments/settle`, {
+            method: 'POST',
+            headers: {'content-type':'application/json','x-tournament-settle-secret':tournamentSecret},
+            body: JSON.stringify({tournamentId:String(tournament.id)}),
+          });
+          if (!response.ok) console.error('tournament settlement', tournament.id, response.status, await response.text().catch(()=>''));
+        } catch (error) {
+          console.error('tournament settlement worker', tournament.id, error);
+        }
       }
     }
   } catch (error) {
