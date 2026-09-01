@@ -49,7 +49,7 @@ export async function GET(q: NextRequest) {
     const a = await admin(q);
     if (!a) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
     await pool.query(`UPDATE ludo_events SET status='ended',updated_at=NOW() WHERE status='published' AND ends_at<=NOW()`);
-    const r = await pool.query<any>(`SELECT e.*,COUNT(ee.user_id)::int participants,COUNT(*) FILTER(WHERE ee.completed)::int completed FROM ludo_events e LEFT JOIN ludo_event_entries ee ON ee.event_id=e.id GROUP BY e.id ORDER BY e.starts_at ASC`);
+    const r = await pool.query<any>(`SELECT e.*,COUNT(ee.user_id)::int participants,COUNT(*) FILTER (WHERE ee.completed)::int completed FROM ludo_events e LEFT JOIN ludo_event_entries ee ON ee.event_id=e.id GROUP BY e.id ORDER BY e.starts_at ASC`);
     return NextResponse.json({ events: r.rows.map(present), serverNow: new Date().toISOString() });
   } catch (e) {
     console.error("admin events GET", e);
@@ -85,10 +85,10 @@ export async function POST(q: NextRequest) {
       if (!title) return NextResponse.json({ error: "Event title is required." }, { status: 400 });
       if (new Date(endsAt).getTime() <= new Date(startsAt).getTime()) return NextResponse.json({ error: "End time must be after start time." }, { status: 400 });
       if (action === "create") {
-        await pool.query(`INSERT INTO ludo_events(id,title,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'published')`, [id,title,description,icon,color,reward,rewardCoins,rewardGems,eventType,missionKind,missionTarget,JSON.stringify(modes),JSON.stringify(boards),startsAt,endsAt]);
+        await pool.query(`INSERT INTO ludo_events(id,title,name,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status) VALUES($1,$2,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,'published')`, [id,title,description,icon,color,reward,rewardCoins,rewardGems,eventType,missionKind,missionTarget,JSON.stringify(modes),JSON.stringify(boards),startsAt,endsAt]);
         await audit(a, "create_event", { id, title, startsAt, endsAt });
       } else {
-        const r = await pool.query(`UPDATE ludo_events SET title=$1,description=$2,icon=$3,color=$4,reward=$5,reward_coins=$6,reward_gems=$7,event_type=$8,mission_kind=$9,mission_target=$10,modes=$11,boards=$12,starts_at=$13,ends_at=$14,status=CASE WHEN status='cancelled' THEN 'published' ELSE status END,updated_at=NOW() WHERE id=$15`, [title,description,icon,color,reward,rewardCoins,rewardGems,eventType,missionKind,missionTarget,JSON.stringify(modes),JSON.stringify(boards),startsAt,endsAt,id]);
+        const r = await pool.query(`UPDATE ludo_events SET title=$1,name=$1,description=$2,icon=$3,color=$4,reward=$5,reward_coins=$6,reward_gems=$7,event_type=$8,mission_kind=$9,mission_target=$10,modes=$11,boards=$12,starts_at=$13,ends_at=$14,status=CASE WHEN status='cancelled' THEN 'published' ELSE status END,updated_at=NOW() WHERE id=$15`, [title,description,icon,color,reward,rewardCoins,rewardGems,eventType,missionKind,missionTarget,JSON.stringify(modes),JSON.stringify(boards),startsAt,endsAt,id]);
         if (!r.rowCount) return NextResponse.json({ error: "Event not found." }, { status: 404 });
         await audit(a, "edit_event", { id, title, startsAt, endsAt });
       }
@@ -98,7 +98,7 @@ export async function POST(q: NextRequest) {
     if (action === "set_status") {
       const id = String(b.id || "");
       const status = String(b.status || "");
-      if (!['draft','published','cancelled','ended'].includes(status)) return NextResponse.json({ error: "Invalid event status." }, { status: 400 });
+      if (!["draft","published","cancelled","ended"].includes(status)) return NextResponse.json({ error: "Invalid event status." }, { status: 400 });
       const r = await pool.query(`UPDATE ludo_events SET status=$1,updated_at=NOW() WHERE id=$2`, [status, id]);
       if (!r.rowCount) return NextResponse.json({ error: "Event not found." }, { status: 404 });
       await audit(a, "event_status", { id, status });
