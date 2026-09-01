@@ -35,6 +35,22 @@ Conceptual lifecycle:
 
 Cancelled events are also retained server-side.
 
+### Admin schema compatibility
+
+`ludo_events.name` is a required database column. The Admin event creation/edit path must keep the compatibility field synchronized with the configured title:
+
+- create: `name = title`
+- edit: `name = title`
+
+Event seed definitions must also provide the required `name` value. An empty event table is valid; an Admin API error must not be used as the empty-state representation.
+
+Recent production fixes:
+
+- `76fcea4b2b9dfa1cf8a0c9fba0935ecc44eb284e` — Admin event creation name compatibility.
+- `1a999106e655b780cf4e50c403f4f6d4fd26de13` — event seed compatibility with required `name` column.
+
+Do not add fake events, reset event rows, or bypass the database constraint as a workaround.
+
 ## Joining
 
 Players can join only while the server evaluates the event as `live`. The `/api/events` POST `action=join` endpoint creates an idempotent `ludo_event_entries` record.
@@ -83,4 +99,5 @@ The progress fill must be a block-level element with an explicit height and widt
 - Do not trust client timestamps for lifecycle authority.
 - Do not show expired/history tabs on the player Event page unless product requirements explicitly change.
 - Keep Admin as the place for full lifecycle/history review.
+- Treat `name` as a required compatibility field and keep it synchronized with `title`.
 - When changing Event behavior, update this document and `DEVELOPER_HANDOFF.md` in the same change.
