@@ -198,7 +198,18 @@ function GameContent() {
 
       localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => {
         if (!mounted || !message?.text) return;
-        setChatMessages((items) => [...items.slice(-99), { id: String(message.id || Date.now()), name: String(message.name || "Player"), text: String(message.text), at: Number(message.at || Date.now()) }]);
+        const id = String(message.id || "");
+        const name = String(message.name || "Player");
+        const text = String(message.text);
+        const at = Number(message.at || Date.now());
+        setChatMessages((items) => {
+          if (id && items.some((item) => item.id === id)) return items;
+          const duplicateLocal = items.find(
+            (item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000
+          );
+          if (duplicateLocal) return items;
+          return [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }];
+        });
       });
 
       localSocket.on("game-state", (next: GameState) => {
@@ -248,6 +259,16 @@ function GameContent() {
   const sendChatMessage = () => {
     const text = chatText.trim();
     if (!text || !socket?.connected) return;
+    const now = Date.now();
+    setChatMessages((items) => [
+      ...items.slice(-99),
+      {
+        id: `local-${now}`,
+        name: mine?.name || "Player",
+        text,
+        at: now,
+      },
+    ]);
     socket.emit("chat", { text });
     setChatText("");
   };
@@ -366,7 +387,7 @@ function GameContent() {
           </footer>
         {chatOpen && <section className="mp-overlay-panel" role="dialog" aria-label="Room chat">
           <div className="mp-panel-head"><strong>Room Chat</strong><button type="button" onClick={() => setChatOpen(false)} aria-label="Close chat">×</button></div>
-          <div className="mp-chat-list">{chatMessages.length ? chatMessages.map((m) => <div className={`mp-chat-message ${m.id === me ? "mine" : ""}`} key={`${m.id}-${m.at}`}><b>{m.name}</b><span>{m.text}</span></div>) : <p className="mp-empty">No messages yet. Say hello!</p>}</div>
+          <div className="mp-chat-list">{chatMessages.length ? chatMessages.map((m) => <div className={`mp-chat-message ${m.id.startsWith("local-") || m.name === mine.name ? "mine" : ""}`} key={`${m.id}-${m.at}`}><b>{m.name}</b><span>{m.text}</span></div>) : <p className="mp-empty">No messages yet. Say hello!</p>}</div>
           <form className="mp-chat-compose" onSubmit={(e) => { e.preventDefault(); sendChatMessage(); }}><input value={chatText} onChange={(e) => setChatText(e.target.value)} maxLength={240} placeholder="Type a message…" aria-label="Chat message"/><button type="submit">Send</button></form>
         </section>}
 
@@ -417,26 +438,32 @@ function GameContent() {
         .ll-board-stage {
           min-height: 0;
           width: 100%;
+          height: 100%;
           display: flex;
           align-items: center;
           justify-content: center;
+          overflow: hidden;
           padding: 2px 0 12px;
         }
 
         .ll-board-frame {
           width: min(100%, calc(100dvh - 290px));
           max-width: 100%;
+          max-height: 100%;
+          height: auto;
           margin-inline: auto;
-          aspect-ratio: 1;
+          aspect-ratio: 1 / 1;
           padding: 7px;
           border-radius: 30px;
           background: linear-gradient(145deg, #f6da82 0%, #8d6819 43%, #e7c970 100%);
           box-shadow: 0 14px 38px rgba(0,0,0,.8), 0 0 0 1px rgba(212,175,55,.35);
+          flex: 0 1 auto;
         }
 
         .ll-board-frame > div {
           width: 100% !important;
           height: 100% !important;
+          aspect-ratio: 1 / 1;
           border-radius: 23px;
           overflow: hidden;
         }
@@ -533,7 +560,7 @@ function GameContent() {
           .multiplayer-topbar-room { padding: 7px 9px; border-radius: 12px; gap: 5px; }
           .multiplayer-topbar-room span { font-size: 7px; }
           .multiplayer-topbar-room b { font-size: 9px; }
-          .ll-board-frame { width: min(100%, calc(100dvh - 420px)); padding: 5px; border-radius: 23px; }
+          .ll-board-frame { width: min(100%, calc(100dvh - 240px)); max-height: 100%; }
           .ll-board-frame > div { border-radius: 18px; }
           .ll-controls-row { grid-template-columns: minmax(135px, .85fr) minmax(0, 1.5fr) 58px; gap: 6px; min-height: 116px; }
           .ll-user-box { padding: 9px; border-radius: 14px; }
@@ -573,7 +600,7 @@ function GameContent() {
         @media (max-height: 760px) {
           .ludo-live-container { padding-top: 8px; padding-bottom: 8px; }
           .multiplayer-topbar { min-height: 52px; padding-bottom: 5px; }
-          .ll-board-frame { width: min(100%, calc(100dvh - 355px)); }
+          .ll-board-frame { width: min(100%, calc(100dvh - 300px)); max-height: 100%; }
           .ll-controls-row { min-height: 100px; }
         }
       `}</style>
