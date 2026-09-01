@@ -56,4 +56,3 @@ jobs:
           git add app/game-online/page.tsx
           git commit -m "Fix game-online board layout and quick chat" -m "[layout-chat-fix-bot]"
           git push
-# temporary trigger only; removed after the page patch is committed
