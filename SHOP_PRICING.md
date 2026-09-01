@@ -14,6 +14,14 @@ The Admin Shop can change **both price and payment currency** for currency packa
 
 The override is keyed by `(item_type,item_id)` and is the source of truth for both display and purchase validation.
 
+## Canonical Admin Shop location
+
+The canonical Admin catalogue-management surface is:
+
+`/dbase/shop`
+
+The Admin hamburger's Catalogue section should point to Shop only. Do not create parallel Admin catalogue pages for Boards, Dice, Avatars or Yards unless a future product decision explicitly requires separate management surfaces.
+
 ## Player Shop categories
 
 The Player Shop includes:
@@ -38,6 +46,27 @@ Do not create a separate public Shop category for backgroundless stickers. They 
 Current built-in yard product IDs use the `yard-` namespace. Backgroundless stickers use IDs such as `yard-sticker-crown`, `yard-sticker-neon`, `yard-sticker-dragon`, `yard-sticker-panda`, `yard-sticker-sakura`, and `yard-sticker-bolt`.
 
 Yard equipment is a single slot. Equipping one `yard-*` item replaces the previously equipped yard cosmetic, regardless of whether it is a full background or a backgroundless sticker.
+
+## Avatar Admin creation
+
+Avatar creation is managed from the canonical `/dbase/shop` Admin Shop surface.
+
+The existing Add Avatar UI supports two mutually exclusive image-input modes:
+
+1. **Upload** — the admin selects the actual image file.
+2. **URL** — the admin supplies an image URL.
+
+The admin does **not** submit both image sources at once. Switching modes clears the other source so only one image source is active for the avatar being added.
+
+Avatar creation also follows the existing Player Shop avatar categories/data model rather than creating a second avatar catalogue.
+
+Avatar pricing may expose:
+
+- 🪙 Coins
+- 💎 Gems
+- ₦ Naira
+
+This multi-currency avatar pricing requirement does **not** change the purchase behavior of other Shop stock. Existing Board, Dice, Yard, Item and package purchase behavior remains governed by their existing catalogue/purchase paths.
 
 ## Currency packages
 
@@ -125,4 +154,4 @@ Do not move purchased currency packages into Inventory or Award Room; they chang
 
 ## Change discipline
 
-If product IDs, default prices, supported currencies, payment behavior, fulfillment, XP rules, yard-cosmetic types, artwork storage, or Admin sticker workflow change, update `docs/YARD_COSMETICS.md`, `ARCHITECTURE.md`, and `DEVELOPER_HANDOFF.md` together with this document.
+If product IDs, default prices, supported currencies, payment behavior, fulfillment, XP rules, yard-cosmetic types, artwork storage, or Admin avatar/sticker workflow change, update `docs/YARD_COSMETICS.md`, `ARCHITECTURE.md`, `DEVELOPER_HANDOFF.md` and `CURRENT_PROJECT_STATE.md` together with this document.
