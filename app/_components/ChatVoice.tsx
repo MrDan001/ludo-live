@@ -6,10 +6,10 @@ type Member={id:string;playerId?:string;name:string;role?:string;online?:boolean
 declare global{interface Window{Peer?:any}}
 function loadPeer(){return new Promise<any>((resolve,reject)=>{if(window.Peer)return resolve(window.Peer);const s=document.createElement("script");s.src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js";s.onload=()=>resolve(window.Peer);s.onerror=reject;document.head.appendChild(s)})}
 const safe=(v:string)=>String(v||"").replace(/[^a-zA-Z0-9_-]/g,"").slice(0,32);
-export default function ChatVoice({roomCode,playerId,members,socket}:{roomCode:string;playerId:string;members:Member[];socket:Socket|null}){
- const peerRef=useRef<any>(null),streamRef=useRef<MediaStream|null>(null),connections=useRef<Record<string,any>>({}),peerPlayers=useRef<Record<string,string>>({}),peerNames=useRef<Record<string,string>>({}),activityTimer=useRef<number|null>(null),reconnectTimer=useRef<number|null>(null),socketRef=useRef<Socket|null>(socket),selfPeer=useRef("");
+export default function ChatVoice({roomCode,playerId,members,socket}:{roomCode:string;playerId:string;members:Member[];socket?:Socket|null}){
+ const peerRef=useRef<any>(null),streamRef=useRef<MediaStream|null>(null),connections=useRef<Record<string,any>>({}),peerPlayers=useRef<Record<string,string>>({}),peerNames=useRef<Record<string,string>>({}),activityTimer=useRef<number|null>(null),reconnectTimer=useRef<number|null>(null),socketRef=useRef<Socket|null>(socket||null),selfPeer=useRef("");
  const[ready,setReady]=useState(false),[mic,setMic]=useState(false),[notice,setNotice]=useState(""); const selfPeerId=`ludo-chat-${safe(roomCode)}-${safe(playerId)}`;
- useEffect(()=>{socketRef.current=socket},[socket]);
+ useEffect(()=>{socketRef.current=socket||null},[socket]);
  const setAvatarSpeaking=(pid:string,on:boolean)=>{const name=peerNames.current[pid]||members.find(m=>String(m.playerId||m.id)===String(pid))?.name;if(!name)return;document.querySelectorAll<HTMLButtonElement>(".ig-avatar").forEach(b=>{if(b.getAttribute("aria-label")===name)b.classList.toggle("voice-speaking",on)})};
  const broadcastSpeaking=(on:boolean)=>Object.values(connections.current).forEach((c:any)=>{if(c?.data?.open)try{c.data.send({type:"speaking",playerId:String(playerId),speaking:on})}catch{}});
  const playRemote=(peerId:string,s:MediaStream)=>{let a=document.getElementById(`chat-remote-${peerId}`) as HTMLAudioElement|null;if(!a){a=document.createElement("audio");a.id=`chat-remote-${peerId}`;a.autoplay=true;a.setAttribute("playsinline","true");a.style.display="none";document.body.appendChild(a)}a.srcObject=s;a.muted=false;void a.play().catch(()=>setNotice("Tap Mic once to allow voice playback."))};
