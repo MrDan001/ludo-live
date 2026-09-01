@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import LudoBoard, { type BoardThemeId, type DemoToken } from "../_components/LudoBoardMultiplayer";
 import DemoDice from "../_components/DemoDice";
+import ChatVoice from "../_components/ChatVoice";
 import { canMove, nextProgress, FINISH_PROGRESS, type DiceValue } from "../../lib/ludoEngine";
 import { playerColorsForSeats } from "../../lib/ludoRules";
 
@@ -87,8 +88,14 @@ function GameContent() {
   const [animating, setAnimating] = useState(false);
   const [muted, setMuted] = useState(false);
   const [soundEnabled, setSoundEnabled] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [chatMessages, setChatMessages] = useState<Array<{id:string;name:string;text:string;at:number}>>([]);
   const [roomCode, setRoomCode] = useState("W100NB");
   const [coins] = useState(2450);
+
+  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); if (saved.sound !== undefined) setSoundEnabled(saved.sound !== false); } catch {} }, []);
 
   const diceTimer = useRef<number | null>(null);
   const revisionRef = useRef(-1);
@@ -189,6 +196,11 @@ function GameContent() {
         diceTimer.current = window.setTimeout(() => setRemoteRolling(false), 900);
       });
 
+      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => {
+        if (!mounted || !message?.text) return;
+        setChatMessages((items) => [...items.slice(-99), { id: String(message.id || Date.now()), name: String(message.name || "Player"), text: String(message.text), at: Number(message.at || Date.now()) }]);
+      });
+
       localSocket.on("game-state", (next: GameState) => {
         if (!mounted || !applyState(next)) return;
         if (next.dice !== null) setRoll(next.dice);
@@ -229,7 +241,34 @@ function GameContent() {
   }, [socket, game, myTurn, pending, animating, remoteRolling]);
 
   const sendQuickReaction = (text: string) => {
-    if (socket) socket.emit("chat", { text });
+    if (socket?.connected) socket.emit("chat", { text });
+  };
+
+  const sendChatMessage = () => {
+    const text = chatText.trim();
+    if (!text || !socket?.connected) return;
+    socket.emit("chat", { text });
+    setChatText("");
+  };
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    try {
+      const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}");
+      localStorage.setItem("ludo-settings", JSON.stringify({ ...saved, sound: next }));
+    } catch {}
+    window.dispatchEvent(new CustomEvent("ludo-settings-updated", { detail: { sound: next } }));
+  };
+
+  const leaveRoom = () => {
+    if (!window.confirm("Are you sure you want to leave this match?")) return;
+    try { localStorage.removeItem("ludo-room"); } catch {}
+    if (!socket?.connected) { window.location.href = "/lobby"; return; }
+    const go = () => { window.location.href = "/lobby"; };
+    socket.once("room-left", go);
+    socket.emit("leave-room");
+    window.setTimeout(go, 900);
   };
 
   return (
@@ -294,18 +333,13 @@ function GameContent() {
             </div>
 
             <div className="ll-side-actions">
-              <button type="button" className="ll-action-btn">
+              <button type="button" className="ll-action-btn" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen}>
                 <span className="action-icon">•••</span>
                 <span>Chat</span>
               </button>
-              <button
-                type="button"
-                className={`ll-action-btn ${muted ? "off" : ""}`}
-                onClick={() => setMuted((v) => !v)}
-              >
-                <span className="action-icon">🎙</span>
-                <span>Mic {muted ? "Off" : "On"}</span>
-              </button>
+              <div className="ll-action-btn ll-voice-host">
+                <ChatVoice roomCode={roomCode} playerId={me} members={players.map((p) => ({ playerId: p.playerId, name: p.name }))} />
+              </div>
             </div>
           </div>
 
@@ -318,9 +352,9 @@ function GameContent() {
           </div>
 
           <footer className="ll-footer">
-            <button type="button" className="ll-foot-btn exit">↪ Leave Match</button>
-            <button type="button" className="ll-foot-btn">👥 Players</button>
-            <button type="button" className="ll-foot-btn" onClick={() => setSoundEnabled((v) => !v)}>
+            <button type="button" className="ll-foot-btn exit" onClick={leaveRoom}>↪ Leave Match</button>
+            <button type="button" className="ll-foot-btn" onClick={() => setPlayersOpen((v) => !v)}>👥 Players</button>
+            <button type="button" className="ll-foot-btn" onClick={toggleSound}>
               {soundEnabled ? "🔊 Sound" : "🔇 Sound"}
             </button>
             <div className="ll-room-chip">
@@ -329,6 +363,17 @@ function GameContent() {
               <span className="copy-icon">▢</span>
             </div>
           </footer>
+        {chatOpen && <section className="mp-overlay-panel" role="dialog" aria-label="Room chat">
+          <div className="mp-panel-head"><strong>Room Chat</strong><button type="button" onClick={() => setChatOpen(false)} aria-label="Close chat">×</button></div>
+          <div className="mp-chat-list">{chatMessages.length ? chatMessages.map((m) => <div className={`mp-chat-message ${m.id === me ? "mine" : ""}`} key={`${m.id}-${m.at}`}><b>{m.name}</b><span>{m.text}</span></div>) : <p className="mp-empty">No messages yet. Say hello!</p>}</div>
+          <form className="mp-chat-compose" onSubmit={(e) => { e.preventDefault(); sendChatMessage(); }}><input value={chatText} onChange={(e) => setChatText(e.target.value)} maxLength={240} placeholder="Type a message…" aria-label="Chat message"/><button type="submit">Send</button></form>
+        </section>}
+
+        {playersOpen && <section className="mp-overlay-panel mp-players-panel" role="dialog" aria-label="Players in room">
+          <div className="mp-panel-head"><strong>Players in Room</strong><button type="button" onClick={() => setPlayersOpen(false)} aria-label="Close players">×</button></div>
+          <div className="mp-player-list">{players.map((p) => <div className="mp-player-row" key={p.playerId}><div className="mp-mini-avatar"><PlayerAvatar src={p.avatar} fallback="👤" /></div><div><b>{p.name}</b><small>{String(p.playerId) === String(me) ? "You" : "In match"}</small></div></div>)}</div>
+        </section>}
+
         </div>
       </div>
 
@@ -367,6 +412,7 @@ function GameContent() {
         }
 
         .multiplayer-topbar{position:relative;display:grid;grid-template-columns:minmax(0,1fr) 150px minmax(0,1fr);align-items:center;gap:12px;width:100%;min-height:116px;padding:4px 0 14px;z-index:50}.multiplayer-player-card{position:relative;min-width:0;height:92px;display:flex;align-items:center;gap:12px;padding:10px 16px 10px 12px;border:1px solid rgba(102,76,25,.9);border-radius:31px;background:linear-gradient(145deg,#130f08,#060604);box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 10px 25px rgba(0,0,0,.5)}.multiplayer-player-avatar{width:66px;height:66px;flex:0 0 66px;border-radius:50%;overflow:hidden;display:grid;place-items:center;background:#0a0906;border:3px solid #d4af37;font-size:27px}.multiplayer-player-avatar img{width:100%;height:100%;object-fit:cover}.multiplayer-player-copy{min-width:0;flex:1}.multiplayer-player-name-row{display:flex;align-items:center;gap:8px}.multiplayer-player-name-row strong{color:#f7f3ea;font-size:clamp(13px,1.7vw,19px);font-weight:950;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.multiplayer-you-badge{padding:4px 8px;border-radius:7px;background:linear-gradient(#ffd85a,#e9a817);color:#181105;font-size:10px;font-weight:1000}.multiplayer-player-status{display:flex;align-items:center;gap:9px;margin-top:10px;font-size:clamp(11px,1.45vw,16px);font-weight:850}.multiplayer-player-status-you{color:#22e875}.multiplayer-player-status-opponent{color:#ff3347}.multiplayer-status-dot{width:16px;height:16px;border-radius:50%}.multiplayer-player-status-you .multiplayer-status-dot{background:#16e76b;box-shadow:0 0 12px #16e76b}.multiplayer-player-status-opponent .multiplayer-status-dot{background:#ff263e;box-shadow:0 0 12px #ff263e}.multiplayer-level-badge{position:absolute;left:58px;bottom:-13px;min-width:60px;padding:5px 9px;border:1px solid #b48722;border-radius:15px;background:#090806;color:#f1ca51;font-size:13px;font-weight:950;text-align:center}.multiplayer-topbar-logo{width:132px;height:104px;justify-self:center;display:flex;flex-direction:column;align-items:center;justify-content:center;color:#f5cf61;text-align:center;filter:drop-shadow(0 0 12px rgba(212,175,55,.35))}.multiplayer-logo-crown{font-size:33px;line-height:.7}.multiplayer-topbar-logo strong{font-family:Georgia,serif;font-size:32px;line-height:.9;color:#f7d56d;text-shadow:0 2px #6d4500}.multiplayer-topbar-logo>span:last-child{font-size:19px;font-weight:1000;letter-spacing:1px;color:#e9b52e}.multiplayer-menu-btn span{width:36px;height:5px;border-radius:99px;background:#e0a916}
+        .mp-overlay-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92%,420px);max-height:70%;display:flex;flex-direction:column;background:linear-gradient(145deg,#171109,#070706);border:1px solid rgba(212,175,55,.55);border-radius:20px;box-shadow:0 18px 60px rgba(0,0,0,.8),0 0 30px rgba(212,175,55,.12);z-index:100;padding:14px;color:#f4e6b1}.mp-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:16px;padding-bottom:10px;border-bottom:1px solid rgba(212,175,55,.2)}.mp-panel-head button{border:0;background:transparent;color:#f1d878;font-size:26px;cursor:pointer}.mp-chat-list{flex:1;min-height:120px;overflow:auto;padding:10px 2px;display:flex;flex-direction:column;gap:8px}.mp-chat-message{align-self:flex-start;max-width:85%;display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:12px;background:#20170b;border:1px solid rgba(212,175,55,.18)}.mp-chat-message.mine{align-self:flex-end;background:#12351e}.mp-chat-message b{font-size:10px;color:#e5bd4d}.mp-chat-message span{font-size:13px;color:#f7f3ea;word-break:break-word}.mp-empty{margin:auto;color:#a79b82;font-size:12px}.mp-chat-compose{display:flex;gap:7px;border-top:1px solid rgba(212,175,55,.2);padding-top:10px}.mp-chat-compose input{flex:1;min-width:0;border:1px solid rgba(212,175,55,.35);border-radius:10px;background:#080705;color:#fff;padding:9px}.mp-chat-compose button{border:1px solid #b88d28;border-radius:10px;background:#c7951c;color:#100d06;font-weight:900;padding:0 12px}.mp-player-list{overflow:auto;padding-top:10px;display:flex;flex-direction:column;gap:8px}.mp-player-row{display:flex;align-items:center;gap:10px;padding:9px;border-radius:12px;background:#100d08;border:1px solid rgba(212,175,55,.15)}.mp-player-row b{display:block;font-size:13px}.mp-player-row small{display:block;margin-top:2px;color:#76ef9e;font-size:10px}.mp-mini-avatar{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid #b88d28;display:grid;place-items:center;background:#090806}.mp-mini-avatar img{width:100%;height:100%;object-fit:cover}.mp-players-panel{max-height:55%}.ll-voice-host{padding:0!important;overflow:hidden}.ll-voice-host>div,.ll-voice-host button{width:100%!important;height:100%!important}.ll-voice-host button{border:0!important;border-radius:16px!important;font:inherit!important}.
         .ll-board-stage {
           min-height: 0;
           display: flex;
@@ -376,7 +422,7 @@ function GameContent() {
         }
 
         .ll-board-frame {
-          width: min(100%, 680px, calc(100dvh - 475px));
+          width: min(100%, 100%, calc(100dvh - 290px));
           aspect-ratio: 1;
           padding: 7px;
           border-radius: 30px;

@@ -66,7 +66,7 @@ export default function LudoAudio(){
         master.gain.setValueAtTime(0.0001,now);master.gain.linearRampToValueAtTime(1.45,now+.006);master.gain.setValueAtTime(1.45,now+.02);master.gain.linearRampToValueAtTime(0.0001,now+end);
       }catch{}
     };
-    const onAudio=(event:Event)=>{const value=String((event as CustomEvent).detail||"");if(["dice","move","capture","safe","home","win"].includes(value))play(value as SoundKind)};
+    const onAudio=(event:Event)=>{const value=String((event as CustomEvent).detail||"");if(!["dice","move","capture","safe","home","win"].includes(value))return;try{const saved=JSON.parse(localStorage.getItem("ludo-settings")||"{}");if(saved.sound===false)return}catch{}play(value as SoundKind)};
     window.addEventListener("ludo-audio",onAudio);
     return()=>{window.removeEventListener("ludo-audio",onAudio);try{void ctxRef.current?.close()}catch{}ctxRef.current=null};
   },[]);
