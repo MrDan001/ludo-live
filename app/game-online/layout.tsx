@@ -5,7 +5,7 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
     <>
       {children}
       <style>{`
-        /* /game-online only: one authoritative, refresh-safe board rule. */
+        /* /game-online?room=... only: one stable square board dimension. */
         .ludo-live-wrapper .ll-board-stage {
           min-width: 0 !important;
           min-height: 0 !important;
@@ -18,16 +18,15 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
         }
 
         .ludo-live-wrapper .ll-board-frame {
-          flex: none !important;
-          flex-shrink: 0 !important;
+          flex: 0 0 auto !important;
           box-sizing: border-box !important;
-          width: auto !important;
-          height: min(92vw, 680px, calc(100% - 16px)) !important;
-          aspect-ratio: 1 / 1 !important;
+          width: min(96vw, 760px, calc(100% - 12px)) !important;
+          height: min(96vw, 760px, calc(100% - 12px)) !important;
           min-width: 0 !important;
           min-height: 0 !important;
-          max-width: calc(100% - 16px) !important;
-          max-height: calc(100% - 16px) !important;
+          max-width: calc(100% - 12px) !important;
+          max-height: calc(100% - 12px) !important;
+          aspect-ratio: 1 / 1 !important;
           margin: auto !important;
         }
 
@@ -37,14 +36,6 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
           min-width: 0 !important;
           min-height: 0 !important;
           aspect-ratio: 1 / 1 !important;
-        }
-
-        @media (max-width: 700px) {
-          .ludo-live-wrapper .ll-board-frame {
-            height: min(96vw, 680px, calc(100% - 12px)) !important;
-            max-width: calc(100% - 12px) !important;
-            max-height: calc(100% - 12px) !important;
-          }
         }
       `}</style>
     </>
