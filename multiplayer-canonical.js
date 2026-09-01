@@ -34,7 +34,7 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
     dice: room.dice,
     pendingMove: room.pendingMove,
     sixStreak: room.sixStreak,
-    players: room.players.map(p => ({ playerId: p.playerId, name: p.name, seat: p.seat, colors: p.colors })),
+    players: room.players.map(p => ({ playerId: p.playerId, name: p.name, seat: p.seat, colors: p.colors, level: p.level, avatar: p.avatar, coins: p.coins })),
     tokens: room.tokens,
     winnerId: room.winnerId || null,
     stateRevision: room.stateRevision,
@@ -57,7 +57,19 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
             shadow = { code, members: new Map(), players: [], status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, sixStreak: 0, tokens: {}, winnerId: null, stateRevision: 0 };
             liveRooms.set(code, shadow);
           }
-          shadow.members.set(pid, { playerId: pid, name: String(payload.name || "Player"), id: this.id });
+          shadow.members.set(pid, {
+            playerId: pid,
+            name: String(payload.name || "Player"),
+            avatar: String(payload.avatar || ""),
+            level: Math.max(1, Number(payload.level) || 1),
+            coins: Math.max(0, Number(payload.coins) || 0),
+            id: this.id,
+          });
+          this.data.playerId = pid;
+          this.data.profileName = String(payload.name || "Player");
+          this.data.profileAvatar = String(payload.avatar || "");
+          this.data.profileLevel = Math.max(1, Number(payload.level) || 1);
+          this.data.profileCoins = Math.max(0, Number(payload.coins) || 0);
         }
         const result = listener.apply(this, arguments);
         const shadow = liveRooms.get(code);
@@ -75,10 +87,17 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
           const sockets = [...this.nsp.sockets.values()].filter(s => s.rooms?.has(code));
           for (const s of sockets) {
             const pid = pidOf(s);
-            if (pid) shadow.members.set(pid, { playerId: pid, name: String(s.data?.profileName || shadow.members.get(pid)?.name || "Player"), id: s.id });
+            if (pid) shadow.members.set(pid, {
+              playerId: pid,
+              name: String(s.data?.profileName || shadow.members.get(pid)?.name || "Player"),
+              avatar: String(s.data?.profileAvatar || shadow.members.get(pid)?.avatar || ""),
+              level: Math.max(1, Number(s.data?.profileLevel || shadow.members.get(pid)?.level) || 1),
+              coins: Math.max(0, Number(s.data?.profileCoins ?? shadow.members.get(pid)?.coins) || 0),
+              id: s.id,
+            });
           }
           const source = [...shadow.members.values()];
-          const players = source.map((m, seat) => ({ playerId: m.playerId, name: m.name, seat, colors: playerColorsForSeats(source.length === 2 ? 2 : 4, seat) }));
+          const players = source.map((m, seat) => ({ playerId: m.playerId, name: m.name, seat, colors: playerColorsForSeats(source.length === 2 ? 2 : 4, seat), level: m.level, avatar: m.avatar, coins: m.coins }));
           shadow.players = players;
           shadow.status = "playing";
           shadow.currentPlayerId = players[0]?.playerId || null;
@@ -127,17 +146,11 @@ if (!Socket.prototype.__ludoAuthorityPatched) {
           if (!token || !canMove(all, token, dice)) return;
           const result = applyMove(all, token, dice);
           if (!result) return;
-
-          // Capture rule for this multiplayer mode:
-          // the victim returns to its yard, while the killer goes directly to
-          // the center/finish square. The client uses the captured field to play
-          // the capture animation and places the killer in the center grid.
           if (result.captured) {
             const killer = result.tokens.find(t => t.color === token.color && t.id === token.id);
             if (killer) killer.position = 57;
             result.captured.position = 0;
           }
-
           syncTokens(room, result.tokens);
           room.stateRevision += 1;
           this.nsp.to(code).emit("game-moved", { playerId: pid, tokenId, to: result.target, captured: result.captured ? { color: result.captured.color, id: result.captured.id } : null, captureToCenter: Boolean(result.captured), stateRevision: room.stateRevision });
