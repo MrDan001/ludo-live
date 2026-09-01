@@ -1,0 +1,34 @@
+name: Fix multiplayer build
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    if: "!contains(github.event.head_commit.message, '[functional-fix-bot]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix voice member shape
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          p=Path('app/game-online/page.tsx')
+          s=p.read_text()
+          old='members={players.map((p) => ({ playerId: p.playerId, name: p.name }))}'
+          new='members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name }))}'
+          if old not in s: raise SystemExit('voice member mapping not found')
+          s=s.replace(old,new,1)
+          s=s.replace('  const [muted, setMuted] = useState(false);\n','',1)
+          p.write_text(s)
+          PY
+          git diff --check
+          git add app/game-online/page.tsx
+          git commit -m "Fix multiplayer voice member typing" -m "[functional-fix-bot]"
+          git rm .github/workflows/fix-multiplayer-build.yml
+          git commit --amend --no-edit
+          git push
