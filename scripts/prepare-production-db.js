@@ -40,7 +40,47 @@ async function main() {
       CREATE INDEX IF NOT EXISTS ludo_events_status_idx ON ludo_events(status);
       CREATE INDEX IF NOT EXISTS ludo_event_entries_user_idx ON ludo_event_entries(user_id, joined_at DESC);
       CREATE INDEX IF NOT EXISTS ludo_event_rewards_user_idx ON ludo_event_rewards(user_id, settled_at DESC);
+      CREATE TABLE IF NOT EXISTS ludo_xp_events (user_id TEXT NOT NULL REFERENCES ludo_users(id) ON DELETE CASCADE, event_key TEXT NOT NULL, amount INTEGER NOT NULL, source TEXT NOT NULL, created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(), UNIQUE(user_id,event_key));
     `);
+
+    const duplicateCheck = await client.query(`
+      SELECT user_id, event_key, COUNT(*)::int AS duplicate_count
+      FROM ludo_xp_events
+      GROUP BY user_id, event_key
+      HAVING COUNT(*) > 1
+      ORDER BY duplicate_count DESC
+      LIMIT 20
+    `);
+    if (duplicateCheck.rowCount) {
+      throw new Error(`SAFE MIGRATION ABORTED: ludo_xp_events contains duplicate (user_id,event_key) records: ${JSON.stringify(duplicateCheck.rows)}`);
+    }
+
+    const existingConstraints = await client.query(`
+      SELECT c.conname, c.contype, pg_get_constraintdef(c.oid) AS constraint_def
+      FROM pg_constraint c
+      WHERE c.conrelid = 'ludo_xp_events'::regclass
+      ORDER BY c.conname
+    `);
+
+    for (const row of existingConstraints.rows) {
+      const def = String(row.constraint_def || '').replace(/\s+/g, ' ').trim();
+      if ((row.contype === 'p' || row.contype === 'u') && /^PRIMARY KEY \(event_key\)$/i.test(def) || row.contype === 'u' && /^UNIQUE \(event_key\)$/i.test(def)) {
+        await client.query(`ALTER TABLE ludo_xp_events DROP CONSTRAINT ${JSON.stringify(row.conname)}`);
+      }
+    }
+
+    const composite = await client.query(`
+      SELECT 1
+      FROM pg_constraint
+      WHERE conrelid = 'ludo_xp_events'::regclass
+        AND contype IN ('p','u')
+        AND regexp_replace(pg_get_constraintdef(oid), '\\s+', ' ', 'g') ~* '^(PRIMARY KEY|UNIQUE) \\(user_id, event_key\\)$'
+      LIMIT 1
+    `);
+    if (!composite.rowCount) {
+      await client.query(`ALTER TABLE ludo_xp_events ADD CONSTRAINT ludo_xp_events_user_event_key_unique UNIQUE (user_id,event_key)`);
+    }
+
     const constraints = await client.query(`SELECT conname, contype, pg_get_constraintdef(oid) AS constraint_def FROM pg_constraint WHERE conrelid = 'ludo_xp_events'::regclass ORDER BY conname`);
     console.log('LIVE ludo_xp_events CONSTRAINTS:', JSON.stringify(constraints.rows));
     console.log('Production database schema prepared.');
