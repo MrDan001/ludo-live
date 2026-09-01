@@ -104,15 +104,13 @@ Recent work added request metadata and identity resolution around wallet audit r
 Relevant recent commits include:
 
 - `fdbd865102ffbd4efc133b5ec8157395f8c0800b` — shared wallet request metadata helper.
-- `458f0cc0209ced35d8ae?` — weekly wallet audit request metadata fix. *(Historical commit reference should be checked against Git history before using it in tooling.)*
+- `458f0cc0209ced35ad4c729101bf05adf7267016` — weekly wallet audit request metadata fix.
 - `e61bf3015d8866302b7248067138f17c5849430a` — capture wallet IP/User-Agent for Spin rewards.
 - `c37c2d639d91685e1c1d87c71d2995f4d53ef90e` — capture request metadata for daily wallet rewards.
 - `8731bbfbf00fa4f92748e316b4c826266a6a9842` — capture request metadata for progress wallet rewards.
 - `412ba0c8cca044295f721918bef5b2fbdd593374` — expose player identity in wallet audit records.
 - `bb0b52924adb30aed67771ed1f5eda271a2552c2` — show resolved player identity in wallet audit.
 - `9ef17ff16a5b79ad93b134944ac4c920293455ec` — complete wallet audit identity resolution.
-
-**Note:** the weekly-audit SHA above is intentionally flagged because the repository history should be used as the authoritative value; do not copy a possibly mistyped SHA from documentation.
 
 ## 7. XP event idempotency
 
