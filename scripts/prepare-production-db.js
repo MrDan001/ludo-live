@@ -41,6 +41,8 @@ async function main() {
       CREATE INDEX IF NOT EXISTS ludo_event_entries_user_idx ON ludo_event_entries(user_id, joined_at DESC);
       CREATE INDEX IF NOT EXISTS ludo_event_rewards_user_idx ON ludo_event_rewards(user_id, settled_at DESC);
     `);
+    const constraints = await client.query(`SELECT conname, contype, pg_get_constraintdef(oid) AS constraint_def FROM pg_constraint WHERE conrelid = 'ludo_xp_events'::regclass ORDER BY conname`);
+    console.log('LIVE ludo_xp_events CONSTRAINTS:', JSON.stringify(constraints.rows));
     console.log('Production database schema prepared.');
   } finally { await client.end(); }
 }
