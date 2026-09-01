@@ -21,6 +21,16 @@ Examples:
 
 Because the formula is calculated from the current level, it continues indefinitely.
 
+## XP reset rule at level-up
+
+When a player's XP reaches or exceeds the current level's requirement, the server advances the player to the next level and **resets XP to `0` for that new level**.
+
+Remaining/overflow XP is intentionally **not carried forward**. For example, a player at `Level 6 — 65 / 40 XP` advances to Level 7 with `0 XP` rather than carrying 25 XP into Level 7.
+
+This rule changes only the level transition behavior. It does **not** truncate, reduce, or alter the configured XP reward amounts. Existing XP sources continue to award their configured values.
+
+The level reward ledger remains idempotent on `(user_id, level)`, and already-owned milestone cosmetics continue to receive their configured gem compensation.
+
 ## Active-time XP
 
 Verified active game-session time is an additional XP source:
