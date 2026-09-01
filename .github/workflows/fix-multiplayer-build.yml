@@ -9,26 +9,50 @@ permissions:
 
 jobs:
   fix:
-    if: "!contains(github.event.head_commit.message, '[functional-fix-bot]')"
+    if: "!contains(github.event.head_commit.message, '[layout-chat-fix-bot]')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fix voice member shape
+      - name: Patch actual game-online UI
         run: |
           python3 - <<'PY'
           from pathlib import Path
           p=Path('app/game-online/page.tsx')
           s=p.read_text()
-          old='members={players.map((p) => ({ playerId: p.playerId, name: p.name }))}'
-          new='members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name }))}'
-          if old not in s: raise SystemExit('voice member mapping not found')
+
+          old='''  const sendQuickReaction = (text: string) => {\n    if (socket?.connected) socket.emit("chat", { text });\n  };'''
+          new='''  const sendQuickReaction = (text: string) => {\n    setChatText(text);\n    setChatOpen(true);\n  };'''
+          if old not in s:
+              raise SystemExit('quick reaction handler not found')
           s=s.replace(old,new,1)
-          s=s.replace('  const [muted, setMuted] = useState(false);\n','',1)
+
+          old='''.ludo-live-container {\n          position: relative;\n          width: 100%;\n          max-width: 760px;'''
+          new='''.ludo-live-container {\n          position: relative;\n          width: 100%;\n          max-width: none;'''
+          if old not in s:
+              raise SystemExit('container sizing rule not found')
+          s=s.replace(old,new,1)
+
+          old='''.ll-board-stage {\n          min-height: 0;\n          display: flex;\n          align-items: center;\n          justify-content: center;\n          padding: 2px 0 12px;\n        }'''
+          new='''.ll-board-stage {\n          min-height: 0;\n          width: 100%;\n          display: flex;\n          align-items: center;\n          justify-content: center;\n          padding: 2px 0 12px;\n        }'''
+          if old not in s:
+              raise SystemExit('board stage rule not found')
+          s=s.replace(old,new,1)
+
+          old='''.ll-board-frame {\n          width: min(100%, 100%, calc(100dvh - 290px));\n          aspect-ratio: 1;'''
+          new='''.ll-board-frame {\n          width: min(100%, calc(100dvh - 290px));\n          max-width: 100%;\n          margin-inline: auto;\n          aspect-ratio: 1;'''
+          if old not in s:
+              raise SystemExit('board frame rule not found')
+          s=s.replace(old,new,1)
+
+          old='''.mp-chat-compose input{flex:1;min-width:0;border:1px solid rgba(212,175,55,.35);border-radius:10px;background:#080705;color:#fff;padding:9px}.mp-chat-compose button{'''
+          new='''.mp-chat-compose input{flex:1;min-width:0;border:1px solid rgba(212,175,55,.35);border-radius:10px;background:#080705;color:#fff;padding:9px}.mp-chat-compose input:focus{outline:2px solid rgba(212,175,55,.35);outline-offset:1px}.mp-chat-compose button{'''
+          if old not in s:
+              raise SystemExit('chat compose rule not found')
+          s=s.replace(old,new,1)
+
           p.write_text(s)
           PY
           git diff --check
           git add app/game-online/page.tsx
-          git commit -m "Fix multiplayer voice member typing" -m "[functional-fix-bot]"
-          git rm .github/workflows/fix-multiplayer-build.yml
-          git commit --amend --no-edit
+          git commit -m "Fix game-online board layout and quick chat" -m "[layout-chat-fix-bot]"
           git push
