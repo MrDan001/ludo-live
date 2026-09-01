@@ -1,0 +1,76 @@
+name: Online game hardening
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  harden:
+    if: "!contains(github.event.head_commit.message, '[online-hardening-bot]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Harden game-online state and reconnect handling
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          page = Path('app/game-online/page.tsx')
+          s = page.read_text()
+          replacements = [
+            (
+              '  const myTurn = game ? String(game.currentPlayerId || "") === String(me) : true;',
+              '  const myTurn = game ? String(game.currentPlayerId || "") === String(me) : false;'
+            ),
+            (
+              '  const handleRoll = useCallback(() => { if (!socket || !game) { setRoll((Math.floor(Math.random() * 6) + 1) as DiceValue); return; } if (!myTurn || pending !== null || animating || remoteRolling) return; socket.emit("game-roll"); }, [socket, game, myTurn, pending, animating, remoteRolling]);',
+              '  const handleRoll = useCallback(() => { if (!socket?.connected || !game) return; if (!myTurn || pending !== null || animating || remoteRolling) return; socket.emit("game-roll"); }, [socket, game, myTurn, pending, animating, remoteRolling]);'
+            ),
+            (
+              '  }, [applyState, roomCode, params]);',
+              '  }, [applyState, params]);'
+            ),
+            (
+              'type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number };',
+              'type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number; peerId?: string };'
+            ),
+            (
+              '<ChatVoice roomCode={roomCode} playerId={me} members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true }))} />',
+              '<ChatVoice socket={socket} roomCode={roomCode} playerId={me} members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true, peerId: p.peerId }))} />'
+            ),
+          ]
+          for old, new in replacements:
+              if old not in s:
+                  raise SystemExit(f'missing expected page pattern: {old[:100]}')
+              s = s.replace(old, new, 1)
+          page.write_text(s)
+
+          server = Path('server.js')
+          ss = server.read_text()
+          server_replacements = [
+            (
+              "socket.on('join-room',({roomCode,name,roomSize,playerId,board,dice,host}={})=>{",
+              "socket.on('join-room',({roomCode,name,roomSize,playerId,avatar,level,coins,board,dice,host}={})=>{"
+            ),
+            (
+              "member.id=socket.id;member.socketId=socket.id;member.cookie=socket.handshake.headers.cookie||member.cookie||'';",
+              "member.id=socket.id;member.socketId=socket.id;member.connected=true;clearTimeout(member.reconnectTimer);member.reconnectTimer=null;member.cookie=socket.handshake.headers.cookie||member.cookie||'';"
+            ),
+          ]
+          for old, new in server_replacements:
+              if old not in ss:
+                  raise SystemExit(f'missing expected server pattern: {old[:100]}')
+              ss = ss.replace(old, new, 1)
+          server.write_text(ss)
+          PY
+
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/online-game-hardening.yml
+          git add app/game-online/page.tsx server.js
+          git commit -m "Harden game-online multiplayer state" -m "[online-hardening-bot]"
+          git push
