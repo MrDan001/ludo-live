@@ -74,6 +74,7 @@ export default function TournamentAdmin() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
+  const [deletingId, setDeletingId] = useState("");
   const [now, setNow] = useState(Date.now());
 
   const load = async () => {
@@ -167,6 +168,33 @@ export default function TournamentAdmin() {
     }
   };
 
+  const removeTournament = async (tournament: Tournament) => {
+    const name = String(tournament.name || "this tournament");
+    if (!window.confirm(`Delete tournament “${name}”? This cannot be undone.`)) return;
+
+    setError("");
+    setNotice("");
+    setDeletingId(String(tournament.id));
+
+    try {
+      const response = await fetch("/api/admin/tournaments", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "delete", id: tournament.id }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to delete tournament");
+
+      if (String(edit?.id || "") === String(tournament.id)) setEdit(null);
+      setNotice(`Tournament “${name}” was deleted successfully.`);
+      await load();
+    } catch (err: any) {
+      setError(err?.message || "Unable to delete tournament");
+    } finally {
+      setDeletingId("");
+    }
+  };
+
   return (
     <main className="dbase-app">
       <aside className="dbase-sidebar">
@@ -256,6 +284,7 @@ export default function TournamentAdmin() {
                 rows.map((tournament) => {
                   const current = phaseOf(tournament, now);
                   const status = meta[current];
+                  const isDeleting = deletingId === String(tournament.id);
 
                   return (
                     <div className="case-row" key={tournament.id}>
@@ -277,6 +306,7 @@ export default function TournamentAdmin() {
                       </div>
                       <button
                         className="admin-btn"
+                        disabled={isDeleting}
                         onClick={() =>
                           setEdit({
                             ...tournament,
@@ -286,6 +316,13 @@ export default function TournamentAdmin() {
                         }
                       >
                         Edit
+                      </button>
+                      <button
+                        className="admin-btn"
+                        disabled={isDeleting}
+                        onClick={() => void removeTournament(tournament)}
+                      >
+                        {isDeleting ? "Deleting…" : "Delete"}
                       </button>
                     </div>
                   );
