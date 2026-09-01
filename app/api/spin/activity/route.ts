@@ -130,8 +130,8 @@ export async function POST(request: NextRequest) {
         };
 
         xp += xpGranted;
-        while (xp >= requiredForLevel(level)) {
-          xp -= requiredForLevel(level);
+        if (xp >= requiredForLevel(level)) {
+          xp = 0;
           level += 1;
           rewardLevels.push(level);
           const reward = getLevelRewardPlan(level);
@@ -147,10 +147,11 @@ export async function POST(request: NextRequest) {
              RETURNING level`,
             [id, level, reward.coins, reward.gems, reward.badge, reward.unlock?.type || null, reward.unlock?.id || null, reward.unlock?.name || null, compensationGems, `Level ${level} Reward`]
           );
-          if (!inserted.rowCount) continue;
-          rewardCoins += reward.coins;
-          rewardGems += reward.gems + compensationGems;
-          if (reward.unlock && !compensationGems) owned[reward.unlock.type].push(reward.unlock.id);
+          if (inserted.rowCount) {
+            rewardCoins += reward.coins;
+            rewardGems += reward.gems + compensationGems;
+            if (reward.unlock && !compensationGems) owned[reward.unlock.type].push(reward.unlock.id);
+          }
         }
 
         await client.query(
