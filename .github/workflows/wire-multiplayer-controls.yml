@@ -1,0 +1,134 @@
+name: Wire multiplayer controls
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  wire:
+    if: "!contains(github.event.head_commit.message, '[functional-bot]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wire multiplayer controls
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+
+          # ---------- server: preserve profile avatars + explicit leave ----------
+          p = Path('server.js')
+          s = p.read_text()
+          s = s.replace(
+              "function publicMembers(room){return [...room.members.values()]}",
+              "function publicMembers(room){return [...room.members.values()].map(m=>({...m,avatar:m.avatar||''}))}"
+          )
+          s = s.replace(
+              "member.name=String(name).slice(0,24);member.board=",
+              "member.name=String(name).slice(0,24);member.avatar=String(avatar||member.avatar||'');member.board="
+          )
+          s = s.replace(
+              "socket.on(\"join-room\",({roomCode,name,roomSize,playerId,board,dice,host}={})=>{",
+              "socket.on(\"join-room\",({roomCode,name,roomSize,playerId,avatar,board,dice,host}={})=>{"
+          )
+          s = s.replace(
+              "name:String(name).slice(0,24),host:!!host||socket.id===room.hostId||takePendingHost",
+              "name:String(name).slice(0,24),avatar:String(avatar||''),host:!!host||socket.id===room.hostId||takePendingHost"
+          )
+          s = s.replace(
+              "players:members.map((m,i)=>({playerId:m.playerId||m.id,name:m.name,seat:i}))",
+              "players:members.map((m,i)=>({playerId:m.playerId||m.id,name:m.name,avatar:m.avatar||'',seat:i}))"
+          )
+          marker = " socket.on('disconnect',()=>{"
+          leave = ''' socket.on("leave-room",()=>{const code=socket.data.roomCode,room=rooms.get(code);if(!room)return socket.emit("room-left",{roomCode:code});const member=room.members.get(socket.id);if(!member)return socket.emit("room-left",{roomCode:code});const wasHost=room.hostId===socket.id||room.hostPlayerId===member.playerId;room.members.delete(socket.id);socket.leave(code);socket.data.roomCode=null;if(wasHost){const next=[...room.members.values()][0];if(next){next.host=true;next.ready=true;room.hostId=next.id;room.hostPlayerId=next.playerId||next.id}else{clearTimeout(room.hostTimer);rooms.delete(code)}}io.to(code).emit("roster",publicMembers(room));broadcastRooms();socket.emit("room-left",{roomCode:code});});\n'''
+          if 'socket.on("leave-room"' not in s:
+              if marker not in s: raise SystemExit('disconnect marker not found')
+              s = s.replace(marker, leave + marker, 1)
+          p.write_text(s)
+
+          # ---------- audio: honor the in-game Sound toggle ----------
+          p = Path('app/_components/LudoAudio.tsx')
+          s = p.read_text()
+          old = 'const onAudio=(event:Event)=>{const value=String((event as CustomEvent).detail||"");if(["dice","move","capture","safe","home","win"].includes(value))play(value as SoundKind)};'
+          new = 'const onAudio=(event:Event)=>{const value=String((event as CustomEvent).detail||"");if(!["dice","move","capture","safe","home","win"].includes(value))return;try{const saved=JSON.parse(localStorage.getItem("ludo-settings")||"{}");if(saved.sound===false)return}catch{}play(value as SoundKind)};'
+          if old not in s: raise SystemExit('LudoAudio handler not found')
+          s = s.replace(old,new,1)
+          p.write_text(s)
+
+          # ---------- game-online: functional controls, preserving existing header ----------
+          p = Path('app/game-online/page.tsx')
+          s = p.read_text()
+          s = s.replace(
+              'import DemoDice from "../_components/DemoDice";',
+              'import DemoDice from "../_components/DemoDice";\nimport ChatVoice from "../_components/ChatVoice";'
+          )
+          s = s.replace(
+              '  const [soundEnabled, setSoundEnabled] = useState(true);',
+              '  const [soundEnabled, setSoundEnabled] = useState(true);\n  const [chatOpen, setChatOpen] = useState(false);\n  const [playersOpen, setPlayersOpen] = useState(false);\n  const [chatText, setChatText] = useState("");\n  const [chatMessages, setChatMessages] = useState<Array<{id:string;name:string;text:string;at:number}>>([]);'
+          )
+          s = s.replace(
+              '      localSocket.on("game-state", (next: GameState) => {',
+              '      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => {\n        if (!mounted || !message?.text) return;\n        setChatMessages((items) => [...items.slice(-99), { id: String(message.id || Date.now()), name: String(message.name || "Player"), text: String(message.text), at: Number(message.at || Date.now()) }]);\n      });\n\n      localSocket.on("game-state", (next: GameState) => {'
+          )
+          s = s.replace(
+              '  const sendQuickReaction = (text: string) => {\n    if (socket) socket.emit("chat", { text });\n  };',
+              '''  const sendQuickReaction = (text: string) => {\n    if (socket?.connected) socket.emit("chat", { text });\n  };\n\n  const sendChatMessage = () => {\n    const text = chatText.trim();\n    if (!text || !socket?.connected) return;\n    socket.emit("chat", { text });\n    setChatText("");\n  };\n\n  const toggleSound = () => {\n    const next = !soundEnabled;\n    setSoundEnabled(next);\n    try {\n      const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}");\n      localStorage.setItem("ludo-settings", JSON.stringify({ ...saved, sound: next }));\n    } catch {}\n    window.dispatchEvent(new CustomEvent("ludo-settings-updated", { detail: { sound: next } }));\n  };\n\n  const leaveRoom = () => {\n    if (!window.confirm("Are you sure you want to leave this match?")) return;\n    try { localStorage.removeItem("ludo-room"); } catch {}\n    if (!socket?.connected) { window.location.href = "/lobby"; return; }\n    const go = () => { window.location.href = "/lobby"; };\n    socket.once("room-left", go);\n    socket.emit("leave-room");\n    window.setTimeout(go, 900);\n  };'''
+          )
+          s = s.replace(
+              '<button type="button" className="ll-action-btn">\n                <span className="action-icon">•••</span>\n                <span>Chat</span>\n              </button>',
+              '<button type="button" className="ll-action-btn" onClick={() => setChatOpen((v) => !v)} aria-expanded={chatOpen}>\n                <span className="action-icon">•••</span>\n                <span>Chat</span>\n              </button>'
+          )
+          old_mic = '''              <button\n                type="button"\n                className={`ll-action-btn ${muted ? "off" : ""}`}\n                onClick={() => setMuted((v) => !v)}\n              >\n                <span className="action-icon">🎙</span>\n                <span>Mic {muted ? "Off" : "On"}</span>\n              </button>'''
+          new_mic = '''              <div className="ll-action-btn ll-voice-host">\n                <ChatVoice roomCode={roomCode} playerId={me} members={players.map((p) => ({ playerId: p.playerId, name: p.name }))} />\n              </div>'''
+          if old_mic not in s: raise SystemExit('mic button not found')
+          s = s.replace(old_mic,new_mic,1)
+          s = s.replace(
+              '<button type="button" className="ll-foot-btn exit">↪ Leave Match</button>',
+              '<button type="button" className="ll-foot-btn exit" onClick={leaveRoom}>↪ Leave Match</button>'
+          )
+          s = s.replace(
+              '<button type="button" className="ll-foot-btn">👥 Players</button>',
+              '<button type="button" className="ll-foot-btn" onClick={() => setPlayersOpen((v) => !v)}>👥 Players</button>'
+          )
+          s = s.replace(
+              '<button type="button" className="ll-foot-btn" onClick={() => setSoundEnabled((v) => !v)}>\n              {soundEnabled ? "🔊 Sound" : "🔇 Sound"}\n            </button>',
+              '<button type="button" className="ll-foot-btn" onClick={toggleSound}>\n              {soundEnabled ? "🔊 Sound" : "🔇 Sound"}\n            </button>'
+          )
+          anchor = '''        </div>\n      </div>\n\n      <style jsx global>{`'''
+          overlays = '''        {chatOpen && <section className="mp-overlay-panel" role="dialog" aria-label="Room chat">\n          <div className="mp-panel-head"><strong>Room Chat</strong><button type="button" onClick={() => setChatOpen(false)} aria-label="Close chat">×</button></div>\n          <div className="mp-chat-list">{chatMessages.length ? chatMessages.map((m) => <div className={`mp-chat-message ${m.id === me ? "mine" : ""}`} key={`${m.id}-${m.at}`}><b>{m.name}</b><span>{m.text}</span></div>) : <p className="mp-empty">No messages yet. Say hello!</p>}</div>\n          <form className="mp-chat-compose" onSubmit={(e) => { e.preventDefault(); sendChatMessage(); }}><input value={chatText} onChange={(e) => setChatText(e.target.value)} maxLength={240} placeholder="Type a message…" aria-label="Chat message"/><button type="submit">Send</button></form>\n        </section>}\n\n        {playersOpen && <section className="mp-overlay-panel mp-players-panel" role="dialog" aria-label="Players in room">\n          <div className="mp-panel-head"><strong>Players in Room</strong><button type="button" onClick={() => setPlayersOpen(false)} aria-label="Close players">×</button></div>\n          <div className="mp-player-list">{players.map((p) => <div className="mp-player-row" key={p.playerId}><div className="mp-mini-avatar"><PlayerAvatar src={p.avatar} fallback="👤" /></div><div><b>{p.name}</b><small>{String(p.playerId) === String(me) ? "You" : "In match"}</small></div></div>)}</div>\n        </section>}\n\n'''
+          if anchor not in s: raise SystemExit('overlay anchor not found')
+          s = s.replace(anchor, overlays + anchor, 1)
+          # Make the board use the available vertical space instead of the old fixed 475px cap.
+          old_width = 'width: min(100%, 680px, calc(100dvh - 475px));'
+          new_width = 'width: min(100%, 100%, calc(100dvh - 290px));'
+          if old_width not in s: raise SystemExit('board size rule not found')
+          s = s.replace(old_width,new_width,1)
+          # Restore sound setting from the shared settings store on first render.
+          s = s.replace(
+              '  const diceTimer = useRef<number | null>(null);',
+              '  useEffect(() => { try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); if (saved.sound !== undefined) setSoundEnabled(saved.sound !== false); } catch {} }, []);\n\n  const diceTimer = useRef<number | null>(null);'
+          )
+          # Panel/voice styles are additive; existing header styles remain untouched.
+          style_marker = '        .ll-board-stage {'
+          css = '''        .mp-overlay-panel{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(92%,420px);max-height:70%;display:flex;flex-direction:column;background:linear-gradient(145deg,#171109,#070706);border:1px solid rgba(212,175,55,.55);border-radius:20px;box-shadow:0 18px 60px rgba(0,0,0,.8),0 0 30px rgba(212,175,55,.12);z-index:100;padding:14px;color:#f4e6b1}.mp-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:16px;padding-bottom:10px;border-bottom:1px solid rgba(212,175,55,.2)}.mp-panel-head button{border:0;background:transparent;color:#f1d878;font-size:26px;cursor:pointer}.mp-chat-list{flex:1;min-height:120px;overflow:auto;padding:10px 2px;display:flex;flex-direction:column;gap:8px}.mp-chat-message{align-self:flex-start;max-width:85%;display:flex;flex-direction:column;gap:3px;padding:8px 10px;border-radius:12px;background:#20170b;border:1px solid rgba(212,175,55,.18)}.mp-chat-message.mine{align-self:flex-end;background:#12351e}.mp-chat-message b{font-size:10px;color:#e5bd4d}.mp-chat-message span{font-size:13px;color:#f7f3ea;word-break:break-word}.mp-empty{margin:auto;color:#a79b82;font-size:12px}.mp-chat-compose{display:flex;gap:7px;border-top:1px solid rgba(212,175,55,.2);padding-top:10px}.mp-chat-compose input{flex:1;min-width:0;border:1px solid rgba(212,175,55,.35);border-radius:10px;background:#080705;color:#fff;padding:9px}.mp-chat-compose button{border:1px solid #b88d28;border-radius:10px;background:#c7951c;color:#100d06;font-weight:900;padding:0 12px}.mp-player-list{overflow:auto;padding-top:10px;display:flex;flex-direction:column;gap:8px}.mp-player-row{display:flex;align-items:center;gap:10px;padding:9px;border-radius:12px;background:#100d08;border:1px solid rgba(212,175,55,.15)}.mp-player-row b{display:block;font-size:13px}.mp-player-row small{display:block;margin-top:2px;color:#76ef9e;font-size:10px}.mp-mini-avatar{width:40px;height:40px;border-radius:50%;overflow:hidden;border:2px solid #b88d28;display:grid;place-items:center;background:#090806}.mp-mini-avatar img{width:100%;height:100%;object-fit:cover}.mp-players-panel{max-height:55%}.ll-voice-host{padding:0!important;overflow:hidden}.ll-voice-host>div,.ll-voice-host button{width:100%!important;height:100%!important}.ll-voice-host button{border:0!important;border-radius:16px!important;font:inherit!important}.\n'''
+          if style_marker not in s: raise SystemExit('style marker not found')
+          s = s.replace(style_marker, css + style_marker, 1)
+          p.write_text(s)
+          PY
+
+          git diff --check
+          grep -q 'socket.on("leave-room"' server.js
+          grep -q 'ChatVoice' app/game-online/page.tsx
+          grep -q 'onClick={leaveRoom}' app/game-online/page.tsx
+          grep -q 'mp-overlay-panel' app/game-online/page.tsx
+          grep -q 'calc(100dvh - 290px)' app/game-online/page.tsx
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add server.js app/_components/LudoAudio.tsx app/game-online/page.tsx
+          git commit -m "Make multiplayer UI controls functional" -m "[functional-bot]"
+          git rm .github/workflows/wire-multiplayer-controls.yml
+          git commit --amend --no-edit
+          git push
