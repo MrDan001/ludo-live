@@ -1,46 +1,16 @@
 "use client";
 
-import { useEffect, type ReactNode } from "react";
+import type { ReactNode } from "react";
 
 export default function GameOnlineLayout({ children }: { children: ReactNode }) {
-  useEffect(() => {
-    const updateBoardSize = () => {
-      const stage = document.querySelector(".ludo-live-wrapper .ll-board-stage");
-      if (!(stage instanceof HTMLElement)) return;
-
-      const rect = stage.getBoundingClientRect();
-      const size = Math.max(0, Math.min(rect.width, rect.height) - 16);
-      if (Number.isFinite(size) && size > 0) {
-        stage.style.setProperty("--ll-board-size", `${size}px`);
-      }
-    };
-
-    let observer: ResizeObserver | null = null;
-    const attach = () => {
-      const stage = document.querySelector(".ludo-live-wrapper .ll-board-stage");
-      if (!(stage instanceof HTMLElement)) return;
-      observer = new ResizeObserver(updateBoardSize);
-      observer.observe(stage);
-      updateBoardSize();
-      window.visualViewport?.addEventListener("resize", updateBoardSize);
-    };
-
-    const frame = window.requestAnimationFrame(attach);
-    window.addEventListener("resize", updateBoardSize);
-
-    return () => {
-      window.cancelAnimationFrame(frame);
-      observer?.disconnect();
-      window.removeEventListener("resize", updateBoardSize);
-      window.visualViewport?.removeEventListener("resize", updateBoardSize);
-    };
-  }, []);
-
   return (
     <>
       {children}
       <style jsx global>{`
+        /* /game-online only: size the square board from its real stage. */
         .ludo-live-wrapper .ll-board-stage {
+          container-type: size;
+          container-name: game-online-board-stage;
           min-width: 0 !important;
           min-height: 0 !important;
           width: 100% !important;
@@ -55,12 +25,12 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
         .ludo-live-wrapper .ll-board-frame {
           flex: 0 0 auto !important;
           flex-shrink: 0 !important;
-          width: var(--ll-board-size, 100%) !important;
-          height: var(--ll-board-size, auto) !important;
           min-width: 0 !important;
           min-height: 0 !important;
           max-width: 100% !important;
           max-height: 100% !important;
+          width: min(100cqw, calc(100cqh - 16px)) !important;
+          height: min(100cqw, calc(100cqh - 16px)) !important;
           aspect-ratio: 1 / 1 !important;
           margin: auto !important;
         }
@@ -71,6 +41,14 @@ export default function GameOnlineLayout({ children }: { children: ReactNode }) 
           min-width: 0 !important;
           min-height: 0 !important;
           aspect-ratio: 1 / 1 !important;
+        }
+
+        /* Keep the tiny breathing margin on very short mobile stages too. */
+        @media (max-width: 700px) {
+          .ludo-live-wrapper .ll-board-frame {
+            width: min(100cqw, calc(100cqh - 12px)) !important;
+            height: min(100cqw, calc(100cqh - 12px)) !important;
+          }
         }
       `}</style>
     </>
