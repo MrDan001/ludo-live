@@ -16,7 +16,7 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
  const targetsRef=useRef<Record<string,number>>({});
  useEffect(()=>{targetsRef.current=Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0]));},[demoTokens]);
  useEffect(()=>{let cancelled=false;const tick=()=>{if(cancelled)return;setVisualPositions(current=>{const next={...current};let changed=false;for(const [key,target] of Object.entries(targetsRef.current)){const from=Number.isFinite(next[key])?next[key]:target;if(from===target)continue;next[key]=target>from?from+1:from-1;changed=true;}return changed?next:current;});};const id=window.setInterval(tick,135);return()=>{cancelled=true;window.clearInterval(id);};},[]);
- const visualTokens=demoTokens.map(t=>{const position=visualPositions[tokenKey(t)]??Number(t.position)||0;return {...t,position,state:visualState(position)};});
+ const visualTokens=demoTokens.map(t=>{const raw=visualPositions[tokenKey(t)];const position=raw===undefined?Number(t.position)||0:raw;return {...t,position,state:visualState(position)};});
  const moving=visualTokens.filter(t=>t.state!=="yard"&&t.state!=="finished").map(t=>{const cell=getTokenCell(t.color,t.position);return cell?{...t,row:cell[0],col:cell[1]}:null}).filter(Boolean) as Array<DemoToken&{row:number;col:number}>;
  const finished=visualTokens.filter(t=>t.state==="finished");
  const legalSet=new Set(legalTokenKeys); const yardTokens=visualTokens.filter(t=>t.state==="yard");
