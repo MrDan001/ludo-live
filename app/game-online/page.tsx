@@ -91,12 +91,25 @@ function GameContent() {
       localSocket.on("game-dice", (e: { value: DiceValue }) => { setRoll(e.value); setRemoteRolling(true); if (diceTimer.current) window.clearTimeout(diceTimer.current); diceTimer.current = window.setTimeout(() => setRemoteRolling(false), 900); });
       localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number; playerId?: string }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""), name = String(message.name || "Player"), text = String(message.text), at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicate = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicate) return items; return [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); if (!chatOpenRef.current && String(message.playerId || "") !== String(playerId) && name !== profileName) setChatUnread(true); });
       localSocket.on("game-state", (next: GameState) => { if (!mounted || !applyState(next)) return; if (next.dice !== null) setRoll(next.dice); setPending(next.currentPlayerId === playerId ? next.pendingMove : null); setAnimating(false); });
+localSocket.on("game-moved", (move: { playerId?: string; tokenId?: string; to?: number; captureToCenter?: boolean; stateRevision?: number }) => {
+  if (!mounted || String(move.playerId || "") !== String(playerId) || !move.tokenId) return;
+  const [color, idText] = String(move.tokenId).split(":");
+  const id = Number(idText);
+  if (!COLORS.includes(color as Color) || !Number.isInteger(id)) return;
+  const target = move.captureToCenter ? FINISH : Number(move.to);
+  if (!Number.isFinite(target)) return;
+  if (Number.isFinite(Number(move.stateRevision))) revisionRef.current = Math.max(revisionRef.current, Number(move.stateRevision));
+  setTokens((current) => current.map((token) => token.color === color && token.id === id ? { ...token, position: target, state: target === 0 ? "yard" : target === FINISH ? "finished" : target > 51 ? "home" : "track" } : token));
+  setPending(null);
+  setAnimating(false);
+});
+localSocket.on("game-move-error", () => { if (!mounted) return; setAnimating(false); });
     };
     void connect(); return () => { mounted = false; if (diceTimer.current) window.clearTimeout(diceTimer.current); localSocket?.disconnect(); };
   }, [applyState, roomCode, params]);
 
   useEffect(() => { if (!socket || !game || !myTurn || pending === null || animating) return; if (!tokens.some((t) => myColors.includes(t.color) && canMove(tokens, t, pending))) { setAnimating(true); socket.emit("game-move", { tokenId: "__skip__" }); } }, [socket, game, myTurn, pending, animating, tokens, myColors]);
-  const chooseToken = useCallback((color: Color, id: number) => { if (!socket || !game || !myTurn || pending === null || animating) return; const token = tokens.find((t) => t.color === color && t.id === id); if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return; const target = nextProgress(token.position, pending); if (target === null) return; setPending(null); setAnimating(true); socket.emit("game-move", { tokenId: `${color}:${id}`, to: target }); }, [socket, game, myTurn, pending, animating, tokens, myColors]);
+  const chooseToken = useCallback((color: Color, id: number) => { if (!socket || !game || !myTurn || pending === null || animating) return; const token = tokens.find((t) => t.color === color && t.id === id); if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return; const target = nextProgress(token.position, pending); if (target === null) return; setAnimating(true); socket.emit("game-move", { tokenId: `${color}:${id}`, to: target }); }, [socket, game, myTurn, pending, animating, tokens, myColors]);
   const handleRoll = useCallback(() => { if (!socket || !game) { setRoll((Math.floor(Math.random() * 6) + 1) as DiceValue); return; } if (!myTurn || pending !== null || animating || remoteRolling) return; socket.emit("game-roll"); }, [socket, game, myTurn, pending, animating, remoteRolling]);
   const sendQuickReaction = (text: string) => { setChatText(text); setChatOpen(true); setChatUnread(false); };
   const sendChatMessage = () => { const text = chatText.trim(); if (!text || !socket?.connected) return; const now = Date.now(); setChatMessages((items) => [...items.slice(-99), { id: `local-${now}`, name: mine?.name || myName || "Player", text, at: now }]); socket.emit("chat", { text }); setChatText(""); };
