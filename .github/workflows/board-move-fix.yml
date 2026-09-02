@@ -1,0 +1,68 @@
+name: Fix online board move acknowledgement
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-board-move:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Patch online board move flow
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/game-online/page.tsx')
+          text = path.read_text()
+
+          old_state = '''      localSocket.on("game-state", (next: GameState) => { if (!mounted || !applyState(next)) return; if (next.dice !== null) setRoll(next.dice); setPending(next.currentPlayerId === playerId ? next.pendingMove : null); setAnimating(false); });'''
+          new_state = '''      localSocket.on("game-state", (next: GameState) => { if (!mounted || !applyState(next)) return; if (next.dice !== null) setRoll(next.dice); setPending(next.currentPlayerId === playerId ? next.pendingMove : null); setAnimating(false); });
+          localSocket.on("game-moved", (move: { playerId?: string; tokenId?: string; to?: number; captureToCenter?: boolean; stateRevision?: number }) => {
+            if (!mounted || String(move.playerId || "") !== String(playerId) || !move.tokenId) return;
+            const [color, idText] = String(move.tokenId).split(":");
+            const id = Number(idText);
+            if (!COLORS.includes(color as Color) || !Number.isInteger(id)) return;
+            const target = move.captureToCenter ? FINISH : Number(move.to);
+            if (!Number.isFinite(target)) return;
+            if (Number.isFinite(Number(move.stateRevision))) revisionRef.current = Math.max(revisionRef.current, Number(move.stateRevision));
+            setTokens((current) => current.map((token) => token.color === color && token.id === id ? { ...token, position: target, state: target === 0 ? "yard" : target === FINISH ? "finished" : target > 51 ? "home" : "track" } : token));
+            setPending(null);
+            setAnimating(false);
+          });
+          localSocket.on("game-move-error", () => { if (!mounted) return; setAnimating(false); });'''
+          if old_state not in text:
+              raise SystemExit('Expected game-state listener was not found')
+          text = text.replace(old_state, new_state, 1)
+
+          old_move = '''  const chooseToken = useCallback((color: Color, id: number) => { if (!socket || !game || !myTurn || pending === null || animating) return; const token = tokens.find((t) => t.color === color && t.id === id); if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return; const target = nextProgress(token.position, pending); if (target === null) return; setPending(null); setAnimating(true); socket.emit("game-move", { tokenId: `${color}:${id}`, to: target }); }, [socket, game, myTurn, pending, animating, tokens, myColors]);'''
+          new_move = '''  const chooseToken = useCallback((color: Color, id: number) => { if (!socket || !game || !myTurn || pending === null || animating) return; const token = tokens.find((t) => t.color === color && t.id === id); if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return; const target = nextProgress(token.position, pending); if (target === null) return; setAnimating(true); socket.emit("game-move", { tokenId: `${color}:${id}`, to: target }); }, [socket, game, myTurn, pending, animating, tokens, myColors]);'''
+          if old_move not in text:
+              raise SystemExit('Expected chooseToken implementation was not found')
+          text = text.replace(old_move, new_move, 1)
+
+          path.write_text(text)
+          PY
+
+      - name: Verify patch
+        run: |
+          grep -F 'localSocket.on("game-moved"' app/game-online/page.tsx
+          grep -F 'localSocket.on("game-move-error"' app/game-online/page.tsx
+          grep -F 'const chooseToken = useCallback' app/game-online/page.tsx
+
+      - name: Commit patch and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/game-online/page.tsx .github/workflows/board-move-fix.yml
+          git commit -m "Fix online board move acknowledgement flow"
+          git push
