@@ -40,18 +40,46 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
     const current=visualRef.current.find(t=>tokenKey(t)===moveKey);
     const start=Math.max(0,Number(current?.position ?? previous.get(moveKey) ?? 0));
     const target=moveValue.position;
-
-    // A capture is represented authoritatively as a jump from the track to FINISH.
-    // It is not a normal movement through every remaining board square: the killer
-    // must land directly in the centre. A normal home-to-centre move is 56 -> 57
-    // and therefore still uses the regular one-box stepping below.
     const isCaptureJump=target===57&&start<56;
     if(isCaptureJump){
       if(animationRef.current)window.clearInterval(animationRef.current.timer);
       animationRef.current=null;
-      visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,57):t);
-      setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,57):t));
-      emitMoveAudio();
+      const victim=Array.from(previous.entries()).find(([key,pos])=>{
+        if(pos<=0||pos>=52)return false;
+        const incomingVictim=incoming.get(key);
+        if(!incomingVictim||incomingVictim.position!==0)return false;
+        const victimToken=incomingVictim.token;
+        const killerColor=moveValue.token.color;
+        if(victimToken.color===killerColor)return false;
+        const killerCell=getTokenCell(killerColor,Math.min(51,start));
+        const victimCell=getTokenCell(victimToken.color,pos);
+        return Boolean(killerCell&&victimCell&&JSON.stringify(killerCell)===JSON.stringify(victimCell));
+      });
+      const victimPosition=victim?.[1];
+      const meetingPosition=typeof victimPosition==="number"?victimPosition:start;
+      if(meetingPosition>start&&meetingPosition<52){
+        let captureTimer:number;
+        captureTimer=window.setInterval(()=>{
+          const next=Number(visualRef.current.find(t=>tokenKey(t)===moveKey)?.position??start)+1;
+          if(next<meetingPosition){
+            const stepped=tokenWithPosition(moveValue.token,next);
+            visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?stepped:t);
+            setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?stepped:t));
+            emitMoveAudio();
+            return;
+          }
+          window.clearInterval(captureTimer);animationRef.current=null;
+          const finalToken=tokenWithPosition(moveValue.token,57);
+          visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?finalToken:t);
+          setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?finalToken:t));
+          emitMoveAudio();
+        },MOVE_STEP_MS);
+        animationRef.current={key:moveKey,timer:captureTimer};
+      }else{
+        visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,57):t);
+        setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,57):t));
+        emitMoveAudio();
+      }
     }else if(start>=target){
       setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,target):t));
       visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,target):t);
@@ -110,7 +138,7 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
   <style>{`.canonical-ludo-frame{isolation:isolate}.canonical-ludo-frame .shared-ludo-board{box-shadow:none!important;border:0!important;outline:none!important;filter:none!important;position:relative;z-index:1}@keyframes legalYardTokenBreath{0%,100%{transform:translate(-50%,-50%) scale(.94);filter:saturate(1)}50%{transform:translate(-50%,-50%) scale(1.08);filter:saturate(1.12)}}@keyframes canonicalTokenBreath{0%,100%{transform:translate(-50%,-50%) scale(.94);filter:saturate(1)}50%{transform:translate(-50%,-50%) scale(1.07);filter:saturate(1.12)}}`}</style>
   <LudoBoard theme={theme} demoTokens={[]} onTokenClick={onTokenClick} style={{width:"100%",height:"100%"}}/><YardSkinOverlay />
   {yardTokens.map(t=>{const [left,top]=YARD_CENTERS[t.color][t.id]||YARD_CENTERS[t.color][0];const legal=legalSet.has(`${t.color}-${t.id}`);return <button key={`yard-${t.color}-${t.id}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${legal?"Legal move for ":""}${t.color} token`} style={yardTokenStyle(t.color,left,top,legal)}/>;})}
-  {stackedMoving.map(({t,index,count})=>{const key=`${t.color}-${t.id}`,legal=legalSet.has(key);const [dx,dy]=stackOffset(index,count);return <button key={`moving-${key}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${legal?"Legal move for ":""}${t.color} token ${count>1?`(${index+1} of ${count} on square)`:""}`} style={{position:"absolute",left:`calc(${(t.col+.5)*100/15}% + ${dx*0.9}%)`,top:`calc(${(t.row+.5)*100/15}% + ${dy*0.9}%)`,transform:"translate(-50%,-50%)",width:count>1?"5.8%":"6.8%",aspectRatio:1,borderRadius:"50%",border:`2px solid ${p.accent}`,background:p[t.color],boxShadow:legal?`inset 0 2px 3px rgba(255,255,255,.55),0 0 0 2px ${p.accent},0 0 18px ${p.accent}`:"inset 0 2px 3px rgba(255,255,255,.55),0 2px 5px rgba(0,0,0,.3)",animation:legal?"canonicalTokenBreath 1.45s ease-in-out infinite":undefined,zIndex:30+index,padding:0,cursor:legal?"pointer":"default",fontSize:0,color:"transparent"}}/>;})}
+  {stackedMoving.map(({t,index,count})=>{const key=`${t.color}-${t.id}`,legal=legalSet.has(key);const [dx,dy]=stackOffset(index,count);return <button key={`moving-${key}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${legal?"Legal move for ":""}${t.color} token ${count>1?`(${index+1} of ${count} on square)`:""}`} style={{position:"absolute",left:`calc(${(t.col+.5)*100/15}% + ${dx*0.9}%)`,top:`calc(${(t.row+.5)*100/15}% + ${dy*0.9}%`,transform:"translate(-50%,-50%)",width:count>1?"5.8%":"6.8%",aspectRatio:1,borderRadius:"50%",border:`2px solid ${p.accent}`,background:p[t.color],boxShadow:legal?`inset 0 2px 3px rgba(255,255,255,.55),0 0 0 2px ${p.accent},0 0 18px ${p.accent}`:"inset 0 2px 3px rgba(255,255,255,.55),0 2px 5px rgba(0,0,0,.3)",animation:legal?"canonicalTokenBreath 1.45s ease-in-out infinite":undefined,zIndex:30+index,padding:0,cursor:legal?"pointer":"default",fontSize:0,color:"transparent"}}/>;})}
   {finished.map(t=>{const group=FINISH_ORDER[t.color]??0;const slotIndex=group*4+t.id;const slot=FINISH_SLOTS[slotIndex]||FINISH_SLOTS[0];return <div key={`finished-${t.color}-${t.id}`} aria-label={`${t.color} finished token`} style={{position:"absolute",left:slot[0],top:slot[1],transform:"translate(-50%,-50%)",width:"4%",aspectRatio:1,borderRadius:"50%",background:p[t.color],border:`2px solid ${p.accent}`,zIndex:35}}/>;})}
  </div>;
 }
