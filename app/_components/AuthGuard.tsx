@@ -21,6 +21,7 @@ export default function AuthGuard(){
         const d=await r.json().catch(()=>({}));
         if(!cancelled&&(!r.ok||!d?.user)){
           try{sessionStorage.removeItem("ludo-live:last-session-v1")}catch{}
+          await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"logout"}),credentials:"same-origin"}).catch(()=>{});
           router.replace(`/login?next=${encodeURIComponent(pathname)}`);
         }
       }catch{
