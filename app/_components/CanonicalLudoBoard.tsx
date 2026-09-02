@@ -2,11 +2,11 @@
 import React,{useEffect,useRef,useState} from "react";
 import LudoBoard,{BOARD_NAMES,BOARD_PALETTES,type BoardThemeId,type DemoToken} from "./LudoBoard";
 import YardSkinOverlay from "./YardSkinOverlay";
-import {getTokenCell} from "../../lib/canonicalLudoBoard";
+import {getTokenCell,MAIN_PATH,START_INDEX} from "../../lib/canonicalLudoBoard";
 export type {BoardThemeId,DemoToken};
 type Props={theme?:BoardThemeId;demoTokens?:DemoToken[];onTokenClick?:(color:DemoToken["color"],id:number)=>void;legalTokenKeys?:string[]};
-const YARD_CENTERS:Record<DemoToken["color"],Array<[string,string]>>={green:[["calc(13.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],yellow:[["calc(73.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(73.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(26.39% - 2.85px)"]],red:[["calc(13.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(86.39% + 2.85px)"],["calc(26.39% - 2.85px)","calc(86.39% + 2.85px)"]],blue:[["calc(73.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(73.61% - 2.85px)","calc(86.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(86.39% - 2.85px)"]]};
-const FINISH_SLOTS:Array<[string,string]>=[["44%","44%"],["48%","44%"],["44%","48%"],["48%","48%"],["52%","44%"],["56%","44%"],["52%","48%"],["56%","48%"],["44%","52%"],["48%","52%"],["44%","56%"],["48%","56%"],["52%","52%"],["56%","52%"],["52%","56%"],["56%","56%"]];
+const YARD_CENTERS:Record<DemoToken["color"],Array<[string,string]>>={green:[["calc(13.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],yellow:[["calc(73.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(73.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(26.39% - 2.85px)"]],red:[["calc(13.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(86.39% + 2.85px)"],["calc(26.39% - 2.85px)","calc(86.39% - 2.85px)"]],blue:[["calc(73.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(73.61% - 2.85px)","calc(86.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(86.39% - 2.85px)"]]};
+const FINISH_SLOTS:Array<[string,string]>= [["44%","44%"],["48%","44%"],["44%","48%"],["48%","48%"],["52%","44%"],["56%","44%"],["52%","48%"],["56%","48%"],["44%","52%"],["48%","52%"],["44%","56%"],["48%","56%"],["52%","52%"],["56%","52%"],["52%","56%"],["56%","56%"]];
 const FINISH_ORDER:{[key:string]:number}={red:0,yellow:1,green:2,blue:3};
 const MOVE_STEP_MS=220;
 const tokenKey=(t:DemoToken)=>`${t.color}:${t.id}`;
@@ -55,8 +55,10 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
         const victimCell=getTokenCell(victimToken.color,pos);
         return Boolean(killerCell&&victimCell&&JSON.stringify(killerCell)===JSON.stringify(victimCell));
       });
-      const victimPosition=victim?.[1];
-      const meetingPosition=typeof victimPosition==="number"?victimPosition:start;
+      const victimCell=typeof victim?.[1]==="number"?getTokenCell(incoming.get(victim![0])!.token.color,victim![1]):null;
+      const victimTrackIndex=victimCell?MAIN_PATH.findIndex(cell=>cell[0]===victimCell[0]&&cell[1]===victimCell[1]):-1;
+      const victimProgress=victimTrackIndex>=0?((victimTrackIndex-START_INDEX[moveValue.token.color]+52)%52)+1:start;
+      const meetingPosition=Math.max(start,Math.min(51,victimProgress));
       if(meetingPosition>start&&meetingPosition<52){
         let captureTimer:number;
         captureTimer=window.setInterval(()=>{
