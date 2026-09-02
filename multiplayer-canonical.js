@@ -1,210 +1,176 @@
 const { Socket } = require("socket.io");
-const { applyMove, canMove, hasLegalMove, hasWon, playerColorsForSeats, tokenState } = require("./lib/ludoRules");
+const authority = require("./lib/onlineLudoAuthority");
+const { playerColorsForSeats } = require("./lib/ludoRules");
 
-// Multiplayer game-authority patch. Bot-vs-Human and Tournament are not touched.
-// server.js still owns rooms/ready/chat; this preload takes authoritative ownership
-// of only the live game roll/move state so client-supplied positions cannot bypass rules.
-if (!Socket.prototype.__ludoAuthorityPatched) {
+// Clean online-game controller. The board and page UI remain untouched.
+// This module owns only live-game state: turn, dice, tokens and movement.
+if (!Socket.prototype.__ludoOnlineAuthorityV2) {
   const originalOn = Socket.prototype.on;
-  const liveRooms = new Map();
-  const leaveHandlers = new WeakMap();
-  Socket.prototype.__ludoAuthorityPatched = true;
+  const games = new Map();
+  const members = new Map();
+  const leaveListeners = new WeakMap();
+  Socket.prototype.__ludoOnlineAuthorityV2 = true;
 
-  const roomOf = socket => String(socket?.data?.roomCode || "").trim().toUpperCase();
-  const pidOf = socket => String(socket?.data?.playerId || "").trim();
-  const makeTokens = () => {
-    const tokens = {};
-    for (const color of ["red", "yellow", "green", "blue"]) {
-      tokens[color] = {};
-      for (let id = 0; id < 4; id++) tokens[color][String(id)] = { position: 0 };
+  const roomCode = (socket) => String(socket?.data?.roomCode || "").trim().toUpperCase();
+  const playerId = (socket) => String(socket?.data?.playerId || "").trim();
+
+  const getRoom = (socket) => games.get(roomCode(socket));
+
+  const ensureRoom = (code) => {
+    let room = games.get(code);
+    if (!room) {
+      room = { code, status: "waiting", members: new Map(), game: null };
+      games.set(code, room);
     }
-    return tokens;
-  };
-  const flatTokens = room => Object.entries(room.tokens).flatMap(([color, ids]) => Object.entries(ids).map(([id, v]) => ({
-    color, id: Number(id), position: Number(v.position) || 0, state: tokenState(Number(v.position) || 0),
-  })));
-  const syncTokens = (room, tokens) => {
-    for (const t of tokens) {
-      room.tokens[t.color] ||= {};
-      room.tokens[t.color][String(t.id)] = { position: t.position };
-    }
-  };
-  const snapshot = room => ({
-    status: room.status,
-    currentPlayerId: room.currentPlayerId,
-    dice: room.dice,
-    pendingMove: room.pendingMove,
-    sixStreak: room.sixStreak,
-    players: room.players.map(p => ({ playerId: p.playerId, name: p.name, seat: p.seat, colors: p.colors, level: p.level, avatar: p.avatar, coins: p.coins })),
-    tokens: room.tokens,
-    winnerId: room.winnerId || null,
-    stateRevision: room.stateRevision,
-  });
-  const emitState = (socket, room) => { room.stateRevision += 1; socket.nsp.to(room.code).emit("game-state", snapshot(room)); };
-  const nextPlayer = room => {
-    const index = room.players.findIndex(p => p.playerId === room.currentPlayerId);
-    const next = room.players[(index + 1) % room.players.length];
-    return next?.playerId || null;
+    return room;
   };
 
-  Socket.prototype.on = function(event, listener) {
+  const syncMember = (socket, payload = {}) => {
+    const code = roomCode(socket);
+    const pid = String(payload.playerId || playerId(socket) || "").trim();
+    if (!code || !pid) return null;
+    const room = ensureRoom(code);
+    room.members.set(pid, {
+      playerId: pid,
+      name: String(payload.name || socket.data.profileName || "Player"),
+      avatar: String(payload.avatar ?? socket.data.profileAvatar ?? ""),
+      level: Math.max(1, Number(payload.level ?? socket.data.profileLevel) || 1),
+      coins: Math.max(0, Number(payload.coins ?? socket.data.profileCoins) || 0),
+    });
+    return room;
+  };
+
+  const stateFor = (room) => room?.game ? authority.snapshot(room.game) : null;
+  const emitState = (socket, room) => {
+    if (!room?.game) return;
+    socket.nsp.to(room.code).emit("game-state", stateFor(room));
+  };
+
+  Socket.prototype.on = function (event, listener) {
     if (event === "leave-room") {
-      leaveHandlers.set(this, listener);
+      leaveListeners.set(this, listener);
       return originalOn.call(this, event, listener);
     }
 
     if (event === "join-room") {
-      return originalOn.call(this, event, function(payload = {}) {
+      return originalOn.call(this, event, function (payload = {}) {
         const code = String(payload.roomCode || "").trim().toUpperCase();
         const pid = String(payload.playerId || "").trim();
-        const previousCode = roomOf(this);
-
-        // A player is allowed to switch rooms immediately. If this socket still
-        // belongs to another room, run that room's real server-side leave handler
-        // before the normal join handler so the authoritative rooms map is freed.
-        if (previousCode && code && previousCode !== code) {
-          const leave = leaveHandlers.get(this);
-          if (leave) {
-            leave.call(this);
-          }
-          const previousShadow = liveRooms.get(previousCode);
-          if (previousShadow && pid) {
-            previousShadow.members.delete(pid);
-            if (previousShadow.members.size === 0) liveRooms.delete(previousCode);
-          }
-        }
-
         if (code && pid) {
-          let shadow = liveRooms.get(code);
-          if (!shadow) {
-            shadow = { code, members: new Map(), players: [], status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, sixStreak: 0, tokens: {}, winnerId: null, stateRevision: 0 };
-            liveRooms.set(code, shadow);
-          }
-          shadow.members.set(pid, {
-            playerId: pid,
-            name: String(payload.name || "Player"),
-            avatar: String(payload.avatar || ""),
-            level: Math.max(1, Number(payload.level) || 1),
-            coins: Math.max(0, Number(payload.coins) || 0),
-            id: this.id,
-          });
+          this.data.roomCode = code;
           this.data.playerId = pid;
           this.data.profileName = String(payload.name || "Player");
           this.data.profileAvatar = String(payload.avatar || "");
           this.data.profileLevel = Math.max(1, Number(payload.level) || 1);
           this.data.profileCoins = Math.max(0, Number(payload.coins) || 0);
+          const room = ensureRoom(code);
+          room.members.set(pid, {
+            playerId: pid,
+            name: this.data.profileName,
+            avatar: this.data.profileAvatar,
+            level: this.data.profileLevel,
+            coins: this.data.profileCoins,
+          });
+          members.set(pid, { code, socketId: this.id });
         }
+
         const result = listener.apply(this, arguments);
-        const shadow = liveRooms.get(code);
-        if (shadow?.status === "playing") emitState(this, shadow);
+        const room = games.get(code);
+        if (room?.game) {
+          this.emit("game-state", stateFor(room));
+        }
         return result;
       });
     }
 
     if (event === "start-game") {
-      return originalOn.call(this, event, function() {
+      return originalOn.call(this, event, function () {
         const result = listener.apply(this, arguments);
-        const code = roomOf(this);
-        const shadow = liveRooms.get(code);
-        if (code && shadow) {
-          const sockets = [...this.nsp.sockets.values()].filter(s => s.rooms?.has(code));
-          for (const s of sockets) {
-            const pid = pidOf(s);
-            if (pid) shadow.members.set(pid, {
-              playerId: pid,
-              name: String(s.data?.profileName || shadow.members.get(pid)?.name || "Player"),
-              avatar: String(s.data?.profileAvatar || shadow.members.get(pid)?.avatar || ""),
-              level: Math.max(1, Number(s.data?.profileLevel || shadow.members.get(pid)?.level) || 1),
-              coins: Math.max(0, Number(s.data?.profileCoins ?? shadow.members.get(pid)?.coins) || 0),
-              id: s.id,
-            });
-          }
-          const source = [...shadow.members.values()];
-          const players = source.map((m, seat) => ({ playerId: m.playerId, name: m.name, seat, colors: playerColorsForSeats(source.length === 2 ? 2 : 4, seat), level: m.level, avatar: m.avatar, coins: m.coins }));
-          shadow.players = players;
-          shadow.status = "playing";
-          shadow.currentPlayerId = players[0]?.playerId || null;
-          shadow.dice = null;
-          shadow.pendingMove = null;
-          shadow.sixStreak = 0;
-          shadow.winnerId = null;
-          shadow.tokens = makeTokens();
-          shadow.stateRevision = 0;
-          emitState(this, shadow);
+        const code = roomCode(this);
+        const room = games.get(code);
+        if (!room) return result;
+
+        const sockets = [...this.nsp.sockets.values()].filter((s) => s.rooms?.has(code));
+        for (const s of sockets) {
+          const pid = playerId(s);
+          if (!pid) continue;
+          room.members.set(pid, {
+            playerId: pid,
+            name: String(s.data?.profileName || room.members.get(pid)?.name || "Player"),
+            avatar: String(s.data?.profileAvatar || room.members.get(pid)?.avatar || ""),
+            level: Math.max(1, Number(s.data?.profileLevel || room.members.get(pid)?.level) || 1),
+            coins: Math.max(0, Number(s.data?.profileCoins ?? room.members.get(pid)?.coins) || 0),
+          });
         }
+
+        const list = [...room.members.values()];
+        if (!list.length) return result;
+        const players = list.map((member, seat) => ({
+          ...member,
+          seat,
+          colors: playerColorsForSeats(list.length === 2 ? 2 : 4, seat),
+        }));
+        room.game = authority.createGame(players);
+        room.status = "playing";
+        emitState(this, room);
         return result;
       });
     }
 
     if (event === "game-roll") {
-      return originalOn.call(this, event, function() {
-        const code = roomOf(this), pid = pidOf(this), room = liveRooms.get(code);
-        if (!room || room.status !== "playing" || room.currentPlayerId !== pid || room.pendingMove !== null) return;
-        const value = 1 + Math.floor(Math.random() * 6);
-        room.dice = value;
-        room.pendingMove = value;
-        room.stateRevision += 1;
-        this.nsp.to(code).emit("game-dice", { playerId: pid, value, stateRevision: room.stateRevision });
-        this.nsp.to(code).emit("game-state", snapshot(room));
+      return originalOn.call(this, event, function () {
+        const room = getRoom(this);
+        const pid = playerId(this);
+        if (!room?.game) return;
+        const result = authority.roll(room.game, pid);
+        if (!result.ok) {
+          this.emit("game-roll-error", { error: result.reason });
+          return;
+        }
+        this.nsp.to(room.code).emit("game-dice", {
+          playerId: pid,
+          value: result.value,
+          stateRevision: result.stateRevision,
+        });
+        emitState(this, room);
       });
     }
 
     if (event === "game-move") {
-      return originalOn.call(this, event, function(payload = {}) {
-        const code = roomOf(this), pid = pidOf(this), room = liveRooms.get(code);
-        if (!room || room.status !== "playing" || room.currentPlayerId !== pid || room.pendingMove === null) return;
-        const dice = Number(room.pendingMove);
-        const colors = room.players.find(p => p.playerId === pid)?.colors || [];
-        const all = flatTokens(room);
-        const legal = hasLegalMove(all, colors, dice);
-        const tokenId = String(payload.tokenId || "");
+      return originalOn.call(this, event, function (payload = {}) {
+        const room = getRoom(this);
+        const pid = playerId(this);
+        if (!room?.game) return;
 
-        if (tokenId === "__skip__") {
-          if (legal) return;
-        } else {
-          const parts = tokenId.split(":");
-          if (parts.length !== 2 || !colors.includes(parts[0])) return;
-          const id = Number(parts[1]);
-          const token = all.find(t => t.color === parts[0] && t.id === id);
-          if (!token || !canMove(all, token, dice)) return;
-          const result = applyMove(all, token, dice);
-          if (!result) return;
-          if (result.captured) {
-            const killer = result.tokens.find(t => t.color === token.color && t.id === token.id);
-            if (killer) killer.position = 57;
-            result.captured.position = 0;
-          }
-          syncTokens(room, result.tokens);
-          room.stateRevision += 1;
-          this.nsp.to(code).emit("game-moved", { playerId: pid, tokenId, to: result.target, captured: result.captured ? { color: result.captured.color, id: result.captured.id } : null, captureToCenter: Boolean(result.captured), stateRevision: room.stateRevision });
-          if (hasWon(result.tokens, colors)) {
-            room.status = "finished";
-            room.winnerId = pid;
-            room.currentPlayerId = null;
-            room.pendingMove = null;
-            room.dice = null;
-            emitState(this, room);
-            return;
-          }
+        const result = authority.move(room.game, pid, String(payload.tokenId || ""));
+        if (!result.ok) {
+          this.emit("game-move-error", { error: result.reason });
+          return;
         }
 
-        if (dice === 6) room.sixStreak += 1;
-        else room.sixStreak = 0;
-        const forceNext = room.sixStreak >= 3;
-        if (forceNext || dice !== 6) {
-          room.sixStreak = forceNext ? 0 : room.sixStreak;
-          room.currentPlayerId = nextPlayer(room);
+        if (result.tokenId) {
+          this.nsp.to(room.code).emit("game-moved", {
+            playerId: pid,
+            tokenId: result.tokenId,
+            from: result.from,
+            to: result.target,
+            captured: result.captured || null,
+            captureToCenter: Boolean(result.captureToCenter),
+            stateRevision: result.stateRevision,
+          });
         }
-        room.pendingMove = null;
-        room.dice = null;
         emitState(this, room);
       });
     }
 
     if (event === "disconnect") {
-      return originalOn.call(this, event, function() {
-        const code = roomOf(this), pid = pidOf(this), shadow = liveRooms.get(code);
-        if (shadow && pid && shadow.status === "waiting") shadow.members.delete(pid);
+      return originalOn.call(this, event, function () {
+        const code = roomCode(this);
+        const pid = playerId(this);
+        const room = games.get(code);
+        members.delete(pid);
+        if (room && pid && room.status === "waiting") room.members.delete(pid);
+        if (room && room.status === "waiting" && room.members.size === 0) games.delete(code);
         return listener.apply(this, arguments);
       });
     }
