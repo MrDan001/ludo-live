@@ -1,5 +1,5 @@
 "use client";
-import React from "react";
+import React,{useEffect,useRef,useState} from "react";
 import LudoBoard,{BOARD_NAMES,BOARD_PALETTES,type BoardThemeId,type DemoToken} from "./LudoBoard";
 import YardSkinOverlay from "./YardSkinOverlay";
 import {getTokenCell} from "../../lib/canonicalLudoBoard";
@@ -8,11 +8,21 @@ type Props={theme?:BoardThemeId;demoTokens?:DemoToken[];onTokenClick?:(color:Dem
 const YARD_CENTERS:Record<DemoToken["color"],Array<[string,string]>>={green:[["calc(13.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],yellow:[["calc(73.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(73.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(26.39% - 2.85px)"]],red:[["calc(13.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(86.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(86.39% - 2.85px)"]],blue:[["calc(73.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(73.61% - 2.85px)","calc(86.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(86.39% - 2.85px)"]]};
 const FINISH_SLOTS:Array<[string,string]>=[["44%","44%"],["48%","44%"],["44%","48%"],["48%","48%"],["52%","44%"],["56%","44%"],["52%","48%"],["56%","48%"],["44%","52%"],["48%","52%"],["44%","56%"],["48%","56%"],["52%","52%"],["56%","52%"],["52%","56%"],["56%","56%"]];
 const FINISH_ORDER:{[key:string]:number}={red:0,yellow:1,green:2,blue:3};
+const tokenKey=(t:DemoToken)=>`${t.color}:${t.id}`;
 export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onTokenClick,legalTokenKeys=[]}:Props){
  const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
- const moving=demoTokens.filter(t=>t.state!=="yard"&&t.state!=="finished").map(t=>{const cell=getTokenCell(t.color,t.position);return cell?{...t,row:cell[0],col:cell[1]}:null}).filter(Boolean) as Array<DemoToken&{row:number;col:number}>;
- const finished=demoTokens.filter(t=>t.state==="finished");
- const legalSet=new Set(legalTokenKeys); const yardTokens=demoTokens.filter(t=>t.state==="yard");
+ const [visualPositions,setVisualPositions]=useState<Record<string,number>>(()=>Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0])));
+ const targetsRef=useRef<Record<string,number>>({});
+ useEffect(()=>{targetsRef.current=Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0]));},[demoTokens]);
+ useEffect(()=>{
+  let cancelled=false;
+  const tick=()=>{if(cancelled)return;setVisualPositions(current=>{const next={...current};let changed=false;for(const [key,target] of Object.entries(targetsRef.current)){const from=Number.isFinite(next[key])?next[key]:target;if(from===target)continue;const step=target>from?from+1:target<from?from-1:from;next[key]=step;changed=true;}return changed?next:current;});};
+  const id=window.setInterval(tick,135); return()=>{cancelled=true;window.clearInterval(id);};
+ },[]);
+ const visualTokens=demoTokens.map(t=>({...t,position:visualPositions[tokenKey(t)]??Number(t.position)||0}));
+ const moving=visualTokens.filter(t=>t.state!=="yard"&&t.state!=="finished").map(t=>{const cell=getTokenCell(t.color,t.position);return cell?{...t,row:cell[0],col:cell[1]}:null}).filter(Boolean) as Array<DemoToken&{row:number;col:number}>;
+ const finished=visualTokens.filter(t=>t.state==="finished");
+ const legalSet=new Set(legalTokenKeys); const yardTokens=visualTokens.filter(t=>t.state==="yard");
  const sharedGroups=new Map<string,Array<DemoToken&{row:number;col:number}>>();
  moving.forEach(t=>{const key=`${t.row}-${t.col}`;const group=sharedGroups.get(key)||[];group.push(t);sharedGroups.set(key,group);});
  const stackedMoving=Array.from(sharedGroups.values()).flatMap(group=>group.map((t,index)=>({t,index,count:group.length})));
