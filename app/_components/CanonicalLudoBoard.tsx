@@ -40,29 +40,41 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
     const current=visualRef.current.find(t=>tokenKey(t)===moveKey);
     const start=Math.max(0,Number(current?.position ?? previous.get(moveKey) ?? 0));
     const target=moveValue.position;
-    if(start>=target){
-     setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,target):t));
-     visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,target):t);
-    }else{
-     if(animationRef.current)window.clearInterval(animationRef.current.timer);
-     const timer=window.setInterval(()=>{
-      const next=Number(visualRef.current.find(t=>tokenKey(t)===moveKey)?.position??start)+1;
-      if(next>=target){
-       window.clearInterval(timer);animationRef.current=null;
-       const finalToken=tokenWithPosition(moveValue.token,target);
-       visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?finalToken:t);
-       setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?finalToken:t));
-       emitMoveAudio();
-       return;
-      }
-      const currentToken=visualRef.current.find(t=>tokenKey(t)===moveKey);
-      if(!currentToken){window.clearInterval(timer);animationRef.current=null;return;}
-      const stepped=tokenWithPosition(moveValue.token,next);
-      visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?stepped:t);
-      setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?stepped:t));
+
+    // A capture is represented authoritatively as a jump from the track to FINISH.
+    // It is not a normal movement through every remaining board square: the killer
+    // must land directly in the centre. A normal home-to-centre move is 56 -> 57
+    // and therefore still uses the regular one-box stepping below.
+    const isCaptureJump=target===57&&start<56;
+    if(isCaptureJump){
+      if(animationRef.current)window.clearInterval(animationRef.current.timer);
+      animationRef.current=null;
+      visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,57):t);
+      setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,57):t));
       emitMoveAudio();
-     },MOVE_STEP_MS);
-     animationRef.current={key:moveKey,timer};
+    }else if(start>=target){
+      setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,target):t));
+      visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?tokenWithPosition(moveValue.token,target):t);
+    }else{
+      if(animationRef.current)window.clearInterval(animationRef.current.timer);
+      const timer=window.setInterval(()=>{
+       const next=Number(visualRef.current.find(t=>tokenKey(t)===moveKey)?.position??start)+1;
+       if(next>=target){
+        window.clearInterval(timer);animationRef.current=null;
+        const finalToken=tokenWithPosition(moveValue.token,target);
+        visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?finalToken:t);
+        setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?finalToken:t));
+        emitMoveAudio();
+        return;
+       }
+       const currentToken=visualRef.current.find(t=>tokenKey(t)===moveKey);
+       if(!currentToken){window.clearInterval(timer);animationRef.current=null;return;}
+       const stepped=tokenWithPosition(moveValue.token,next);
+       visualRef.current=visualRef.current.map(t=>tokenKey(t)===moveKey?stepped:t);
+       setVisualTokens(prev=>prev.map(t=>tokenKey(t)===moveKey?stepped:t));
+       emitMoveAudio();
+      },MOVE_STEP_MS);
+      animationRef.current={key:moveKey,timer};
     }
    }
   }
