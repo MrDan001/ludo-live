@@ -77,7 +77,7 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
   const id=window.setInterval(tick,300);
   return()=>{cancelled=true;window.clearInterval(id);};
  },[]);
- const visualTokens=demoTokens.map(t=>{const position=visualPositions[tokenKey(t)]??Number(t.position)||0;return {...t,position,state:stateFor(position)};});
+ const visualTokens=demoTokens.map(t=>{const position=visualPositions[tokenKey(t)] ?? (Number(t.position) || 0);return {...t,position,state:stateFor(position)};});
  const moving=visualTokens.filter(t=>t.state!=="yard"&&t.state!=="finished").map(t=>{const cell=getTokenCell(t.color,t.position);return cell?{...t,row:cell[0],col:cell[1]}:null}).filter(Boolean) as Array<DemoToken&{row:number;col:number}>;
  const finished=visualTokens.filter(t=>t.state==="finished");
  const legalSet=new Set(legalTokenKeys);const yardTokens=visualTokens.filter(t=>t.state==="yard");
