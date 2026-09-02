@@ -5,22 +5,23 @@ import YardSkinOverlay from "./YardSkinOverlay";
 import {getTokenCell} from "../../lib/canonicalLudoBoard";
 export type {BoardThemeId,DemoToken};
 type Props={theme?:BoardThemeId;demoTokens?:DemoToken[];onTokenClick?:(color:DemoToken["color"],id:number)=>void;legalTokenKeys?:string[]};
-const YARD_CENTERS:Record<DemoToken["color"],Array<[string,string]>>={green:[["calc(13.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],yellow:[["calc(73.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(73.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(26.39% - 2.85px)"]],red:[["calc(13.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(86.39% + 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],blue:[["calc(73.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(73.61% - 2.85px)","calc(86.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(86.39% - 2.85px)"]]};
+const YARD_CENTERS:Record<DemoToken["color"],Array<[string,string]>>={green:[["calc(13.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],yellow:[["calc(73.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(73.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(26.39% - 2.85px)"]],red:[["calc(13.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(86.39% + 2.85px)"],["calc(26.39% - 2.85px)","calc(86.39% + 2.85px)"]],blue:[["calc(73.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(73.61% - 2.85px)","calc(86.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(86.39% - 2.85px)"]]};
 const FINISH_SLOTS:Array<[string,string]>=[["44%","44%"],["48%","44%"],["44%","48%"],["48%","48%"],["52%","44%"],["56%","44%"],["52%","48%"],["56%","48%"],["44%","52%"],["48%","52%"],["44%","56%"],["48%","56%"],["52%","52%"],["56%","52%"],["52%","56%"],["56%","56%"]];
 const FINISH_ORDER:{[key:string]:number}={red:0,yellow:1,green:2,blue:3};
 const tokenKey=(t:DemoToken)=>`${t.color}:${t.id}`;
 const stateFor=(position:number):DemoToken["state"]=>position===0?"yard":position===57?"finished":position>51?"home":"track";
-const audio=(kind:"move"|"capture"|"home")=>{if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:kind}))};
+type Animation={from:number;target:number;captureLanding?:number;phase:"normal"|"capture"};
 export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onTokenClick,legalTokenKeys=[]}:Props){
  const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
- const [visualPositions,setVisualPositions]=useState<Record<string,number>>(()=>Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0])));
- const previousServerRef=useRef<Record<string,number>>(Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0])));
- const targetRef=useRef<Record<string,number>>(Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0])));
- const animationRef=useRef<Record<string,{from:number;target:number;captureLanding?:number;phase:"move"|"capture"}>>({});
+ const initial=Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0]));
+ const [visualPositions,setVisualPositions]=useState<Record<string,number>>(initial);
+ const serverPositionsRef=useRef<Record<string,number>>(initial);
+ const animationsRef=useRef<Record<string,Animation>>({});
  useEffect(()=>{
   const incoming=Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0]));
-  const previous=previousServerRef.current;
-  const nextAnimations:Record<string,{from:number;target:number;captureLanding?:number;phase:"move"|"capture"}>={};
+  const previous=serverPositionsRef.current;
+  const animations:Record<string,Animation>={};
+  const immediateYard:string[]=[];
   for(const [key,target] of Object.entries(incoming)){
    const old=previous[key];
    if(old===undefined||old===target)continue;
@@ -28,17 +29,25 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
     const victim=Object.entries(incoming).find(([victimKey,victimTarget])=>victimTarget===0&&Number(previous[victimKey])>0);
     const landing=victim?Number(previous[victim[0]]):undefined;
     if(landing!==undefined&&landing>0&&landing<57){
-     nextAnimations[key]={from:old,target:57,captureLanding:landing,phase:"capture"};
-     setVisualPositions(current=>({...current,[victim[0]]:0,[key]:old}));
+     animations[key]={from:old,target:57,captureLanding:landing,phase:"capture"};
+     immediateYard.push(victim[0]);
      continue;
     }
    }
-   nextAnimations[key]={from:old,target,phase:"move"};
-   setVisualPositions(current=>({...current,[key]:old}));
+   animations[key]={from:old,target,phase:"normal"};
   }
-  animationRef.current=nextAnimations;
-  targetRef.current=incoming;
-  previousServerRef.current=incoming;
+  animationsRef.current=animations;
+  serverPositionsRef.current=incoming;
+  setVisualPositions(current=>{
+   const next={...current};
+   for(const [key,target] of Object.entries(incoming)){
+    const old=previous[key];
+    if(old!==undefined&&old!==target)next[key]=old;
+    else if(next[key]===undefined)next[key]=target;
+   }
+   for(const key of immediateYard)next[key]=0;
+   return next;
+  });
  },[demoTokens]);
  useEffect(()=>{
   let cancelled=false;
@@ -47,23 +56,20 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
    setVisualPositions(current=>{
     const next={...current};
     let changed=false;
-    for(const [key,animation] of Object.entries(animationRef.current)){
-     const from=Number(next[key]);
+    for(const [key,animation] of Object.entries(animationsRef.current)){
+     const from=Number.isFinite(next[key])?next[key]:animation.from;
      if(animation.phase==="capture"&&animation.captureLanding!==undefined){
-      if(from<animation.captureLanding){next[key]=from+1;audio("move");changed=true;continue;}
+      if(from<animation.captureLanding){next[key]=from+1;changed=true;continue;}
       next[key]=57;
-      animationRef.current[key]={...animation,phase:"move",from:57};
-      audio("capture");
-      window.setTimeout(()=>audio("home"),40);
+      delete animationsRef.current[key];
       changed=true;
       continue;
      }
-     if(from===animation.target){delete animationRef.current[key];continue;}
+     if(from===animation.target){delete animationsRef.current[key];continue;}
      const step=animation.target>from?from+1:from-1;
      next[key]=step;
-     audio(animation.target===57&&step===57?"home":"move");
      changed=true;
-     if(step===animation.target)delete animationRef.current[key];
+     if(step===animation.target)delete animationsRef.current[key];
     }
     return changed?next:current;
    });
