@@ -1,5 +1,5 @@
 "use client";
-import React,{useEffect,useRef,useState} from "react";
+import React from "react";
 import LudoBoard,{BOARD_NAMES,BOARD_PALETTES,type BoardThemeId,type DemoToken} from "./LudoBoard";
 import YardSkinOverlay from "./YardSkinOverlay";
 import {getTokenCell} from "../../lib/canonicalLudoBoard";
@@ -10,88 +10,21 @@ const FINISH_SLOTS:Array<[string,string]>=[["44%","44%"],["48%","44%"],["44%","4
 const FINISH_ORDER:{[key:string]:number}={red:0,yellow:1,green:2,blue:3};
 const tokenKey=(t:DemoToken)=>`${t.color}:${t.id}`;
 const stateFor=(position:number):DemoToken["state"]=>position===0?"yard":position===57?"finished":position>51?"home":"track";
-type Animation={from:number;target:number;captureLanding?:number;phase:"normal"|"capture"};
 export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onTokenClick,legalTokenKeys=[]}:Props){
  const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
- const initial=Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0]));
- const [visualPositions,setVisualPositions]=useState<Record<string,number>>(initial);
- const serverPositionsRef=useRef<Record<string,number>>(initial);
- const animationsRef=useRef<Record<string,Animation>>({});
- useEffect(()=>{
-  const incoming=Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0]));
-  const previous=serverPositionsRef.current;
-  const animations:Record<string,Animation>={};
-  const immediateYard:string[]=[];
-  for(const [key,target] of Object.entries(incoming)){
-   const old=previous[key];
-   if(old===undefined||old===target)continue;
-   if(target===57&&old<57){
-    const victim=Object.entries(incoming).find(([victimKey,victimTarget])=>victimTarget===0&&Number(previous[victimKey])>0);
-    if(victim){
-     const landing=Number(previous[victim[0]]);
-     if(landing>0&&landing<57){
-      animations[key]={from:old,target:57,captureLanding:landing,phase:"capture"};
-      immediateYard.push(victim[0]);
-      continue;
-     }
-    }
-   }
-   animations[key]={from:old,target,phase:"normal"};
-  }
-  animationsRef.current=animations;
-  serverPositionsRef.current=incoming;
-  setVisualPositions(current=>{
-   const next={...current};
-   for(const [key,target] of Object.entries(incoming)){
-    const old=previous[key];
-    if(old!==undefined&&old!==target)next[key]=old;
-    else if(next[key]===undefined)next[key]=target;
-   }
-   for(const key of immediateYard)next[key]=0;
-   return next;
-  });
- },[demoTokens]);
- useEffect(()=>{
-  let cancelled=false;
-  const tick=()=>{
-   if(cancelled)return;
-   setVisualPositions(current=>{
-    const next={...current};
-    let changed=false;
-    for(const [key,animation] of Object.entries(animationsRef.current)){
-     const from=Number.isFinite(next[key])?next[key]:animation.from;
-     if(animation.phase==="capture"&&animation.captureLanding!==undefined){
-      if(from<animation.captureLanding){next[key]=from+1;changed=true;continue;}
-      next[key]=57;
-      delete animationsRef.current[key];
-      changed=true;
-      continue;
-     }
-     if(from===animation.target){delete animationsRef.current[key];continue;}
-     const step=animation.target>from?from+1:from-1;
-     next[key]=step;
-     changed=true;
-     if(step===animation.target)delete animationsRef.current[key];
-    }
-    return changed?next:current;
-   });
-  };
-  const id=window.setInterval(tick,300);
-  return()=>{cancelled=true;window.clearInterval(id);};
- },[]);
- const visualTokens=demoTokens.map(t=>{const position=visualPositions[tokenKey(t)] ?? (Number(t.position) || 0);return {...t,position,state:stateFor(position)};});
+ const visualTokens=demoTokens.map(t=>{const position=Number(t.position)||0;return {...t,position,state:stateFor(position)};});
  const moving=visualTokens.filter(t=>t.state!=="yard"&&t.state!=="finished").map(t=>{const cell=getTokenCell(t.color,t.position);return cell?{...t,row:cell[0],col:cell[1]}:null}).filter(Boolean) as Array<DemoToken&{row:number;col:number}>;
  const finished=visualTokens.filter(t=>t.state==="finished");
  const legalSet=new Set(legalTokenKeys);const yardTokens=visualTokens.filter(t=>t.state==="yard");
  const sharedGroups=new Map<string,Array<DemoToken&{row:number;col:number}>>();moving.forEach(t=>{const key=`${t.row}-${t.col}`;const group=sharedGroups.get(key)||[];group.push(t);sharedGroups.set(key,group);});
  const stackedMoving=Array.from(sharedGroups.values()).flatMap(group=>group.map((t,index)=>({t,index,count:group.length})));
- const yardTokenStyle=(color:DemoToken["color"],id:number,left:string,top:string,legal:boolean):React.CSSProperties=>({position:"absolute",left,top,transform:"translate(-50%,-50%)",width:"10.9%",aspectRatio:1,borderRadius:"50%",border:`3px solid ${p.accent}`,background:p[color],boxShadow:legal?`inset 0 2px 3px rgba(255,255,255,.55),0 0 0 2px ${p.accent},0 0 18px ${p.accent}`:"inset 0 2px 3px rgba(255,255,255,.55),0 2px 5px rgba(0,0,0,.25)",animation:legal?"legalYardTokenBreath 1.45s ease-in-out infinite":undefined,zIndex:30,padding:0,cursor:"pointer",fontSize:0,color:"transparent"});
+ const yardTokenStyle=(color:DemoToken["color"],left:string,top:string,legal:boolean):React.CSSProperties=>({position:"absolute",left,top,transform:"translate(-50%,-50%)",width:"10.9%",aspectRatio:1,borderRadius:"50%",border:`3px solid ${p.accent}`,background:p[color],boxShadow:legal?`inset 0 2px 3px rgba(255,255,255,.55),0 0 0 2px ${p.accent},0 0 18px ${p.accent}`:"inset 0 2px 3px rgba(255,255,255,.55),0 2px 5px rgba(0,0,0,.25)",animation:legal?"legalYardTokenBreath 1.45s ease-in-out infinite":undefined,zIndex:30,padding:0,cursor:"pointer",fontSize:0,color:"transparent"});
  const stackOffset=(index:number,count:number):[number,number]=>{if(count<=1)return[0,0];if(count===2)return[index===0?-1:1,index===0?-1:1];if(count===3){const slots:[number,number][]=[[-1,-1],[1,-1],[0,1]];return slots[index]??[0,0];}if(count===4){const slots:[number,number][]=[[-1,-1],[1,-1],[-1,1],[1,1]];return slots[index]??[0,0];}const cols=Math.ceil(Math.sqrt(count));const rows=Math.ceil(count/cols);const col=index%cols;const row=Math.floor(index/cols);return[(col-(cols-1)/2)*1.4,(row-(rows-1)/2)*1.4];};
  return <div className="canonical-ludo-frame" style={{position:"relative",width:"100%",aspectRatio:"1",touchAction:"none",overscrollBehavior:"contain",userSelect:"none",WebkitUserSelect:"none"} as React.CSSProperties} aria-label={`${BOARD_NAMES[theme]} canonical Ludo board`}>
-  <style>{`.canonical-ludo-frame{isolation:isolate}.canonical-ludo-frame .shared-ludo-board{box-shadow:none!important;border:0!important;outline:none!important;filter:none!important;position:relative;z-index:1}@keyframes legalMoveBreath{0%,100%{opacity:.45;transform:translate(-50%,-50%) scale(.9)}50%{opacity:1;transform:translate(-50%,-50%) scale(1.08)}}@keyframes legalYardTokenBreath{0%,100%{transform:translate(-50%,-50%) scale(.94);filter:saturate(1)}50%{transform:translate(-50%,-50%) scale(1.08);filter:saturate(1.12)}}@keyframes canonicalTokenBreath{0%,100%{transform:translate(-50%,-50%) scale(.94);filter:saturate(1);box-shadow:0 2px 5px rgba(0,0,0,.35)}50%{transform:translate(-50%,-50%) scale(1.07);filter:saturate(1.12);box-shadow:0 0 0 2px currentColor,0 0 14px currentColor}}`}</style>
+  <style>{`.canonical-ludo-frame{isolation:isolate}.canonical-ludo-frame .shared-ludo-board{box-shadow:none!important;border:0!important;outline:none!important;filter:none!important;position:relative;z-index:1}@keyframes legalYardTokenBreath{0%,100%{transform:translate(-50%,-50%) scale(.94);filter:saturate(1)}50%{transform:translate(-50%,-50%) scale(1.08);filter:saturate(1.12)}}@keyframes canonicalTokenBreath{0%,100%{transform:translate(-50%,-50%) scale(.94);filter:saturate(1);box-shadow:0 2px 5px rgba(0,0,0,.35)}50%{transform:translate(-50%,-50%) scale(1.07);filter:saturate(1.12);box-shadow:0 0 0 2px currentColor,0 0 14px currentColor}}`}</style>
   <LudoBoard theme={theme} demoTokens={[]} onTokenClick={onTokenClick} style={{width:"100%",height:"100%"}}/><YardSkinOverlay />
-  {yardTokens.map(t=>{const [left,top]=YARD_CENTERS[t.color][t.id]||YARD_CENTERS[t.color][0];const legal=legalSet.has(`${t.color}-${t.id}`);return <button key={`yard-${t.color}-${t.id}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${legal?"Legal move for ":""}${t.color} token`} style={yardTokenStyle(t.color,t.id,left,top,legal)}/>;})}
+  {yardTokens.map(t=>{const [left,top]=YARD_CENTERS[t.color][t.id]||YARD_CENTERS[t.color][0];const legal=legalSet.has(`${t.color}-${t.id}`);return <button key={`yard-${t.color}-${t.id}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${legal?"Legal move for ":""}${t.color} token`} style={yardTokenStyle(t.color,left,top,legal)}/>;})}
   {stackedMoving.map(({t,index,count})=>{const key=`${t.color}-${t.id}`,legal=legalSet.has(key);const [dx,dy]=stackOffset(index,count);return <button key={`moving-${key}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${legal?"Legal move for ":""}${t.color} token ${count>1?`(${index+1} of ${count} on square)`:""}`} style={{position:"absolute",left:`calc(${(t.col+.5)*100/15}% + ${dx*0.9}%)`,top:`calc(${(t.row+.5)*100/15}% + ${dy*0.9}%)`,transform:"translate(-50%,-50%)",width:count>1?"5.8%":"6.8%",aspectRatio:1,borderRadius:"50%",border:`2px solid ${p.accent}`,background:p[t.color],boxShadow:legal?`inset 0 2px 3px rgba(255,255,255,.55),0 0 0 2px ${p.accent},0 0 18px ${p.accent}`:"inset 0 2px 3px rgba(255,255,255,.55),0 2px 5px rgba(0,0,0,.3)",animation:legal?"canonicalTokenBreath 1.45s ease-in-out infinite":undefined,zIndex:30+index,padding:0,cursor:legal?"pointer":"default",fontSize:0,color:"transparent"}}/>;})}
-  {finished.map(t=>{const group=FINISH_ORDER[t.color]??0;const slotIndex=group*4+t.id;const slot=FINISH_SLOTS[slotIndex]||FINISH_SLOTS[0];return <div key={`finished-${t.color}-${t.id}`} aria-label={`${t.color} finished token`} style={{position:"absolute",left:slot[0],top:slot[1],transform:"translate(-50%,-50%",width:"4%",aspectRatio:1,borderRadius:"50%",background:p[t.color],border:`2px solid ${p.accent}`,zIndex:35}}/>;})}
+  {finished.map(t=>{const group=FINISH_ORDER[t.color]??0;const slotIndex=group*4+t.id;const slot=FINISH_SLOTS[slotIndex]||FINISH_SLOTS[0];return <div key={`finished-${t.color}-${t.id}`} aria-label={`${t.color} finished token`} style={{position:"absolute",left:slot[0],top:slot[1],transform:"translate(-50%,-50%)",width:"4%",aspectRatio:1,borderRadius:"50%",background:p[t.color],border:`2px solid ${p.accent}`,zIndex:35}}/>;})}
  </div>;
 }
