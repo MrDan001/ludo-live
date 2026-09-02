@@ -5,25 +5,77 @@ import YardSkinOverlay from "./YardSkinOverlay";
 import {getTokenCell} from "../../lib/canonicalLudoBoard";
 export type {BoardThemeId,DemoToken};
 type Props={theme?:BoardThemeId;demoTokens?:DemoToken[];onTokenClick?:(color:DemoToken["color"],id:number)=>void;legalTokenKeys?:string[]};
-const YARD_CENTERS:Record<DemoToken["color"],Array<[string,string]>>={green:[["calc(13.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],yellow:[["calc(73.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(73.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(26.39% - 2.85px)"]],red:[["calc(13.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(86.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(86.39% - 2.85px)"]],blue:[["calc(73.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(86.39% - 2.85px)"],["calc(73.61% - 2.85px)","calc(86.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(86.39% - 2.85px)"]]};
+const YARD_CENTERS:Record<DemoToken["color"],Array<[string,string]>>={green:[["calc(13.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],yellow:[["calc(73.61% + 2.85px)","calc(13.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(13.61% + 2.85px)"],["calc(73.61% + 2.85px)","calc(26.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(26.39% - 2.85px)"]],red:[["calc(13.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(26.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(13.61% + 2.85px)","calc(86.39% + 2.85px)"],["calc(26.39% - 2.85px)","calc(26.39% - 2.85px)"]],blue:[["calc(73.61% + 2.85px)","calc(73.61% + 2.85px)"],["calc(86.39% - 2.85px)","calc(73.61% + 2.85px)"],["calc(73.61% - 2.85px)","calc(86.39% - 2.85px)"],["calc(86.39% - 2.85px)","calc(86.39% - 2.85px)"]]};
 const FINISH_SLOTS:Array<[string,string]>=[["44%","44%"],["48%","44%"],["44%","48%"],["48%","48%"],["52%","44%"],["56%","44%"],["52%","48%"],["56%","48%"],["44%","52%"],["48%","52%"],["44%","56%"],["48%","56%"],["52%","52%"],["56%","52%"],["52%","56%"],["56%","56%"]];
 const FINISH_ORDER:{[key:string]:number}={red:0,yellow:1,green:2,blue:3};
 const tokenKey=(t:DemoToken)=>`${t.color}:${t.id}`;
-const visualState=(position:number):DemoToken["state"]=>position===0?"yard":position===57?"finished":position>51?"home":"track";
-const emitAudio=(kind:"move"|"capture"|"home")=>{if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:kind}))};
+const stateFor=(position:number):DemoToken["state"]=>position===0?"yard":position===57?"finished":position>51?"home":"track";
+const audio=(kind:"move"|"capture"|"home")=>{if(typeof window!=="undefined")window.dispatchEvent(new CustomEvent("ludo-audio",{detail:kind}))};
 export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onTokenClick,legalTokenKeys=[]}:Props){
  const p=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
  const [visualPositions,setVisualPositions]=useState<Record<string,number>>(()=>Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0])));
- const targetsRef=useRef<Record<string,number>>({});
- const captureRef=useRef<Record<string,{landing:number}>>({});
- const previousRef=useRef<Record<string,number>>({});
- useEffect(()=>{const incoming=Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0]));const previous=previousRef.current;setVisualPositions(current=>{const next={...current};for(const [key,target] of Object.entries(incoming)){if(target!==57||previous[key]===undefined||previous[key]===57)continue;const victim=Object.entries(incoming).find(([victimKey,victimTarget])=>victimTarget===0&&Number(previous[victimKey])>0);if(!victim)continue;const landing=Number(previous[victim[0]]);if(landing>0&&landing<57){captureRef.current[key]={landing};}next[victim[0]]=0;}return next});targetsRef.current=incoming;previousRef.current=incoming;},[demoTokens]);
- useEffect(()=>{let cancelled=false;const tick=()=>{if(cancelled)return;setVisualPositions(current=>{const next={...current};let changed=false;for(const [key,target] of Object.entries(targetsRef.current)){const special=captureRef.current[key];const from=Number.isFinite(next[key])?next[key]:target;if(special){if(from<special.landing){next[key]=from+1;emitAudio("move");changed=true;continue}if(from===special.landing){next[key]=57;delete captureRef.current[key];emitAudio("capture");window.setTimeout(()=>emitAudio("home"),35);changed=true;continue}if(from!==57){next[key]=57;changed=true;continue}continue}if(from===target)continue;next[key]=target>from?from+1:from-1;changed=true;if(target===57&&from+1===57)emitAudio("home");else emitAudio("move");}return changed?next:current;});};const id=window.setInterval(tick,300);return()=>{cancelled=true;window.clearInterval(id);};},[]);
- const visualTokens=demoTokens.map(t=>{const raw=visualPositions[tokenKey(t)];const position=raw===undefined?Number(t.position)||0:raw;return {...t,position,state:visualState(position)};});
+ const previousServerRef=useRef<Record<string,number>>(Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0])));
+ const targetRef=useRef<Record<string,number>>(Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0])));
+ const animationRef=useRef<Record<string,{from:number;target:number;captureLanding?:number;phase:"move"|"capture"}>>({});
+ useEffect(()=>{
+  const incoming=Object.fromEntries(demoTokens.map(t=>[tokenKey(t),Number(t.position)||0]));
+  const previous=previousServerRef.current;
+  const nextAnimations:Record<string,{from:number;target:number;captureLanding?:number;phase:"move"|"capture"}>={};
+  for(const [key,target] of Object.entries(incoming)){
+   const old=previous[key];
+   if(old===undefined||old===target)continue;
+   if(target===57&&old<57){
+    const victim=Object.entries(incoming).find(([victimKey,victimTarget])=>victimTarget===0&&Number(previous[victimKey])>0);
+    const landing=victim?Number(previous[victim[0]]):undefined;
+    if(landing!==undefined&&landing>0&&landing<57){
+     nextAnimations[key]={from:old,target:57,captureLanding:landing,phase:"capture"};
+     setVisualPositions(current=>({...current,[victim[0]]:0,[key]:old}));
+     continue;
+    }
+   }
+   nextAnimations[key]={from:old,target,phase:"move"};
+   setVisualPositions(current=>({...current,[key]:old}));
+  }
+  animationRef.current=nextAnimations;
+  targetRef.current=incoming;
+  previousServerRef.current=incoming;
+ },[demoTokens]);
+ useEffect(()=>{
+  let cancelled=false;
+  const tick=()=>{
+   if(cancelled)return;
+   setVisualPositions(current=>{
+    const next={...current};
+    let changed=false;
+    for(const [key,animation] of Object.entries(animationRef.current)){
+     const from=Number(next[key]);
+     if(animation.phase==="capture"&&animation.captureLanding!==undefined){
+      if(from<animation.captureLanding){next[key]=from+1;audio("move");changed=true;continue;}
+      next[key]=57;
+      animationRef.current[key]={...animation,phase:"move",from:57};
+      audio("capture");
+      window.setTimeout(()=>audio("home"),40);
+      changed=true;
+      continue;
+     }
+     if(from===animation.target){delete animationRef.current[key];continue;}
+     const step=animation.target>from?from+1:from-1;
+     next[key]=step;
+     audio(animation.target===57&&step===57?"home":"move");
+     changed=true;
+     if(step===animation.target)delete animationRef.current[key];
+    }
+    return changed?next:current;
+   });
+  };
+  const id=window.setInterval(tick,300);
+  return()=>{cancelled=true;window.clearInterval(id);};
+ },[]);
+ const visualTokens=demoTokens.map(t=>{const position=visualPositions[tokenKey(t)]??Number(t.position)||0;return {...t,position,state:stateFor(position)};});
  const moving=visualTokens.filter(t=>t.state!=="yard"&&t.state!=="finished").map(t=>{const cell=getTokenCell(t.color,t.position);return cell?{...t,row:cell[0],col:cell[1]}:null}).filter(Boolean) as Array<DemoToken&{row:number;col:number}>;
  const finished=visualTokens.filter(t=>t.state==="finished");
- const legalSet=new Set(legalTokenKeys); const yardTokens=visualTokens.filter(t=>t.state==="yard");
- const sharedGroups=new Map<string,Array<DemoToken&{row:number;col:number}>>(); moving.forEach(t=>{const key=`${t.row}-${t.col}`;const group=sharedGroups.get(key)||[];group.push(t);sharedGroups.set(key,group);});
+ const legalSet=new Set(legalTokenKeys);const yardTokens=visualTokens.filter(t=>t.state==="yard");
+ const sharedGroups=new Map<string,Array<DemoToken&{row:number;col:number}>>();moving.forEach(t=>{const key=`${t.row}-${t.col}`;const group=sharedGroups.get(key)||[];group.push(t);sharedGroups.set(key,group);});
  const stackedMoving=Array.from(sharedGroups.values()).flatMap(group=>group.map((t,index)=>({t,index,count:group.length})));
  const yardTokenStyle=(color:DemoToken["color"],id:number,left:string,top:string,legal:boolean):React.CSSProperties=>({position:"absolute",left,top,transform:"translate(-50%,-50%)",width:"10.9%",aspectRatio:1,borderRadius:"50%",border:`3px solid ${p.accent}`,background:p[color],boxShadow:legal?`inset 0 2px 3px rgba(255,255,255,.55),0 0 0 2px ${p.accent},0 0 18px ${p.accent}`:"inset 0 2px 3px rgba(255,255,255,.55),0 2px 5px rgba(0,0,0,.25)",animation:legal?"legalYardTokenBreath 1.45s ease-in-out infinite":undefined,zIndex:30,padding:0,cursor:"pointer",fontSize:0,color:"transparent"});
  const stackOffset=(index:number,count:number):[number,number]=>{if(count<=1)return[0,0];if(count===2)return[index===0?-1:1,index===0?-1:1];if(count===3){const slots:[number,number][]=[[-1,-1],[1,-1],[0,1]];return slots[index]??[0,0];}if(count===4){const slots:[number,number][]=[[-1,-1],[1,-1],[-1,1],[1,1]];return slots[index]??[0,0];}const cols=Math.ceil(Math.sqrt(count));const rows=Math.ceil(count/cols);const col=index%cols;const row=Math.floor(index/cols);return[(col-(cols-1)/2)*1.4,(row-(rows-1)/2)*1.4];};
