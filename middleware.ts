@@ -21,17 +21,6 @@ function securityHeaders(response:NextResponse){
 export function middleware(request:NextRequest){
   const{pathname,searchParams}=request.nextUrl;
 
-  // Preserve the existing canonical game/dashboard rewrites.
-  if(pathname==="/home")return securityHeaders(NextResponse.redirect(new URL("/dashboard",request.url)));
-  if(pathname==="/dashboard"){
-    const url=request.nextUrl.clone();url.pathname="/home";
-    return securityHeaders(NextResponse.rewrite(url));
-  }
-  if(pathname==="/game"&&(searchParams.has("room")||searchParams.has("tournament"))){
-    const url=request.nextUrl.clone();url.pathname="/game-online";
-    return securityHeaders(NextResponse.rewrite(url));
-  }
-
   if(isPublic(pathname))return securityHeaders(NextResponse.next());
 
   // Fast first gate. The cookie is NOT trusted as proof of authentication;
@@ -40,6 +29,18 @@ export function middleware(request:NextRequest){
     const login=new URL("/login",request.url);
     login.searchParams.set("next",pathname+request.nextUrl.search);
     return securityHeaders(NextResponse.redirect(login));
+  }
+
+  // Preserve the existing canonical game/dashboard rewrites only after the
+  // request has passed the authentication gate.
+  if(pathname==="/home")return securityHeaders(NextResponse.redirect(new URL("/dashboard",request.url)));
+  if(pathname==="/dashboard"){
+    const url=request.nextUrl.clone();url.pathname="/home";
+    return securityHeaders(NextResponse.rewrite(url));
+  }
+  if(pathname==="/game"&&(searchParams.has("room")||searchParams.has("tournament"))){
+    const url=request.nextUrl.clone();url.pathname="/game-online";
+    return securityHeaders(NextResponse.rewrite(url));
   }
 
   return securityHeaders(NextResponse.next());
