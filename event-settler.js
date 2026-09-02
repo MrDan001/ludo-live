@@ -1,4 +1,5 @@
 const { Pool } = require('pg');
+const { randomUUID } = require('crypto');
 
 function databaseConnectionString() {
   const raw = process.env.DATABASE_URL;
@@ -46,6 +47,9 @@ async function settleExpiredEvents() {
             [event.id, entry.user_id, Number(event.reward_coins) || 0, Number(event.reward_gems) || 0]
           );
           if (inserted.rowCount) {
+            const requestId = randomUUID();
+            const sourceRef = `event:${event.id}:user:${entry.user_id}`;
+            await client.query(`SELECT set_config('ludo.wallet_source','event_settlement',true),set_config('ludo.wallet_source_ref',$1,true),set_config('ludo.wallet_actor','',true),set_config('ludo.wallet_actor_type','system',true),set_config('ludo.wallet_request_id',$2,true),set_config('ludo.wallet_ip','',true),set_config('ludo.wallet_user_agent','event-settler',true),set_config('ludo.wallet_reason',$3,true)`, [sourceRef, requestId, `Event reward settlement: ${event.id}`]);
             await client.query(`UPDATE ludo_users SET coins=coins+$1,gems=gems+$2 WHERE id=$3`, [Number(event.reward_coins) || 0, Number(event.reward_gems) || 0, entry.user_id]);
             await client.query(`UPDATE ludo_event_entries SET reward_claimed=TRUE WHERE event_id=$1 AND user_id=$2`, [event.id, entry.user_id]);
           }

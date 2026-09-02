@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
 import { pool, ensureAuthSchema } from "../../auth/_db";
 import { getLevelRewardPlan } from "../../../../lib/levelRewards";
+import { ensureWalletAudit, markWalletContext } from "../../lib/wallet-audit";
 
 const COOKIE = "ludo_session";
 const WINDOW_START = 17;
@@ -154,6 +155,17 @@ export async function POST(request: NextRequest) {
           }
         }
 
+        await ensureWalletAudit(client);
+        if (rewardCoins || rewardGems) {
+          await markWalletContext(client, {
+            source: "activity_level_reward",
+            sourceRef: `activity:${id}:level:${level}`,
+            actorUserId: id,
+            ip: (request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "").split(",")[0].trim(),
+            userAgent: request.headers.get("user-agent") || "",
+            reason: `Activity XP level reward: level ${level}`,
+          });
+        }
         await client.query(
           `UPDATE ludo_users
            SET xp=$1,level=$2,coins=coins+$3,gems=gems+$4,
