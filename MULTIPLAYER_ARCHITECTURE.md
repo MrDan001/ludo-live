@@ -2,159 +2,155 @@
 
 ## Purpose
 
-This document is the implementation contract for **2-player and 4-player live multiplayer**. Read this before changing multiplayer gameplay, board rendering, token movement, valid-move highlighting, capture/block behavior, or multiplayer audio.
+This document is the implementation contract for **2-player and 4-player live multiplayer**. Read it before changing multiplayer gameplay, board rendering, token movement, valid-move highlighting, capture/block behavior, chat, voice, or multiplayer audio.
 
 ## Protected references — DO NOT MODIFY
 
-- **Bot vs Human:** `app/game/GameBoardContent.tsx` and `/game` are the known-good gameplay/visual reference.
-- **Tournament:** `app/tournament/game/page.tsx`, `app/game/TournamentBotGame.tsx`, and the canonical Tournament gameplay/rules are production-approved and must remain untouched when fixing multiplayer.
-- `lib/ludoRules.js` / `lib/ludoRules.ts` is the canonical rules source. Multiplayer must reuse it; do not create a competing Ludo rules engine.
+- **Bot vs Human:** `app/game/GameBoardContent.tsx` and `/game` are the protected gameplay reference.
+- **Tournament:** `app/tournament/game/page.tsx` and `app/game/TournamentBotGame.tsx` are the protected Tournament reference.
+- **Canonical rules:** `lib/ludoRules.js` / `lib/ludoRules.ts` and `lib/ludoEngine.ts` are the rules source of truth.
 
-When multiplayer needs behavior that already exists in Tournament, port the behavior into multiplayer without editing Tournament.
+When multiplayer needs behavior that already exists in Tournament, reproduce the behavior in multiplayer without editing Tournament or Bot-vs-Human.
 
-## Multiplayer entry points
+## Active multiplayer entry points
 
-- `app/game/MultiplayerGameCanonical.tsx` — live multiplayer client, Socket.IO connection, local state projection, turn/dice handling, token selection and audio event dispatch.
-- `app/_components/LudoBoardMultiplayer.tsx` — multiplayer board presentation.
-- `app/_components/LudoBoard.tsx` — shared board geometry/token renderer. Avoid changing it globally when a multiplayer-only wrapper or overlay can solve the problem.
-- `server.js` — Socket.IO room state and live multiplayer events.
-- `lib/ludoRules.js` — canonical movement, board-cell mapping, block, safe-square, capture and win logic.
-- `lib/ludoEngine.ts` — typed adapter over canonical rules.
-- `lib/multiplayerMove.js` — multiplayer move adapter; use this as the boundary between socket payloads and canonical rules.
+- `app/game-online/page.tsx` — `/game-online` entry route; uses `Suspense` and `force-dynamic`.
+- `app/game-online/OnlineMultiplayerGame.tsx` — compatibility entry for the active rebuilt client.
+- `app/game-online/OnlineMultiplayerGameFixed.tsx` — rebuilt multiplayer client and movement presentation.
+- `app/_components/CanonicalLudoBoard.tsx` — canonical board presentation/interaction.
+- `app/_components/DemoDice.tsx` — dice UI and local roll interaction.
+- `app/_components/ChatVoice.tsx` — shared room voice implementation.
+- `server.js` / multiplayer Socket.IO layer — room, roster, dice, movement, chat and game-state transport.
+- `lib/onlineLudoAuthority.js` — server-side multiplayer movement authority.
+
+`lib/multiplayerMove.js` is a legacy adapter that must not be deleted blindly. Trace current imports before removing it.
+
+## Movement source of truth
+
+`lib/onlineLudoAuthority.js` now delegates movement calculation to the canonical `lib/ludoRules` implementation, including `applyMove()` and canonical legality/capture/win checks.
+
+The server calculates the authoritative result. The client never treats a client-supplied destination as authoritative.
+
+The movement event includes enough information for presentation:
+
+- `tokenId`
+- `from`
+- `to`
+- `finalTo`
+- `captureProgress`
+- `captured`
+- `captureToCenter`
+- `stateRevision`
+
+## Movement animation architecture
+
+The previous multiplayer implementation could receive the final `game-state` and immediately render the final token position. That caused tokens to disappear/reappear or visually snap instead of counting through the board.
+
+The rebuilt client separates **authoritative state** from **display state**:
+
+1. `game-state` is normalized into an authoritative token snapshot.
+2. A `game-moved` event is placed into a client-side movement queue.
+3. The display token remains under animation control while the move is running.
+4. The token advances through each traversed progress cell at roughly **280 ms per step**.
+5. When the queue is empty, display state is reconciled with the latest authoritative snapshot.
+
+`stateRevision` prevents stale server updates from being applied.
+
+## Capture / kill animation contract
+
+For a successful capture, the visual sequence is explicitly:
+
+1. Killer starts at `from`.
+2. Killer moves visibly, one progress step at a time, to the victim's square (`captureProgress`).
+3. Victim is returned to yard (`position = 0`).
+4. Killer proceeds to the authoritative `finalTo` / finish destination.
+5. Final display is reconciled with authoritative `game-state`.
+
+Do not collapse this sequence into an instant final-state update.
+
+The canonical authority supplies the capture result. Do not reimplement capture detection in the UI.
+
+## Board progress contract
+
+- `0` = yard/home.
+- `1..51` = shared/main track.
+- `52..57` = color-specific home/finish lane.
+- `FINISH` from canonical rules = final small center finish destination.
+
+Use canonical board geometry and progress mapping. Do not invent another physical-track coordinate system in multiplayer.
+
+Every traversed visible cell must be rendered, including home-lane cells.
 
 ## Player/team mapping
 
-- 2 players: seat 0 owns **Red + Yellow**; seat 1 owns **Green + Blue**.
+Always use `playerColorsForSeats()`.
+
+- 2 players: seat 0 = Red + Yellow; seat 1 = Green + Blue.
 - 4 players: one canonical color per seat.
-- Use `playerColorsForSeats()` from the canonical rules. Do not duplicate seat mapping in UI.
-- A player can move only tokens belonging to their assigned colors.
+- Players may move only their assigned colors.
+- Teammates cannot capture teammates.
 
-## Authoritative movement contract
+## Legal-token highlighting
 
-The client may calculate legal moves for UI feedback, but the server is authoritative.
+The client may calculate legality for UI using canonical `canMove()`.
 
-Required flow:
+- Only legal tokens are passed to `CanonicalLudoBoard` through `legalTokenKeys`.
+- Only legal tokens pulse/become selectable after a dice roll.
+- The server validates the final move independently.
 
-1. Current player rolls the dice.
-2. Server records the dice value and pending move.
-3. Client highlights only legal tokens.
-4. Player selects one highlighted token.
-5. Server validates ownership and the dice value.
-6. Server calls the canonical `canMove()` / `applyMove()` rules.
-7. Server applies block/safe-square/capture rules.
-8. Server broadcasts the resulting authoritative token state to the room.
-9. Both clients render the same state.
-
-Never trust a client-supplied destination (`to`) as the source of truth.
-
-## Board progress / coordinate contract
-
-Canonical progress is:
-
-- `0` = yard/home area; token has not entered the track.
-- `1..51` = the 51 shared/main-track progress positions.
-- `52..57` = the six color-specific home/finish-lane positions.
-- `58` / canonical `FINISH` = final small center finish position.
-
-A token entering its home lane must visibly occupy **each of the six home-lane cells in order**. It must not disappear from the board and jump directly to the center finish box.
-
-Use `getTokenCell(color, progress)` from the canonical rules for geometry. Do not invent an alternate offset or physical-track calculation in multiplayer.
-
-### Entry-square warning
-
-The first playable progress is canonical progress `1`. If a multiplayer token visually appears one cell ahead of the Tournament/Bot-vs-Human reference, fix the **multiplayer rendering/coordinate mapping**, not the canonical rules.
-
-## Block and capture contract
-
-### Blocks
-
-- Two opposing tokens occupying the same physical cell form a block.
-- A move must not pass through or land on an opposing two-token block.
-- Block detection must use canonical physical-cell mapping, not raw progress-number equality.
-
-### Capture
-
-- Capture is allowed only when the canonical safe-square and opponent-count rules allow it.
-- A single capturable opponent is returned to yard (`position = 0`, `state = "yard"`).
-- Safe squares do not permit capture.
-- Preserve the exact canonical Tournament behavior for the attacking token after a successful kill. Do not substitute ordinary-Ludo assumptions for the existing product rule.
-
-## Valid-token breathing pulse
-
-After a player rolls, `legalTokenKeys` contains only tokens that can legally move for that dice value.
-
-- The multiplayer board must actually pass/render `legalTokenKeys`.
-- Only legal tokens receive the breathing/pulse effect.
-- Do not make every token pulse.
-- Do not make every token clickable and reject illegal moves afterward.
-- Pulse disappears when the dice is consumed, turn changes, or the move animation completes.
-
-## Token presentation
-
-Multiplayer tokens must not display numeric token IDs. IDs are internal state identifiers only.
-
-Do not expose `token.id` as visible text on the board.
-
-## Movement animation
-
-The authoritative state determines the final position; animation is presentation only.
-
-- Animate the token through each traversed cell.
-- Do not skip the six home-lane cells.
-- Capture/kill animation must finish before the resulting yard state is visually settled where applicable.
-- Do not mutate Tournament/Bot-vs-Human animation code to fix multiplayer.
-
-## Audio contract
-
-`DemoDice` owns the local player roll-start sound:
-
-`dice button tap -> exactly ONE local dice event -> dice animation -> server result`
-
-Do **not** emit a second dice sound when the number/result arrives.
-
-For multiplayer synchronization, remote players must also hear the relevant event on their own devices. The implementation should distinguish:
-
-- **Local roll start:** local `DemoDice` plays the roll-start sound once.
-- **Remote roll start:** the server/socket event tells other clients to play the roll-start sound once.
-- **Local result:** do not play another dice sound.
-- **Remote result:** do not play another dice sound.
-- `move`, `capture`, `safe`, `home`, and `win` events should likewise be broadcast when the action is authoritative, so every connected player hears the same game event.
-
-Canonical audio events are: `dice`, `move`, `capture`, `safe`, `home`, `win`.
+Never make every token clickable and reject illegal moves only after selection.
 
 ## State synchronization
 
-`game-state` is authoritative. Clients should ignore stale revisions and project server token positions into their local rendering state.
+`game-state` is authoritative.
 
-A cosmetic update must not overwrite gameplay state. A player's board skin is host-authoritative; player-specific identity remains player-specific.
+- Ignore stale `stateRevision` values.
+- Update the authoritative snapshot on every valid state update.
+- Do not overwrite animated display tokens while a movement is active.
+- Reconcile display from the newest authoritative snapshot after animation completes.
+- Cosmetic/player metadata must not overwrite gameplay positions.
+
+## Audio
+
+Canonical audio events are `dice`, `move`, `capture`, `safe`, `home`, and `win`.
+
+`DemoDice` owns the local player roll-start event. Do not play a second local dice sound when the server result arrives. Remote roll events must be synchronized through the multiplayer event path.
+
+## Player identity / room UI
+
+The online game uses authenticated profile/customization data for player name, level, coins and equipped avatar where available. Chat and voice remain integrated.
+
+The room/board theme remains host-authoritative; player identity and equipped avatar remain player-specific.
 
 ## Testing checklist
-
-Before calling a multiplayer release complete:
 
 ### 2-player
 
 - [ ] Both players join the same room.
-- [ ] Correct Red/Yellow vs Green/Blue ownership.
-- [ ] Ready/turn state works.
-- [ ] Rolling produces one local sound and one remote sound.
-- [ ] Only valid tokens pulse.
-- [ ] Token exits on canonical first entry square.
-- [ ] Token moves through all 51 shared-track positions correctly.
-- [ ] Token moves visibly through home-lane cells 52–57.
-- [ ] Token reaches center only at canonical finish.
-- [ ] Safe square prevents capture.
-- [ ] Single opponent capture returns opponent to yard.
-- [ ] Two-opponent block cannot be crossed/captured.
-- [ ] Both devices receive identical authoritative state.
+- [ ] Red/Yellow vs Green/Blue ownership is correct.
+- [ ] Ready and turn state works.
+- [ ] Only legal tokens pulse.
+- [ ] Normal movement is visibly cell-by-cell.
+- [ ] Yard entry uses canonical first progress.
+- [ ] Home-lane movement visibly traverses each cell.
+- [ ] Finish uses the canonical final destination.
+- [ ] Safe squares prevent capture.
+- [ ] Capture shows killer-to-victim movement, victim-to-yard, then killer-to-finish.
+- [ ] Both clients converge on identical authoritative state.
+- [ ] Chat works.
+- [ ] Voice works.
 
 ### 4-player
 
-Repeat the movement, pulse, block, capture, home-lane and audio checks with all four colors/seats.
+Repeat movement, legal-token, home-lane, capture, synchronization, chat and voice checks with all four seats/colors.
+
+## Protected-mode rule
+
+**Do not edit Tournament or Bot-vs-Human to fix a multiplayer defect.** Multiplayer is its own client presentation path but must use the canonical rules/reference behavior.
 
 ## Deployment discipline
 
-- Do not call a multiplayer change live until Railway reports `SUCCESS`.
-- If Railway fails, fix the reported build/runtime error before unrelated changes.
-- Do not alter Tournament or Bot-vs-Human while repairing multiplayer.
-- Update this document whenever multiplayer architecture or gameplay contracts change.
+- Build the affected multiplayer code.
+- Inspect Railway build/runtime logs.
+- Do not call the release live until Railway reports `SUCCESS`.
+- Update this document and `DEVELOPER_STATE_2026-09-02.md` whenever the multiplayer contract changes.
