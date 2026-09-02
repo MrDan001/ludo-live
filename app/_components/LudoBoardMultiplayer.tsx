@@ -31,16 +31,65 @@ export default function LudoBoardMultiplayer({theme="classic",preview=false,clas
   if(snapOnUpdate||!animateUpdates){Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout);timersRef.current={};launchTimersRef.current={};setLaunchingKeys(new Set());displayRef.current=Array.from(incoming.values());setDisplayTokens(displayRef.current);return;}
   const current=new Map(displayRef.current.map(t=>[keyOf(t),t]));
   const capturePairs:Array<{killerKey:string;killerFrom:number;capturedKey:string;capturedFrom:number}>=[];
-  for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken)continue;const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;
-   if(to>0&&to<FINISH_PROGRESS&&from>0){const victim=[...current.values()].find(v=>Number(v.position)===to&&Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});continue;}}
+  const captureKillerKeys=new Set<string>();
+  const capturedKeys=new Set<string>();
+
+  // A capture is authoritative on the server as two simultaneous state changes:
+  // the killer ends at FINISH_PROGRESS and the victim is reset to yard. The old
+  // animation detector only looked for the pre-capture square as the killer's
+  // incoming target, so it missed the real server state and animated every cell
+  // from the capture square through the finish lane. Detect the actual pair here.
+  for(const[key,target]of incoming){
+   const currentToken=current.get(key);if(!currentToken)continue;
+   const from=Number(currentToken.position),to=Number(target.position);
+   if(from===to||timersRef.current[key])continue;
+   if(to!==FINISH_PROGRESS||from<=0||target.state!=="finished")continue;
+   const victim=[...current.values()].find(v=>{
+    const incomingVictim=incoming.get(keyOf(v));
+    return Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incomingVictim?.state==="yard"&&Number(incomingVictim.position)===0&&v.color!==target.color;
+   });
+   if(victim){
+    const pair={killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)};
+    capturePairs.push(pair);captureKillerKeys.add(key);capturedKeys.add(pair.capturedKey);
+   }
   }
-  const capturedKeys=new Set(capturePairs.map(p=>p.capturedKey));
-  for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken)continue;const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;if(capturedKeys.has(key))continue;
+
+  // Backward-compatible detection for any authoritative state that exposes the
+  // pre-capture square as the killer target.
+  if(capturePairs.length===0){
+   for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken)continue;const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;
+    if(to>0&&to<FINISH_PROGRESS&&from>0){const victim=[...current.values()].find(v=>Number(v.position)===to&&Number(v.position)>0&&Number(v.position)<FINISH_PROGRESS&&incoming.get(keyOf(v))?.state==="yard"&&v.color!==target.color);if(victim){capturePairs.push({killerKey:key,killerFrom:from,capturedKey:keyOf(victim),capturedFrom:Number(victim.position)});captureKillerKeys.add(key);capturedKeys.add(keyOf(victim));continue;}}
+   }
+  }
+
+  for(const[key,target]of incoming){const currentToken=current.get(key);if(!currentToken)continue;const from=Number(currentToken.position),to=Number(target.position);if(from===to||timersRef.current[key])continue;if(capturedKeys.has(key)||captureKillerKeys.has(key))continue;
+   // A captured token is reconciled by the capture animation above/below. Never
+   // animate a victim backwards along the track into the yard.
    if(currentToken.position>0&&target.state==="yard")continue;
    if(from===0&&to===1&&target.state==="track"){const launched=displayRef.current.map(t=>keyOf(t)===key?{...target,position:1,state:"track" as const}:t);displayRef.current=launched;setDisplayTokens(launched);setLaunchingKeys(p=>new Set(p).add(key));if(launchTimersRef.current[key])window.clearTimeout(launchTimersRef.current[key]);launchTimersRef.current[key]=window.setTimeout(()=>{setLaunchingKeys(p=>{const n=new Set(p);n.delete(key);return n});delete launchTimersRef.current[key]},220);emitAudio("move");continue;}
    const direction=to>from?1:-1;const advance=()=>{const live=displayRef.current.find(t=>keyOf(t)===key);if(!live){delete timersRef.current[key];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=to:next<=to,position=reached?to:next,nextState=stateForPosition(position);const nextTokens=displayRef.current.map(t=>keyOf(t)===key?{...t,position,state:nextState}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(position===FINISH_PROGRESS&&previous!==FINISH_PROGRESS&&finishSound)emitAudio("finish");else emitAudio("move");if(reached){delete timersRef.current[key];return;}timersRef.current[key]=window.setTimeout(advance,220)};timersRef.current[key]=window.setTimeout(advance,220);
   }
-  for(const pair of capturePairs){const direction=pair.capturedFrom>pair.killerFrom?1:-1;const advanceToKill=()=>{const live=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!live){delete timersRef.current[pair.killerKey];return;}const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=pair.capturedFrom:next<=pair.capturedFrom,position=reached?pair.capturedFrom:next;const nextTokens=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position,state:stateForPosition(position)}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);if(reached){const resolved=displayRef.current.map(t=>keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);displayRef.current=resolved;setDisplayTokens(resolved);emitAudio("capture");const killer=resolved.find(t=>keyOf(t)===pair.killerKey);if(killer){const centered=resolved.map(t=>keyOf(t)===pair.killerKey?{...killer,position:FINISH_PROGRESS,state:"finished" as const}:t);displayRef.current=centered;setDisplayTokens(centered);}delete timersRef.current[pair.killerKey];return;}emitAudio("move");timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220)};timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220);}
+
+  for(const pair of capturePairs){
+   const direction=pair.capturedFrom>pair.killerFrom?1:-1;
+   const advanceToKill=()=>{
+    const live=displayRef.current.find(t=>keyOf(t)===pair.killerKey);if(!live){delete timersRef.current[pair.killerKey];return;}
+    const previous=Number(live.position),next=previous+direction,reached=direction>0?next>=pair.capturedFrom:next<=pair.capturedFrom,position=reached?pair.capturedFrom:next;
+    const nextTokens=displayRef.current.map(t=>keyOf(t)===pair.killerKey?{...t,position,state:stateForPosition(position)}:t);displayRef.current=nextTokens;setDisplayTokens(nextTokens);
+    if(reached){
+      // The victim goes directly to its yard; it never visually counts backwards.
+      // The killer then goes directly to the canonical small center finish slot;
+      // it never counts box-by-box through the finish lane.
+      const resolved=displayRef.current.map(t=>keyOf(t)===pair.capturedKey?{...t,position:0,state:"yard" as const}:t);
+      const killer=resolved.find(t=>keyOf(t)===pair.killerKey);
+      const centered=killer?resolved.map(t=>keyOf(t)===pair.killerKey?{...killer,position:FINISH_PROGRESS,state:"finished" as const}:t):resolved;
+      displayRef.current=centered;setDisplayTokens(centered);emitAudio("capture");delete timersRef.current[pair.killerKey];return;
+    }
+    emitAudio("move");timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220);
+   };
+   timersRef.current[pair.killerKey]=window.setTimeout(advanceToKill,220);
+  }
+
   const reconciled=displayRef.current.filter(t=>incoming.has(keyOf(t)));for(const token of incoming.values())if(!reconciled.some(t=>keyOf(t)===keyOf(token)))reconciled.push(token);displayRef.current=reconciled;setDisplayTokens(reconciled);
  },[tokens,snapOnUpdate,animateUpdates]);
  useEffect(()=>()=>{Object.values(timersRef.current).forEach(window.clearTimeout);Object.values(launchTimersRef.current).forEach(window.clearTimeout)},[]);
