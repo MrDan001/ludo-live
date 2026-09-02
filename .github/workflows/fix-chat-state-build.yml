@@ -1,4 +1,4 @@
-name: Fix chat state build
+name: Apply online multiplayer fixes
 
 on:
   push:
@@ -9,27 +9,64 @@ permissions:
 
 jobs:
   fix:
-    if: "!contains(github.event.head_commit.message, '[chat-state-fix-bot]')"
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Fix chat state updater and remove workflow
+      - name: Patch game-online
         shell: bash
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          p = Path('app/game-online/page.tsx')
-          s = p.read_text()
-          old = '''      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""); const name = String(message.name || "Player"); const text = String(message.text); const at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicateLocal = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicateLocal) return duplicateLocal ? items : [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); if (!chatOpen) setChatUnread(true); });'''
-          new = '''      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => { if (!mounted || !message?.text) return; const id = String(message.id || ""); const name = String(message.name || "Player"); const text = String(message.text); const at = Number(message.at || Date.now()); setChatMessages((items) => { if (id && items.some((item) => item.id === id)) return items; const duplicateLocal = items.find((item) => item.id.startsWith("local-") && item.name === name && item.text === text && Math.abs(item.at - at) < 5000); if (duplicateLocal) return items; return [...items.slice(-99), { id: id || `remote-${at}`, name, text, at }]; }); if (!chatOpen) setChatUnread(true); });'''
-          if old not in s:
-              raise SystemExit('expected chat updater pattern not found')
-          p.write_text(s.replace(old, new, 1))
+          p=Path('app/game-online/page.tsx')
+          s=p.read_text()
+          def R(a,b,label):
+              global s
+              if a not in s: raise SystemExit('missing '+label)
+              s=s.replace(a,b,1)
+          R('import LudoBoard, { type BoardThemeId, type DemoToken } from "../_components/LudoBoardMultiplayer";','import CanonicalLudoBoard, { type BoardThemeId, type DemoToken } from "../_components/CanonicalLudoBoard";','board import')
+          R('type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number };','type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number; peerId?: string };','player type')
+          old='const normalizeTokens = (serverTokens: TokenMap): DemoToken[] => COLORS.flatMap((color) => Array.from({ length: 4 }, (_, id) => { const raw = serverTokens?.[color]?.[String(id)]?.position; const position = typeof raw === "number" && Number.isFinite(raw) ? raw : 0; return { color, id, position, state: position === 0 ? ("yard" as const) : position === FINISH ? ("finished" as const) : position > 51 ? ("home" as const) : ("track" as const) }; }));'
+          new='''const normalizeTokens = (serverTokens: TokenMap): DemoToken[] => {
+            const positions: Partial<Record<`${Color}:${number}`, number>> = {};
+            Object.values(serverTokens || {}).forEach(pt=>Object.entries(pt||{}).forEach(([key,token])=>{
+              if(!/^(red|yellow|green|blue):[0-3]$/.test(key)) return;
+              const position=Number(token?.position); if(Number.isFinite(position)) positions[key as `${Color}:${number}`]=position;
+            }));
+            return COLORS.flatMap(color=>Array.from({length:4},(_,id)=>{const position=positions[`${color}:${id}`]??0;return {color,id,position,state:position===0?("yard" as const):position===FINISH?("finished" as const):position>51?("home" as const):("track" as const)};}));
+          };'''
+          R(old,new,'token normalization')
+          R('  const [game, setGame] = useState<GameState | null>(null);\n','  const [game, setGame] = useState<GameState | null>(null);\n  const [roster, setRoster] = useState<Player[]>([]);\n','roster state')
+          R('  const [chatOpen, setChatOpen] = useState(false);\n','  const [chatOpen, setChatOpen] = useState(false);\n  const [chatUnread, setChatUnread] = useState(false);\n  const chatOpenRef = useRef(false);\n','chat state')
+          R('  const revisionRef = useRef(-1);\n','  const revisionRef = useRef(-1);\n  useEffect(() => { chatOpenRef.current = chatOpen; }, [chatOpen]);\n','chat ref')
+          a=s.index('  const players = useMemo(() => {'); b=s.index('\n\n  const mine =',a)
+          s=s[:a]+'''  const players = useMemo(() => {
+            const gameById=new Map((game?.players||[]).map(p=>[String(p.playerId),p]));
+            if(roster.length) return roster.map(member=>{const merged={...gameById.get(String(member.playerId)),...member} as Player;return String(member.playerId)===String(me)?{...merged,name:merged.name||myName,level:Number(merged.level)>0?Number(merged.level):myLevel,avatar:merged.avatar||myAvatarUrl,coins:Number.isFinite(Number(merged.coins))?Number(merged.coins):myCoins}:merged;});
+            if(game?.players?.length) return game.players.map(p=>String(p.playerId)===String(me)?{...p,name:p.name||myName,level:Number(p.level)>0?Number(p.level):myLevel,avatar:p.avatar||myAvatarUrl,coins:Number.isFinite(Number(p.coins))?Number(p.coins):myCoins}:p);
+            return myName?[{playerId:me||"1",name:myName,level:myLevel,avatar:myAvatarUrl,coins:myCoins,seat:0}]:[];
+          },[game?.players,roster,me,myName,myAvatarUrl,myLevel,myCoins]);'''+s[b:]
+          R('.map((t) => `${t.color}:${t.id}`)','.map((t) => `${t.color}-${t.id}`)','legal key')
+          R('localSocket.on("roster", (members: Player[]) => setGame((g) => g ? { ...g, players: members } : { status: "waiting", currentPlayerId: null, dice: null, pendingMove: null, players: members, tokens: {} }));','localSocket.on("roster", (members: Player[]) => { const nextRoster=Array.isArray(members)?members:[]; setRoster(nextRoster); setGame(g=>g?{...g,players:nextRoster}:{status:"waiting",currentPlayerId:null,dice:null,pendingMove:null,players:nextRoster,tokens:{}}); });','roster handler')
+          a=s.index('      localSocket.on("chat",'); b=s.index('      localSocket.on("game-state",',a)
+          s=s[:a]+'''      localSocket.on("chat", (message: { id?: string; name?: string; text?: string; at?: number; playerId?: string }) => {
+        if(!mounted||!message?.text)return;
+        const id=String(message.id||""),name=String(message.name||"Player"),text=String(message.text),at=Number(message.at||Date.now());
+        setChatMessages(items=>{if(id&&items.some(item=>item.id===id))return items;const duplicate=items.find(item=>item.id.startsWith("local-")&&item.name===name&&item.text===text&&Math.abs(item.at-at)<5000);if(duplicate)return items;return [...items.slice(-99),{id:id||`remote-${at}`,name,text,at}];});
+        if(!chatOpenRef.current&&String(message.playerId||"")!==String(playerId))setChatUnread(true);
+      });
+'''+s[b:]
+          R('<div className="ll-board-frame"><LudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken} legalTokenKeys={legalTokenKeys} animateUpdates finishSound /></div>','<div className="ll-board-frame"><CanonicalLudoBoard theme={theme} demoTokens={tokens} onTokenClick={chooseToken} legalTokenKeys={legalTokenKeys} /></div>','canonical board')
+          R('<button type="button" onClick={() => setChatOpen((v) => !v)}><b>•••</b><span>Chat</span></button>','<button type="button" onClick={() => setChatOpen(v=>{const next=!v;if(next)setChatUnread(false);return next;})}><b>•••</b><span>Chat</span>{chatUnread&&<i aria-label="New chat message" style={{position:"absolute",top:6,right:6,width:8,height:8,borderRadius:"50%",background:"#ff2941",boxShadow:"0 0 8px #ff2941"}}/>}</button>','chat button')
+          R('members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true }))}','members={players.map((p) => ({ id: p.playerId, playerId: p.playerId, name: p.name, online: true, peerId: p.peerId }))}','peer id')
+          R('<small>★ {p.level || 1} · {String(p.playerId) === String(me) ? "You" : "In match"}</small>','<small>★ {p.level || 1} · 🟡 {Number(p.coins || 0).toLocaleString()} · {String(p.playerId) === String(me) ? "You" : "In match"}</small>','player balance')
+          R('.ll-board-frame>.mp-board-wrap{width:100%!important;height:100%!important;aspect-ratio:1/1!important}.ll-board-frame>.mp-board-wrap>div:first-child{width:100%!important;height:100%!important}','.ll-board-frame>*{width:100%!important;height:100%!important;aspect-ratio:1/1!important}','board sizing')
+          R('.ll-action-stack button,.ll-mic{width:52px;','.ll-action-stack button,.ll-mic{width:52px;position:relative;','indicator anchor')
+          p.write_text(s)
           PY
           git diff --check
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
           git add app/game-online/page.tsx
-          git rm .github/workflows/fix-chat-state-build.yml
-          git commit -m "Fix game-online chat state updater" -m "[chat-state-fix-bot]"
+          git rm .github/workflows/fix-chat-state-build.yml .github/workflows/fix-online-functional.yml .github/workflows/fix-online-functional-v2.yml .github/workflows/apply-online-fix.yml
+          git commit -m "Fix online HUD sync, voice peers, chat unread state and canonical board" || true
           git push
