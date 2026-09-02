@@ -1,6 +1,6 @@
 import {NextRequest,NextResponse} from "next/server";
 
-const PUBLIC_PATHS=new Set(["/","/login","/signup","/auth","/privacy","/terms"]);
+const PUBLIC_PATHS=new Set(["/","/login","/signup","/auth","/privacy","/terms","/dbase/login"]);
 const SESSION_COOKIE="ludo_session";
 
 function isPublic(pathname:string){
@@ -23,16 +23,12 @@ export function middleware(request:NextRequest){
 
   if(isPublic(pathname))return securityHeaders(NextResponse.next());
 
-  // Fast first gate. The cookie is NOT trusted as proof of authentication;
-  // protected APIs/server operations must validate it with currentUser().
   if(!request.cookies.get(SESSION_COOKIE)?.value){
-    const login=new URL("/login",request.url);
+    const login=new URL(pathname.startsWith("/dbase")?"/dbase/login":"/login",request.url);
     login.searchParams.set("next",pathname+request.nextUrl.search);
     return securityHeaders(NextResponse.redirect(login));
   }
 
-  // Preserve the existing canonical game/dashboard rewrites only after the
-  // request has passed the authentication gate.
   if(pathname==="/home")return securityHeaders(NextResponse.redirect(new URL("/dashboard",request.url)));
   if(pathname==="/dashboard"){
     const url=request.nextUrl.clone();url.pathname="/home";
