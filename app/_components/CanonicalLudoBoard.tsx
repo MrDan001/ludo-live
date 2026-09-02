@@ -27,11 +27,13 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
    if(old===undefined||old===target)continue;
    if(target===57&&old<57){
     const victim=Object.entries(incoming).find(([victimKey,victimTarget])=>victimTarget===0&&Number(previous[victimKey])>0);
-    const landing=victim?Number(previous[victim[0]]):undefined;
-    if(landing!==undefined&&landing>0&&landing<57){
-     animations[key]={from:old,target:57,captureLanding:landing,phase:"capture"};
-     immediateYard.push(victim[0]);
-     continue;
+    if(victim){
+     const landing=Number(previous[victim[0]]);
+     if(landing>0&&landing<57){
+      animations[key]={from:old,target:57,captureLanding:landing,phase:"capture"};
+      immediateYard.push(victim[0]);
+      continue;
+     }
     }
    }
    animations[key]={from:old,target,phase:"normal"};
@@ -90,6 +92,6 @@ export default function CanonicalLudoBoard({theme="classic",demoTokens=[],onToke
   <LudoBoard theme={theme} demoTokens={[]} onTokenClick={onTokenClick} style={{width:"100%",height:"100%"}}/><YardSkinOverlay />
   {yardTokens.map(t=>{const [left,top]=YARD_CENTERS[t.color][t.id]||YARD_CENTERS[t.color][0];const legal=legalSet.has(`${t.color}-${t.id}`);return <button key={`yard-${t.color}-${t.id}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${legal?"Legal move for ":""}${t.color} token`} style={yardTokenStyle(t.color,t.id,left,top,legal)}/>;})}
   {stackedMoving.map(({t,index,count})=>{const key=`${t.color}-${t.id}`,legal=legalSet.has(key);const [dx,dy]=stackOffset(index,count);return <button key={`moving-${key}`} type="button" onClick={()=>onTokenClick?.(t.color,t.id)} aria-label={`${legal?"Legal move for ":""}${t.color} token ${count>1?`(${index+1} of ${count} on square)`:""}`} style={{position:"absolute",left:`calc(${(t.col+.5)*100/15}% + ${dx*0.9}%)`,top:`calc(${(t.row+.5)*100/15}% + ${dy*0.9}%)`,transform:"translate(-50%,-50%)",width:count>1?"5.8%":"6.8%",aspectRatio:1,borderRadius:"50%",border:`2px solid ${p.accent}`,background:p[t.color],boxShadow:legal?`inset 0 2px 3px rgba(255,255,255,.55),0 0 0 2px ${p.accent},0 0 18px ${p.accent}`:"inset 0 2px 3px rgba(255,255,255,.55),0 2px 5px rgba(0,0,0,.3)",animation:legal?"canonicalTokenBreath 1.45s ease-in-out infinite":undefined,zIndex:30+index,padding:0,cursor:legal?"pointer":"default",fontSize:0,color:"transparent"}}/>;})}
-  {finished.map(t=>{const group=FINISH_ORDER[t.color]??0;const slotIndex=group*4+t.id;const slot=FINISH_SLOTS[slotIndex]||FINISH_SLOTS[0];return <div key={`finished-${t.color}-${t.id}`} aria-label={`${t.color} finished token`} style={{position:"absolute",left:slot[0],top:slot[1],transform:"translate(-50%,-50%)",width:"4%",aspectRatio:1,borderRadius:"50%",background:p[t.color],border:`2px solid ${p.accent}`,zIndex:35}}/>;})}
+  {finished.map(t=>{const group=FINISH_ORDER[t.color]??0;const slotIndex=group*4+t.id;const slot=FINISH_SLOTS[slotIndex]||FINISH_SLOTS[0];return <div key={`finished-${t.color}-${t.id}`} aria-label={`${t.color} finished token`} style={{position:"absolute",left:slot[0],top:slot[1],transform:"translate(-50%,-50%",width:"4%",aspectRatio:1,borderRadius:"50%",background:p[t.color],border:`2px solid ${p.accent}`,zIndex:35}}/>;})}
  </div>;
 }
