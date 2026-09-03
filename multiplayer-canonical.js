@@ -13,9 +13,11 @@ if(!Socket.prototype.__ludoOnlineAuthorityV2){const originalOn=Socket.prototype.
   room.game.pendingMove=null;room.game.dice=null;room.game.sixStreak=0;room.game.stateRevision++;
   if(remaining.length===1){
    const winner=remaining[0];room.game.status="finished";room.game.winnerId=String(winner.playerId);room.game.currentPlayerId=null;
+   const stakeInfo=await globalThis.__ludoMultiplayerStakeGet?.(room.code).catch?.(()=>null);
+   const pot=Number(stakeInfo?.pot)||0;
+   await globalThis.__ludoMatchFinished?.(room.code,String(winner.playerId));
    emitState(socket,room);
-   socket.nsp.to(room.code).emit("game-forfeit-winner",{winnerId:String(winner.playerId),winnerName:String(winner.name||"Player"),reason:"opponent_left",roomCode:room.code});
-   try{await globalThis.__ludoMatchFinished?.(room.code,String(winner.playerId));}catch(error){console.error("[multiplayer-forfeit] settlement failed",room.code,error);}
+   socket.nsp.to(room.code).emit("game-forfeit-winner",{winnerId:String(winner.playerId),winnerName:String(winner.name||"Player"),pot,reason:"opponent_left",roomCode:room.code});
    try{await globalThis.__ludoCreateWinnerNotification?.(room.code,String(winner.playerId),String(winner.name||"Player"));}catch(error){console.error("[multiplayer-forfeit] notification failed",room.code,error);}
   }else{socket.nsp.to(room.code).emit("game-player-left",{playerId:String(pid),remaining:remaining.map(m=>String(m.playerId))});emitState(socket,room);}
   return true;
