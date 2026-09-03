@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Socket } from "socket.io-client";
 import OnlineMultiplayerGame from "./OnlineMultiplayerGame";
 
@@ -13,6 +13,15 @@ type GameSocket = Socket & {
   __ludoChatListeners?: Set<(message: ChatMessage) => void>;
   __ludoChatHistoryPromise?: Promise<void>;
   __ludoChatSequence?: number;
+};
+
+type StakeStatus = {
+  roomSize: number;
+  stakePerPlayer: number;
+  pot: number;
+  stakedAmount: number;
+  stakedPlayers: number;
+  status: string;
 };
 
 const patched = Symbol.for("ludo.game-online.chat-runtime-fix");
@@ -100,9 +109,48 @@ async function loadHistory(socket: GameSocket) {
   return promise;
 }
 
+function StakeDisplay() {
+  const [stake, setStake] = useState<StakeStatus | null>(null);
+
+  useEffect(() => {
+    const roomCode = new URLSearchParams(window.location.search).get("room")?.trim().toUpperCase();
+    if (!roomCode) return;
+    let alive = true;
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/multiplayer-stake?roomCode=${encodeURIComponent(roomCode)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (alive) setStake(data && Number(data.pot) > 0 ? data : null);
+      } catch {}
+    };
+    void load();
+    const timer = window.setInterval(load, 1500);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, []);
+
+  if (!stake) return null;
+
+  const status = stake.status === "settled" ? "SETTLED" : stake.status === "locked" ? "LOCKED" : "STAKED";
+  return (
+    <div style={{
+      position: "fixed", zIndex: 55, top: "max(98px, calc(env(safe-area-inset-top) + 98px))", left: "50%",
+      transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: 8,
+      padding: "7px 12px", borderRadius: 999, border: "1px solid rgba(214,173,75,.45)",
+      background: "rgba(8,8,8,.86)", color: "#fff", boxShadow: "0 8px 24px rgba(0,0,0,.35)",
+      backdropFilter: "blur(10px)", pointerEvents: "none", whiteSpace: "nowrap",
+    }}>
+      <span style={{ fontSize: 13 }}>🪙</span>
+      <span style={{ fontSize: 8, fontWeight: 900, letterSpacing: .8, color: "#aaa" }}>STAKED POT</span>
+      <b style={{ fontSize: 11, color: "#f0d579" }}>{stake.pot.toLocaleString()} COINS</b>
+      <span style={{ fontSize: 7, fontWeight: 900, color: status === "SETTLED" ? "#73e5a0" : "#aaa" }}>{status}</span>
+    </div>
+  );
+}
+
 export default function OnlineMultiplayerChatRuntimeFix() {
   useEffect(() => {
     return () => {};
   }, []);
-  return <OnlineMultiplayerGame />;
+  return <><StakeDisplay /><OnlineMultiplayerGame /></>;
 }
