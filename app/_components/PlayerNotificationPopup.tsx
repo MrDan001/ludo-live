@@ -29,10 +29,14 @@ export default function PlayerNotificationPopup() {
 
   if (!current) return null;
 
-  const close = async () => {
+  const close = async (returnToLobby = false) => {
     if (closing) return;
     setClosing(true);
     try { await fetch("/api/player/notifications", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: current.id }) }); } catch {}
+    if (returnToLobby) {
+      window.location.replace("/lobby");
+      return;
+    }
     const rest = items.filter(x => x.id !== current.id);
     setItems(rest);
     setCurrent(rest[0] || null);
@@ -41,6 +45,7 @@ export default function PlayerNotificationPopup() {
 
   const created = current.createdAt ? new Date(current.createdAt).toLocaleString() : "";
   const kind = current.kind === "warning" ? "⚠" : current.kind === "success" ? "✓" : "✦";
+  const isMultiplayerVictory = current.kind === "multiplayer_stake";
 
   return <div style={{ position: "fixed", inset: 0, zIndex: 999998, pointerEvents: "none", display: "grid", placeItems: "center", padding: 18, background: "rgba(2,6,23,.48)", backdropFilter: "blur(5px)" }}>
     <div style={{ pointerEvents: "auto", width: "min(480px,100%)", position: "relative", borderRadius: 30, padding: 2, background: "linear-gradient(135deg,rgba(96,165,250,.8),rgba(168,85,247,.55),rgba(45,212,191,.45))", boxShadow: "0 30px 110px rgba(0,0,0,.7)" }}>
@@ -54,7 +59,7 @@ export default function PlayerNotificationPopup() {
         <div style={{ marginTop: 21, padding: 17, borderRadius: 18, background: "rgba(255,255,255,.045)", border: "1px solid rgba(255,255,255,.07)", whiteSpace: "pre-wrap", lineHeight: 1.65, fontSize: 15, color: "#e2e8f0" }}>{current.message}</div>
         {created && <div style={{ marginTop: 10, fontSize: 10, color: "#64748b" }}>{created}</div>}
         {items.length > 1 && <div style={{ marginTop: 12, fontSize: 11, color: "#94a3b8", textAlign: "center" }}>{items.length - 1} more message{items.length - 1 === 1 ? "" : "s"} waiting</div>}
-        <button disabled={closing} onClick={close} style={{ marginTop: 17, width: "100%", border: 0, borderRadius: 16, padding: 14, background: "linear-gradient(135deg,#60a5fa,#2563eb)", color: "#fff", fontWeight: 900, fontSize: 14, boxShadow: "0 12px 30px rgba(37,99,235,.25)" }}>{closing ? "Closing…" : "✓ Got it"}</button>
+        <button disabled={closing} onClick={()=>close(isMultiplayerVictory)} style={{ marginTop: 17, width: "100%", border: 0, borderRadius: 16, padding: 14, background: "linear-gradient(135deg,#60a5fa,#2563eb)", color: "#fff", fontWeight: 900, fontSize: 14, boxShadow: "0 12px 30px rgba(37,99,235,.25)" }}>{closing ? "Closing…" : "✓ Got it"}</button>
       </div>
     </div>
   </div>;
