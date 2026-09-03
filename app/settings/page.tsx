@@ -14,24 +14,9 @@ export default function SettingsPage(){
  const toggle=(key:keyof Settings)=>{setSettings(s=>{const n={...s,[key]:!s[key]};localStorage.setItem("ludo-settings",JSON.stringify(n));window.dispatchEvent(new CustomEvent("ludo-settings-updated",{detail:n}));return n})};
  const logout=async()=>{
   setMessage("");
-  try{
-   const r=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"logout"})});
-   if(!r.ok)throw Error();
-  }catch{
-   setMessage("Unable to contact the server. Signing you out locally…");
-  }finally{
-   localStorage.removeItem("ludo-account");
-   localStorage.removeItem("ludo-settings");
-   localStorage.removeItem("ludo-guest");
-   localStorage.removeItem("ludo-account-created");
-   ["ludo-player-id","ludo-player-name","ludo-level","ludo-xp","ludo-wallet"].forEach(k=>localStorage.removeItem(k));
-   window.dispatchEvent(new Event("ludo-profile-updated"));
-   window.dispatchEvent(new Event("ludo-wallet-updated"));
-   router.replace("/");
-   router.refresh();
-  }
+  try{const r=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"logout"})});if(!r.ok)throw Error();}catch{setMessage("Unable to contact the server. Signing you out locally…");}finally{localStorage.removeItem("ludo-account");localStorage.removeItem("ludo-settings");localStorage.removeItem("ludo-guest");localStorage.removeItem("ludo-account-created");["ludo-player-id","ludo-player-name","ludo-level","ludo-xp","ludo-wallet"].forEach(k=>localStorage.removeItem(k));window.dispatchEvent(new Event("ludo-profile-updated"));window.dispatchEvent(new Event("ludo-wallet-updated"));router.replace("/");router.refresh();}
  };
- return <AppFrame back="/home"><div style={{maxWidth:700,margin:"0 auto",paddingBottom:40}}><h1 style={{fontSize:36}}>Settings</h1><p style={{color:"#94a3b8"}}>Customize your Ludo Live experience. Changes apply across your profile and games.</p><section style={panel}>{labels.map(([key,icon,title,desc])=><button key={key} onClick={()=>toggle(key)} style={row}><span><span style={{fontSize:25,marginRight:10}}>{icon}</span><span><b>{title}</b><small>{desc}</small></span></span><span style={{width:56,height:31,borderRadius:20,padding:3,background:settings[key]?"#37b51e":"#334155",display:"flex",justifyContent:settings[key]?"flex-end":"flex-start"}}><span style={{width:25,height:25,borderRadius:"50%",background:"#fff"}}/></span></button>)}</section><section style={{...panel,marginTop:12}}><Link href="/how-to" style={linkRow}>❓ <b>Game Rules & Help</b><span>›</span></Link><Link href="/privacy" style={linkRow}>🛡️ <b>Privacy Policy</b><span>›</span></Link><Link href="/terms" style={linkRow}>📄 <b>Terms of Service</b><span>›</span></Link><Link href="/support" style={linkRow}>💬 <b>Help & Support</b><span>›</span></Link></section><button onClick={logout} style={logoutStyle}>Logout</button>{message&&<p style={{color:"#93c5fd"}}>{message}</p>}</div></AppFrame>}
+ return <AppFrame back="/home"><div style={{maxWidth:700,margin:"0 auto",paddingBottom:40}}><h1 style={{fontSize:36}}>Settings</h1><p style={{color:"#94a3b8"}}>Customize your Ludo Live experience. Changes apply across your profile and games.</p><section style={panel}>{labels.map(([key,icon,title,desc])=><button key={key} onClick={()=>toggle(key)} style={row}><span><span style={{fontSize:25,marginRight:10}}>{icon}</span><span><b>{title}</b><small>{desc}</small></span></span><span style={{width:56,height:31,borderRadius:20,padding:3,background:settings[key]?"#37b51e":"#334155",display:"flex",justifyContent:settings[key]?"flex-end":"flex-start"}}><span style={{width:25,height:25,borderRadius:"50%",background:"#fff"}}/></span></button>)}</section><section style={{...panel,marginTop:12}}><Link href="/account/password" style={linkRow}>🔐 <span><b>Change Password</b><small>Update your account password</small></span><span>›</span></Link><Link href="/how-to" style={linkRow}>❓ <b>Game Rules & Help</b><span>›</span></Link><Link href="/privacy" style={linkRow}>🛡️ <b>Privacy Policy</b><span>›</span></Link><Link href="/terms" style={linkRow}>📄 <b>Terms of Service</b><span>›</span></Link><Link href="/support" style={linkRow}>💬 <b>Help & Support</b><span>›</span></Link></section><button onClick={logout} style={logoutStyle}>Logout</button>{message&&<p style={{color:"#93c5fd"}}>{message}</p>}</div></AppFrame>}
 const panel={background:"linear-gradient(180deg,#061b42,#04132f)",border:"1px solid rgba(78,125,211,.25)",borderRadius:18,overflow:"hidden",marginTop:20};
 const row={width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px",border:0,borderBottom:"1px solid rgba(78,125,211,.13)",background:"transparent",color:"#fff",cursor:"pointer",textAlign:"left" as const,fontSize:16};
 const linkRow={width:"100%",display:"flex",alignItems:"center",justifyContent:"space-between",padding:"18px 20px",borderBottom:"1px solid rgba(78,125,211,.13)",background:"transparent",color:"#fff",textDecoration:"none",cursor:"pointer",fontSize:15};
