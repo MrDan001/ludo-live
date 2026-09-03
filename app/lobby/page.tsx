@@ -5,11 +5,23 @@ import AppFrame from "../_components/AppFrame";
 import { AccountGateModal, useAccountGate } from "../_components/AccountGate";
 
 type OpenRoom={code:string;players:number;roomSize:number;hostName:string;stakeType?:"free"|"paid";stakeCoins?:number;paid?:boolean};
+async function hydrateRoomStakes(list:OpenRoom[]){
+ const rooms=Array.isArray(list)?list.filter(room=>Number(room.players)>0&&Number(room.players)<Number(room.roomSize)):[];
+ return Promise.all(rooms.map(async room=>{
+  try{
+   const r=await fetch(`/api/stake/room?code=${encodeURIComponent(room.code)}`,{cache:"no-store"});
+   if(!r.ok)return room;
+   const d=await r.json();
+   const stakeCoins=Math.max(0,Math.trunc(Number(d?.stakeCoins)||0));
+   const paid=d?.stakeType==="paid"||stakeCoins>0;
+   return {...room,stakeType:paid?"paid":"free",stakeCoins,paid};
+  }catch{return room}
+ }));
+}
 export default function LobbyPage(){
  const [rooms,setRooms]=useState<OpenRoom[]>([]);const [connected,setConnected]=useState(false);const [walletCoins,setWalletCoins]=useState<number|null>(null);const gate=useAccountGate();
- useEffect(()=>{let mounted=true;(async()=>{try{const r=await fetch("/api/auth",{cache:"no-store"});const d=await r.json();if(mounted)setWalletCoins(Number.isFinite(Number(d?.user?.coins))?Number(d.user.coins):null)}catch{}})();const socket:Socket=io(window.location.origin,{transports:["websocket","polling"]});socket.on("connect",()=>{setConnected(true);socket.emit("list-rooms")});socket.on("disconnect",()=>setConnected(false));socket.on("room-list",(list:OpenRoom[])=>setRooms(Array.isArray(list)?list.filter(room=>Number(room.players)>0&&Number(room.players)<Number(room.roomSize)):[]));return()=>{mounted=false;socket.disconnect()}},[]);
+ useEffect(()=>{let mounted=true;(async()=>{try{const r=await fetch("/api/auth",{cache:"no-store"});const d=await r.json();if(mounted)setWalletCoins(Number.isFinite(Number(d?.user?.coins))?Number(d.user.coins):null)}catch{}})();const socket:Socket=io(window.location.origin,{transports:["websocket","polling"]});const refresh=(list:OpenRoom[])=>{void hydrateRoomStakes(list).then(next=>{if(mounted)setRooms(next)});};socket.on("connect",()=>{setConnected(true);socket.emit("list-rooms")});socket.on("disconnect",()=>setConnected(false));socket.on("room-list",(list:OpenRoom[])=>refresh(list));return()=>{mounted=false;socket.disconnect()}},[]);
  const openRoom=(href:string)=>{gate.check(()=>{window.location.href=href})};
- const afford=(room:OpenRoom)=>!room.paid||Number(room.stakeCoins||0)<=0||walletCoins===null||walletCoins>=Number(room.stakeCoins||0);
  return <AppFrame><div style={{maxWidth:900,margin:"0 auto",paddingBottom:40}}>
   <div style={{display:"flex",justifyContent:"space-between",gap:16,alignItems:"center",flexWrap:"wrap"}}><div><h1 style={{fontSize:40,marginBottom:6}}>🌐 Online Players</h1><p style={{color:"#94a3b8",marginTop:0}}>See players who are waiting right now and jump into an open game.</p></div><span style={{padding:"7px 11px",borderRadius:999,background:connected?"rgba(34,197,94,.12)":"rgba(245,158,11,.12)",color:connected?"#4ade80":"#fbbf24",fontSize:12,fontWeight:900}}>{connected?"● LIVE":"○ CONNECTING"}</span></div>
   <section style={{marginTop:22}}><div style={{marginBottom:12}}><h2 style={{margin:"0 0 4px"}}>🎮 Create or join a game</h2><p style={{margin:0,color:"#64748b",fontSize:13}}>Create a room for friends or join an existing room.</p></div><div style={{display:"grid",gridTemplateColumns:"repeat(auto-fit,minmax(220px,1fr))",gap:12}}><button onClick={()=>openRoom("/room?action=create")} style={tile}><span style={{fontSize:30}}>➕</span><b style={{display:"block",fontSize:20,marginTop:8}}>Create Game</b><small>Choose a free room or set a coin stake for your room.</small></button><button onClick={()=>openRoom("/room?action=join")} style={tile}><span style={{fontSize:30}}>🔑</span><b style={{display:"block",fontSize:20,marginTop:8}}>Join by Code</b><small>Enter a friend's private room code.</small></button></div></section>
