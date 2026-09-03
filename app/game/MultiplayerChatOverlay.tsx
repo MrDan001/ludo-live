@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { io, type Socket } from "socket.io-client";
 
 type Message = { id: string; name: string; text: string; at: number };
 
@@ -11,7 +10,6 @@ export default function MultiplayerChatOverlay({ roomCode }: Props) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
-  const [socket, setSocket] = useState<Socket | null>(null);
   const [playerId, setPlayerId] = useState("");
   const [playerName, setPlayerName] = useState("Player");
 
@@ -19,7 +17,6 @@ export default function MultiplayerChatOverlay({ roomCode }: Props) {
 
   useEffect(() => {
     let mounted = true;
-    let s: Socket | null = null;
 
     const mergeMessages = (current: Message[], incoming: Message[]) => {
       const all = [...current, ...incoming]
@@ -53,40 +50,25 @@ export default function MultiplayerChatOverlay({ roomCode }: Props) {
     const connect = async () => {
       let id = "";
       let name = "Player";
-      let avatar = "";
       try {
         const response = await fetch("/api/auth", { cache: "no-store" });
         const data = await response.json();
         id = String(data?.user?.id || "");
         name = String(data?.user?.username || "Player");
-        avatar = String(data?.user?.avatar || data?.user?.image || "");
       } catch {}
       if (!mounted) return;
       setPlayerId(id);
       setPlayerName(name);
-
-      s = io(window.location.origin, { transports: ["websocket", "polling"], reconnection: true });
-      setSocket(s);
-      s.on("connect", () => {
-        if (id) s?.emit("join-room", { roomCode: room, name, avatar, roomSize: 2, playerId: id });
-        void loadHistory();
-      });
-      s.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => {
-        if (!mounted || !message?.text) return;
-        setMessages((items) => mergeMessages(items, [{
-          id: String(message.id || `${Date.now()}-${Math.random()}`),
-          name: String(message.name || "Player"),
-          text: String(message.text),
-          at: Number(message.at || Date.now()),
-        }]));
-      });
+      setMessages([]);
+      void loadHistory();
     };
 
-    setMessages([]);
     void connect();
+    const poll = window.setInterval(() => { void loadHistory(); }, 1200);
+
     return () => {
       mounted = false;
-      s?.disconnect();
+      window.clearInterval(poll);
     };
   }, [room]);
 
@@ -106,15 +88,24 @@ export default function MultiplayerChatOverlay({ roomCode }: Props) {
     };
   }, []);
 
-  const send = () => {
+  const send = async () => {
     const value = text.trim().slice(0, 240);
-    if (!value || !socket?.connected) return;
-    void fetch("/api/multiplayer-chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ roomCode: room, text: value }),
-    }).catch(() => {});
-    socket.emit("chat", { text: value });
+    if (!value || !playerId) return;
+    try {
+      const response = await fetch("/api/multiplayer-chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ roomCode: room, text: value }),
+      });
+      if (response.ok) {
+        const data = await response.json().catch(() => null);
+        if (data?.message) setMessages((items) => {
+          const next = data.message as Message;
+          const exists = items.some((item) => item.id === next.id);
+          return exists ? items : [...items, next].slice(-100);
+        });
+      }
+    } catch {}
     setText("");
   };
 
@@ -141,14 +132,14 @@ export default function MultiplayerChatOverlay({ roomCode }: Props) {
               ))
             )}
           </div>
-          <form onSubmit={(event) => { event.preventDefault(); send(); }}>
+          <form onSubmit={(event) => { event.preventDefault(); void send(); }}>
             <input
               value={text}
               onChange={(event) => setText(event.target.value.slice(0, 240))}
               placeholder="Type a message…"
               aria-label="Chat message"
             />
-            <button type="submit" disabled={!text.trim() || !socket?.connected}>Send</button>
+            <button type="submit" disabled={!text.trim() || !playerId}>Send</button>
           </form>
         </div>
       )}
