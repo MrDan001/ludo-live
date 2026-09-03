@@ -16,10 +16,10 @@ type GameSocket = Socket & {
 };
 
 const patched = Symbol.for("ludo.game-online.chat-runtime-fix");
-const socketPrototype = Socket.prototype as Socket.prototype & Record<string | symbol, unknown>;
+const socketPrototype = Socket.prototype as any;
 
-if (!(socketPrototype as any)[patched]) {
-  (socketPrototype as any)[patched] = true;
+if (!socketPrototype[patched]) {
+  socketPrototype[patched] = true;
 
   const originalOn = Socket.prototype.on;
   const originalEmit = Socket.prototype.emit;
