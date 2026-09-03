@@ -58,6 +58,14 @@ export function ensureTournamentV2Schema() {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         UNIQUE(tournament_id,user_id,badge_type)
       );
+
+      -- Safe migration: only shrink the old 1,000-coin participation reward on
+      -- open tournaments that nobody has entered yet. Never rewrite a live/entered bracket.
+      UPDATE ludo_tournaments t
+      SET participation_reward_coins=100
+      WHERE t.status='open'
+        AND t.participation_reward_coins=1000
+        AND NOT EXISTS (SELECT 1 FROM ludo_tournament_entries e WHERE e.tournament_id=t.id);
     `).then(() => undefined);
   }
   return promise;
