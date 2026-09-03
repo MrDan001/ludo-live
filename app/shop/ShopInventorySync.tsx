@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect } from "react";
+import { useCallback, useEffect, useState } from "react";
+import LudoConfirmModal from "../_components/LudoConfirmModal";
 
 async function readState() {
   const r = await fetch("/api/customization", { cache: "no-store" });
@@ -18,6 +19,8 @@ function money(currency: string, price: number) {
 }
 
 export default function ShopInventorySync() {
+  const [paymentError, setPaymentError] = useState("");
+
   const sync = useCallback(async () => {
     const root = document.querySelector<HTMLElement>(".shop-page");
     if (!root) return;
@@ -86,7 +89,7 @@ export default function ShopInventorySync() {
           } catch (e) {
             button.disabled = false;
             button.textContent = `BUY • ₦${Number(item.price).toLocaleString("en-NG")}`;
-            alert(e instanceof Error ? e.message : "Unable to start payment.");
+            setPaymentError(e instanceof Error ? e.message : "Unable to start payment.");
           }
         };
         old.replaceWith(button);
@@ -106,5 +109,5 @@ export default function ShopInventorySync() {
     return () => { alive = false; window.removeEventListener("focus", run); window.removeEventListener("ludo-wallet-updated", run); observer.disconnect(); };
   }, [sync]);
 
-  return null;
+  return <LudoConfirmModal open={!!paymentError} title="Payment unavailable" message={paymentError} confirmLabel="OK" cancelLabel="Close" onConfirm={() => setPaymentError("")} onCancel={() => setPaymentError("")} />;
 }
