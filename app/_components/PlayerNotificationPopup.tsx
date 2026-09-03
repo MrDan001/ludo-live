@@ -54,12 +54,12 @@ export default function PlayerNotificationPopup() {
         <div style={{ display: "flex", alignItems: "center", gap: 13 }}>
           <div style={{ width: 54, height: 54, flex: "0 0 auto", borderRadius: 17, display: "grid", placeItems: "center", fontSize: 25, background: "linear-gradient(145deg,rgba(96,165,250,.25),rgba(168,85,247,.2))", border: "1px solid rgba(147,197,253,.3)", boxShadow: "0 0 28px rgba(96,165,250,.16)" }}>{kind}</div>
           <div style={{ minWidth: 0 }}><div style={{ fontSize: 10, letterSpacing: 2.2, color: "#93c5fd", fontWeight: 900 }}>LUDO LIVE • MESSAGE</div><h2 style={{ margin: "4px 0 0", fontSize: 24, lineHeight: 1.15 }}>{current.title || "A message for you"}</h2></div>
-          <button onClick={close} aria-label="Close notification" style={{ marginLeft: "auto", alignSelf: "flex-start", width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.05)", color: "#cbd5e1", fontSize: 18, cursor: "pointer" }}>×</button>
+          <button onClick={()=>void close()} aria-label="Close notification" style={{ marginLeft: "auto", alignSelf: "flex-start", width: 34, height: 34, borderRadius: "50%", border: "1px solid rgba(255,255,255,.12)", background: "rgba(255,255,255,.05)", color: "#cbd5e1", fontSize: 18, cursor: "pointer" }}>×</button>
         </div>
         <div style={{ marginTop: 21, padding: 17, borderRadius: 18, background: "rgba(255,255,255,.045)", border: "1px solid rgba(255,255,255,.07)", whiteSpace: "pre-wrap", lineHeight: 1.65, fontSize: 15, color: "#e2e8f0" }}>{current.message}</div>
         {created && <div style={{ marginTop: 10, fontSize: 10, color: "#64748b" }}>{created}</div>}
         {items.length > 1 && <div style={{ marginTop: 12, fontSize: 11, color: "#94a3b8", textAlign: "center" }}>{items.length - 1} more message{items.length - 1 === 1 ? "" : "s"} waiting</div>}
-        <button disabled={closing} onClick={()=>close(isMultiplayerVictory)} style={{ marginTop: 17, width: "100%", border: 0, borderRadius: 16, padding: 14, background: "linear-gradient(135deg,#60a5fa,#2563eb)", color: "#fff", fontWeight: 900, fontSize: 14, boxShadow: "0 12px 30px rgba(37,99,235,.25)" }}>{closing ? "Closing…" : "✓ Got it"}</button>
+        <button disabled={closing} onClick={()=>void close(isMultiplayerVictory)} style={{ marginTop: 17, width: "100%", border: 0, borderRadius: 16, padding: 14, background: "linear-gradient(135deg,#60a5fa,#2563eb)", color: "#fff", fontWeight: 900, fontSize: 14, boxShadow: "0 12px 30px rgba(37,99,235,.25)" }}>{closing ? "Closing…" : "✓ Got it"}</button>
       </div>
     </div>
   </div>;
