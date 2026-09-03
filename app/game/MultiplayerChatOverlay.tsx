@@ -21,6 +21,35 @@ export default function MultiplayerChatOverlay({ roomCode }: Props) {
     let mounted = true;
     let s: Socket | null = null;
 
+    const mergeMessages = (current: Message[], incoming: Message[]) => {
+      const all = [...current, ...incoming]
+        .filter((message) => message?.text)
+        .map((message) => ({
+          id: String(message.id || `${message.name}-${message.at}`),
+          name: String(message.name || "Player"),
+          text: String(message.text),
+          at: Number(message.at || Date.now()),
+        }))
+        .sort((a, b) => a.at - b.at);
+      const seen = new Set<string>();
+      return all.filter((message) => {
+        const key = `${message.name}\u0000${message.text}\u0000${Math.floor(message.at / 5000)}`;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      }).slice(-100);
+    };
+
+    const loadHistory = async () => {
+      try {
+        const response = await fetch(`/api/multiplayer-chat?roomCode=${encodeURIComponent(room)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (!mounted || !Array.isArray(data?.messages)) return;
+        setMessages((current) => mergeMessages(current, data.messages));
+      } catch {}
+    };
+
     const connect = async () => {
       let id = "";
       let name = "Player";
@@ -40,21 +69,20 @@ export default function MultiplayerChatOverlay({ roomCode }: Props) {
       setSocket(s);
       s.on("connect", () => {
         if (id) s?.emit("join-room", { roomCode: room, name, avatar, roomSize: 2, playerId: id });
+        void loadHistory();
       });
       s.on("chat", (message: { id?: string; name?: string; text?: string; at?: number }) => {
         if (!mounted || !message?.text) return;
-        setMessages((items) => [
-          ...items.slice(-99),
-          {
-            id: String(message.id || `${Date.now()}-${Math.random()}`),
-            name: String(message.name || "Player"),
-            text: String(message.text),
-            at: Number(message.at || Date.now()),
-          },
-        ]);
+        setMessages((items) => mergeMessages(items, [{
+          id: String(message.id || `${Date.now()}-${Math.random()}`),
+          name: String(message.name || "Player"),
+          text: String(message.text),
+          at: Number(message.at || Date.now()),
+        }]));
       });
     };
 
+    setMessages([]);
     void connect();
     return () => {
       mounted = false;
@@ -81,6 +109,11 @@ export default function MultiplayerChatOverlay({ roomCode }: Props) {
   const send = () => {
     const value = text.trim().slice(0, 240);
     if (!value || !socket?.connected) return;
+    void fetch("/api/multiplayer-chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ roomCode: room, text: value }),
+    }).catch(() => {});
     socket.emit("chat", { text: value });
     setText("");
   };
