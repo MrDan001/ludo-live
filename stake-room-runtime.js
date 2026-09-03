@@ -21,22 +21,17 @@ function db() {
   return pool;
 }
 
-function normalizeCode(value) {
-  return String(value || '').trim().toUpperCase();
-}
-
+function normalizeCode(value) { return String(value || '').trim().toUpperCase(); }
 function normalizeStake(value) {
   const n = Math.trunc(Number(value));
   if (!Number.isFinite(n) || n < 100 || n > 10000) return null;
   return n;
 }
-
 function publicStake(code) {
   const entry = rooms.get(code);
   if (!entry) return { stakeType: 'free', stakeCoins: 0, paid: false };
   return { stakeType: entry.stakeCoins > 0 ? 'paid' : 'free', stakeCoins: entry.stakeCoins, paid: entry.stakeCoins > 0 };
 }
-
 async function hasEnoughCoins(playerId, amount) {
   if (!playerId) return { ok: false, reason: 'Please sign in before joining a paid room.' };
   try {
@@ -51,21 +46,14 @@ async function hasEnoughCoins(playerId, amount) {
     return { ok: false, reason: 'Unable to verify your coin balance right now. Please try again.' };
   }
 }
-
 function registerRoom(code, hostPlayerId, stakeCoins) {
   const normalizedStake = Number(stakeCoins) || 0;
   if (normalizedStake !== 0 && normalizeStake(normalizedStake) === null) throw new Error('Stake must be 0 for a free room or between 100 and 10,000 coins.');
   const existing = rooms.get(code);
   if (existing && existing.hostPlayerId !== String(hostPlayerId || '')) throw new Error('This room already has a stake setting.');
-  rooms.set(code, {
-    hostPlayerId: String(hostPlayerId || ''),
-    stakeCoins: normalizedStake,
-    createdAt: existing?.createdAt || Date.now(),
-    updatedAt: Date.now(),
-  });
+  rooms.set(code, { hostPlayerId: String(hostPlayerId || ''), stakeCoins: normalizedStake, createdAt: existing?.createdAt || Date.now(), updatedAt: Date.now() });
   return publicStake(code);
 }
-
 function patchSocketOn(Socket) {
   const originalOn = Socket.prototype.on;
   if (Socket.prototype.__ludoStakePatched) return;
@@ -78,54 +66,39 @@ function patchSocketOn(Socket) {
       const pid = String(incoming.playerId || '').trim();
       const existing = rooms.get(code);
       const requestedHost = !!incoming.host;
+      const hasStakeFields = incoming.stakeType !== undefined || incoming.stakeCoins !== undefined;
 
-      // The host's create-room payload is the authoritative source for the
-      // room's free/paid setting. Persist it before the normal server handler
-      // broadcasts the room list, otherwise the lobby can only see FREE.
-      if (requestedHost && pid && incoming.stakeType !== undefined || requestedHost && pid && incoming.stakeCoins !== undefined) {
+      // Capture the host's create-room choice before server.js broadcasts room-list.
+      if (requestedHost && pid && hasStakeFields) {
         const requestedType = String(incoming.stakeType || '').toLowerCase();
         const requestedCoins = requestedType === 'free' ? 0 : (incoming.stakeCoins ?? 0);
         const normalizedStake = Number(requestedCoins) === 0 ? 0 : normalizeStake(requestedCoins);
         if (normalizedStake === null) return this.emit('room-error', 'Paid room stakes must be between 100 and 10,000 coins.');
         if (existing && existing.hostPlayerId !== pid) return this.emit('room-error', 'Only the player who created this room can change its stake setting.');
-        try {
-          registerRoom(code, pid, normalizedStake);
-        } catch (error) {
-          return this.emit('room-error', error instanceof Error ? error.message : 'Unable to save the room stake.');
-        }
+        try { registerRoom(code, pid, normalizedStake); }
+        catch (error) { return this.emit('room-error', error instanceof Error ? error.message : 'Unable to save the room stake.'); }
       }
 
       const entry = rooms.get(code);
-      if (entry && requestedHost && entry.hostPlayerId !== pid) {
-        return this.emit('room-error', 'Only the player who created this room can claim it as host.');
-      }
-
+      if (entry && requestedHost && entry.hostPlayerId !== pid) return this.emit('room-error', 'Only the player who created this room can claim it as host.');
       const stakeCoins = entry ? Number(entry.stakeCoins) || 0 : 0;
       if (stakeCoins > 0) {
         const check = await hasEnoughCoins(pid, stakeCoins);
         if (!check.ok) return this.emit('room-error', check.reason);
       }
-
       const payload = { ...incoming, stakeType: stakeCoins > 0 ? 'paid' : 'free', stakeCoins };
       return listener.call(this, payload, ...args.slice(1));
     });
   };
 }
-
 function patchServerEmit(Server) {
   if (Server.prototype.__ludoStakeEmitPatched) return;
   Server.prototype.__ludoStakeEmitPatched = true;
   const originalEmit = Server.prototype.emit;
   Server.prototype.emit = function patchedStakeEmit(event, ...args) {
     if (event === 'room-list' && Array.isArray(args[0])) {
-      const list = args[0];
-      const mapped = list.map(room => {
-        const code = normalizeCode(room?.code);
-        const stake = publicStake(code);
-        return { ...room, ...stake };
-      });
-      args[0] = mapped;
-      const activeCodes = new Set(mapped.map(room => normalizeCode(room?.code)).filter(Boolean));
+      args[0] = args[0].map(room => ({ ...room, ...publicStake(normalizeCode(room?.code)) }));
+      const activeCodes = new Set(args[0].map(room => normalizeCode(room?.code)).filter(Boolean));
       const now = Date.now();
       for (const [code, entry] of rooms.entries()) {
         if (!activeCodes.has(code) && now - Number(entry.updatedAt || entry.createdAt || now) > 6 * 60 * 60 * 1000) rooms.delete(code);
@@ -134,15 +107,11 @@ function patchServerEmit(Server) {
     return originalEmit.call(this, event, ...args);
   };
 }
-
 try {
   const socketIo = require('socket.io');
   const Socket = require('socket.io').Socket;
   if (Socket) patchSocketOn(Socket);
   if (socketIo.Server) patchServerEmit(socketIo.Server);
-} catch (error) {
-  console.error('stake room runtime patch', error);
-}
-
+} catch (error) { console.error('stake room runtime patch', error); }
 globalState.__ludoStakeRoomRegister = registerRoom;
 globalState.__ludoStakeRoomGet = code => publicStake(normalizeCode(code));
