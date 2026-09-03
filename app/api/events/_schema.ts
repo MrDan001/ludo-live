@@ -68,13 +68,21 @@ export function ensureEventsSchema() {
 
         INSERT INTO ludo_events(id,title,name,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status)
         SELECT * FROM (VALUES
-          ('daily-domination','Daily Domination','Daily Domination','Win matches across the Ludo Live game modes.','🏆','purple','🪙 2,500',2500,0,'challenge','win_games',3,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '30 minutes',NOW()+INTERVAL '2 hours 30 minutes','published'),
-          ('dice-frenzy','Dice Frenzy','Dice Frenzy','Roll, move and win before the clock runs out.','⚄','blue','💎 25',0,25,'challenge','roll_dice',20,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '15 minutes',NOW()+INTERVAL '3 hours','published'),
-          ('ludo-live-rush','Ludo Live Rush','Ludo Live Rush','Complete games in any supported mood and board.','🔥','purple','🪙 5,000',5000,0,'challenge','complete_games',5,'["bot","2p","4p","tournament"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '4 hours','published'),
-          ('midnight-masters','Midnight Masters','Midnight Masters','A scheduled night-mode challenge is opening soon.','🌙','blue','💎 50',0,50,'challenge','win_games',5,'["bot","2p","4p"]'::jsonb,'["midnight"]'::jsonb,NOW()+INTERVAL '20 minutes',NOW()+INTERVAL '2 hours 20 minutes','published'),
-          ('royal-road','Royal Road','Royal Road','Prepare for a royal-board winning streak.','👑','purple','🪙 7,500',7500,0,'challenge','win_games',7,'["2p","4p"]'::jsonb,'["royal"]'::jsonb,NOW()+INTERVAL '60 minutes',NOW()+INTERVAL '4 hours','published')
+          ('daily-domination','Daily Domination','Daily Domination','Win matches across the Ludo Live game modes.','🏆','purple','🪙 500',500,0,'challenge','win_games',3,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '30 minutes',NOW()+INTERVAL '2 hours 30 minutes','published'),
+          ('dice-frenzy','Dice Frenzy','Dice Frenzy','Roll, move and win before the clock runs out.','⚄','blue','💎 5',0,5,'challenge','roll_dice',20,'["bot","2p","4p"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '15 minutes',NOW()+INTERVAL '3 hours','published'),
+          ('ludo-live-rush','Ludo Live Rush','Ludo Live Rush','Complete games in any supported mood and board.','🔥','purple','🪙 750',750,0,'challenge','complete_games',5,'["bot","2p","4p","tournament"]'::jsonb,'["classic","midnight","royal","jungle","fire-ice"]'::jsonb,NOW()-INTERVAL '5 minutes',NOW()+INTERVAL '4 hours','published'),
+          ('midnight-masters','Midnight Masters','Midnight Masters','A scheduled night-mode challenge is opening soon.','🌙','blue','💎 10',0,10,'challenge','win_games',5,'["bot","2p","4p"]'::jsonb,'["midnight"]'::jsonb,NOW()+INTERVAL '20 minutes',NOW()+INTERVAL '2 hours 20 minutes','published'),
+          ('royal-road','Royal Road','Royal Road','Prepare for a royal-board winning streak.','👑','purple','🪙 1000',1000,0,'challenge','win_games',7,'["2p","4p"]'::jsonb,'["royal"]'::jsonb,NOW()+INTERVAL '60 minutes',NOW()+INTERVAL '4 hours','published')
         ) AS seed(id,title,name,description,icon,color,reward,reward_coins,reward_gems,event_type,mission_kind,mission_target,modes,boards,starts_at,ends_at,status)
-        WHERE NOT EXISTS (SELECT 1 FROM ludo_events)
+        WHERE NOT EXISTS (SELECT 1 FROM ludo_events);
+
+        -- Safe migration: shrink only seeded-style events nobody has joined yet.
+        UPDATE ludo_events e SET reward_coins=CASE e.id WHEN 'daily-domination' THEN 500 WHEN 'ludo-live-rush' THEN 750 WHEN 'royal-road' THEN 1000 ELSE e.reward_coins END,
+          reward_gems=CASE e.id WHEN 'dice-frenzy' THEN 5 WHEN 'midnight-masters' THEN 10 ELSE e.reward_gems END,
+          reward=CASE e.id WHEN 'daily-domination' THEN '🪙 500' WHEN 'dice-frenzy' THEN '💎 5' WHEN 'ludo-live-rush' THEN '🪙 750' WHEN 'midnight-masters' THEN '💎 10' WHEN 'royal-road' THEN '🪙 1000' ELSE e.reward END,
+          updated_at=NOW()
+        WHERE e.id IN ('daily-domination','dice-frenzy','ludo-live-rush','midnight-masters','royal-road')
+          AND NOT EXISTS (SELECT 1 FROM ludo_event_entries x WHERE x.event_id=e.id);
       `);
     })().catch((error) => { ready = null; throw error; });
   }
