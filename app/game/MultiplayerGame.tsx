@@ -1,9 +1,17 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import MultiplayerGameCanonical from "./MultiplayerGameCanonical";
 import MultiplayerChatOverlay from "./MultiplayerChatOverlay";
 
 export default function MultiplayerGame() {
+  const [activeRoomCode, setActiveRoomCode] = useState("W100NB");
+
+  useEffect(() => {
+    const room = new URLSearchParams(window.location.search).get("room");
+    if (room) setActiveRoomCode(room.toUpperCase());
+  }, []);
+
   return (
     <div
       className="multiplayer-route-shell"
@@ -14,7 +22,15 @@ export default function MultiplayerGame() {
         if (button.classList.contains("ll-pill-btn")) {
           event.preventDefault();
           event.stopPropagation();
-          window.dispatchEvent(new CustomEvent("ludo-quick-chat", { detail: button.textContent?.trim() || "" }));
+          const value = button.textContent?.trim() || "";
+          if (value) {
+            void fetch("/api/multiplayer-chat", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ roomCode: activeRoomCode, text: value }),
+            }).catch(() => {});
+          }
+          window.dispatchEvent(new CustomEvent("ludo-quick-chat", { detail: value }));
         } else if (button.classList.contains("ll-action-btn") && button.textContent?.trim().toLowerCase() === "chat") {
           event.preventDefault();
           event.stopPropagation();
@@ -46,7 +62,7 @@ export default function MultiplayerGame() {
         <MultiplayerGameCanonical />
       </div>
 
-      <MultiplayerChatOverlay roomCode="W100NB" />
+      <MultiplayerChatOverlay roomCode={activeRoomCode} />
 
       <style jsx global>{`
         html,
