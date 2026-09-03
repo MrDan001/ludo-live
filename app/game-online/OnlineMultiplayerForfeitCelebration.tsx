@@ -45,7 +45,7 @@ export default function OnlineMultiplayerForfeitCelebration(){
       <div className="ludo-forfeit-name">{event.winnerName}</div>
       <div className="ludo-forfeit-pot">🪙 Winning pot: <b>{Number(event.pot||0).toLocaleString()} coins</b></div>
       <div className="ludo-forfeit-note">{isWinner?"Your opponent left the game, so you were automatically declared the last player standing. The winning coins have been awarded to your profile.":`${event.winnerName} was declared the last player standing after the opponent left.`}</div>
-      <button type="button" className="ludo-forfeit-button" onClick={()=>{window.location.replace("/lobby");}}>Acknowledge &amp; Return to Lobby</button>
+      <button type="button" className="ludo-forfeit-button" onClick={()=>{window.location.replace("/lobby");}}>Got it</button>
     </div>
   </div>;
 }
