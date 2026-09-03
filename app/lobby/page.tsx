@@ -5,7 +5,7 @@ import AppFrame from "../_components/AppFrame";
 import { AccountGateModal, useAccountGate } from "../_components/AccountGate";
 
 type OpenRoom={code:string;players:number;roomSize:number;hostName:string;stakeType?:"free"|"paid";stakeCoins?:number;paid?:boolean};
-async function hydrateRoomStakes(list:OpenRoom[]){
+async function hydrateRoomStakes(list:OpenRoom[]):Promise<OpenRoom[]>{
  const rooms=Array.isArray(list)?list.filter(room=>Number(room.players)>0&&Number(room.players)<Number(room.roomSize)):[];
  return Promise.all(rooms.map(async room=>{
   try{
@@ -14,7 +14,8 @@ async function hydrateRoomStakes(list:OpenRoom[]){
    const d=await r.json();
    const stakeCoins=Math.max(0,Math.trunc(Number(d?.stakeCoins)||0));
    const paid=d?.stakeType==="paid"||stakeCoins>0;
-   return {...room,stakeType:paid?"paid":"free",stakeCoins,paid};
+   const stakeType:"free"|"paid"=paid?"paid":"free";
+   return {...room,stakeType,stakeCoins,paid};
   }catch{return room}
  }));
 }
