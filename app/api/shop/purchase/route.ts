@@ -9,7 +9,13 @@ const ITEMS:Record<string,{name:string;price:number;currency:"gems";kind:"item"|
 const clean=(v:unknown)=>Array.isArray(v)?v.map(String):[];
 const levelRequired=(level:number)=>10+Math.max(0,level)*5;
 
-export async function POST(req:NextRequest){const client=await pool.connect();let tx=false;try{await ensureAuthSchema();await ensureTournamentV2Schema();const user=await currentUser(req);if(!user||user.is_guest)return NextResponse.json({error:"A registered account is required."},{status:403});const body=await req.json(),id=String(body.id||""),type=String(body.type||"");
+async function ensureShopAccountingSchema(){
+ await pool.query(`CREATE TABLE IF NOT EXISTS ludo_admin_wallets(id TEXT PRIMARY KEY,revenue_gems BIGINT NOT NULL DEFAULT 0,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+ await pool.query(`INSERT INTO ludo_admin_wallets(id,revenue_gems) VALUES('platform',0) ON CONFLICT(id) DO NOTHING;`);
+ await pool.query(`CREATE TABLE IF NOT EXISTS ludo_admin_wallet_ledger(id BIGSERIAL PRIMARY KEY,wallet_to TEXT NOT NULL,currency TEXT NOT NULL CHECK(currency IN ('coins','gems')),amount BIGINT NOT NULL,reason TEXT NOT NULL,created_at TIMESTAMPTZ NOT NULL DEFAULT NOW());`);
+}
+
+export async function POST(req:NextRequest){const client=await pool.connect();let tx=false;try{await ensureAuthSchema();await ensureTournamentV2Schema();await ensureShopAccountingSchema();const user=await currentUser(req);if(!user||user.is_guest)return NextResponse.json({error:"A registered account is required."},{status:403});const body=await req.json(),id=String(body.id||""),type=String(body.type||"");
  let catalogItem=await getShopItem(type,id);
  // An older admin override can contain only currency/price and leave reward fields NULL.
  // Never let that erase the built-in package reward; the package definition remains authoritative for what is awarded.
