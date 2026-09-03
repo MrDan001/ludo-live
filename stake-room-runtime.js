@@ -53,11 +53,13 @@ async function hasEnoughCoins(playerId, amount) {
 }
 
 function registerRoom(code, hostPlayerId, stakeCoins) {
+  const normalizedStake = Number(stakeCoins) || 0;
+  if (normalizedStake !== 0 && normalizeStake(normalizedStake) === null) throw new Error('Stake must be 0 for a free room or between 100 and 10,000 coins.');
   const existing = rooms.get(code);
   if (existing && existing.hostPlayerId !== String(hostPlayerId || '')) throw new Error('This room already has a stake setting.');
   rooms.set(code, {
     hostPlayerId: String(hostPlayerId || ''),
-    stakeCoins: Number(stakeCoins) || 0,
+    stakeCoins: normalizedStake,
     createdAt: existing?.createdAt || Date.now(),
     updatedAt: Date.now(),
   });
@@ -74,9 +76,26 @@ function patchSocketOn(Socket) {
       const incoming = args[0] || {};
       const code = normalizeCode(incoming.roomCode);
       const pid = String(incoming.playerId || '').trim();
-      const entry = rooms.get(code);
+      const existing = rooms.get(code);
       const requestedHost = !!incoming.host;
 
+      // The host's create-room payload is the authoritative source for the
+      // room's free/paid setting. Persist it before the normal server handler
+      // broadcasts the room list, otherwise the lobby can only see FREE.
+      if (requestedHost && pid && incoming.stakeType !== undefined || requestedHost && pid && incoming.stakeCoins !== undefined) {
+        const requestedType = String(incoming.stakeType || '').toLowerCase();
+        const requestedCoins = requestedType === 'free' ? 0 : (incoming.stakeCoins ?? 0);
+        const normalizedStake = Number(requestedCoins) === 0 ? 0 : normalizeStake(requestedCoins);
+        if (normalizedStake === null) return this.emit('room-error', 'Paid room stakes must be between 100 and 10,000 coins.');
+        if (existing && existing.hostPlayerId !== pid) return this.emit('room-error', 'Only the player who created this room can change its stake setting.');
+        try {
+          registerRoom(code, pid, normalizedStake);
+        } catch (error) {
+          return this.emit('room-error', error instanceof Error ? error.message : 'Unable to save the room stake.');
+        }
+      }
+
+      const entry = rooms.get(code);
       if (entry && requestedHost && entry.hostPlayerId !== pid) {
         return this.emit('room-error', 'Only the player who created this room can claim it as host.');
       }
