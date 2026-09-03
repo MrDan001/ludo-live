@@ -5,10 +5,14 @@ import { getLevelRewardPlan } from "../../../../lib/levelRewards";
 import { ensureWalletAudit, markWalletContext } from "../../lib/wallet-audit";
 
 const COOKIE = "ludo_session";
+const WINDOW_START = 17;
+const WINDOW_END = 20;
 const HEARTBEAT_CAP_SECONDS = 90;
 const INTERVAL_SECONDS = 30 * 60;
 const NORMAL_SPINS = 1;
 const NORMAL_XP = 2;
+const RUSH_SPINS = 3;
+const RUSH_XP = 6;
 const DAILY_SPIN_CAP = 12;
 
 async function getUserId(request: NextRequest) {
@@ -18,6 +22,8 @@ async function getUserId(request: NextRequest) {
   const r = await pool.query<{ id: string }>("SELECT u.id FROM ludo_users u JOIN ludo_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW() LIMIT 1", [hash]);
   return r.rows[0]?.id ?? null;
 }
+function nigeriaHour(date = new Date()) { return Number(new Intl.DateTimeFormat("en-NG", { timeZone: "Africa/Lagos", hour: "numeric", hour12: false }).format(date)); }
+function isRush(date = new Date()) { const hour = nigeriaHour(date); return hour >= WINDOW_START && hour < WINDOW_END; }
 function dayKey(date = new Date()) { return new Intl.DateTimeFormat("en-CA", { timeZone: "Africa/Lagos" }).format(date); }
 
 async function ensureActivitySchema() {
@@ -61,10 +67,14 @@ export async function POST(request: NextRequest) {
       if (activeSeconds >= INTERVAL_SECONDS && rewardSpinsToday < DAILY_SPIN_CAP) {
         const intervals = Math.floor(activeSeconds / INTERVAL_SECONDS);
         const grantableIntervals = Math.min(intervals, DAILY_SPIN_CAP - rewardSpinsToday);
-        // Activity rewards are deliberately flat. There is no rush multiplier,
-        // so banked activity can never be redeemed for an amplified reward.
-        granted = grantableIntervals * NORMAL_SPINS;
-        xpGranted = grantableIntervals * NORMAL_XP;
+        // The 3x rush multiplier is preserved, but only the intervals actually
+        // granted during the rush window receive it. Banked time cannot be
+        // multiplied repeatedly or converted after the daily activity cap.
+        const rush = isRush(now);
+        const spinsPerInterval = rush ? RUSH_SPINS : NORMAL_SPINS;
+        const xpPerInterval = rush ? RUSH_XP : NORMAL_XP;
+        granted = grantableIntervals * spinsPerInterval;
+        xpGranted = grantableIntervals * xpPerInterval;
         spins += granted;
         rewardSpinsToday += grantableIntervals;
         activeSeconds -= grantableIntervals * INTERVAL_SECONDS;
@@ -91,7 +101,7 @@ export async function POST(request: NextRequest) {
 
       await client.query(`INSERT INTO ludo_spin_state(user_id,spins,total_spins,active_seconds,total_active_seconds,last_heartbeat_at,activity_reward_day,activity_reward_spins) VALUES($1,$2,0,$3,$4,$5,$6,$7) ON CONFLICT(user_id) DO UPDATE SET spins=$2,active_seconds=$3,total_active_seconds=$4,last_heartbeat_at=$5,activity_reward_day=$6,activity_reward_spins=$7`,[id,spins,activeSeconds,totalActiveSeconds,now,rewardDay,rewardSpinsToday]);
       await client.query("COMMIT");
-      return NextResponse.json({ok:true,granted,xpGranted,xp,level,levels:rewardLevels,spins,boostWindow:false,activeSeconds:totalActiveSeconds,activitySpinsToday:rewardSpinsToday,dailySpinCap:DAILY_SPIN_CAP},{headers:{"Cache-Control":"no-store"}});
+      return NextResponse.json({ok:true,granted,xpGranted,xp,level,levels:rewardLevels,spins,boostWindow:isRush(now),activeSeconds:totalActiveSeconds,activitySpinsToday:rewardSpinsToday,dailySpinCap:DAILY_SPIN_CAP},{headers:{"Cache-Control":"no-store"}});
     } catch(error){await client.query("ROLLBACK").catch(()=>{});throw error;} finally{client.release();}
   } catch(e){console.error(e);return NextResponse.json({ok:false,error:"Activity reward unavailable."},{status:500});}
 }
