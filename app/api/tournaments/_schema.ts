@@ -6,7 +6,7 @@ export function ensureTournamentV2Schema() {
   if (!promise) {
     promise = pool.query(`
       ALTER TABLE ludo_tournaments ADD COLUMN IF NOT EXISTS prize_multiplier NUMERIC(8,4) NOT NULL DEFAULT 0.20;
-      ALTER TABLE ludo_tournaments ADD COLUMN IF NOT EXISTS participation_reward_coins INTEGER NOT NULL DEFAULT 1000;
+      ALTER TABLE ludo_tournaments ADD COLUMN IF NOT EXISTS participation_reward_coins INTEGER NOT NULL DEFAULT 100;
       ALTER TABLE ludo_tournaments ADD COLUMN IF NOT EXISTS participation_reward_gems INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE ludo_tournaments ADD COLUMN IF NOT EXISTS join_cutoff_days INTEGER NOT NULL DEFAULT 2;
       ALTER TABLE ludo_tournaments ADD COLUMN IF NOT EXISTS funding_reserved_coins BIGINT NOT NULL DEFAULT 0;
