@@ -244,10 +244,8 @@ export default function OnlineMultiplayerGame() {
       });
       s.on("game-dice", (event: { value: DiceValue; playerId?: string }) => {
         if (Number(event?.value) >= 1) setRoll(event.value);
-        if (String(event?.playerId || "") !== String(p.playerId)) {
-          setRemoteRolling(true);
-          window.setTimeout(() => mountedRef.current && setRemoteRolling(false), 700);
-        }
+        setRemoteRolling(true);
+        window.setTimeout(() => { if (mountedRef.current) setRemoteRolling(false); }, 900);
       });
       s.on("game-moved", (move: MoveEvent) => { if (!move?.tokenId) return; clearAction(); moveQueueRef.current.push(move); if (!animationRef.current) { const next = moveQueueRef.current.shift(); if (next) void animateRef.current(next); } });
       s.on("game-roll-error", () => { clearAction(); setAnimating(false); });
