@@ -64,7 +64,7 @@ if (!Socket.prototype.__ludoOnlineAuthorityV4) {
   };
   globalThis.__ludoForfeitPlayer = forfeitPlayer;
   globalThis.__ludoCanonicalHostForRoom = (code) => games.get(String(code || "").trim().toUpperCase())?.hostPlayerId || null;
-  globalThis.__ludoCanonicalCleanupRoom = (code) => { const normalized = String(code || "").trim().toUpperCase(); const room = games.get(normalized); if (room) { for (const m of room.members.values()) clearReconnectTimer(m); games.delete(normalized); } };
+  globalThis.__ludoCanonicalCleanupRoom = (code) => { const normalized = String(code || "").trim().toUpperCase(); const room = games.get(normalized); if (room) { for (const m of room.members.values()) clearReconnectTimer(m); games.delete(normalized); globalThis.__ludoHostCosmeticsCleanup?.(normalized); } };
   Socket.prototype.__ludoOnlineAuthorityV4 = true;
   Socket.prototype.on = function (event, listener) {
     if (event === "join-room") return originalOn.call(this, event, function (payload = {}, ...extra) {
@@ -110,13 +110,13 @@ if (!Socket.prototype.__ludoOnlineAuthorityV4) {
     });
     if (event === "game-roll") return originalOn.call(this, event, function (...args) {
       const ack = ackFrom(args), room = getRoom(this), pid = playerId(this); if (!room?.game) { safeAck(ack, { ok: false, error: "game_not_started" }); return; }
-      if (!currentMember(room, pid)?.connected || !currentMember(room, pid)?.socketId) { safeAck(ack, { ok: false, error: "player_disconnected" }); return; }
+      const member = currentMember(room, pid); if (!member?.connected || !member.socketId) { safeAck(ack, { ok: false, error: "player_disconnected" }); return; }
       const result = authority.roll(room.game, pid); if (!result.ok) { safeAck(ack, { ok: false, error: result.reason }); this.emit("game-roll-error", { error: result.reason }); return; }
       room.nsp?.to(room.code).emit("game-dice", { playerId: pid, value: result.value, stateRevision: result.stateRevision }); emitState(room); safeAck(ack, { ok: true, value: result.value, stateRevision: result.stateRevision });
     });
     if (event === "game-move") return originalOn.call(this, event, function (...args) {
       const payload = args[0] || {}, ack = ackFrom(args), room = getRoom(this), pid = playerId(this); if (!room?.game) { safeAck(ack, { ok: false, error: "game_not_started" }); return; }
-      if (!currentMember(room, pid)?.connected || !currentMember(room, pid)?.socketId) { safeAck(ack, { ok: false, error: "player_disconnected" }); return; }
+      const member = currentMember(room, pid); if (!member?.connected || !member.socketId) { safeAck(ack, { ok: false, error: "player_disconnected" }); return; }
       const result = authority.move(room.game, pid, String(payload.tokenId || "")); if (!result.ok) { safeAck(ack, { ok: false, error: result.reason }); this.emit("game-move-error", { error: result.reason }); return; }
       if (result.tokenId) room.nsp?.to(room.code).emit("game-moved", { playerId: pid, tokenId: result.tokenId, from: result.from, to: result.target, finalTo: result.finalTo, captureProgress: result.captureProgress, captured: result.captured || null, captureToCenter: Boolean(result.captureToCenter), stateRevision: result.stateRevision });
       emitState(room); safeAck(ack, { ok: true, stateRevision: result.stateRevision, tokenId: result.tokenId || null }); if (room.game.status === "finished") void globalThis.__ludoMatchFinished?.(room.code, String(room.game.winnerId || ""));
