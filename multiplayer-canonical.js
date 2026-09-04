@@ -12,16 +12,18 @@ if (!Socket.prototype.__ludoOnlineAuthorityV4) {
   const getRoom = (socket) => games.get(roomCode(socket));
   const ackFrom = (args) => [...args].reverse().find((arg) => typeof arg === "function");
   const safeAck = (ack, payload) => { if (typeof ack === "function") { try { ack(payload); } catch {} } };
+  const publicMember = (m) => { const { socketId, reconnectTimer, ...safe } = m || {}; return safe; };
   const ensureRoom = (code, nsp, roomSize) => {
     let room = games.get(code);
     if (!room) room = { code, status: "waiting", members: new Map(), game: null, hostPlayerId: null, nsp, roomSize: Number(roomSize) === 2 ? 2 : 4 };
-    else { if (nsp) room.nsp = nsp; if (!room.game && (Number(roomSize) === 2 || Number(roomSize) === 4)) room.roomSize = Number(roomSize); }
+    else { if (nsp) room.nsp = nsp; if (!room.game && (Number(roomSize) === 2 || Number(roomSize) === 4) && room.members.size === 0) room.roomSize = Number(roomSize); }
     games.set(code, room);
     return room;
   };
   const stateFor = (room) => room?.game ? authority.snapshot(room.game) : null;
   const emitState = (room) => { if (room?.game) { room.lastState = stateFor(room); room.nsp?.to(room.code).emit("game-state", room.lastState); } };
   const emitStateTo = (socket, room) => { if (room?.game) socket.emit("game-state", stateFor(room)); };
+  const roster = (room) => [...(room?.members?.values?.() || [])].map(publicMember);
   const connectedMembers = (room) => [...(room?.members?.values?.() || [])].filter((m) => m.connected !== false && m.socketId);
   const currentMember = (room, pid) => room?.members.get(pid) || null;
   const otherConnectedMembers = (room, pid) => connectedMembers(room).filter((m) => String(m.playerId) !== String(pid));
@@ -70,12 +72,17 @@ if (!Socket.prototype.__ludoOnlineAuthorityV4) {
       if (!code || !pid) return listener.apply(this, [next, ...extra]);
       const room = ensureRoom(code, this.nsp, next.roomSize); let member = room.members.get(pid);
       if (!member && room.game) { this.emit("room-error", "This match has already started. Reconnect using the same player account."); return; }
+      const isFirstPlayer = !room.hostPlayerId && room.members.size === 0;
       if (!member) {
-        member = { playerId: pid, name: String(next.name || "Player").slice(0, 24), avatar: String(next.avatar || ""), level: Math.max(1, Number(next.level) || 1), coins: Math.max(0, Number(next.coins) || 0), peerId: null, socketId: this.id, connected: true, host: room.members.size === 0, ready: room.members.size === 0, reconnectTimer: null };
+        if (room.members.size >= room.roomSize) { this.emit("room-error", "Room is full."); return; }
+        const authoritativeHost = isFirstPlayer;
+        next.host = authoritativeHost;
+        member = { playerId: pid, name: String(next.name || "Player").slice(0, 24), avatar: String(next.avatar || ""), level: Math.max(1, Number(next.level) || 1), coins: Math.max(0, Number(next.coins) || 0), peerId: null, socketId: this.id, connected: true, host: authoritativeHost, ready: authoritativeHost, reconnectTimer: null };
         room.members.set(pid, member); if (!room.hostPlayerId) room.hostPlayerId = pid;
       } else {
         clearReconnectTimer(member); const wasDisconnected = member.connected === false || !member.socketId; member.socketId = this.id; member.connected = true;
         member.name = String(next.name || member.name || "Player").slice(0, 24); member.avatar = String(next.avatar ?? member.avatar ?? ""); member.level = Math.max(1, Number(next.level) || member.level || 1); member.coins = Number.isFinite(Number(next.coins)) ? Number(next.coins) : (member.coins ?? 0);
+        next.host = String(member.playerId) === String(room.hostPlayerId);
         if (wasDisconnected) broadcastConnection(room, pid, true, "reconnected");
       }
       this.data.roomCode = code; this.data.playerId = pid; this.data.roomSize = room.roomSize; if (!this.data.authUserId) this.data.authUserId = pid;
@@ -85,7 +92,7 @@ if (!Socket.prototype.__ludoOnlineAuthorityV4) {
         if (gamePlayer) { gamePlayer.name = member.name; gamePlayer.avatar = member.avatar; gamePlayer.level = member.level; gamePlayer.coins = member.coins; }
         emitStateTo(this, room); this.emit("game-connection", { roomCode: code, playerId: pid, connected: true, reason: "reconnected" });
       }
-      room.nsp?.to(code).emit("game-roster", [...room.members.values()].map((m) => ({ ...m, socketId: undefined, reconnectTimer: undefined })));
+      room.nsp?.to(code).emit("game-roster", roster(room));
       return result;
     });
     if (event === "start-game") return originalOn.call(this, event, function (...args) {
@@ -93,35 +100,30 @@ if (!Socket.prototype.__ludoOnlineAuthorityV4) {
       if (!room) { safeAck(ack, { ok: false, error: "room_not_found" }); this.emit("start-error", "Room no longer exists. Please rejoin the room."); return; }
       if (String(room.hostPlayerId || "") !== pid) { safeAck(ack, { ok: false, error: "not_host" }); this.emit("start-error", "Only the room host can start the game."); return; }
       if (room.game) { safeAck(ack, { ok: false, error: "already_started" }); this.emit("start-error", "Game has already started."); return; }
-      const live = connectedMembers(room); const roomSize = room.roomSize === 2 || room.roomSize === 4 ? room.roomSize : (live.length === 2 ? 2 : 4);
+      const live = connectedMembers(room); const roomSize = room.roomSize === 2 || room.roomSize === 4 ? room.roomSize : 4;
       if (live.length !== roomSize) { safeAck(ack, { ok: false, error: "waiting_for_players" }); this.emit("start-error", `Waiting for all players (${live.length}/${roomSize}).`); return; }
       if (!live.every((m) => m.ready !== false)) { safeAck(ack, { ok: false, error: "players_not_ready" }); this.emit("start-error", "All players must be ready."); return; }
       const players = live.map((member, seat) => ({ playerId: String(member.playerId), name: member.name, avatar: member.avatar, level: member.level, coins: member.coins, peerId: member.peerId || null, seat, colors: playerColorsForSeats(roomSize, seat) }));
       room.game = authority.createGame(players); room.status = "playing"; for (const member of live) member.host = String(member.playerId) === String(room.hostPlayerId);
-      room.nsp?.to(code).emit("start-game", { board: live.find((m) => String(m.playerId) === String(room.hostPlayerId))?.board || "classic", members: live.map((m) => ({ ...m, socketId: undefined, reconnectTimer: undefined })) });
+      room.nsp?.to(code).emit("start-game", { board: live.find((m) => String(m.playerId) === String(room.hostPlayerId))?.board || "classic", members: live.map(publicMember) });
       emitState(room); void globalThis.__ludoMatchStarted?.(code, roomSize); safeAck(ack, { ok: true, state: stateFor(room) });
     });
     if (event === "game-roll") return originalOn.call(this, event, function (...args) {
       const ack = ackFrom(args), room = getRoom(this), pid = playerId(this); if (!room?.game) { safeAck(ack, { ok: false, error: "game_not_started" }); return; }
+      if (!currentMember(room, pid)?.connected || !currentMember(room, pid)?.socketId) { safeAck(ack, { ok: false, error: "player_disconnected" }); return; }
       const result = authority.roll(room.game, pid); if (!result.ok) { safeAck(ack, { ok: false, error: result.reason }); this.emit("game-roll-error", { error: result.reason }); return; }
       room.nsp?.to(room.code).emit("game-dice", { playerId: pid, value: result.value, stateRevision: result.stateRevision }); emitState(room); safeAck(ack, { ok: true, value: result.value, stateRevision: result.stateRevision });
     });
     if (event === "game-move") return originalOn.call(this, event, function (...args) {
       const payload = args[0] || {}, ack = ackFrom(args), room = getRoom(this), pid = playerId(this); if (!room?.game) { safeAck(ack, { ok: false, error: "game_not_started" }); return; }
+      if (!currentMember(room, pid)?.connected || !currentMember(room, pid)?.socketId) { safeAck(ack, { ok: false, error: "player_disconnected" }); return; }
       const result = authority.move(room.game, pid, String(payload.tokenId || "")); if (!result.ok) { safeAck(ack, { ok: false, error: result.reason }); this.emit("game-move-error", { error: result.reason }); return; }
       if (result.tokenId) room.nsp?.to(room.code).emit("game-moved", { playerId: pid, tokenId: result.tokenId, from: result.from, to: result.target, finalTo: result.finalTo, captureProgress: result.captureProgress, captured: result.captured || null, captureToCenter: Boolean(result.captureToCenter), stateRevision: result.stateRevision });
       emitState(room); safeAck(ack, { ok: true, stateRevision: result.stateRevision, tokenId: result.tokenId || null }); if (room.game.status === "finished") void globalThis.__ludoMatchFinished?.(room.code, String(room.game.winnerId || ""));
     });
-    if (event === "game-recover") return originalOn.call(this, event, function (...args) {
-      const ack = ackFrom(args), room = getRoom(this), pid = playerId(this); if (!room?.game) { safeAck(ack, { ok: false, error: "game_not_started" }); return; } if (!currentMember(room, pid)) { safeAck(ack, { ok: false, error: "not_in_match" }); return; }
-      emitStateTo(this, room); safeAck(ack, { ok: true, state: stateFor(room) });
-    });
+    if (event === "game-recover") return originalOn.call(this, event, function (...args) { const ack = ackFrom(args), room = getRoom(this), pid = playerId(this); if (!room?.game) { safeAck(ack, { ok: false, error: "game_not_started" }); return; } if (!currentMember(room, pid)) { safeAck(ack, { ok: false, error: "not_in_match" }); return; } emitStateTo(this, room); safeAck(ack, { ok: true, state: stateFor(room) }); });
     if (event === "leave-room") return originalOn.call(this, event, async function (...args) { const code = roomCode(this), pid = playerId(this), room = games.get(code); if (room?.game && pid) await forfeitPlayer(this, room, pid, "opponent_left"); return listener.apply(this, args); });
-    if (event === "disconnect") return originalOn.call(this, event, function (...args) {
-      const code = roomCode(this), pid = playerId(this), room = games.get(code), member = pid ? room?.members.get(pid) : null;
-      if (member && String(member.socketId) === String(this.id)) { member.connected = false; member.socketId = null; broadcastConnection(room, pid, false, "socket_disconnect"); if (room.game?.status === "playing") scheduleForfeit(room, pid); room.nsp?.to(code).emit("game-roster", [...room.members.values()].map((m) => ({ ...m, socketId: undefined, reconnectTimer: undefined }))); }
-      return listener.apply(this, args);
-    });
+    if (event === "disconnect") return originalOn.call(this, event, function (...args) { const code = roomCode(this), pid = playerId(this), room = games.get(code), member = pid ? room?.members.get(pid) : null; if (member && String(member.socketId) === String(this.id)) { member.connected = false; member.socketId = null; broadcastConnection(room, pid, false, "socket_disconnect"); if (room.game?.status === "playing") scheduleForfeit(room, pid); room.nsp?.to(code).emit("game-roster", roster(room)); } return listener.apply(this, args); });
     return originalOn.call(this, event, listener);
   };
 }
