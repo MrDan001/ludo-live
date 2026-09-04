@@ -13,8 +13,6 @@ The player Event page intentionally shows only two tabs:
 
 Expired/ended events are not shown to players. Event records remain in PostgreSQL for Admin review, settlement, and audit/history.
 
-The player page has one Back control only. `AppFrame` back navigation is hidden for this page because the page renders its own header Back button.
-
 ## Admin lifecycle
 
 Admin is the source of event configuration. Admin can create/publish/schedule events and define:
@@ -26,6 +24,11 @@ Admin is the source of event configuration. Admin can create/publish/schedule ev
 - supported boards/moods
 - start date/time
 - end date/time
+- board, dice, yard and yard-artwork configuration
+
+The Admin Events page `/dbase/events` separates **current/active** event records from **History**. Ended records belong in History; published/upcoming/live records remain in the current area. This is an Admin UI presentation boundary only; records are not deleted when they end.
+
+The shared Admin visual selectors are sourced from `/api/shop/catalog` through `app/dbase/VisualSelectors.tsx`. Stored visual configuration is `boardId`, `diceId`, `yardId`, and `yardKind` (`background` or `sticker`). The current Event API exposes these values. Storing them does not by itself mean `/game-online` applies them; the game-session handoff must explicitly carry/apply them before that can be claimed as implemented.
 
 The server determines event state from the stored timestamps. Client countdowns are presentation only.
 
@@ -43,11 +46,6 @@ Cancelled events are also retained server-side.
 - edit: `name = title`
 
 Event seed definitions must also provide the required `name` value. An empty event table is valid; an Admin API error must not be used as the empty-state representation.
-
-Recent production fixes:
-
-- `76fcea4b2b9dfa1cf8a0c9fba0935ecc44eb284e` — Admin event creation name compatibility.
-- `1a999106e655b780cf4e50c403f4f6d4fd26de13` — event seed compatibility with required `name` column.
 
 Do not add fake events, reset event rows, or bypass the database constraint as a workaround.
 
@@ -100,4 +98,7 @@ The progress fill must be a block-level element with an explicit height and widt
 - Do not show expired/history tabs on the player Event page unless product requirements explicitly change.
 - Keep Admin as the place for full lifecycle/history review.
 - Treat `name` as a required compatibility field and keep it synchronized with `title`.
+- Treat Admin visual configuration as stored configuration until the gameplay handoff explicitly applies it.
 - When changing Event behavior, update this document and `DEVELOPER_HANDOFF.md` in the same change.
+
+**Last reconciled:** 2026-09-04
