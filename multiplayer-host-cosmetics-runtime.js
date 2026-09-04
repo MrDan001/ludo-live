@@ -1,7 +1,7 @@
 // Host-authoritative cosmetics bridge for online multiplayer.
 // Cosmetic state only; game rules and move state are untouched.
 const { Socket } = require('socket.io');
-const PATCH = '__ludoHostCosmeticsRuntimeV3';
+const PATCH = '__ludoHostCosmeticsRuntimeV4';
 const proto = Socket.prototype;
 const roomCosmetics = new Map();
 if (!proto[PATCH]) {
@@ -12,26 +12,29 @@ if (!proto[PATCH]) {
       const data = packet && packet.data;
       if (Array.isArray(data) && data[0] === 'host-cosmetics-update') {
         const roomCode = String(this.data?.roomCode || '').trim().toUpperCase();
-        if (roomCode) {
-          const payload = data[1] || {};
-          const cosmetics = {
-            board: String(payload.board || 'classic').slice(0, 80),
-            dice: String(payload.dice || 'classic').slice(0, 80),
-            yard: String(payload.yard || '').slice(0, 120),
-          };
-          roomCosmetics.set(roomCode, cosmetics);
-          this.to(roomCode).emit('host-cosmetics', cosmetics);
-        }
+        const senderId = String(this.data?.authUserId || this.data?.playerId || '').trim();
+        const canonicalHost = String(globalThis.__ludoCanonicalHostForRoom?.(roomCode) || '').trim();
+        if (!roomCode || (canonicalHost && canonicalHost !== senderId)) return;
+        const payload = data[1] || {};
+        const cosmetics = {
+          board: String(payload.board || 'classic').slice(0, 80),
+          dice: String(payload.dice || 'classic').slice(0, 80),
+          yard: String(payload.yard || '').slice(0, 120),
+        };
+        roomCosmetics.set(roomCode, cosmetics);
+        this.to(roomCode).emit('host-cosmetics', cosmetics);
         return;
       }
       if (Array.isArray(data) && data[0] === 'join-room') {
         const roomCode = String(data[1]?.roomCode || '').trim().toUpperCase();
         const result = originalOnevent.call(this, packet);
         const cosmetics = roomCosmetics.get(roomCode);
-        if (cosmetics && String(this.data?.roomCode || '').toUpperCase() === roomCode) {
-          this.emit('host-cosmetics', cosmetics);
-        }
+        if (cosmetics && String(this.data?.roomCode || '').toUpperCase() === roomCode) this.emit('host-cosmetics', cosmetics);
         return result;
+      }
+      if (Array.isArray(data) && (data[0] === 'room-closed' || data[0] === 'room-null')) {
+        const roomCode = String(data[1]?.roomCode || this.data?.roomCode || '').trim().toUpperCase();
+        if (roomCode) roomCosmetics.delete(roomCode);
       }
     } catch (e) {
       console.error('host cosmetics runtime', e);
@@ -39,3 +42,4 @@ if (!proto[PATCH]) {
     return originalOnevent.call(this, packet);
   };
 }
+module.exports = {};
