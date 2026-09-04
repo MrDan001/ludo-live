@@ -3,10 +3,6 @@ import { Suspense } from "react";
 import "./globals.css";
 import "./home.css";
 import "./board-skin-overlay.css";
-import "./ludo-mobile-polish.css";
-import "./ludo-multiplayer-reference.css";
-import "./ludo-multiplayer-final-balance.css";
-import "./game-online-mobile.css";
 import GameSocialOverlay from "./_components/GameSocialOverlay";
 import LudoAudio from "./_components/LudoAudio";
 import SessionResume from "./_components/SessionResume";
@@ -36,6 +32,6 @@ export const viewport: Viewport = {
   userScalable: false, viewportFit: "cover", themeColor: "#07152d"
 };
 
-export default function RootLayout({children}:{children:React.ReactNode}){
+export default function RootLayout({ children }: { children: React.ReactNode }) {
   return <html lang="en"><body><ServiceWorkerRegistration /><AuthGuard /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense><Suspense fallback={null}><LudoAudio /></Suspense><XPLevelCelebration /><XPWinWatcher /><ActiveSpinRewards /><MissionGameplayTracker /><NotificationGate /><SuspendedGate /><PlayerNotificationPopup /><AdminPlayerModeration /></body></html>;
 }
