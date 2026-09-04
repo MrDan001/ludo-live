@@ -31,7 +31,12 @@ export async function GET(_q: NextRequest, { params }: { params: { id: string } 
       }
     }
 
-    return new NextResponse(bytes, {
+    // NextResponse's BodyInit typing is narrower than Node's Buffer generic.
+    // Create a plain ArrayBuffer-backed Uint8Array for the binary response.
+    const body = new Uint8Array(bytes.length);
+    body.set(bytes);
+
+    return new NextResponse(body, {
       status: 200,
       headers: {
         "Content-Type": contentType,
