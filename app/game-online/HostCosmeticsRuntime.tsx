@@ -6,7 +6,9 @@ type CosmeticPayload={board?:string;dice?:string;yard?:string};
 type GameSocket=Socket & {__ludoHostCosmeticsHostId?:string;__ludoHostCosmeticsPlayerId?:string;__ludoHostCosmeticsLast?:string;__ludoSelfCosmetics?:CosmeticPayload};
 const PATCH=Symbol.for("ludo.game-online.host-cosmetics-runtime-v2");
 const proto=Socket.prototype as any;
-const hostSockets=((Socket as any).__ludoHostSockets||(Socket as any).__ludoHostSockets=new Set<GameSocket>()) as Set<GameSocket>;
+const existingHostSockets=(Socket as any).__ludoHostSockets as Set<GameSocket>|undefined;
+const hostSockets: Set<GameSocket>=existingHostSockets||new Set<GameSocket>();
+(Socket as any).__ludoHostSockets=hostSockets;
 if(!proto[PATCH]){
  proto[PATCH]=true;
  const originalOn=Socket.prototype.on;
