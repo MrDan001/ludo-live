@@ -2,7 +2,7 @@
 
 ## Scope
 
-This document defines the player-facing **Daily Missions** lifecycle. The Admin Mission manager is a separate management surface and now contains both **Daily** and **Weekly** tabs at `/dbase/missions`.
+This document defines the player-facing **Daily Missions** lifecycle. The Admin Mission manager is a separate management surface and now contains both **Daily** and **Weekly** tabs at `/dbase/missions`, plus a current/history separation for finished mission records.
 
 ## Player daily lifecycle
 
@@ -26,12 +26,18 @@ The active counter counts only category 2 and remains `/ 6`.
 
 ## Admin management
 
-The Admin page `/dbase/missions` has two tabs:
+The Admin page `/dbase/missions` has two management tabs:
 
 - **Daily** — existing daily missions are preserved and can be edited.
 - **Weekly** — existing weekly missions are preserved and can be edited.
 
+Within the Admin mission lifecycle, unfinished/current records remain in the current management view and finished records are moved to **History**. History is a UI filter over the existing server records; it does not delete or recreate mission definitions.
+
 Daily management uses `/api/admin/missions`. Weekly management uses `/api/admin/missions/weekly`. Editing must persist to the server-backed mission configuration and must not replace the existing catalogue with an empty/default list.
+
+Admin mission editors support the mission type `purchase_shop`. For that type, `app/dbase/VisualSelectors.tsx`/`ShopItemSelector` loads the existing `/api/shop/catalog` catalogue and stores the selected target as `type:id` in `shop_item`.
+
+Admin mission editors also store board, dice, yard and yard-artwork (`background`/`sticker`) configuration. These selectors are configuration data; do not claim that they alter `/game-online` gameplay until a game-session handoff explicitly applies them.
 
 The player-facing Daily contract remains independent of the Admin editing UI: Admin changes configure the mission catalogue, while player completion and reward claims remain server-authoritative.
 
@@ -60,9 +66,10 @@ Do not use `missions.slice(0, 6)` for the player Daily tab. That hides completed
 - Do not credit rewards from React/client state.
 - Do not allow duplicate claims.
 - Do not turn Admin editing into a second source of truth.
+- Do not treat `purchase_shop` configuration storage as proof that purchase-event progress tracking has been wired unless the purchase path explicitly updates mission progress.
 
 ## Documentation rule
 
-Any future change to mission lifecycle, assignment count, rewards, claim behavior, or Admin Daily/Weekly management must update this document, the weekly mission documentation if present, `ARCHITECTURE.md`, and `DEVELOPER_HANDOFF.md` in the same change.
+Any future change to mission lifecycle, assignment count, rewards, claim behavior, Admin Daily/Weekly management, history filtering, purchase-shop missions, or visual configuration must update this document, the weekly mission documentation if present, `ARCHITECTURE.md`, and `DEVELOPER_HANDOFF.md` in the same change.
 
-**Last reconciled:** 2026-09-03
+**Last reconciled:** 2026-09-04
