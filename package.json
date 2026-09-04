@@ -7,7 +7,7 @@
     "dev": "next dev",
     "build": "next build",
     "prestart": "node scripts/prepare-multiplayer-room.js",
-    "start": "node -r ./room-refresh-persistence.js -r ./empty-room-cleanup.js -r ./room-join-runtime-fix.js -r ./multiplayer-canonical.js -r ./mission-rules.js -r ./forfeit-rules.js -r ./event-settler.js -r ./stake-room-runtime.js -r ./multiplayer-stake-runtime.js -r ./multiplayer-stake-create-room-fix.js -r ./multiplayer-stake-concurrency-fix.js -r ./multiplayer-stake-db-race-fix.js -r ./multiplayer-stake-notification-runtime.js -r ./multiplayer-host-cosmetics-runtime.js -r ./multiplayer-auth-runtime.js server.js",
+    "start": "node -r ./multiplayer-stake-runtime.js -r ./multiplayer-stake-create-room-fix.js -r ./multiplayer-stake-concurrency-fix.js -r ./multiplayer-stake-db-race-fix.js -r ./multiplayer-stake-notification-runtime.js -r ./multiplayer-host-cosmetics-runtime.js server.js",
     "vercel-build": "next build",
     "android:sync": "npx cap sync android",
     "android:open": "npx cap open android"
