@@ -10,7 +10,7 @@ function base64ToUint8Array(value: string) {
 }
 
 export default function NotificationGate() {
-  const [state, setState] = useState<"checking" | "ready" | "blocked" | "unsupported" | "subscribed" | "error">("checking");
+  const [state, setState] = useState<"checking" | "ready" | "blocked" | "unsupported" | "subscribed" | "error" | "skipped">("checking");
   const [message, setMessage] = useState("");
 
   async function subscribe() {
@@ -29,7 +29,7 @@ export default function NotificationGate() {
       const permission = Notification.permission === "granted" ? "granted" : await Notification.requestPermission();
       if (permission !== "granted") {
         setState("blocked");
-        setMessage("Notifications are required. Enable them in your browser or device settings, then return here.");
+        setMessage("Notifications are optional. You can continue using Ludo Live without enabling them.");
         return;
       }
       const registration = await navigator.serviceWorker.ready;
@@ -44,7 +44,7 @@ export default function NotificationGate() {
       setState("subscribed");
     } catch (error) {
       setState("error");
-      setMessage(error instanceof Error ? error.message : "Notification setup failed. Please try again.");
+      setMessage(error instanceof Error ? error.message : "Notification setup failed. You can continue using Ludo Live without enabling notifications.");
     }
   }
 
@@ -63,16 +63,17 @@ export default function NotificationGate() {
     return () => { cancelled = true; };
   }, []);
 
-  if (state === "checking" || state === "subscribed") return null;
+  if (state === "checking" || state === "subscribed" || state === "skipped") return null;
 
   return (
     <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(2,8,23,.96)", display: "grid", placeItems: "center", padding: 20 }}>
       <div style={{ width: "min(440px,100%)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 24, padding: 24, background: "#07152d", color: "white", textAlign: "center", boxShadow: "0 20px 80px rgba(0,0,0,.5)" }}>
         <div style={{ fontSize: 46, marginBottom: 8 }}>🔔</div>
-        <h2 style={{ margin: "0 0 10px", fontSize: 24 }}>Notifications are required</h2>
+        <h2 style={{ margin: "0 0 10px", fontSize: 24 }}>Enable notifications</h2>
         <p style={{ opacity: .82, lineHeight: 1.5, margin: "0 0 18px" }}>Allow Ludo Live notifications so you can receive game, room, friend, tournament and reward updates even when the app is not in the foreground.</p>
-        {state === "unsupported" ? <p style={{ color: "#ffd166" }}>{message || "This browser/device does not support web push. Install/open Ludo Live as an app or use a supported secure browser."}</p> : <button onClick={subscribe} style={{ width: "100%", border: 0, borderRadius: 14, padding: "14px 18px", fontWeight: 800, fontSize: 16, cursor: "pointer" }}>Enable Notifications</button>}
+        {state === "unsupported" ? <p style={{ color: "#ffd166" }}>{message || "This browser/device does not support web push. You can continue using Ludo Live without notifications."}</p> : <button onClick={subscribe} style={{ width: "100%", border: 0, borderRadius: 14, padding: "14px 18px", fontWeight: 800, fontSize: 16, cursor: "pointer" }}>Enable Notifications</button>}
         {message && state !== "unsupported" && <p style={{ color: "#ffb4b4", margin: "14px 0 0", lineHeight: 1.45 }}>{message}</p>}
+        <button onClick={() => setState("skipped")} style={{ width: "100%", marginTop: 12, border: "1px solid rgba(255,255,255,.2)", borderRadius: 14, padding: "12px 18px", background: "transparent", color: "white", fontWeight: 700, fontSize: 15, cursor: "pointer" }}>Continue without notifications</button>
       </div>
     </div>
   );
