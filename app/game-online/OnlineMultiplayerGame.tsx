@@ -1,5 +1,6 @@
 "use client";
-import { useEffect, useMemo, useRef, useState, useCallback } from "react";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { io, type Socket } from "socket.io-client";
 import CanonicalLudoBoard, { type BoardThemeId, type DemoToken } from "../_components/CanonicalLudoBoard";
@@ -10,47 +11,317 @@ import { canMove, FINISH_PROGRESS, type DiceValue } from "../../lib/ludoEngine";
 import { playerColorsForSeats, tokenState } from "../../lib/ludoRules";
 import type { DiceSkinId } from "../_components/LudoDice";
 
-type Color="red"|"yellow"|"green"|"blue";
-type Player={playerId:string;name:string;seat:number;colors?:Color[];level?:number;avatar?:string;coins?:number;peerId?:string;host?:boolean;ready?:boolean;connected?:boolean;board?:string;dice?:string;yard?:string};
-type TokenMap=Record<string,Record<string,{position:number}>>;
-type GameState={status:string;currentPlayerId:string|null;dice:DiceValue|null;pendingMove:DiceValue|null;players:Player[];tokens:TokenMap;winnerId?:string|null;stateRevision?:number};
-type MoveEvent={playerId?:string;tokenId:string;from:number;to:number;finalTo?:number;captureProgress?:number|null;captured?:{playerId:string;color:Color;id:number}|null;captureToCenter?:boolean;stateRevision?:number};
-type Cosmetics={board:BoardThemeId;dice:DiceSkinId;yard:string};
-type CustomizationResponse={equippedBoard?:string;equippedDice?:string;equippedItems?:unknown[]};
-const COLORS:Color[]=["red","yellow","green","blue"];
-const REACTIONS=["👋 Hi!","😂 LOL","🔥 Nice!","👍 Good move","🏆 GG","😜"];
-const EMPTY_TOKENS:DemoToken[]=COLORS.flatMap(color=>Array.from({length:4},(_,id)=>({color,id,position:0,state:"yard" as const})));
-const normalize=(serverTokens:TokenMap):DemoToken[]=>COLORS.flatMap(color=>Array.from({length:4},(_,id)=>{const value=serverTokens?.[color]?.[`${color}:${id}`]?.position ?? serverTokens?.[color]?.[String(id)]?.position ?? 0;const position=Number.isFinite(Number(value))?Number(value):0;return{color,id,position,state:tokenState(position)};}));
-const validBoard=(value:string):BoardThemeId=>value as BoardThemeId;
-const defaultCosmetics:Cosmetics={board:"classic",dice:"classic",yard:""};
+type Color = "red" | "yellow" | "green" | "blue";
+type Player = { playerId: string; name: string; seat: number; colors?: Color[]; level?: number; avatar?: string; coins?: number; peerId?: string; host?: boolean; ready?: boolean; connected?: boolean; board?: string; dice?: string; yard?: string };
+type TokenMap = Record<string, Record<string, { position: number }>>;
+type GameState = { status: string; currentPlayerId: string | null; dice: DiceValue | null; pendingMove: DiceValue | null; players: Player[]; tokens: TokenMap; winnerId?: string | null; stateRevision?: number };
+type MoveEvent = { playerId?: string; tokenId: string; from: number; to: number; target?: number; finalTo?: number; captureProgress?: number | null; captured?: { playerId: string; color: Color; id: number } | null; captureToCenter?: boolean; stateRevision?: number };
+type ChatMessage = { id: string; name: string; text: string; at: number };
+type Cosmetics = { board: BoardThemeId; dice: DiceSkinId; yard: string };
+type CustomizationResponse = { equippedBoard?: string; equippedDice?: string; equippedItems?: unknown[] };
 
-function PlayerAvatar({src,fallback="👤"}:{src?:string;fallback?:string}){return src&&(src.startsWith("http")||src.startsWith("/")||src.startsWith("data:"))?<img src={src} alt="Avatar" style={{width:"100%",height:"100%",objectFit:"cover"}}/>:<span>{src||fallback}</span>}
+const COLORS: Color[] = ["red", "yellow", "green", "blue"];
+const REACTIONS = ["👋 Hi!", "😂 LOL", "🔥 Nice!", "👍 Good move", "🏆 GG", "😜"];
+const EMPTY_TOKENS: DemoToken[] = COLORS.flatMap(color => Array.from({ length: 4 }, (_, id) => ({ color, id, position: 0, state: "yard" as const })));
+const normalizeTokens = (serverTokens: TokenMap): DemoToken[] => COLORS.flatMap(color => Array.from({ length: 4 }, (_, id) => {
+  const value = serverTokens?.[color]?.[`${color}:${id}`]?.position ?? serverTokens?.[color]?.[String(id)]?.position ?? 0;
+  const position = Number.isFinite(Number(value)) ? Number(value) : 0;
+  return { color, id, position, state: tokenState(position) };
+}));
+const defaultCosmetics: Cosmetics = { board: "classic", dice: "classic", yard: "" };
 
-function StakeDisplay({roomCode}:{roomCode:string}){const[stake,setStake]=useState<any>(null);useEffect(()=>{let alive=true;const load=async()=>{try{const r=await fetch(`/api/multiplayer-stake?roomCode=${encodeURIComponent(roomCode)}`,{cache:"no-store"});if(!r.ok)return;const d=await r.json();if(alive)setStake(Number(d?.pot)>0?d:null)}catch{}};void load();const t=window.setInterval(load,2500);return()=>{alive=false;window.clearInterval(t)}},[roomCode]);if(!stake)return null;return <div style={{position:"fixed",top:88,left:"50%",transform:"translateX(-50%)",zIndex:80,padding:"7px 12px",borderRadius:999,border:"1px solid rgba(212,175,55,.45)",background:"rgba(8,8,8,.9)",color:"#f0d579",fontSize:10,fontWeight:900,whiteSpace:"nowrap"}}>🪙 STAKED POT · {Number(stake.pot).toLocaleString()} COINS · {String(stake.status||"").toUpperCase()}</div>}
+function PlayerAvatar({ src, fallback = "👤" }: { src?: string; fallback?: string }) {
+  return src && (src.startsWith("http") || src.startsWith("/") || src.startsWith("data:"))
+    ? <img src={src} alt="Avatar" className="mp-avatar-image" />
+    : <span>{src || fallback}</span>;
+}
 
-export default function OnlineMultiplayerGame(){
- const params=useSearchParams();
- const roomCode=String(params.get("room")||"W100NB").trim().toUpperCase();
- const roomSize=Number(params.get("size")||2)===4?4:2;
- const[socket,setSocket]=useState<Socket|null>(null);const[connected,setConnected]=useState(false);const[connectionMessage,setConnectionMessage]=useState("Connecting…");
- const[me,setMe]=useState("");const[profile,setProfile]=useState({name:"Player",avatar:"",level:1,coins:0});const[game,setGame]=useState<GameState|null>(null);const[roster,setRoster]=useState<Player[]>([]);const[tokens,setTokens]=useState<DemoToken[]>(EMPTY_TOKENS);const[roll,setRoll]=useState<DiceValue>(6);const[pending,setPending]=useState<DiceValue|null>(null);const[remoteRolling,setRemoteRolling]=useState(false);const[animating,setAnimating]=useState(false);
- const[cosmetics,setCosmetics]=useState<Cosmetics>(defaultCosmetics);const selfCosmeticsRef=useRef<Cosmetics>(defaultCosmetics);const revisionRef=useRef(-1);const authoritativeRef=useRef<DemoToken[]>(EMPTY_TOKENS);const animationRef=useRef(false);const moveQueueRef=useRef<MoveEvent[]>([]);const actionTimerRef=useRef<number|null>(null);const requestPendingRef=useRef(false);
- const[soundEnabled,setSoundEnabled]=useState(true);const[chatOpen,setChatOpen]=useState(false);const[chatUnread,setChatUnread]=useState(false);const[chatText,setChatText]=useState("");const[chatMessages,setChatMessages]=useState<Array<{id:string;name:string;text:string;at:number}>>([]);const[playersOpen,setPlayersOpen]=useState(false);const[leaveConfirmOpen,setLeaveConfirmOpen]=useState(false);
- const mountedRef=useRef(true);const gameRef=useRef<GameState|null>(null);const chatOpenRef=useRef(false);const animateRef=useRef<(move:MoveEvent)=>Promise<void>>(async()=>{});
- const clearAction=useCallback(()=>{if(actionTimerRef.current!==null){window.clearTimeout(actionTimerRef.current);actionTimerRef.current=null}requestPendingRef.current=false},[]);
- const recover=useCallback((s:Socket|null)=>{if(!s?.connected)return;s.emit("game-recover",(result:{ok?:boolean})=>{if(result?.ok)setConnectionMessage("Connected")})},[]);
- const loadProfile=useCallback(async()=>{try{const authResponse=await fetch("/api/auth",{cache:"no-store"});const customizationResponse=await fetch("/api/customization",{cache:"no-store"});const a=await authResponse.json();const c:CustomizationResponse=customizationResponse.ok?await customizationResponse.json():{};const name=String(a?.user?.username||"Player");const avatar=String(a?.user?.avatar||a?.user?.image||"");const level=Math.max(1,Number(a?.user?.level)||1);const coins=Math.max(0,Number(a?.user?.coins)||0);const next:Cosmetics={board:validBoard(String(c.equippedBoard||"classic")),dice:(String(c.equippedDice||"classic") as DiceSkinId),yard:Array.isArray(c.equippedItems)?String(c.equippedItems.find((x):x is string=>typeof x==="string"&&x.startsWith("yard-"))||""):""};setProfile({name,avatar,level,coins});selfCosmeticsRef.current=next;setCosmetics(v=>v.board===next.board&&v.dice===next.dice&&v.yard===next.yard?v:next);return{playerId:String(a?.user?.id||""),name,avatar,level,coins,cosmetics:next}}catch{return null}},[]);
- useEffect(()=>{mountedRef.current=true;try{const saved=JSON.parse(localStorage.getItem("ludo-settings")||"{}");if(saved.sound!==undefined)setSoundEnabled(saved.sound!==false)}catch{}return()=>{mountedRef.current=false}},[]);
- useEffect(()=>{let cancelled=false;let s:Socket|null=null;const start=async()=>{const p=await loadProfile();if(cancelled||!p||!p.playerId)return;setMe(p.playerId);s=io(window.location.origin,{transports:["websocket","polling"],reconnection:true,reconnectionAttempts:Infinity,reconnectionDelay:500,reconnectionDelayMax:3000});setSocket(s);const join=()=>{setConnected(true);setConnectionMessage("Connected");s?.emit("join-room",{roomCode,roomSize,name:p.name,avatar:p.avatar,level:p.level,coins:p.coins,board:p.cosmetics.board,dice:p.cosmetics.dice,yard:p.cosmetics.yard,playerId:p.playerId})};s.on("connect",join);s.on("disconnect",()=>{setConnected(false);clearAction();setAnimating(false);animationRef.current=false;setConnectionMessage("Reconnecting…")});s.on("connect_error",e=>{setConnected(false);setConnectionMessage(`Connection error: ${e.message||"retrying"}`)});s.on("roster",(members:Player[])=>{setRoster(Array.isArray(members)?members:[]);const host=Array.isArray(members)?members.find(m=>m.host):null;if(host)setCosmetics({board:validBoard(String(host.board||"classic")),dice:(String(host.dice||"classic") as DiceSkinId),yard:String(host.yard||"")});});s.on("host-cosmetics",(c:Cosmetics)=>setCosmetics({board:validBoard(String(c?.board||"classic")),dice:(String(c?.dice||"classic") as DiceSkinId),yard:String(c?.yard||"")}));s.on("game-state",(next:GameState)=>{if(!mountedRef.current)return;const r=Number(next.stateRevision??-1);if(r>=0&&revisionRef.current>=0&&r<revisionRef.current)return;if(r>=0)revisionRef.current=r;gameRef.current=next;setGame(next);setPending(String(next.currentPlayerId||"")===p.playerId?next.pendingMove:null);if(next.dice!==null)setRoll(next.dice);authoritativeRef.current=normalize(next.tokens||{});if(!animationRef.current&&moveQueueRef.current.length===0)setTokens(authoritativeRef.current.map(t=>({...t})));if(next.status!=="playing"){clearAction();setAnimating(false);animationRef.current=false}});s.on("game-dice",(e:{value:DiceValue})=>{if(Number(e?.value)>=1)setRoll(e.value);setRemoteRolling(true);window.setTimeout(()=>mountedRef.current&&setRemoteRolling(false),700)});s.on("game-moved",(move:MoveEvent)=>{if(!move?.tokenId)return;clearAction();moveQueueRef.current.push(move);if(!animationRef.current){const next=moveQueueRef.current.shift();if(next)void animateRef.current(next)}});s.on("game-roll-error",()=>{clearAction();setAnimating(false)});s.on("game-move-error",()=>{clearAction();setAnimating(false);animationRef.current=false});s.on("chat",(m:any)=>{if(!m?.text)return;setChatMessages(items=>items.some(x=>x.id===String(m.id))?items:[...items.slice(-99),{id:String(m.id||Date.now()),name:String(m.name||"Player"),text:String(m.text),at:Number(m.at||Date.now())}]);if(!chatOpenRef.current&&String(m.playerId)!==p.playerId)setChatUnread(true)});s.on("game-finished",(e:any)=>setConnectionMessage(e?.winnerId===p.playerId?"You won!":"Match finished"));const onOnline=()=>{if(s?.connected)recover(s)};window.addEventListener("online",onOnline);return()=>{cancelled=true;window.removeEventListener("online",onOnline);s?.disconnect()}};void start();return()=>{cancelled=true;s?.disconnect()}},[roomCode,roomSize,clearAction,loadProfile,recover]);
- useEffect(()=>{gameRef.current=game},[game]);useEffect(()=>{chatOpenRef.current=chatOpen},[chatOpen]);
- const animateMove=useCallback(async(move:MoveEvent)=>{if(!mountedRef.current)return;animationRef.current=true;setAnimating(true);const[color,idText]=String(move.tokenId).split(":");const id=Number(idText);if(!COLORS.includes(color as Color)||!Number.isInteger(id)){animationRef.current=false;setAnimating(false);return}const from=Number(move.from);const capture=Boolean(move.captureToCenter&&move.captured);const contact=Number(capture?(move.captureProgress??move.to):move.to);const finalTo=Number(move.finalTo??(capture?FINISH_PROGRESS:move.to));const update=(position:number)=>setTokens(prev=>prev.map(t=>t.color===color&&t.id===id?{...t,position,state:tokenState(position)}:t));update(from);if(contact!==from){const step=contact>from?1:-1;for(let p=from+step;;p+=step){await new Promise(r=>window.setTimeout(r,70));if(!mountedRef.current)return;update(p);if(p===contact)break}}if(capture&&move.captured){setTokens(prev=>prev.map(t=>t.color===move.captured!.color&&t.id===move.captured!.id?{...t,position:0,state:"yard"}:t));await new Promise(r=>window.setTimeout(r,60))}if(finalTo!==contact){await new Promise(r=>window.setTimeout(r,capture?0:70));if(!mountedRef.current)return;update(finalTo)}else if(capture)update(FINISH_PROGRESS);const next=moveQueueRef.current.shift();if(next){await animateRef.current(next);return}animationRef.current=false;setAnimating(false);setTokens(authoritativeRef.current.map(t=>({...t})))},[]);useEffect(()=>{animateRef.current=animateMove},[animateMove]);
- const players=useMemo(()=>roster.length?roster:(game?.players||[]),[roster,game?.players]);const mine=players.find(p=>String(p.playerId)===me)||players[0];const opponent=players.find(p=>String(p.playerId)!==String(me));const myColors=useMemo<Color[]>(()=>mine?.colors?.length?mine.colors:(playerColorsForSeats(roomSize,mine?.seat??0) as Color[]),[mine,roomSize]);const myTurn=!!game&&connected&&String(game.currentPlayerId||"")===String(me);const legalTokenKeys=useMemo(()=>pending===null||!myTurn?[]:tokens.filter(t=>myColors.includes(t.color)&&canMove(tokens,t,pending)).map(t=>`${t.color}-${t.id}`),[pending,myTurn,tokens,myColors]);
- const emitAction=useCallback((event:"game-roll"|"game-move",payload?:unknown)=>{if(!socket?.connected)return false;clearAction();requestPendingRef.current=true;setAnimating(true);actionTimerRef.current=window.setTimeout(()=>{clearAction();setAnimating(false);socket.connected&&recover(socket)},7000);socket.emit(event,payload,(ack:{ok?:boolean})=>{if(ack?.ok){if(event==="game-roll")setAnimating(false);return}clearAction();setAnimating(false);if(socket.connected)recover(socket)});return true},[socket,clearAction,recover]);
- const chooseToken=(color:Color,id:number)=>{if(!socket||!game||!connected||!myTurn||pending===null||animating||requestPendingRef.current)return;const token=tokens.find(t=>t.color===color&&t.id===id);if(!token||!myColors.includes(color)||!canMove(tokens,token,pending))return;void emitAction("game-move",{tokenId:`${color}:${id}`})};
- const handleRoll=()=>{if(!socket||!game||!connected||!myTurn||pending!==null||animating||remoteRolling||requestPendingRef.current)return;void emitAction("game-roll")};
- const toggleSound=()=>{const next=!soundEnabled;setSoundEnabled(next);try{const saved=JSON.parse(localStorage.getItem("ludo-settings")||"{}");localStorage.setItem("ludo-settings",JSON.stringify({...saved,sound:next}))}catch{}};
- const sendChat=(value=chatText)=>{const text=value.trim();if(!text||!socket?.connected)return;const now=Date.now();setChatMessages(items=>[...items.slice(-99),{id:`local-${now}`,name:mine?.name||profile.name,text,at:now}]);socket.emit("chat",{text});void fetch("/api/multiplayer-chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({roomCode,text}),cache:"no-store"}).catch(()=>{});setChatText("")};
- const confirmLeave=()=>{setLeaveConfirmOpen(false);socket?.emit("leave-room");window.setTimeout(()=>{window.location.href="/lobby"},500)};
- const statusColor=connected?"#39e87a":"#ffbe55";
- return <main style={{position:"fixed",inset:0,overflow:"hidden",background:"#000",color:"#fff",fontFamily:"-apple-system,BlinkMacSystemFont,Segoe UI,Roboto,sans-serif"}}><StakeDisplay roomCode={roomCode}/><div style={{height:"100%",display:"grid",gridTemplateRows:"76px minmax(0,1fr) auto",padding:"8px 10px"}}><header style={{display:"grid",gridTemplateColumns:"1fr 100px 1fr",gap:8,alignItems:"center"}}><div style={{display:"flex",alignItems:"center",gap:8,padding:8,border:"1px solid #3b2b13",borderRadius:18,background:"#100c07"}}><div style={{width:44,height:44,borderRadius:"50%",overflow:"hidden",display:"grid",placeItems:"center",border:"2px solid #d4af37",background:"#080706"}}><PlayerAvatar src={mine?.avatar||profile.avatar}/></div><div style={{minWidth:0}}><b style={{fontSize:12,display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{mine?.name||profile.name} <small style={{fontSize:7,color:"#e9b52e"}}>YOU</small></b><span style={{fontSize:8,color:statusColor}}>{connected?"● Connected":"● Reconnecting…"}</span></div></div><div style={{textAlign:"center",color:"#f0c95a"}}><b style={{fontSize:24}}>♛ LUDO</b><small style={{display:"block",fontSize:10,letterSpacing:2}}>LIVE</small></div><div style={{display:"flex",justifyContent:"flex-end",alignItems:"center",gap:8,padding:8,border:"1px solid #3b2b13",borderRadius:18,background:"#100c07"}}><div style={{minWidth:0,textAlign:"right"}}><b style={{fontSize:12,display:"block",overflow:"hidden",textOverflow:"ellipsis",whiteSpace:"nowrap"}}>{opponent?.name||"Waiting for player"}</b><span style={{fontSize:8,color:opponent?"#ff3347":"#ffbe55"}}>{opponent?"● IN MATCH":"● WAITING"}</span></div><div style={{width:44,height:44,borderRadius:"50%",overflow:"hidden",display:"grid",placeItems:"center",border:"2px solid #d4af37",background:"#080706"}}><PlayerAvatar src={opponent?.avatar}/></div></div></header><section style={{minHeight:0,display:"grid",placeItems:"center",padding:"4px 0"}}><div style={{width:"min(100%, 680px)",height:"min(100%, 680px)",aspectRatio:"1",padding:6,borderRadius:24,background:"linear-gradient(145deg,#f6da82,#8d6819 43%,#e7c970)",boxShadow:"0 12px 32px rgba(0,0,0,.8)"}}><CanonicalLudoBoard theme={cosmetics.board} yardSkin={cosmetics.yard} demoTokens={tokens} onTokenClick={chooseToken} legalTokenKeys={legalTokenKeys}/></div></section><section><div style={{display:"grid",gridTemplateColumns:"minmax(120px,.8fr) minmax(0,1.5fr) 58px",gap:6,minHeight:132}}><div style={{border:"1px solid #3b2b13",borderRadius:14,background:"#100c07",padding:8,display:"flex",flexDirection:"column",justifyContent:"space-between"}}><div><b style={{fontSize:11}}>{mine?.name||profile.name}</b><div style={{fontSize:8,color:"#d4af37"}}>★ {mine?.level||profile.level}</div></div><div style={{fontSize:11}}>🟡 <b>{Number(mine?.coins??profile.coins).toLocaleString()}</b></div></div><div style={{border:"1px solid #3b2b13",borderRadius:14,background:"#100c07",padding:7,display:"grid",gridTemplateColumns:"1fr 104px",alignItems:"center"}}><div><b style={{fontSize:10,color:myTurn?"#39e87a":"#aaa"}}>{myTurn?"● YOUR TURN":"● OPPONENT'S TURN"}</b><div style={{fontSize:8,color:"#777",marginTop:5}}>{myTurn?"Roll the dice and make your move":"Wait for the other player to move"}</div></div><DemoDice value={roll} skin={cosmetics.dice} onRoll={handleRoll} disabled={!connected||!game||!myTurn||pending!==null||animating||remoteRolling} botRolling={remoteRolling}/></div><div style={{display:"grid",gridTemplateRows:"1fr 1fr",gap:6}}><button type="button" onClick={()=>{setChatOpen(v=>!v);setChatUnread(false)}} style={{border:"1px solid #3b2b13",borderRadius:14,background:"#100c07",color:"#fff",position:"relative"}}>💬<small style={{display:"block"}}>Chat</small>{chatUnread&&<i style={{position:"absolute",top:6,right:7,width:8,height:8,borderRadius:"50%",background:"#ff2941"}}/>}</button><div style={{border:"1px solid #3b2b13",borderRadius:14,overflow:"hidden"}}><ChatVoice socket={socket} roomCode={roomCode} playerId={me} members={players.map(p=>({id:p.playerId,playerId:p.playerId,name:p.name,online:p.connected!==false,peerId:p.peerId}))}/></div></div></div><div style={{display:"flex",gap:5,overflow:"auto",paddingTop:5}}>{REACTIONS.map(r=><button key={r} onClick={()=>{setChatOpen(true);sendChat(r)}} style={{border:"1px solid #3a2d16",borderRadius:14,background:"#100c07",color:"#f0d477",padding:"5px 8px",fontSize:8}}>{r}</button>)}</div><footer style={{display:"grid",gridTemplateColumns:"auto auto auto minmax(0,1fr)",gap:5,paddingTop:5}}><button type="button" onClick={()=>setLeaveConfirmOpen(true)} style={{border:"1px solid #3a2d16",borderRadius:10,background:"#100c07",color:"#ef5555",fontSize:8,padding:6}}>↪ Leave Match</button><button type="button" onClick={()=>setPlayersOpen(v=>!v)} style={{border:"1px solid #3a2d16",borderRadius:10,background:"#100c07",color:"#cfc6b0",fontSize:8,padding:6}}>👥 Players</button><button type="button" onClick={toggleSound} style={{border:"1px solid #3a2d16",borderRadius:10,background:"#100c07",color:"#cfc6b0",fontSize:8,padding:6}}>{soundEnabled?"🔊 Sound":"🔇 Sound"}</button><div style={{border:"1px solid #3a2d16",borderRadius:10,background:"#100c07",color:"#858585",fontSize:8,padding:6,textAlign:"center"}}>🛡️ Room ID: {roomCode}</div></footer></section></div>{chatOpen&&<section style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",zIndex:200,width:"min(92%,420px)",maxHeight:"70%",display:"flex",flexDirection:"column",padding:13,border:"1px solid rgba(212,175,55,.55)",borderRadius:18,background:"#0d0a06",boxShadow:"0 18px 60px rgba(0,0,0,.85)"}}><header style={{display:"flex",justifyContent:"space-between",paddingBottom:8,borderBottom:"1px solid #332712"}}><b>Room Chat</b><button type="button" onClick={()=>setChatOpen(false)}>×</button></header><div style={{flex:1,overflow:"auto",padding:"8px 0"}}>{chatMessages.length?chatMessages.map(m=><div key={m.id+m.at} style={{padding:"6px 8px",margin:"4px 0",borderRadius:10,background:m.name===mine?.name?"#12351e":"#20170b"}}><b style={{fontSize:9,color:"#e5bd4d",display:"block"}}>{m.name}</b><span style={{fontSize:12}}>{m.text}</span></div>):<p style={{color:"#999",fontSize:11}}>No messages yet.</p>}</div><form onSubmit={e=>{e.preventDefault();sendChat()}} style={{display:"flex",gap:6}}><input value={chatText} onChange={e=>setChatText(e.target.value)} maxLength={240} placeholder="Type a message…" style={{flex:1,minWidth:0,border:"1px solid #5a431d",borderRadius:9,padding:8,background:"#080705",color:"#fff"}}/><button type="submit" style={{border:"1px solid #b88d28",borderRadius:9,background:"#c7951c",fontWeight:900,padding:"0 11px"}}>Send</button></form></section>}{playersOpen&&<section style={{position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",zIndex:200,width:"min(92%,420px)",padding:13,border:"1px solid rgba(212,175,55,.55)",borderRadius:18,background:"#0d0a06"}}><header style={{display:"flex",justifyContent:"space-between"}}><b>Players in Room</b><button onClick={()=>setPlayersOpen(false)}>×</button></header>{players.map(p=><div key={p.playerId} style={{display:"flex",gap:8,padding:8,marginTop:7,borderRadius:10,background:"#100d08"}}><div style={{width:36,height:36,borderRadius:"50%",overflow:"hidden",display:"grid",placeItems:"center",border:"2px solid #b88d28"}}><PlayerAvatar src={p.avatar}/></div><div><b style={{fontSize:11}}>{p.name}</b><small style={{display:"block",fontSize:8,color:"#76ef9e"}}>★ {p.level||1} · 🟡 {Number(p.coins||0).toLocaleString()}</small></div></div>)}</section>}<LudoConfirmModal open={leaveConfirmOpen} title="Leave this match?" message="Are you sure you want to leave this match?" confirmLabel="Leave Match" cancelLabel="Stay" danger onConfirm={confirmLeave} onCancel={()=>setLeaveConfirmOpen(false)}/><div aria-live="polite" style={{position:"fixed",left:"50%",bottom:8,transform:"translateX(-50%)",zIndex:90,fontSize:8,color:statusColor}}>{connectionMessage}</div></main>;
+function ChatPanel({ open, messages, value, setValue, onSend, onClose, reactions, onReaction }: {
+  open: boolean; messages: ChatMessage[]; value: string; setValue: (value: string) => void;
+  onSend: (value?: string) => void; onClose: () => void; reactions: string[]; onReaction: (value: string) => void;
+}) {
+  if (!open) return null;
+  return <div className="mp-chat-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) onClose(); }}>
+    <section className="mp-chat-panel" aria-label="Room Chat" onMouseDown={e => e.stopPropagation()}>
+      <div className="mp-chat-head"><strong>Room Chat</strong><button type="button" onClick={onClose} aria-label="Close chat">×</button></div>
+      <div className="mp-chat-list">
+        {messages.length === 0 ? <div className="mp-chat-empty">No messages yet.</div> : messages.map(message => <div className="mp-chat-message" key={message.id}><div className="mp-chat-name">{message.name}</div><div className="mp-chat-text">{message.text}</div></div>)}
+      </div>
+      <div className="mp-reactions">{reactions.map(reaction => <button key={reaction} type="button" onClick={() => onReaction(reaction)}>{reaction}</button>)}</div>
+      <form className="mp-chat-compose" onSubmit={e => { e.preventDefault(); onSend(); }}>
+        <input value={value} onChange={e => setValue(e.target.value)} placeholder="Type a message…" aria-label="Chat message" maxLength={240} />
+        <button type="submit" disabled={!value.trim()}>Send</button>
+      </form>
+    </section>
+  </div>;
+}
+
+function StakeDisplay({ roomCode }: { roomCode: string }) {
+  const [stake, setStake] = useState<{ pot: number; status?: string } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const load = async () => {
+      try {
+        const response = await fetch(`/api/multiplayer-stake?roomCode=${encodeURIComponent(roomCode)}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const data = await response.json();
+        const pot = Number(data?.pot) || 0;
+        if (alive) setStake(pot > 0 ? { pot, status: String(data?.status || "") } : null);
+      } catch {}
+    };
+    void load();
+    const timer = window.setInterval(load, 2500);
+    return () => { alive = false; window.clearInterval(timer); };
+  }, [roomCode]);
+  if (!stake) return null;
+  return <div className="mp-stake-bar">🪙 STAKED POT · {stake.pot.toLocaleString()} COINS · {String(stake.status || "").toUpperCase()}</div>;
+}
+
+export default function OnlineMultiplayerGame() {
+  const params = useSearchParams();
+  const roomCode = String(params.get("room") || "W100NB").trim().toUpperCase();
+  const roomSize = Number(params.get("size") || 2) === 4 ? 4 : 2;
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [connectionMessage, setConnectionMessage] = useState("Connecting…");
+  const [me, setMe] = useState("");
+  const [profile, setProfile] = useState({ name: "Player", avatar: "", level: 1, coins: 0 });
+  const [game, setGame] = useState<GameState | null>(null);
+  const [roster, setRoster] = useState<Player[]>([]);
+  const [tokens, setTokens] = useState<DemoToken[]>(EMPTY_TOKENS);
+  const [roll, setRoll] = useState<DiceValue>(6);
+  const [pending, setPending] = useState<DiceValue | null>(null);
+  const [remoteRolling, setRemoteRolling] = useState(false);
+  const [animating, setAnimating] = useState(false);
+  const [cosmetics, setCosmetics] = useState<Cosmetics>(defaultCosmetics);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const revisionRef = useRef(-1);
+  const authoritativeRef = useRef<DemoToken[]>(EMPTY_TOKENS);
+  const animationRef = useRef(false);
+  const moveQueueRef = useRef<MoveEvent[]>([]);
+  const actionTimerRef = useRef<number | null>(null);
+  const requestPendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const chatOpenRef = useRef(false);
+  const animateRef = useRef<(move: MoveEvent) => Promise<void>>(async () => {});
+
+  const clearAction = useCallback(() => {
+    if (actionTimerRef.current !== null) window.clearTimeout(actionTimerRef.current);
+    actionTimerRef.current = null;
+    requestPendingRef.current = false;
+  }, []);
+
+  const recover = useCallback((s: Socket | null) => {
+    if (!s?.connected) return;
+    s.emit("game-recover", (result: { ok?: boolean }) => { if (result?.ok) setConnectionMessage("Connected"); });
+  }, []);
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const [authResponse, customizationResponse] = await Promise.all([
+        fetch("/api/auth", { cache: "no-store" }),
+        fetch("/api/customization", { cache: "no-store" }),
+      ]);
+      const auth = await authResponse.json();
+      const customization: CustomizationResponse = customizationResponse.ok ? await customizationResponse.json() : {};
+      const name = String(auth?.user?.username || "Player");
+      const avatar = String(auth?.user?.avatar || auth?.user?.image || "");
+      const level = Math.max(1, Number(auth?.user?.level) || 1);
+      const coins = Math.max(0, Number(auth?.user?.coins) || 0);
+      const next: Cosmetics = {
+        board: String(customization.equippedBoard || "classic") as BoardThemeId,
+        dice: String(customization.equippedDice || "classic") as DiceSkinId,
+        yard: Array.isArray(customization.equippedItems) ? String(customization.equippedItems.find(x => typeof x === "string" && x.startsWith("yard-")) || "") : "",
+      };
+      setProfile({ name, avatar, level, coins });
+      setCosmetics(current => current.board === next.board && current.dice === next.dice && current.yard === next.yard ? current : next);
+      return { playerId: String(auth?.user?.id || ""), name, avatar, level, coins, cosmetics: next };
+    } catch { return null; }
+  }, []);
+
+  const loadChatHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/multiplayer-chat?roomCode=${encodeURIComponent(roomCode)}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      const history: ChatMessage[] = Array.isArray(data?.messages) ? data.messages.map((m: any) => ({ id: String(m.id), name: String(m.name || "Player"), text: String(m.text || ""), at: Number(m.at) || Date.now() })) : [];
+      setChatMessages(history.slice(-100));
+    } catch {}
+  }, [roomCode]);
+
+  useEffect(() => { mountedRef.current = true; try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); if (saved.sound !== undefined) setSoundEnabled(saved.sound !== false); } catch {} return () => { mountedRef.current = false; }; }, []);
+  useEffect(() => { chatOpenRef.current = chatOpen; if (chatOpen) setChatUnread(false); }, [chatOpen]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let s: Socket | null = null;
+    const start = async () => {
+      const p = await loadProfile();
+      if (cancelled || !p?.playerId) return;
+      setMe(p.playerId);
+      s = io(window.location.origin, { transports: ["polling", "websocket"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 500, reconnectionDelayMax: 3000 });
+      setSocket(s);
+      const join = () => {
+        setConnected(true);
+        setConnectionMessage("Connected");
+        s?.emit("join-room", { roomCode, roomSize, name: p.name, avatar: p.avatar, level: p.level, coins: p.coins, board: p.cosmetics.board, dice: p.cosmetics.dice, yard: p.cosmetics.yard, playerId: p.playerId });
+        window.setTimeout(() => { if (mountedRef.current) void loadChatHistory(); }, 150);
+      };
+      s.on("connect", join);
+      s.on("disconnect", () => { setConnected(false); clearAction(); setAnimating(false); animationRef.current = false; setConnectionMessage("Reconnecting…"); });
+      s.on("connect_error", error => { setConnected(false); setConnectionMessage(`Connection error: ${error.message || "retrying"}`); });
+      s.on("roster", (members: Player[]) => {
+        const next = Array.isArray(members) ? members : [];
+        setRoster(next);
+        const host = next.find(member => member.host);
+        if (host) setCosmetics({ board: String(host.board || "classic") as BoardThemeId, dice: String(host.dice || "classic") as DiceSkinId, yard: String(host.yard || "") });
+      });
+      s.on("host-cosmetics", (value: Cosmetics) => setCosmetics({ board: String(value?.board || "classic") as BoardThemeId, dice: String(value?.dice || "classic") as DiceSkinId, yard: String(value?.yard || "") }));
+      s.on("game-state", (next: GameState) => {
+        if (!mountedRef.current) return;
+        const revision = Number(next.stateRevision ?? -1);
+        if (revision >= 0 && revisionRef.current >= 0 && revision < revisionRef.current) return;
+        if (revision >= 0) revisionRef.current = revision;
+        setGame(next);
+        setPending(String(next.currentPlayerId || "") === p.playerId ? next.pendingMove : null);
+        if (next.dice !== null) setRoll(next.dice);
+        authoritativeRef.current = normalizeTokens(next.tokens || {});
+        if (!animationRef.current && moveQueueRef.current.length === 0) setTokens(authoritativeRef.current.map(token => ({ ...token })));
+        if (next.status !== "playing") { clearAction(); setAnimating(false); animationRef.current = false; }
+      });
+      s.on("game-dice", (event: { value: DiceValue }) => { if (Number(event?.value) >= 1) setRoll(event.value); setRemoteRolling(true); window.setTimeout(() => mountedRef.current && setRemoteRolling(false), 700); });
+      s.on("game-moved", (move: MoveEvent) => { if (!move?.tokenId) return; clearAction(); moveQueueRef.current.push(move); if (!animationRef.current) { const next = moveQueueRef.current.shift(); if (next) void animateRef.current(next); } });
+      s.on("game-roll-error", () => { clearAction(); setAnimating(false); });
+      s.on("game-move-error", () => { clearAction(); setAnimating(false); animationRef.current = false; recover(s); });
+      s.on("chat", (message: any) => {
+        if (!message?.text) return;
+        const normalized: ChatMessage = { id: String(message.id || `${message.playerId || "player"}-${message.at || Date.now()}-${String(message.text)}`), name: String(message.name || "Player"), text: String(message.text), at: Number(message.at) || Date.now() };
+        setChatMessages(items => items.some(item => item.id === normalized.id) ? items : [...items.slice(-99), normalized]);
+        if (!chatOpenRef.current && String(message.playerId) !== p.playerId) setChatUnread(true);
+      });
+      s.on("game-finished", (event: any) => setConnectionMessage(event?.winnerId === p.playerId ? "You won!" : "Match finished"));
+      const onOnline = () => { if (s?.connected) recover(s); };
+      window.addEventListener("online", onOnline);
+      return () => { cancelled = true; window.removeEventListener("online", onOnline); s?.disconnect(); };
+    };
+    void start();
+    return () => { cancelled = true; s?.disconnect(); };
+  }, [roomCode, roomSize, clearAction, loadChatHistory, loadProfile, recover]);
+
+  const animateMove = useCallback(async (move: MoveEvent) => {
+    if (!mountedRef.current) return;
+    animationRef.current = true;
+    setAnimating(true);
+    const [color, idText] = String(move.tokenId).split(":");
+    const id = Number(idText);
+    if (!COLORS.includes(color as Color) || !Number.isInteger(id)) { animationRef.current = false; setAnimating(false); return; }
+    const from = Number(move.from);
+    const contact = Number(move.captureToCenter ? (move.captureProgress ?? move.to ?? move.target) : (move.to ?? move.target));
+    const finalTo = Number(move.finalTo ?? (move.captureToCenter ? FINISH_PROGRESS : contact));
+    const update = (position: number) => setTokens(prev => prev.map(token => token.color === color && token.id === id ? { ...token, position, state: tokenState(position) } : token));
+    update(from);
+    if (contact !== from) {
+      const step = contact > from ? 1 : -1;
+      for (let position = from + step;; position += step) {
+        await new Promise(resolve => window.setTimeout(resolve, 45));
+        if (!mountedRef.current) return;
+        update(position);
+        if (position === contact) break;
+      }
+    }
+    if (move.captureToCenter && move.captured) {
+      setTokens(prev => prev.map(token => token.color === move.captured?.color && token.id === move.captured?.id ? { ...token, position: 0, state: "yard" } : token));
+      await new Promise(resolve => window.setTimeout(resolve, 40));
+    }
+    if (finalTo !== contact) { await new Promise(resolve => window.setTimeout(resolve, 40)); if (!mountedRef.current) return; update(finalTo); }
+    const next = moveQueueRef.current.shift();
+    if (next) { await animateRef.current(next); return; }
+    animationRef.current = false;
+    setAnimating(false);
+    setTokens(authoritativeRef.current.map(token => ({ ...token })));
+  }, []);
+  useEffect(() => { animateRef.current = animateMove; }, [animateMove]);
+
+  const players = useMemo(() => roster.length ? roster : (game?.players || []), [roster, game?.players]);
+  const mine = players.find(player => String(player.playerId) === String(me)) || players[0];
+  const opponent = players.find(player => String(player.playerId) !== String(me));
+  const myColors = useMemo<Color[]>(() => mine?.colors?.length ? mine.colors : playerColorsForSeats(roomSize, mine?.seat ?? 0) as Color[], [mine, roomSize]);
+  const myTurn = !!game && connected && String(game.currentPlayerId || "") === String(me);
+  const legalTokenKeys = useMemo(() => pending === null || !myTurn ? [] : tokens.filter(token => myColors.includes(token.color) && canMove(tokens, token, pending)).map(token => `${token.color}-${token.id}`), [pending, myTurn, tokens, myColors]);
+
+  const emitAction = useCallback((event: "game-roll" | "game-move", payload?: unknown) => {
+    if (!socket?.connected) return false;
+    clearAction();
+    requestPendingRef.current = true;
+    setAnimating(true);
+    actionTimerRef.current = window.setTimeout(() => { clearAction(); setAnimating(false); if (socket.connected) recover(socket); }, 7000);
+    socket.emit(event, payload, (ack: { ok?: boolean }) => { if (ack?.ok) { if (event === "game-roll") setAnimating(false); return; } clearAction(); setAnimating(false); if (socket.connected) recover(socket); });
+    return true;
+  }, [socket, clearAction, recover]);
+
+  const chooseToken = (color: Color, id: number) => {
+    if (!socket || !game || !connected || !myTurn || pending === null || animating || requestPendingRef.current) return;
+    const token = tokens.find(item => item.color === color && item.id === id);
+    if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return;
+    void emitAction("game-move", { tokenId: `${color}:${id}` });
+  };
+
+  const handleRoll = () => {
+    if (!socket || !game || !connected || !myTurn || pending !== null || animating || remoteRolling || requestPendingRef.current) return;
+    void emitAction("game-roll");
+  };
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); localStorage.setItem("ludo-settings", JSON.stringify({ ...saved, sound: next })); } catch {}
+  };
+
+  const sendChat = (value = chatText) => {
+    const text = value.trim();
+    if (!text || !socket?.connected) return;
+    socket.emit("chat", { text });
+    void fetch("/api/multiplayer-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomCode, text }), cache: "no-store" }).catch(() => {});
+    setChatText("");
+  };
+
+  const confirmLeave = () => { setLeaveConfirmOpen(false); socket?.emit("leave-room"); window.setTimeout(() => { window.location.href = "/lobby"; }, 400); };
+
+  const statusText = game?.status === "finished" ? (game.winnerId === me ? "YOU WON" : "MATCH FINISHED") : myTurn ? "YOUR TURN" : "OPPONENT'S TURN";
+  const meName = mine?.name || profile.name;
+  const opponentName = opponent?.name || "Opponent";
+  const commMembers = players.map(player => ({ id: String(player.playerId), playerId: String(player.playerId), name: player.name, role: player.host ? "host" : "member", online: player.connected !== false, peerId: player.peerId }));
+
+  return <main className="mp-page">
+    <div className="mp-shell">
+      <header className="mp-header">
+        <div className="mp-player-card"><div className="mp-avatar"><PlayerAvatar src={mine?.avatar || profile.avatar} /></div><div className="mp-player-copy"><strong>{meName} <span>YOU</span></strong><small><i className="mp-online-dot" /> Connected</small></div></div>
+        <div className="mp-brand"><strong>♛ LUDO</strong><span>LIVE</span></div>
+        <div className="mp-player-card mp-player-card-opponent"><div className="mp-player-copy"><strong>{opponentName}</strong><small><i className={`mp-online-dot ${opponent?.connected === false ? "off" : "busy"}`} /> {opponent?.connected === false ? "Disconnected" : "In match"}</small></div><div className="mp-avatar"><PlayerAvatar src={opponent?.avatar} /></div></div>
+      </header>
+
+      <section className="mp-board-section">
+        <StakeDisplay roomCode={roomCode} />
+        <div className="mp-board-frame"><CanonicalLudoBoard theme={cosmetics.board} yardSkin={cosmetics.yard} demoTokens={tokens} legalTokenKeys={legalTokenKeys} onTokenClick={chooseToken} /></div>
+        <ChatPanel open={chatOpen} messages={chatMessages} value={chatText} setValue={setChatText} onSend={sendChat} onClose={() => setChatOpen(false)} reactions={REACTIONS} onReaction={value => sendChat(value)} />
+      </section>
+
+      <section className="mp-control-section">
+        <div className="mp-info-card"><div className="mp-info-name">{meName}</div><div className="mp-info-level">★ {mine?.level ?? profile.level}</div><div className="mp-info-coins">🪙 {(Number(mine?.coins) || profile.coins).toLocaleString()}</div></div>
+        <div className="mp-turn-card"><div className={`mp-turn-label ${myTurn ? "mine" : ""}`}><span />{statusText}</div><div className="mp-turn-note">{game?.status === "playing" ? (myTurn ? "Roll the dice to play" : "Wait for the other player to move") : connectionMessage}</div><DemoDice value={roll} onRoll={() => handleRoll()} disabled={!myTurn || pending !== null || animating || remoteRolling || !connected || game?.status !== "playing"} botRolling={remoteRolling} skin={cosmetics.dice} /></div>
+        <div className="mp-tools"><button type="button" className={`mp-tool ${chatOpen || chatUnread ? "active" : ""}`} onClick={() => { setChatOpen(true); setChatUnread(false); }}><span>💬</span><small>Chat{chatUnread ? " •" : ""}</small></button><div className="mp-tool"><ChatVoice roomCode={roomCode} playerId={me} members={commMembers} socket={socket} /><small>Mic</small></div></div>
+      </section>
+
+      <div className="mp-bottom-bar"><button type="button" className="danger" onClick={() => setLeaveConfirmOpen(true)}>↩ Leave Match</button><button type="button" onClick={() => setPlayersOpen(true)}>👥 Players</button><button type="button" onClick={toggleSound}>{soundEnabled ? "🔊 Sound" : "🔇 Sound"}</button><div className="mp-connection">● {connected ? "Connected" : "Reconnecting…"}</div><div className="mp-room">🛡️ Room ID: {roomCode}</div></div>
+    </div>
+
+    {playersOpen && <div className="mp-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setPlayersOpen(false); }}><section className="mp-players-modal" role="dialog" aria-modal="true"><div className="mp-chat-head"><strong>Players</strong><button type="button" onClick={() => setPlayersOpen(false)}>×</button></div>{players.map(player => <div className="mp-roster-row" key={player.playerId}><span className="mp-roster-dot" /> <strong>{player.name}</strong><small>{player.connected === false ? "Disconnected" : "Connected"}</small></div>)}</section></div>}
+    <LudoConfirmModal open={leaveConfirmOpen} title="Leave match?" message="Leaving now will end your participation in this room." confirmLabel="Leave" cancelLabel="Stay" onConfirm={confirmLeave} onCancel={() => setLeaveConfirmOpen(false)} danger />
+  </main>;
 }
