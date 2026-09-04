@@ -10,13 +10,14 @@ type GameSocket = Socket & {
   __ludoReliabilitySeq?: number;
 };
 
-const PATCH = Symbol.for("ludo.game-online.reliability-runtime-v1");
+const PATCH = Symbol.for("ludo.game-online.reliability-runtime-v2");
 const proto = Socket.prototype as any;
+const sockets = new Set<GameSocket>();
 const ACTION_TIMEOUT = 6000;
 const CONNECT_RECOVER_DELAY = 250;
 
-function dispatchStatus(status: "connected" | "reconnecting" | "disconnected", reason?: string) {
-  try { window.dispatchEvent(new CustomEvent("ludo-multiplayer-connection", { detail: { status, reason: reason || "" } })); } catch {}
+function dispatchStatus(status: "connected" | "reconnecting" | "disconnected", reason?: string, opponentId?: string) {
+  try { window.dispatchEvent(new CustomEvent("ludo-multiplayer-connection", { detail: { status, reason: reason || "", opponentId: opponentId || "" } })); } catch {}
 }
 
 function localEvent(socket: GameSocket, event: string, payload?: any) {
@@ -24,6 +25,10 @@ function localEvent(socket: GameSocket, event: string, payload?: any) {
     const callbacks = (socket as any)._callbacks?.[`$${event}`];
     if (Array.isArray(callbacks)) for (const cb of callbacks.slice()) cb(payload);
   } catch {}
+}
+
+function connectedSocket() {
+  return [...sockets].find((socket) => socket.connected && !!socket.__ludoReliabilityRoom) || null;
 }
 
 function recover(socket: GameSocket) {
@@ -39,8 +44,10 @@ if (!proto[PATCH]) {
   const originalEmit = Socket.prototype.emit;
 
   proto.on = function(this: GameSocket, event: string, listener: (...args: any[]) => void) {
+    sockets.add(this);
     if (event === "connect") {
       return originalOn.call(this, event, (...args: any[]) => {
+        sockets.add(this);
         dispatchStatus("connected");
         const result = listener(...args);
         window.setTimeout(() => recover(this), CONNECT_RECOVER_DELAY);
@@ -56,6 +63,14 @@ if (!proto[PATCH]) {
     if (event === "connect_error") {
       return originalOn.call(this, event, (...args: any[]) => {
         dispatchStatus("reconnecting", String(args[0]?.message || "network error"));
+        return listener(...args);
+      });
+    }
+    if (event === "game-connection") {
+      return originalOn.call(this, event, (...args: any[]) => {
+        const payload = args[0] || {};
+        if (payload?.connected === false) dispatchStatus("reconnecting", "opponent_disconnected", String(payload.playerId || ""));
+        else if (payload?.connected === true) dispatchStatus("connected", "opponent_reconnected", String(payload.playerId || ""));
         return listener(...args);
       });
     }
@@ -84,13 +99,13 @@ if (!proto[PATCH]) {
   };
 
   proto.emit = function(this: GameSocket, event: string, ...args: any[]) {
+    sockets.add(this);
     if (event === "join-room") {
       const payload = { ...(args[0] || {}) };
       this.__ludoReliabilityRoom = String(payload.roomCode || "").trim().toUpperCase();
       this.__ludoReliabilityPlayer = String(payload.playerId || "");
       return originalEmit.call(this, event, payload, ...args.slice(1));
     }
-
     if (event === "game-roll" || event === "game-move") {
       if (!this.connected) {
         localEvent(this, event === "game-move" ? "game-move-error" : "game-roll-error", { error: "socket_disconnected" });
@@ -100,7 +115,6 @@ if (!proto[PATCH]) {
       const seq = (this.__ludoReliabilitySeq || 0) + 1;
       this.__ludoReliabilitySeq = seq;
       if (this.__ludoReliabilityAction) window.clearTimeout(this.__ludoReliabilityAction.timer);
-
       let settled = false;
       const clearAction = () => {
         if (settled) return;
@@ -125,8 +139,6 @@ if (!proto[PATCH]) {
       this.__ludoReliabilityAction = { kind, timer, seq };
       return originalEmit.call(this, event, ...outbound);
     }
-
-    if (event === "game-recover") return originalEmit.call(this, event, ...args);
     return originalEmit.call(this, event, ...args);
   };
 }
@@ -135,12 +147,22 @@ export default function MultiplayerReliabilityRuntime() {
   useEffect(() => {
     const onOnline = () => dispatchStatus("reconnecting", "network_online");
     const onOffline = () => dispatchStatus("disconnected", "offline");
+    const onClickCapture = (event: MouseEvent) => {
+      if (window.location.pathname !== "/game-online") return;
+      const target = event.target as Element | null;
+      if (!target) return;
+      const control = target.closest(".dice-button, .canonical-ludo-frame button");
+      if (!control) return;
+      const socket = connectedSocket();
+      if (!navigator.onLine || !socket) {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+      }
+    };
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+    window.addEventListener("click", onClickCapture, true);
 
-    // The active online-game client uses 280ms/220ms waits for each displayed
-    // movement step. Narrowly scale only those two delays on this route so
-    // movement stays animated without making the game feel frozen.
     const nativeSetTimeout = window.setTimeout;
     window.setTimeout = ((handler: TimerHandler, timeout?: number, ...rest: any[]) => {
       let nextTimeout = Number(timeout ?? 0);
@@ -155,6 +177,7 @@ export default function MultiplayerReliabilityRuntime() {
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      window.removeEventListener("click", onClickCapture, true);
       window.setTimeout = nativeSetTimeout;
     };
   }, []);
