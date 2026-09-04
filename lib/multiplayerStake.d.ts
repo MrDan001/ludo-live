@@ -1,0 +1,13 @@
+export declare const MIN_STAKE: number;
+export declare const MAX_STAKE: number;
+export declare function normalizeCode(value: unknown): string;
+export declare function normalizeStake(value: unknown): number | null;
+export declare function registerRoomStake(code: string, hostPlayerId: string, stakeCoins: number): { stakeType: string; stakeCoins: number; paid: boolean };
+export declare function getRoomStake(code: string): { stakeType: string; stakeCoins: number; paid: boolean; hostPlayerId?: string };
+export declare function deleteRoomStake(code: string): void;
+export declare function ensureSchema(): Promise<unknown>;
+export declare function roomStake(code: string): Promise<any>;
+export declare function ensurePlayerStake(args: {code: string; playerId: string; roomSize: number; stake: number}): Promise<any>;
+export declare function releasePlayerStake(code: string, playerId: string): Promise<void>;
+export declare function markMatchStarted(code: string): Promise<void>;
+export declare function settleMatch(code: string, winnerId?: string): Promise<void>;
