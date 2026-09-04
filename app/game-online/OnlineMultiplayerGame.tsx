@@ -16,7 +16,7 @@ type Player = { playerId: string; name: string; seat: number; colors?: Color[]; 
 type TokenMap = Record<string, Record<string, { position: number }>>;
 type GameState = { status: string; currentPlayerId: string | null; dice: DiceValue | null; pendingMove: DiceValue | null; players: Player[]; tokens: TokenMap; winnerId?: string | null; stateRevision?: number };
 type MoveEvent = { playerId?: string; tokenId: string; from: number; to: number; target?: number; finalTo?: number; captureProgress?: number | null; captured?: { playerId: string; color: Color; id: number } | null; captureToCenter?: boolean; stateRevision?: number };
-type ChatMessage = { id: string; name: string; text: string; at: number };
+type ChatMessage = { id: string; playerId?: string; name: string; text: string; at: number };
 type Cosmetics = { board: BoardThemeId; dice: DiceSkinId; yard: string };
 type CustomizationResponse = { equippedBoard?: string; equippedDice?: string; equippedItems?: unknown[] };
 
@@ -28,6 +28,15 @@ const normalizeTokens = (serverTokens: TokenMap): DemoToken[] => COLORS.flatMap(
   const position = Number.isFinite(Number(value)) ? Number(value) : 0;
   return { color, id, position, state: tokenState(position) };
 }));
+const uniquePlayers = (items: Player[]) => {
+  const seen = new Set<string>();
+  return items.filter(item => {
+    const id = String(item?.playerId || "");
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+};
 const defaultCosmetics: Cosmetics = { board: "classic", dice: "classic", yard: "" };
 
 function PlayerAvatar({ src, fallback = "👤" }: { src?: string; fallback?: string }) {
@@ -36,8 +45,8 @@ function PlayerAvatar({ src, fallback = "👤" }: { src?: string; fallback?: str
     : <span>{src || fallback}</span>;
 }
 
-function ChatPanel({ open, messages, value, setValue, onSend, onClose, reactions, onReaction }: {
-  open: boolean; messages: ChatMessage[]; value: string; setValue: (value: string) => void;
+function ChatPanel({ open, messages, me, value, setValue, onSend, onClose, reactions, onReaction }: {
+  open: boolean; messages: ChatMessage[]; me: string; value: string; setValue: (value: string) => void;
   onSend: (value?: string) => void; onClose: () => void; reactions: string[]; onReaction: (value: string) => void;
 }) {
   if (!open) return null;
@@ -45,7 +54,13 @@ function ChatPanel({ open, messages, value, setValue, onSend, onClose, reactions
     <section className="mp-chat-panel" aria-label="Room Chat" onMouseDown={e => e.stopPropagation()}>
       <div className="mp-chat-head"><strong>Room Chat</strong><button type="button" onClick={onClose} aria-label="Close chat">×</button></div>
       <div className="mp-chat-list">
-        {messages.length === 0 ? <div className="mp-chat-empty">No messages yet.</div> : messages.map(message => <div className="mp-chat-message" key={message.id}><div className="mp-chat-name">{message.name}</div><div className="mp-chat-text">{message.text}</div></div>)}
+        {messages.length === 0 ? <div className="mp-chat-empty">No messages yet.</div> : messages.map(message => {
+          const mine = String(message.playerId || "") === String(me);
+          return <div className={`mp-chat-message ${mine ? "mine" : ""}`} key={message.id}>
+            <div className="mp-chat-name">{mine ? "You" : message.name}{mine ? <span className="mp-chat-you">YOU</span> : null}</div>
+            <div className="mp-chat-text">{message.text}</div>
+          </div>;
+        })}
       </div>
       <div className="mp-reactions">{reactions.map(reaction => <button key={reaction} type="button" onClick={() => onReaction(reaction)}>{reaction}</button>)}</div>
       <form className="mp-chat-compose" onSubmit={e => { e.preventDefault(); onSend(); }}>
@@ -81,6 +96,7 @@ export default function OnlineMultiplayerGame() {
   const params = useSearchParams();
   const roomCode = String(params.get("room") || "W100NB").trim().toUpperCase();
   const roomSize = Number(params.get("size") || 2) === 4 ? 4 : 2;
+  const cacheKey = `ludo-live-multiplayer:${roomCode}`;
   const [socket, setSocket] = useState<Socket | null>(null);
   const [connected, setConnected] = useState(false);
   const [connectionMessage, setConnectionMessage] = useState("Connecting…");
@@ -110,12 +126,17 @@ export default function OnlineMultiplayerGame() {
   const mountedRef = useRef(true);
   const chatOpenRef = useRef(false);
   const animateRef = useRef<(move: MoveEvent) => Promise<void>>(async () => {});
+  const sendingChatRef = useRef(false);
 
   const clearAction = useCallback(() => {
     if (actionTimerRef.current !== null) window.clearTimeout(actionTimerRef.current);
     actionTimerRef.current = null;
     requestPendingRef.current = false;
   }, []);
+
+  const saveGameCache = useCallback((next: GameState) => {
+    try { sessionStorage.setItem(cacheKey, JSON.stringify(next)); } catch {}
+  }, [cacheKey]);
 
   const recover = useCallback((s: Socket | null) => {
     if (!s?.connected) return;
@@ -150,13 +171,38 @@ export default function OnlineMultiplayerGame() {
       const response = await fetch(`/api/multiplayer-chat?roomCode=${encodeURIComponent(roomCode)}`, { cache: "no-store" });
       if (!response.ok) return;
       const data = await response.json();
-      const history: ChatMessage[] = Array.isArray(data?.messages) ? data.messages.map((m: any) => ({ id: String(m.id), name: String(m.name || "Player"), text: String(m.text || ""), at: Number(m.at) || Date.now() })) : [];
-      setChatMessages(history.slice(-100));
+      const history: ChatMessage[] = Array.isArray(data?.messages) ? data.messages.map((m: any) => ({
+        id: String(m.id), playerId: String(m.playerId || ""), name: String(m.name || "Player"), text: String(m.text || ""), at: Number(m.at) || Date.now(),
+      })) : [];
+      setChatMessages(current => {
+        const merged = [...current];
+        for (const message of history) {
+          const duplicate = merged.some(existing => existing.id === message.id || (existing.playerId && message.playerId && existing.playerId === message.playerId && existing.text === message.text && Math.abs(existing.at - message.at) < 3000));
+          if (!duplicate) merged.push(message);
+        }
+        return merged.sort((a, b) => a.at - b.at).slice(-100);
+      });
     } catch {}
   }, [roomCode]);
 
   useEffect(() => { mountedRef.current = true; try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); if (saved.sound !== undefined) setSoundEnabled(saved.sound !== false); } catch {} return () => { mountedRef.current = false; }; }, []);
   useEffect(() => { chatOpenRef.current = chatOpen; if (chatOpen) setChatUnread(false); }, [chatOpen]);
+
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(cacheKey);
+      if (!raw) return;
+      const cached = JSON.parse(raw) as GameState;
+      if (!cached || !Array.isArray(cached.players) || !cached.tokens) return;
+      revisionRef.current = Number(cached.stateRevision ?? -1);
+      setGame(cached);
+      setPending(cached.pendingMove ?? null);
+      if (cached.dice !== null) setRoll(cached.dice);
+      const cachedTokens = normalizeTokens(cached.tokens);
+      authoritativeRef.current = cachedTokens;
+      setTokens(cachedTokens.map(token => ({ ...token })));
+    } catch {}
+  }, [cacheKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -171,13 +217,13 @@ export default function OnlineMultiplayerGame() {
         setConnected(true);
         setConnectionMessage("Connected");
         s?.emit("join-room", { roomCode, roomSize, name: p.name, avatar: p.avatar, level: p.level, coins: p.coins, board: p.cosmetics.board, dice: p.cosmetics.dice, yard: p.cosmetics.yard, playerId: p.playerId });
-        window.setTimeout(() => { if (mountedRef.current) void loadChatHistory(); }, 150);
+        window.setTimeout(() => { if (mountedRef.current) void loadChatHistory(); }, 120);
       };
       s.on("connect", join);
       s.on("disconnect", () => { setConnected(false); clearAction(); setAnimating(false); animationRef.current = false; setConnectionMessage("Reconnecting…"); });
       s.on("connect_error", error => { setConnected(false); setConnectionMessage(`Connection error: ${error.message || "retrying"}`); });
       s.on("roster", (members: Player[]) => {
-        const next = Array.isArray(members) ? members : [];
+        const next = uniquePlayers(Array.isArray(members) ? members : []);
         setRoster(next);
         const host = next.find(member => member.host);
         if (host) setCosmetics({ board: String(host.board || "classic") as BoardThemeId, dice: String(host.dice || "classic") as DiceSkinId, yard: String(host.yard || "") });
@@ -193,16 +239,26 @@ export default function OnlineMultiplayerGame() {
         if (next.dice !== null) setRoll(next.dice);
         authoritativeRef.current = normalizeTokens(next.tokens || {});
         if (!animationRef.current && moveQueueRef.current.length === 0) setTokens(authoritativeRef.current.map(token => ({ ...token })));
+        saveGameCache(next);
         if (next.status !== "playing") { clearAction(); setAnimating(false); animationRef.current = false; }
       });
-      s.on("game-dice", (event: { value: DiceValue }) => { if (Number(event?.value) >= 1) setRoll(event.value); setRemoteRolling(true); window.setTimeout(() => mountedRef.current && setRemoteRolling(false), 700); });
+      s.on("game-dice", (event: { value: DiceValue; playerId?: string }) => {
+        if (Number(event?.value) >= 1) setRoll(event.value);
+        if (String(event?.playerId || "") !== String(p.playerId)) {
+          setRemoteRolling(true);
+          window.setTimeout(() => mountedRef.current && setRemoteRolling(false), 700);
+        }
+      });
       s.on("game-moved", (move: MoveEvent) => { if (!move?.tokenId) return; clearAction(); moveQueueRef.current.push(move); if (!animationRef.current) { const next = moveQueueRef.current.shift(); if (next) void animateRef.current(next); } });
       s.on("game-roll-error", () => { clearAction(); setAnimating(false); });
       s.on("game-move-error", () => { clearAction(); setAnimating(false); animationRef.current = false; recover(s); });
       s.on("chat", (message: any) => {
         if (!message?.text) return;
-        const normalized: ChatMessage = { id: String(message.id || `${message.playerId || "player"}-${message.at || Date.now()}-${String(message.text)}`), name: String(message.name || "Player"), text: String(message.text), at: Number(message.at) || Date.now() };
-        setChatMessages(items => items.some(item => item.id === normalized.id) ? items : [...items.slice(-99), normalized]);
+        const normalized: ChatMessage = { id: String(message.id || `${message.playerId || "player"}-${message.at || Date.now()}`), playerId: String(message.playerId || ""), name: String(message.name || "Player"), text: String(message.text), at: Number(message.at) || Date.now() };
+        setChatMessages(items => {
+          const duplicate = items.some(item => item.id === normalized.id || (item.playerId && normalized.playerId && item.playerId === normalized.playerId && item.text === normalized.text && Math.abs(item.at - normalized.at) < 3000));
+          return duplicate ? items : [...items.slice(-99), normalized];
+        });
         if (!chatOpenRef.current && String(message.playerId) !== p.playerId) setChatUnread(true);
       });
       s.on("game-finished", (event: any) => setConnectionMessage(event?.winnerId === p.playerId ? "You won!" : "Match finished"));
@@ -212,7 +268,7 @@ export default function OnlineMultiplayerGame() {
     };
     void start();
     return () => { cancelled = true; s?.disconnect(); };
-  }, [roomCode, roomSize, clearAction, loadChatHistory, loadProfile, recover]);
+  }, [roomCode, roomSize, cacheKey, clearAction, loadChatHistory, loadProfile, recover, saveGameCache]);
 
   const animateMove = useCallback(async (move: MoveEvent) => {
     if (!mountedRef.current) return;
@@ -248,7 +304,7 @@ export default function OnlineMultiplayerGame() {
   }, []);
   useEffect(() => { animateRef.current = animateMove; }, [animateMove]);
 
-  const players = useMemo(() => roster.length ? roster : (game?.players || []), [roster, game?.players]);
+  const players = useMemo(() => uniquePlayers(roster.length ? roster : (game?.players || [])), [roster, game?.players]);
   const mine = players.find(player => String(player.playerId) === String(me)) || players[0];
   const opponent = players.find(player => String(player.playerId) !== String(me));
   const myColors = useMemo<Color[]>(() => mine?.colors?.length ? mine.colors : playerColorsForSeats(roomSize, mine?.seat ?? 0) as Color[], [mine, roomSize]);
@@ -261,7 +317,16 @@ export default function OnlineMultiplayerGame() {
     requestPendingRef.current = true;
     setAnimating(true);
     actionTimerRef.current = window.setTimeout(() => { clearAction(); setAnimating(false); if (socket.connected) recover(socket); }, 7000);
-    socket.emit(event, payload, (ack: { ok?: boolean }) => { if (ack?.ok) { if (event === "game-roll") setAnimating(false); return; } clearAction(); setAnimating(false); if (socket.connected) recover(socket); });
+    socket.emit(event, payload, (ack: { ok?: boolean }) => {
+      if (ack?.ok) {
+        clearAction();
+        if (event === "game-roll") setAnimating(false);
+        return;
+      }
+      clearAction();
+      setAnimating(false);
+      if (socket.connected) recover(socket);
+    });
     return true;
   }, [socket, clearAction, recover]);
 
@@ -283,13 +348,20 @@ export default function OnlineMultiplayerGame() {
     try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); localStorage.setItem("ludo-settings", JSON.stringify({ ...saved, sound: next })); } catch {}
   };
 
-  const sendChat = (value = chatText) => {
+  const sendChat = useCallback(async (value = chatText) => {
     const text = value.trim();
-    if (!text || !socket?.connected) return;
-    socket.emit("chat", { text });
-    void fetch("/api/multiplayer-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomCode, text }), cache: "no-store" }).catch(() => {});
-    setChatText("");
-  };
+    if (!text || !socket?.connected || sendingChatRef.current) return;
+    sendingChatRef.current = true;
+    try {
+      const response = await fetch("/api/multiplayer-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomCode, text }), cache: "no-store" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.message?.id) return;
+      setChatText("");
+      socket.emit("chat", { text, messageId: String(data.message.id) });
+    } finally {
+      sendingChatRef.current = false;
+    }
+  }, [chatText, roomCode, socket]);
 
   const confirmLeave = () => { setLeaveConfirmOpen(false); socket?.emit("leave-room"); window.setTimeout(() => { window.location.href = "/lobby"; }, 400); };
 
@@ -309,19 +381,20 @@ export default function OnlineMultiplayerGame() {
       <section className="mp-board-section">
         <StakeDisplay roomCode={roomCode} />
         <div className="mp-board-frame"><CanonicalLudoBoard theme={cosmetics.board} yardSkin={cosmetics.yard} demoTokens={tokens} legalTokenKeys={legalTokenKeys} onTokenClick={chooseToken} /></div>
-        <ChatPanel open={chatOpen} messages={chatMessages} value={chatText} setValue={setChatText} onSend={sendChat} onClose={() => setChatOpen(false)} reactions={REACTIONS} onReaction={value => sendChat(value)} />
       </section>
 
       <section className="mp-control-section">
         <div className="mp-info-card"><div className="mp-info-name">{meName}</div><div className="mp-info-level">★ {mine?.level ?? profile.level}</div><div className="mp-info-coins">🪙 {(Number(mine?.coins) || profile.coins).toLocaleString()}</div></div>
         <div className="mp-turn-card"><div className={`mp-turn-label ${myTurn ? "mine" : ""}`}><span />{statusText}</div><div className="mp-turn-note">{game?.status === "playing" ? (myTurn ? "Roll the dice to play" : "Wait for the other player to move") : connectionMessage}</div><DemoDice value={roll} onRoll={() => handleRoll()} disabled={!myTurn || pending !== null || animating || remoteRolling || !connected || game?.status !== "playing"} botRolling={remoteRolling} skin={cosmetics.dice} /></div>
-        <div className="mp-tools"><button type="button" className={`mp-tool ${chatOpen || chatUnread ? "active" : ""}`} onClick={() => { setChatOpen(true); setChatUnread(false); }}><span>💬</span><small>Chat{chatUnread ? " •" : ""}</small></button><div className="mp-tool"><ChatVoice roomCode={roomCode} playerId={me} members={commMembers} socket={socket} /><small>Mic</small></div></div>
+        <div className="mp-tools"><button type="button" className={`mp-tool ${chatOpen || chatUnread ? "active" : ""}`} onClick={() => setChatOpen(true)}><span>💬</span><small>Chat{chatUnread ? " •" : ""}</small></button><div className="mp-tool"><ChatVoice roomCode={roomCode} playerId={me} members={commMembers} socket={socket} /><small>Mic</small></div></div>
       </section>
 
       <div className="mp-bottom-bar"><button type="button" className="danger" onClick={() => setLeaveConfirmOpen(true)}>↩ Leave Match</button><button type="button" onClick={() => setPlayersOpen(true)}>👥 Players</button><button type="button" onClick={toggleSound}>{soundEnabled ? "🔊 Sound" : "🔇 Sound"}</button><div className="mp-connection">● {connected ? "Connected" : "Reconnecting…"}</div><div className="mp-room">🛡️ Room ID: {roomCode}</div></div>
     </div>
 
-    {playersOpen && <div className="mp-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setPlayersOpen(false); }}><section className="mp-players-modal" role="dialog" aria-modal="true"><div className="mp-chat-head"><strong>Players</strong><button type="button" onClick={() => setPlayersOpen(false)}>×</button></div>{players.map(player => <div className="mp-roster-row" key={player.playerId}><span className="mp-roster-dot" /> <strong>{player.name}</strong><small>{player.connected === false ? "Disconnected" : "Connected"}</small></div>)}</section></div>}
+    <ChatPanel open={chatOpen} messages={chatMessages} me={me} value={chatText} setValue={setChatText} onSend={sendChat} onClose={() => setChatOpen(false)} reactions={REACTIONS} onReaction={sendChat} />
+
+    {playersOpen && <div className="mp-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setPlayersOpen(false); }}><section className="mp-players-modal" role="dialog" aria-modal="true"><div className="mp-chat-head"><strong>Players</strong><button type="button" onClick={() => setPlayersOpen(false)} aria-label="Close players">×</button></div>{players.map(player => <div className="mp-roster-row" key={player.playerId}><span className="mp-roster-dot" /> <strong>{player.name}{String(player.playerId) === String(me) ? " (You)" : ""}</strong><small>{player.connected === false ? "Disconnected" : "Connected"}</small></div>)}</section></div>}
     <LudoConfirmModal open={leaveConfirmOpen} title="Leave match?" message="Leaving now will end your participation in this room." confirmLabel="Leave" cancelLabel="Stay" onConfirm={confirmLeave} onCancel={() => setLeaveConfirmOpen(false)} danger />
   </main>;
 }
