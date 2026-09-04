@@ -1,9 +1,15 @@
 // Host-authoritative cosmetics bridge for online multiplayer.
 // Cosmetic state only; game rules and move state are untouched.
 const { Socket } = require('socket.io');
-const PATCH = '__ludoHostCosmeticsRuntimeV4';
+const PATCH = '__ludoHostCosmeticsRuntimeV5';
 const proto = Socket.prototype;
 const roomCosmetics = new Map();
+
+globalThis.__ludoHostCosmeticsCleanup = (code) => {
+  const normalized = String(code || '').trim().toUpperCase();
+  if (normalized) roomCosmetics.delete(normalized);
+};
+
 if (!proto[PATCH]) {
   proto[PATCH] = true;
   const originalOnevent = proto.onevent;
@@ -14,7 +20,7 @@ if (!proto[PATCH]) {
         const roomCode = String(this.data?.roomCode || '').trim().toUpperCase();
         const senderId = String(this.data?.authUserId || this.data?.playerId || '').trim();
         const canonicalHost = String(globalThis.__ludoCanonicalHostForRoom?.(roomCode) || '').trim();
-        if (!roomCode || (canonicalHost && canonicalHost !== senderId)) return;
+        if (!roomCode || !canonicalHost || canonicalHost !== senderId) return;
         const payload = data[1] || {};
         const cosmetics = {
           board: String(payload.board || 'classic').slice(0, 80),
@@ -31,10 +37,6 @@ if (!proto[PATCH]) {
         const cosmetics = roomCosmetics.get(roomCode);
         if (cosmetics && String(this.data?.roomCode || '').toUpperCase() === roomCode) this.emit('host-cosmetics', cosmetics);
         return result;
-      }
-      if (Array.isArray(data) && (data[0] === 'room-closed' || data[0] === 'room-null')) {
-        const roomCode = String(data[1]?.roomCode || this.data?.roomCode || '').trim().toUpperCase();
-        if (roomCode) roomCosmetics.delete(roomCode);
       }
     } catch (e) {
       console.error('host cosmetics runtime', e);
