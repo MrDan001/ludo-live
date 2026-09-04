@@ -1,0 +1,77 @@
+/* Direct responsive layout for the live multiplayer game. */
+@media (max-width: 700px) {
+  main[style*="position: fixed"][style*="overflow: hidden"] {
+    width: 100vw !important;
+    max-width: 100vw !important;
+    min-width: 0 !important;
+    overflow: hidden !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+    grid-template-rows: clamp(62px, 16vw, 76px) minmax(0, 1fr) auto !important;
+    gap: 6px !important;
+    padding: 6px 8px max(8px, env(safe-area-inset-bottom)) !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] > div:first-child {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    width: 100% !important;
+    overflow: hidden !important;
+    grid-template-columns: minmax(0, 1fr) clamp(46px, 16vw, 82px) minmax(0, 1fr) !important;
+    gap: 5px !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] > div:first-child > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] > div:first-child > * > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] > div:first-child img {
+    max-width: 100% !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] > section,
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] > section > * {
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] > section[style*="display: flex"] {
+    overflow: hidden !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] button,
+  main[style*="position: fixed"][style*="overflow: hidden"] input,
+  main[style*="position: fixed"][style*="overflow: hidden"] textarea {
+    max-width: 100% !important;
+    min-width: 0 !important;
+    box-sizing: border-box !important;
+  }
+}
+
+@media (max-width: 380px) {
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] {
+    grid-template-rows: 60px minmax(0, 1fr) auto !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+    gap: 5px !important;
+  }
+
+  main[style*="position: fixed"][style*="overflow: hidden"] > div[style*="display: grid"] > div:first-child {
+    grid-template-columns: minmax(0, 1fr) 42px minmax(0, 1fr) !important;
+    gap: 4px !important;
+  }
+}
