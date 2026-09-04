@@ -137,10 +137,25 @@ export default function MultiplayerReliabilityRuntime() {
     const onOffline = () => dispatchStatus("disconnected", "offline");
     window.addEventListener("online", onOnline);
     window.addEventListener("offline", onOffline);
+
+    // The active online-game client uses 280ms/220ms waits for each displayed
+    // movement step. Narrowly scale only those two delays on this route so
+    // movement stays animated without making the game feel frozen.
+    const nativeSetTimeout = window.setTimeout;
+    window.setTimeout = ((handler: TimerHandler, timeout?: number, ...rest: any[]) => {
+      let nextTimeout = Number(timeout ?? 0);
+      if (window.location.pathname === "/game-online") {
+        if (nextTimeout === 280) nextTimeout = 80;
+        else if (nextTimeout === 220) nextTimeout = 70;
+      }
+      return nativeSetTimeout(handler, nextTimeout, ...rest);
+    }) as typeof window.setTimeout;
+
     dispatchStatus(navigator.onLine ? "connected" : "disconnected");
     return () => {
       window.removeEventListener("online", onOnline);
       window.removeEventListener("offline", onOffline);
+      window.setTimeout = nativeSetTimeout;
     };
   }, []);
   return null;
