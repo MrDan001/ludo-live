@@ -1,16 +1,20 @@
 # Ludo Live — Documentation Index & Current Contracts
 
-**Reconciled:** 2026-09-03
+**Reconciled:** 2026-09-04
 
-This is the map for the repository Markdown documentation. `CURRENT_PROJECT_STATE.md` is the current implementation ledger; `ARCHITECTURE.md` is the technical contract; `DEVELOPER_HANDOFF.md` is the safe-change guide.
+This is the map for the repository Markdown documentation. `CURRENT_PROJECT_STATE.md` is the current implementation ledger; `ARCHITECTURE.md` is the technical contract; `DEVELOPER_HANDOFF.md` is the safe-change guide. `GAME_ONLINE.md` is the focused handoff for the live multiplayer page and must be read before changing `/game-online`.
 
 ## Current implemented areas
 
-- **Admin Missions:** `/dbase/missions` has Daily and Weekly tabs; existing missions are preserved and editable through server-backed APIs.
+- **Admin Missions:** `/dbase/missions` has Daily and Weekly management plus current/history lifecycle separation; existing missions are preserved and editable through server-backed APIs.
+- **Admin Events:** `/dbase/events` separates active/current records from ended/history records.
+- **Admin Tournament:** `/dbase/tournament` separates current records from ended/history records; lifecycle is derived from stored start/end times.
+- **Admin visual configuration:** Events, Missions and Tournament editors expose Board, Dice, Yard and Background/Backgroundless yard-artwork selectors sourced from the existing Shop catalogue. Mission editing also supports selecting a Shop item for `purchase_shop` missions.
 - **Admin Shop:** `/dbase/shop` is the canonical catalogue management surface.
 - **Admin Finance/Tournaments:** tournament funding is tied to the platform Admin Finance virtual treasury; tournament lifecycle is Upcoming → Live → Ended.
 - **Wallet audit:** wallet mutations are server-authoritative and the audit system records available source/reason/request/actor and request metadata; historical unknown values are preserved rather than fabricated.
 - **Multiplayer:** canonical board/rules/authority modules remain the source of truth. Capture, yard/home state, turn state, room membership and animation must be kept synchronized with authoritative state.
+- **Online multiplayer chat:** live Socket.IO chat is combined with `/api/multiplayer-chat` persistence/history through `OnlineMultiplayerChatRuntimeFix.tsx`.
 - **Chat/voice:** shared in-game communication components exist; voice signaling follows the active room roster/socket and player identity comes from authoritative profile data.
 - **Avatar sync:** equipped profile avatars are the canonical player identity shown in multiplayer/profile surfaces.
 - **Shop/Spin:** free Spin rewards are rewards, not purchases; level locks must not block a valid free reward. Naira purchases use server-verified Paystack flow.
@@ -25,11 +29,12 @@ This is the map for the repository Markdown documentation. `CURRENT_PROJECT_STAT
 | `CURRENT_PROJECT_STATE.md` | Current-state ledger and regression rules |
 | `ARCHITECTURE.md` | Technical/product architecture contract |
 | `DEVELOPER_HANDOFF.md` | Production-safe engineering workflow |
+| `GAME_ONLINE.md` | **Focused `/game-online` multiplayer wiring and regression handoff** |
 | `ADMIN_REBUILD_SPEC.md` | Admin product/rebuild specification; verify implementation against code |
 | `ADMIN_SHOP_LIVE_PRICING.md` | Admin Shop pricing contract |
 | `SHOP_PRICING.md` | Player/Admin Shop pricing rules |
 | `DAILY_MISSIONS.md` | Daily mission lifecycle and claim contract |
-| `EVENTS.md` | Event lifecycle, progress and settlement |
+| `EVENTS.md` | Event lifecycle, progress, settlement and Admin history boundary |
 | `LEVEL_REWARDS.md` | Level reward and progression contract |
 | `LEVEL_PROGRESSION_SCALABILITY.md` | Scalable level progression rules |
 | `MULTIPLAYER_ARCHITECTURE.md` | Multiplayer authority and rendering architecture |
@@ -48,7 +53,8 @@ This is the map for the repository Markdown documentation. `CURRENT_PROJECT_STAT
 | `PRESTIGE_SYSTEM.md` | Prestige calculation |
 | `ROOM_REFRESH.md` | Room refresh/persistence behavior |
 | `RAILWAY_TRIGGER.md` | Railway deployment trigger notes |
-| `DEVELOPER_STATE_2026-09-02.md` | Historical developer-state snapshot; current ledger supersedes it where they differ |
+| `DEVELOPER_STATE_2026-09-02.md` | Historical developer-state snapshot |
+| `DEVELOPER_STATE_2026-09-04.md` | Current 2026-09-04 developer-state snapshot |
 
 ## Status vocabulary
 
@@ -63,17 +69,15 @@ This is the map for the repository Markdown documentation. `CURRENT_PROJECT_STAT
 2. Correct obsolete implementation claims when the code changes.
 3. Never describe a specification as proof that a feature is implemented.
 4. For a production behavior change, update `CURRENT_PROJECT_STATE.md`, `ARCHITECTURE.md`, `DEVELOPER_HANDOFF.md`, and the relevant focused document.
-5. Preserve server-authoritative financial, reward, progression, tournament and customization rules in documentation.
-6. Record unresolved defects as unresolved rather than documenting a guessed fix.
+5. For `/game-online` changes, update `GAME_ONLINE.md` and `MULTIPLAYER_ARCHITECTURE.md` together.
+6. Preserve server-authoritative financial, reward, progression, tournament and customization rules in documentation.
+7. Record unresolved defects as unresolved rather than documenting a guessed fix.
 
-## Important omitted updates now represented by the current ledger
+## Important current boundaries
 
-- Daily + Weekly Admin Mission management.
-- Preservation/editing of existing mission records.
-- Branded modal replacement for native browser dialogs in the online leave-match and Shop payment-error flows.
-- Wallet audit metadata requirements and distinction between historical unknown records and new mutations.
-- Admin Finance treasury as the tournament funding source.
-- Multiplayer capture/yard/finish animation contracts and canonical authority boundaries.
-- In-game chat/voice and equipped-avatar synchronization.
-- Shop level-lock versus free-reward distinction.
-- Vercel web + Railway backend deployment distinction.
+- Player Event UI intentionally has no history/expired tab; ended records remain server-side for Admin review/settlement.
+- Admin Events, Missions and Tournament now separate current work from finished/history in their management UI.
+- Admin visual selectors are configuration storage; do not claim they automatically alter `/game-online` until the game-session handoff carries/applies those values.
+- Live multiplayer chat uses Socket.IO for real-time delivery and `/api/multiplayer-chat` for persistence/history.
+- `OnlineMultiplayerChatRuntimeFix.tsx` is an active compatibility layer, not disposable dead code.
+- Never repair multiplayer by modifying the protected Bot-vs-Human or Tournament reference implementations unless the product requirement explicitly changes those modes.
