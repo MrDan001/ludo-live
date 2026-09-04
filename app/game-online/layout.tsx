@@ -1,52 +1,37 @@
 import type { ReactNode } from "react";
 
-/**
- * Route shell for the rebuilt /game-online page.
- * The page owns the HUD and board composition. This route wrapper only guarantees
- * that the square board is sized from the phone's WIDTH, not from viewport HEIGHT.
- * That distinction is critical on long/narrow phones.
- */
 export default function GameOnlineLayout({ children }: { children: ReactNode }) {
-  return (
-    <>
-      {children}
-      <style dangerouslySetInnerHTML={{ __html: `
-        .ll-rebuilt-page .ll-board-stage {
-          width: 100% !important;
-          min-width: 0 !important;
-          min-height: 0 !important;
-          overflow: hidden !important;
-        }
-
-        .ll-rebuilt-page .ll-board-frame {
-          width: min(calc(100vw - 20px), 680px) !important;
-          height: min(calc(100vw - 20px), 680px) !important;
-          max-width: calc(100vw - 20px) !important;
-          max-height: calc(100vw - 20px) !important;
-          min-width: 0 !important;
-          min-height: 0 !important;
-          aspect-ratio: 1 / 1 !important;
-          flex: 0 0 auto !important;
-          margin: 0 auto !important;
-        }
-
-        .ll-rebuilt-page .ll-board-frame > .mp-board-wrap,
-        .ll-rebuilt-page .ll-board-frame > .mp-board-wrap > div:first-child {
-          width: 100% !important;
-          height: 100% !important;
-          max-width: none !important;
-          max-height: none !important;
-        }
-
-        @media (min-width: 701px) {
-          .ll-rebuilt-page .ll-board-frame {
-            width: min(calc(100vw - 40px), 620px) !important;
-            height: min(calc(100vw - 40px), 620px) !important;
-            max-width: calc(100vw - 40px) !important;
-            max-height: calc(100vw - 40px) !important;
-          }
-        }
-      ` }} />
-    </>
-  );
+  return <>
+    {children}
+    <style dangerouslySetInnerHTML={{ __html: `
+      .mp-page{min-height:100dvh;background:#000;color:#fff;overflow-x:hidden;overflow-y:auto;-webkit-overflow-scrolling:touch;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+      .mp-shell{width:min(100%,820px);margin:0 auto;padding:10px 12px 18px;box-sizing:border-box}
+      .mp-header{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(0,1fr);align-items:center;gap:10px;height:76px;margin-bottom:10px}
+      .mp-player-card{min-width:0;height:62px;display:flex;align-items:center;gap:10px;padding:7px 12px;border:1px solid rgba(220,183,74,.24);border-radius:22px;background:linear-gradient(145deg,#120f0a,#0a0907);box-sizing:border-box;box-shadow:0 6px 20px rgba(0,0,0,.22)}
+      .mp-player-card-opponent{justify-content:flex-end;text-align:right}
+      .mp-avatar{width:50px;height:50px;flex:0 0 50px;border-radius:50%;display:grid;place-items:center;background:#161412;border:3px solid #d7b84b;overflow:hidden;font-size:25px}
+      .mp-avatar-image{width:100%;height:100%;display:block;object-fit:cover}
+      .mp-player-copy{min-width:0;display:flex;flex-direction:column;gap:4px}
+      .mp-player-copy strong{font-size:17px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.mp-player-copy strong span{font-size:9px;color:#f0d369;margin-left:3px}.mp-player-copy small{font-size:10px;color:#63f190;white-space:nowrap;text-transform:capitalize}.mp-online-dot{display:inline-block;width:9px;height:9px;border-radius:50%;background:#39e87a;margin-right:3px}.mp-online-dot.busy{background:#ff365a}.mp-online-dot.off{background:#9d9d9d}
+      .mp-brand{text-align:center;display:flex;flex-direction:column;line-height:1}.mp-brand strong{font-size:34px;color:#f0d264;letter-spacing:-1px}.mp-brand span{font-size:11px;color:#d8bd63;letter-spacing:4px;margin-top:7px}
+      .mp-board-section{position:relative;display:flex;flex-direction:column;align-items:center;gap:8px}
+      .mp-stake-bar{width:max-content;max-width:calc(100% - 20px);padding:8px 14px;border-radius:999px;border:1px solid rgba(212,175,55,.45);background:#0c0b09;color:#f0d579;font-size:11px;font-weight:950;white-space:nowrap;box-sizing:border-box;box-shadow:0 6px 18px rgba(0,0,0,.22)}
+      .mp-board-frame{width:min(calc(100vw - 24px),680px);aspect-ratio:1/1;border:7px solid #cda945;border-radius:28px;background:#cda945;padding:0;box-sizing:border-box;overflow:hidden;box-shadow:0 12px 34px rgba(0,0,0,.32)}
+      .mp-board-frame .canonical-ludo-frame{width:100%!important;height:100%!important;border-radius:18px;overflow:hidden}
+      .mp-board-frame .shared-ludo-board{width:100%!important;height:100%!important}
+      .mp-control-section{display:grid;grid-template-columns:minmax(150px,.85fr) minmax(280px,1.5fr) 92px;gap:10px;align-items:stretch;margin-top:10px}
+      .mp-info-card,.mp-turn-card,.mp-tool,.mp-bottom-bar button,.mp-connection,.mp-room{border:1px solid rgba(220,183,74,.2);background:linear-gradient(145deg,#12100d,#090806);border-radius:18px;color:#fff;box-sizing:border-box}
+      .mp-info-card{padding:14px;display:flex;flex-direction:column;min-height:190px}.mp-info-name{font-size:18px;font-weight:900}.mp-info-level{font-size:11px;color:#f0d369;margin-top:3px}.mp-info-coins{margin-top:auto;font-size:17px;font-weight:900}
+      .mp-turn-card{min-height:190px;padding:12px 10px;display:grid;grid-template-columns:1fr 150px;grid-template-rows:auto 1fr;align-items:center;gap:2px 6px}.mp-turn-label{font-size:13px;font-weight:950;color:#b7b7b7;grid-column:1}.mp-turn-label.mine{color:#f3d56c}.mp-turn-label span{display:inline-block;width:10px;height:10px;border-radius:50%;background:#9b9b9b;margin-right:6px}.mp-turn-label.mine span{background:#45e886}.mp-turn-note{font-size:10px;line-height:1.45;color:#8894a2;grid-column:1;max-width:130px}.mp-turn-card .dice-area{grid-column:2;grid-row:1/3;min-width:0}
+      .mp-tools{display:grid;grid-template-rows:1fr 1fr;gap:10px}.mp-tool{width:100%;min-height:0;padding:7px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;cursor:pointer;color:#f0d56a}.mp-tool.active{box-shadow:0 0 0 1px rgba(240,213,106,.25),0 8px 22px rgba(0,0,0,.28)}.mp-tool span{font-size:21px}.mp-tool small{font-size:9px;font-weight:900}.mp-tool>div{height:100%;width:100%}
+      .mp-bottom-bar{display:grid;grid-template-columns:auto auto auto 1fr 1fr;gap:7px;margin-top:9px}.mp-bottom-bar button,.mp-connection,.mp-room{min-height:39px;padding:8px 10px;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center}.mp-bottom-bar button{cursor:pointer}.mp-bottom-bar .danger{color:#ff8585}.mp-connection{color:#55ee8b}.mp-room{color:#cbbd88;justify-content:flex-start;padding-left:12px}
+      .mp-chat-backdrop,.mp-modal-backdrop{position:fixed;inset:0;z-index:900;background:rgba(0,0,0,.6);display:grid;place-items:center;padding:14px;box-sizing:border-box}
+      .mp-chat-panel,.mp-players-modal{width:min(100%,620px);max-height:min(78dvh,720px);display:flex;flex-direction:column;padding:14px;background:linear-gradient(155deg,#11100c,#080705);border:1px solid rgba(220,183,74,.34);border-radius:24px;box-shadow:0 26px 70px rgba(0,0,0,.55)}
+      .mp-chat-head{display:flex;align-items:center;justify-content:space-between;padding-bottom:10px;border-bottom:1px solid rgba(220,183,74,.18)}.mp-chat-head strong{font-size:21px}.mp-chat-head button{width:38px;height:38px;border:1px solid #4a4130;border-radius:10px;background:#f3f3f3;color:#111;font-size:22px;cursor:pointer}
+      .mp-chat-list{overflow:auto;display:flex;flex-direction:column;gap:7px;padding:12px 0;min-height:120px}.mp-chat-message{padding:9px 11px;border-radius:14px;background:#0d321b}.mp-chat-name{font-size:10px;color:#d6bb58;font-weight:900;margin-bottom:3px}.mp-chat-text{font-size:15px}.mp-chat-empty{padding:22px;text-align:center;color:#7e8790}.mp-reactions{display:flex;gap:6px;overflow-x:auto;padding:4px 0 9px}.mp-reactions button{border:1px solid rgba(220,183,74,.17);border-radius:999px;background:#0c0b09;color:#e9e9e9;padding:7px 9px;white-space:nowrap;font-size:10px;cursor:pointer}.mp-chat-compose{display:grid;grid-template-columns:1fr auto;gap:8px}.mp-chat-compose input{min-width:0;border:1px solid rgba(220,183,74,.3);border-radius:15px;background:#070707;color:#fff;padding:12px;font-size:14px;outline:none}.mp-chat-compose button{border:0;border-radius:14px;padding:0 17px;background:#e0af18;color:#090909;font-weight:950;font-size:13px;cursor:pointer}.mp-chat-compose button:disabled{opacity:.5;cursor:default}
+      .mp-players-modal{max-width:430px}.mp-roster-row{display:grid;grid-template-columns:10px 1fr auto;gap:9px;align-items:center;padding:12px 2px;border-bottom:1px solid rgba(255,255,255,.06)}.mp-roster-dot{width:8px;height:8px;border-radius:50%;background:#38e884}.mp-roster-row small{color:#87909a}
+      @media(max-width:700px){.mp-shell{padding-left:8px;padding-right:8px}.mp-header{gap:6px;height:70px}.mp-player-card{height:58px;padding:6px 7px;border-radius:18px;gap:6px}.mp-avatar{width:44px;height:44px;flex-basis:44px;border-width:2px}.mp-player-copy strong{font-size:14px}.mp-player-copy small{font-size:9px}.mp-brand strong{font-size:28px}.mp-brand span{font-size:9px;letter-spacing:3px;margin-top:5px}.mp-board-frame{width:calc(100vw - 16px);border-width:5px;border-radius:23px}.mp-control-section{grid-template-columns:1fr 1.42fr;grid-template-rows:auto auto}.mp-info-card{min-height:146px}.mp-turn-card{min-height:146px;grid-template-columns:1fr 122px}.mp-tools{grid-column:1/-1;grid-template-columns:1fr 1fr;grid-template-rows:58px;gap:8px}.mp-tool{flex-direction:row}.mp-bottom-bar{grid-template-columns:1fr 1fr 1fr;gap:5px}.mp-room{grid-column:2/4}.mp-bottom-bar button,.mp-connection,.mp-room{font-size:9px;padding:7px}.mp-chat-panel{max-height:82dvh;border-radius:20px;padding:12px}.mp-chat-compose input{font-size:13px}.mp-chat-compose button{padding:0 14px}}
+      @media(max-width:390px){.mp-header{height:64px}.mp-avatar{width:38px;height:38px;flex-basis:38px}.mp-player-copy strong{font-size:12px}.mp-player-copy small{font-size:8px}.mp-brand strong{font-size:24px}.mp-brand span{font-size:8px;letter-spacing:2px}.mp-board-frame{width:calc(100vw - 12px)}.mp-control-section{gap:6px}.mp-turn-card{grid-template-columns:1fr 108px}.mp-bottom-bar{grid-template-columns:1fr 1fr}.mp-room,.mp-connection{grid-column:auto}}
+    ` }} />
+  </>;
 }
