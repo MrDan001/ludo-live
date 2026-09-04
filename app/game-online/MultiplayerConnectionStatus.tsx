@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 
 type Status = "connected" | "reconnecting" | "disconnected";
+type Detail = { status?: Status; reason?: string; opponentId?: string };
 
 export default function MultiplayerConnectionStatus() {
   const [status, setStatus] = useState<Status>("connected");
@@ -10,7 +11,17 @@ export default function MultiplayerConnectionStatus() {
 
   useEffect(() => {
     const onStatus = (event: Event) => {
-      const detail = (event as CustomEvent<{ status?: Status; reason?: string }>).detail || {};
+      const detail = (event as CustomEvent<Detail>).detail || {};
+      if (detail.reason === "opponent_disconnected") {
+        setStatus("reconnecting");
+        setReason("opponent");
+        return;
+      }
+      if (detail.reason === "opponent_reconnected") {
+        setStatus("connected");
+        setReason("");
+        return;
+      }
       if (detail.status === "connected" || detail.status === "reconnecting" || detail.status === "disconnected") setStatus(detail.status);
       setReason(String(detail.reason || ""));
     };
@@ -20,6 +31,7 @@ export default function MultiplayerConnectionStatus() {
 
   if (status === "connected") return null;
 
+  const opponent = reason === "opponent";
   return (
     <div style={{
       position: "fixed",
@@ -38,8 +50,7 @@ export default function MultiplayerConnectionStatus() {
       pointerEvents: "none",
       whiteSpace: "nowrap",
     }}>
-      {status === "reconnecting" ? "🔄 Reconnecting to match…" : "⚠️ Connection lost — waiting to reconnect…"}
-      {reason === "offline" ? "" : ""}
+      {opponent ? "⏳ Opponent connection lost — waiting for reconnect…" : status === "reconnecting" ? "🔄 Reconnecting to match…" : "⚠️ Connection lost — waiting to reconnect…"}
     </div>
   );
 }
