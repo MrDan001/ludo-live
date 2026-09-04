@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
   try {
     await ensureChatSchema();
     const result = await pool.query(
-      `SELECT id, username AS name, message AS text, EXTRACT(EPOCH FROM created_at) * 1000 AS at
+      `SELECT id, user_id AS "playerId", username AS name, message AS text, EXTRACT(EPOCH FROM created_at) * 1000 AS at
        FROM ludo_multiplayer_chat_messages
        WHERE room_code = $1
        ORDER BY created_at DESC, id DESC
@@ -53,6 +53,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       messages: result.rows.reverse().map((row: any) => ({
         id: String(row.id),
+        playerId: String(row.playerId || ""),
         name: String(row.name || "Player"),
         text: String(row.text || ""),
         at: Math.round(Number(row.at) || Date.now()),
@@ -88,7 +89,7 @@ export async function POST(request: NextRequest) {
     const result = await pool.query(
       `INSERT INTO ludo_multiplayer_chat_messages(room_code,user_id,username,message)
        VALUES($1,$2,$3,$4)
-       RETURNING id, username AS name, message AS text, EXTRACT(EPOCH FROM created_at) * 1000 AS at`,
+       RETURNING id, user_id AS "playerId", username AS name, message AS text, EXTRACT(EPOCH FROM created_at) * 1000 AS at`,
       [roomCode, String(user.id), username, text]
     );
 
@@ -96,6 +97,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       message: {
         id: String(row.id),
+        playerId: String(row.playerId || user.id),
         name: String(row.name || username),
         text: String(row.text || text),
         at: Math.round(Number(row.at) || Date.now()),
