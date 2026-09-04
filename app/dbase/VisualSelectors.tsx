@@ -19,5 +19,6 @@ export function VisualSelectors({value,onChange}:{value:any;onChange:(v:any)=>vo
 export function ShopItemSelector({value,onChange}:{value:string;onChange:(v:string)=>void}){
  const[items,setItems]=useState<Item[]>([]);
  useEffect(()=>{fetch("/api/shop/catalog",{cache:"no-store"}).then(r=>r.ok?r.json():null).then(d=>{if(Array.isArray(d?.items))setItems(d.items)}).catch(()=>{});},[]);
- return <label className="admin-field"><span>Shop item to buy</span><select value={value||""} onChange={e=>onChange(e.target.value)}><option value="">Select a shop item…</option>{items.filter(x=>x.type!=="coin_package"&&x.type!=="gem_package").map(x=><option key={`${x.type}:${x.id}`} value={`${x.type}:${x.id}`}>{x.name}{x.yardKind ? ` · ${x.yardKind==="background"?"Yard background":"Backgroundless yard artwork"}` : ` · ${x.type}`}</option>)}</select></label>;
+ const label=(x:Item)=>x.yardKind?(x.yardKind==="background"?`${x.name} · Yard background`:`${x.name} · Backgroundless yard artwork`):`${x.name} · ${x.type}`;
+ return <label className="admin-field"><span>Shop item to buy</span><select value={value||""} onChange={e=>onChange(e.target.value)}><option value="">Select a shop item…</option>{items.filter(x=>x.type!=="coin_package"&&x.type!=="gem_package").map(x=><option key={`${x.type}:${x.id}`} value={`${x.type}:${x.id}`}>{label(x)}</option>)}</select></label>;
 }
