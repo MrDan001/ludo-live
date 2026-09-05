@@ -192,7 +192,7 @@ export default function OnlineMultiplayerGame(){
     <div className="mp-bottom-bar"><button type="button" className="danger" onClick={()=>setLeaveConfirmOpen(true)}>↩ Leave Match</button><button type="button" onClick={()=>setPlayersOpen(true)}>👥 Players</button><button type="button" onClick={toggleSound}>{soundEnabled?"🔊 Sound":"🔇 Sound"}</button><div className="mp-connection">● {connected?"Connected":"Reconnecting…"}</div><div className="mp-room">🛡️ Room ID: {roomCode}</div></div>
   </div>
 
-  <ChatPanel open={chatOpen} messages={chatMessages} me={me} value={chatText} setValue={setChatText} onSend={sendChat} onClose={()=>setChatOpen(false)} reactions={REACTIONS} onReaction={sendChat}/>
+  <ChatPanel open={chatOpen} messages={chatMessages} me={me} value={chatText} setValue={setChatText} onSend={sendChat} onClose={()=>setChatOpen(false)} onReaction={sendChat}/>
   {playersOpen&&<div className="mp-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setPlayersOpen(false);}}><section className="mp-players-modal" role="dialog" aria-modal="true"><div className="mp-chat-head"><strong>Players</strong><button type="button" onClick={()=>setPlayersOpen(false)} aria-label="Close players">×</button></div>{players.map(player=><div className="mp-roster-row" key={player.playerId}><span className="mp-roster-dot"/><strong>{player.name}{String(player.playerId)===String(me)?" (You)":""}</strong><small>{player.connected===false?"Disconnected":"Connected"}</small></div>)}</section></div>}
   <LudoConfirmModal open={leaveConfirmOpen} title="Leave match?" message="Leaving now will end your participation in this room." confirmLabel="Leave" cancelLabel="Stay" onConfirm={confirmLeave} onCancel={()=>setLeaveConfirmOpen(false)} danger/>
   </main>;
