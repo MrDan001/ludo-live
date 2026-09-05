@@ -130,7 +130,9 @@ Only game-session surfaces count active time:
 - `/game-online`
 - `/tournament/game`
 
-Normal 30-minute completion grants 1 spin + 5 XP. The 17:00–20:00 `Africa/Lagos` Rush Hour window grants 3 spins + 15 XP. These values remain server-authoritative.
+The current server implementation grants **1 free spin + 2 XP** for each completed 30-minute interval during normal hours and **3 free spins + 6 XP** during the 17:00–20:00 `Africa/Lagos` Rush Hour window. These values are authoritative in `/api/spin/activity`.
+
+Unused earned spins persist until consumed. The Spin Wheel consumes the server-side free-spin balance.
 
 ## Admin Shop
 
