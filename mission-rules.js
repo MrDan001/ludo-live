@@ -13,6 +13,7 @@ const KINDS = new Set([
 
 let readyPromise = null;
 const rosterSeen = new Set();
+const roomParticipants = new Map();
 
 function day() { return new Date().toISOString().slice(0, 10); }
 
@@ -114,12 +115,21 @@ function roomCode(room) {
   return String(room || "");
 }
 
+function participantIds(code, payload) {
+  const ids = Array.isArray(payload)
+    ? payload.map((member) => String(member?.playerId || "").trim()).filter(Boolean)
+    : [];
+  if (ids.length) roomParticipants.set(code, new Set(ids));
+  return roomParticipants.get(code) || new Set();
+}
+
 function observe(room, event, payload) {
   try {
     const code = roomCode(room);
     const d = day();
 
     if (event === "roster" && Array.isArray(payload)) {
+      const participants = participantIds(code, payload);
       for (const member of payload) {
         const userId = String(member?.playerId || "").trim();
         if (!userId) continue;
@@ -129,13 +139,16 @@ function observe(room, event, payload) {
         rosterSeen.add(key);
         void record(userId, kind, 1, `room-${kind}-${d}-${code}-${userId}`);
       }
+      if (participants.size) roomParticipants.set(code, participants);
     }
 
     if (event === "start-game" && Array.isArray(payload?.members)) {
+      const participants = participantIds(code, payload.members);
       for (const member of payload.members) {
         const userId = String(member?.playerId || "").trim();
         if (userId) void record(userId, "play_games", 1, `play-${code}-${userId}`);
       }
+      if (participants.size) roomParticipants.set(code, participants);
     }
 
     if (event === "game-dice") {
@@ -164,8 +177,12 @@ function observe(room, event, payload) {
       const winnerId = String(state?.winnerId || "").trim();
       if (state?.status === "finished" && winnerId) {
         const revision = Number(state?.stateRevision || Date.now());
+        const participants = roomParticipants.get(code) || new Set([winnerId]);
+        for (const userId of participants) {
+          void record(userId, "complete_games", 1, `finish-${code}-${userId}-${revision}`);
+        }
         void record(winnerId, "win_games", 1, `win-${code}-${winnerId}-${revision}`);
-        void record(winnerId, "complete_games", 1, `finish-${code}-${winnerId}-${revision}`);
+        roomParticipants.delete(code);
       }
     }
   } catch (error) {
