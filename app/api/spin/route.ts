@@ -7,6 +7,7 @@ import { adjustWallet, requestMeta } from "../lib/wallet-audit";
 
 const COOKIE = "ludo_session";
 type DbSlot = SpinWheelSlot & { updatedAt: string };
+type QueryDb = { query: <T = any>(text: string, values?: any[]) => Promise<{ rows: T[] }> };
 
 async function getUser(request: NextRequest) {
   const token = request.cookies.get(COOKIE)?.value;
@@ -25,11 +26,10 @@ async function ensureSchema() {
   for (const reward of DEFAULT_SPIN_WHEEL) {
     await pool.query(`INSERT INTO ludo_spin_wheel_slots(slot,id,kind,label,icon,amount,probability,item_type,item_id) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(slot) DO NOTHING`, [reward.slot, reward.id, reward.kind, reward.label, reward.icon, reward.amount, reward.probability, reward.itemType || null, reward.itemId || null]);
   }
-  // The former configurable reward table is intentionally retired; the fixed eight-slot table above is now the sole wheel configuration source.
   await pool.query(`DROP TABLE IF EXISTS ludo_spin_rewards`);
 }
 
-async function getWheel(db = pool): Promise<{ wheel: DbSlot[]; version: string }> {
+async function getWheel(db: QueryDb = pool): Promise<{ wheel: DbSlot[]; version: string }> {
   const result = await db.query<DbSlot>(`SELECT slot,id,kind,label,icon,amount,probability,item_type AS "itemType",item_id AS "itemId",updated_at AS "updatedAt" FROM ludo_spin_wheel_slots ORDER BY slot ASC`);
   const wheel = result.rows.map((row) => ({ ...row, amount: Number(row.amount), probability: Number(row.probability) }));
   const version = wheel.reduce((latest, row) => row.updatedAt > latest ? row.updatedAt : latest, "");
