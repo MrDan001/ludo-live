@@ -1,372 +1,228 @@
 # Ludo Live — Architecture & Product Contract
 
-## Purpose
+**Reconciled:** 2026-09-05
 
-This is the production technical map. Read it before changing gameplay, board rendering, authentication, customization, XP/levels, Shop, Inventory, Award Room, admin, finance, tournaments, free spins, voice, events, or deployment. **Do not infer product rules from screenshots or previous conversations.** If a rule changes, update this document and `DEVELOPER_HANDOFF.md` in the same change.
+This document is the current technical/product architecture. Repository code and PostgreSQL state are authoritative. Do not infer current behavior from screenshots, old branches, dated snapshots or conversation history.
 
-## Runtime / source of truth
+## Runtime and authority
 
-- Next.js 14 / React 18 / TypeScript 5.6.
+- Next.js / React / TypeScript application.
 - PostgreSQL through `pg` is the persistent source of truth.
 - Socket.IO in `server.js` owns live multiplayer room state.
-- `main` is the production GitHub branch connected to Railway.
-- A release is **not live** until Railway reports `SUCCESS`.
-- Authenticated server APIs derive identity from the `ludo_session` cookie. Never trust a client-supplied user id for privileged operations.
-- `localStorage` may support UX restoration, but it is not authoritative over server-backed account, wallet, customization, tournament, progression, or event state.
+- `main` is the production branch connected to Railway.
+- A release is not considered live until Railway reports `SUCCESS`.
+- Authenticated APIs derive identity from the `ludo_session` cookie.
+- `localStorage` is UX restoration only; it is not authoritative for account, wallet, reward, progression, tournament, event or customization outcomes.
 
-## Canonical gameplay architecture
+## Canonical Ludo gameplay
 
-### Board / rules
+The canonical board/rules layer is shared by local and multiplayer gameplay:
 
-- `app/_components/LudoBoard.tsx` — base 15×15 board, themes, palettes, geometry and token rendering.
-- `app/_components/CanonicalLudoBoard.tsx` — canonical interactive board adapter; legal tokens are supplied through `legalTokenKeys` and receive the breathing/pulse animation.
-- `app/_components/LudoBoardFixed.tsx` — framed/fixed board wrapper.
-- `app/_components/LudoBoardMultiplayer.tsx` — multiplayer renderer.
-- `lib/ludoRules.ts` — underlying rules.
-- `lib/ludoEngine.ts` — public movement/capture/winner/seat adapter.
-- `lib/canonicalLudoBoard.ts` — canonical geometry/state helpers.
+- `app/_components/LudoBoard.tsx`
+- `app/_components/CanonicalLudoBoard.tsx`
+- `app/_components/LudoBoardMultiplayer.tsx`
+- `lib/ludoRules.ts`
+- `lib/ludoEngine.ts`
+- `lib/canonicalLudoBoard.ts`
 
-Current team model: Human = `red` + `yellow`; Bot = `green` + `blue`. Teammates cannot capture each other.
+Human team is Red + Yellow. Bot team is Green + Blue. Teammates cannot capture one another.
 
-**Do not create a second board geometry or parallel rule engine.** Reuse the canonical implementation.
+Do not create a second board geometry or parallel rules engine.
 
-### Multiplayer token rendering and movement contract
+The custom capture rule remains: a successful kill sends the killer directly to finish position `57`, while the killed token returns to yard position `0`. The finish sound is emitted when position `57` is reached, not for every home-lane step.
 
-`app/_components/LudoBoardMultiplayer.tsx` owns the multiplayer overlay token presentation and movement interpolation.
+## Protected `/game-online`
 
-- The multiplayer breathing/glow is attached to the same token element rather than rendered as an independent board marker. This keeps the glow locked to the token when it moves.
-- Yard tokens use a **9%** board-relative size. Track and launch tokens retain their existing **5.1%** size.
-- A token leaving the yard uses the existing launch animation and transitions from its yard center to its first track cell without leaving a glow behind in the yard.
-- The existing finish animation is preserved.
+`/game-online` is currently locked.
 
-### Custom capture/kill rule
+Protected implementation includes:
 
-This game intentionally uses a custom rule: when a token successfully kills an opponent token, the **killer immediately jumps to finish position `57`**. Do not replace this with standard Ludo capture behavior unless explicitly requested.
+- `app/game-online/OnlineMultiplayerGame.tsx`
+- `app/game-online/page.tsx`
+- multiplayer board/authority components used by that route.
 
-- The killed token is reset to position `0` / `yard`.
-- The killer must not animate box-by-box from its capture square through the finish lane.
-- The killer is treated as reaching `57` directly and should use the finish-token sound.
+Do not modify this surface while working on another feature. Reopen it only when the user explicitly requests a change to `/game-online`.
 
-### Finish-lane audio contract
+## Local Bot-vs-Human and Tournament sequencing
 
-Positions `52–56` are the colored finish/home lane. Passing through those positions uses the normal **move** sound only.
+The local Bot-vs-Human surface is `/game` and the Tournament Bot-vs-Human surface is `/tournament/game`.
 
-The **finish** sound is emitted only when the token actually reaches position `57`. It must not fire once per finish-lane step. A custom kill that directly sends the killer to `57` also triggers the finish sound once.
+The no-legal-move handoff follows one visual sequence:
 
-### Protected Bot-vs-Human reference
+**Human roll starts → human roll animation completes → result is committed → turn changes → bot prepares → bot roll animation runs → bot result appears → bot makes its move.**
 
-`app/game/GameBoardContent.tsx` and `/game` are the known-good gameplay reference. Do not casually refactor or alter them while fixing another mode. Port only the smallest required behavior and preserve the reference behavior unless the user explicitly asks for a Bot-vs-Human change.
+A legal human roll continues into token selection and movement before the bot turn begins.
 
-### Dice/audio
+The affected implementations are:
 
-- `app/_components/DemoDice.tsx` — player dice interaction and roll-start event.
-- `app/_components/LudoDice.tsx` — dice skins/rendering.
-- `app/_components/LudoAudio.tsx` — canonical audio system.
-- Audio events: `dice`, `move`, `capture`, `safe`, `home`, `win`.
-- Exactly one player `dice` event occurs at roll start. Do not add another when the result appears. Bot paths may emit their own start-of-roll event because bots do not click `DemoDice`.
+- `app/game/GameBoardContent.tsx`
+- `app/game/TournamentBotGame.tsx`
+- `app/_components/DemoDice.tsx`
 
-## Voice / room microphone
+## Dice and audio
 
-- `app/_components/ChatVoice.tsx` is the shared microphone/voice component used by room surfaces.
-- Voice transport is browser WebRTC through PeerJS (`peerjs@1.5.4`) with PeerJS signaling. It is separate from the Socket.IO gameplay state.
-- The room owner acts as the roster hub: non-owner peers announce themselves to the owner's peer id, and the owner distributes the discovered peer ids so participants can establish direct audio calls.
-- A microphone stream is obtained only after the player presses the Mic button and grants browser permission. The component checks that the page is running in a secure context (`HTTPS`) and that `getUserMedia` is available.
-- **Important call lifecycle rule:** a remote WebRTC call can arrive before the local player has enabled the microphone. `ChatVoice` stores that pending call and answers it as soon as the local microphone is enabled. This prevents the common race where one player turns on the mic before the other and the first audio call is permanently unanswered.
-- Remote streams are attached to hidden autoplay/playsinline audio elements. The component also attempts `audio.play()` after receiving a stream so remote audio is actually rendered by the browser.
-- Mic off stops the local audio tracks; room teardown closes peer connections and removes remote audio elements.
-- Voice failures are reported in the mic control rather than silently failing.
-- Do not create separate voice implementations for individual rooms. Fix shared voice lifecycle issues in `ChatVoice.tsx` unless a room has a demonstrably different voice contract.
-- Browser permission, HTTPS, network/NAT restrictions, and autoplay policies remain external prerequisites for WebRTC. Do not treat the mic button's green state alone as proof that another player received audio.
+`DemoDice` owns the player roll interaction. `LudoDice` owns dice-skin rendering. `LudoAudio` is the canonical audio layer.
 
-## Authentication / profile / customization
+Supported events are `dice`, `move`, `capture`, `safe`, `home` and `win`.
 
-- `app/api/auth/route.ts` — registration, login, guest, logout, username changes and current user.
-- `lib/auth-session.ts` — server session lookup.
-- `app/api/customization/route.ts` — authoritative owned/equipped board, dice, avatar and item state.
+One player `dice` event is emitted at player roll start. Bot paths emit their own roll-start event because bots do not click the player dice.
 
-The profile exposes `username`, wallet and progression/customization data. Multiplayer should use the real profile username rather than generic player labels when available.
+## Authentication, profile and customization
 
-## Multiplayer
+- `app/api/auth/route.ts` handles account/session operations.
+- `lib/auth-session.ts` provides server session lookup.
+- `app/api/customization/route.ts` is authoritative for owned/equipped board, dice, avatar and item state.
+- Player identity should come from the authoritative profile and catalogue data rather than hard-coded placeholder identities.
 
-- `server.js` — Socket.IO room state, roster, host, dice/move events, chat/friends and match hooks.
-- `app/game/MultiplayerGameCanonical.tsx` — client live multiplayer.
-- `app/game-online/page.tsx` — online entry.
-- `app/_components/LiveSocial.tsx` — canonical multiplayer waiting-room presentation.
+## Multiplayer architecture
 
-The **host owns the room board skin**. A joining player's personal board skin must never replace the host skin. Seat/team mapping comes from the canonical engine; do not invent another mapping in UI.
+`server.js` and the multiplayer authority modules own live room state, turn state, legal movement, match outcomes and room membership.
 
-2-player and 4-player multiplayer should remain viewport-sized and non-scrollable unless a deliberate responsive redesign is requested.
+The online multiplayer room uses the existing chat/voice/social components and the canonical profile/customization identity.
 
-### Online Player navigation contract
+The host owns the room board/theme. A joining player's personal board/theme must not replace the host's authoritative room board.
 
-The in-app Back button on the online player page routes directly to `/home`. It must not return the player to the lobby unless the navigation requirement is explicitly changed.
+## Tournament architecture
 
-### Waiting-room identity contract
+- `/tournament` — tournament management/player view.
+- `/tournament/game` — Tournament gameplay shell.
+- `app/game/TournamentBotGame.tsx` — Tournament Bot-vs-Human board/game.
+- `/api/tournaments` and `/api/tournaments/board-state` — tournament state, persistence, win recording and restore.
 
-Player names and avatars in the waiting room use `PlayerIdentityLink` and the authoritative `/api/player/[username]` profile data. If a Socket.IO roster/game-state update contains a stale/default avatar, the authoritative equipped avatar from the player endpoint wins. The canonical `AVATARS` catalogue is the only avatar icon source, including the shared `🧑🏽‍🎮` default representation.
+Tournament funding remains tied to the Admin Finance virtual treasury. Tournament outcomes and points are server-authoritative.
 
-Cosmetic state is merged by stable player identity so a later game-state update cannot make an already-resolved avatar disappear. The waiting room must not create a second avatar catalogue or hard-coded player identities.
+## XP, levels and active-time rewards
 
-## Player Showcase / reputation identity
+Progression is server-backed and duplicate-safe.
 
-- `/player/<username>` is the canonical public player inspection route.
-- `app/player/[username]/page.tsx` consumes `GET /api/player/[username]` and renders server-derived public identity/progression data.
-- `app/_components/PlayerIdentityLink.tsx` is the shared navigation contract from player names/avatars to the Showcase.
-- The Showcase exposes public hierarchy title, level, prestige, achievements, loadout and the single next milestone, but not private wallet, email, password or session data.
-- The Showcase avatar resolves from the same `AVATARS` catalogue and the same `🧑🏽‍🎮` default representation as Profile.
-- The Level Journey is a progressive road that starts publicly at **Level 1**. Level 0 is never rendered as a public journey node. Legacy Level 0 records are visually normalized to Level 1 for the journey.
-- The current visible level receives a 📍 node and `CURRENT LEVEL` pill. The separate `YOU ARE HERE` label and the explanatory paragraph above the road are intentionally absent.
-- The current row displays current-level XP, a progress bar and exact XP remaining to the next level using canonical `xpRequiredForLevel()`.
-- The road renders a useful current-level window rather than enumerating unlimited future levels.
-- Hierarchy is independent of Level and Prestige and is derived from verified active game-session hours. The ladder is: On Your Way (<1h), Rookie (1h), Dabbler (3h), Hobbyist (10h), Enthusiast (20h), Devotee (40h), Fanatic (60h), Expert (100h), Prodigy (300h), Champion (500h), Mastermind (750h), Legend (1,000h), Grandmaster (1,500h), Immortal (2,000h).
+Active-time earning is separate from Spin Wheel configuration:
 
-## Tournament
+- `app/_components/ActiveSpinRewards.tsx`
+- `POST /api/spin/activity`
+- `ludo_spin_state`
 
-- `app/tournament/page.tsx` — tournament list/details/standings.
-- `app/tournament/game/page.tsx` — tournament viewport shell.
-- `app/game/TournamentBotGame.tsx` — tournament Bot-vs-Human game.
-- `app/api/tournaments/route.ts` — tournament listing, join/leave, board persistence, win recording and leaderboard.
-- `app/api/tournaments/board-state/route.ts` — authenticated board-session restore.
-- `app/api/tournaments/_schema.ts` — schema helpers.
-- `app/_components/TournamentSessionResume.tsx` — resume helper.
+Eligible active gameplay surfaces are `/room`, `/game`, `/game-online` and `/tournament/game`, while the document is visible.
 
-Tournament intentionally uses the `classic` board skin unless product requirements explicitly change this. Tournament state is isolated per `(tournament_id, user_id)` with a private `board_token`. The server is authoritative for wins/points and the win transaction is idempotent. Never award tournament points from client state alone.
+The current `/api/spin/activity` implementation uses 30-minute intervals and the `Africa/Lagos` Rush Hour window from 17:00 to 20:00. Its response is authoritative for the exact spin/XP grant values. Unused earned spins persist until consumed.
 
-Tournament game is intentionally viewport-locked/non-scrollable.
+## Spin Wheel architecture — rebuilt 2026-09-05
 
-## XP / levels
+### Surfaces
 
-Progression is server-backed.
+Player wheel:
 
-- A **game win in any game mode** awards **+7 XP**.
-- A **successful diamond purchase** awards **+15 XP**.
-- Every completed **30 minutes of verified active game-session time** awards **+5 XP** during normal hours or **+15 XP** during Rush Hour.
-- XP awards must be server-authoritative and protected against duplicate awards.
-- Existing scalable level progression formula is retained; do not replace it without an explicit product decision.
-- `app/_components/XPLevelCelebration.tsx` provides the level-up presentation.
-- A level completion animates the XP bar filling, transitions to the next level, starts the next level's progress, and shows a congratulatory celebration for roughly 4 seconds.
-- XP/progression updates should dispatch/use the existing progression refresh mechanism rather than maintaining a second local progression system.
+- `/spin`
 
-## Free Spin / Active Time Rewards
+Admin configuration:
 
-Free spins are a server-authoritative reward balance that can be consumed by the Spin Wheel.
+- `/dbase/spin`
 
-- Only active game-session surfaces count toward the engagement timer: `/room`, `/game`, `/game-online`, and `/tournament/game`.
-- The document must be visible. `app/_components/ActiveSpinRewards.tsx` sends periodic heartbeats only while an eligible game-session surface is visible.
-- Every completed **30 minutes** grants **1 free spin + 5 XP** during normal hours.
-- Between **17:00 and 20:00 Nigeria time (`Africa/Lagos`)**, every completed 30-minute interval grants **3 free spins + 15 XP** instead.
-- `/api/spin/activity` is authoritative for elapsed active time, spin grants, XP grants and persistent active-time totals. The server caps heartbeat elapsed time and uses a database transaction/row lock so concurrent heartbeats cannot double-award an interval.
-- `ludo_spin_state.active_seconds` stores the current unawarded remainder; `ludo_spin_state.total_active_seconds` stores the cumulative active-session time used by the hierarchy system.
-- Free-spin balance and consumption are authoritative in PostgreSQL via `ludo_spin_state` and `/api/spin`.
-- Free spins are not coins or gems and must not be represented as either wallet currency.
-- `/profile` displays the player's current **Free Rolls** balance.
-- `/spin` displays the current free-spin balance and consumes the server-side balance when a spin is used.
-- When an active-time reward is granted, the app shows an in-game notification with the spin and XP award. Browser/OS notification is sent only when notification permission is available; do not claim closed-app push delivery without the required push infrastructure.
-- Unused earned spins persist until consumed; they do not reset daily.
-- An existing `extraSpin` wheel prize adds one additional free spin to the server balance.
-- The Nigeria-time window is a business rule and must use `Africa/Lagos`, never the developer/device timezone.
-- Do not implement the reward as a client-only timer or localStorage balance.
+Spin-item claim/history:
 
-## Event architecture
+- `/spin-rewards`
 
-The Event system is a server-authoritative layer over existing gameplay/missions. It does not create a parallel Ludo rules engine.
+API:
 
-### Event source of truth
+- `GET /api/spin`
+- `POST /api/spin`
+- `GET /api/admin/spin`
+- `POST /api/admin/spin`
+- `/api/spin/rewards`
 
-- Event definitions, schedule and rewards are stored in PostgreSQL `ludo_events`.
-- Per-player participation/progress is stored in `ludo_event_entries`.
-- Settled reward payments are protected by the `ludo_event_rewards` ledger.
-- `/api/events` derives the authenticated player from the `ludo_session` cookie.
-- Admin configuration is the source of event schedule, objectives, supported modes/boards and rewards.
+### Fixed eight-slot configuration
 
-### Player Event UI contract
+The Spin Wheel is exactly eight slots.
 
-The player Event page has only two tabs:
+PostgreSQL table:
 
-- **Live Events**
-- **Upcoming**
+- `ludo_spin_wheel_slots`
 
-There is intentionally **no History tab and no Expired tab** for players. Expired records remain in the database for Admin review/settlement.
+Slots are `0–7` internally and displayed as Slots 1–8.
 
-The Event page renders its own single top Back button and passes `hideBack` to `AppFrame` to prevent a duplicate shell Back button.
+The canonical default configuration is defined in `lib/spinWheel.ts`. It contains eight rewards and their initial weights. Those defaults seed only missing slots; Admin edits are persistent.
 
-### Lifecycle
+The old configurable table `ludo_spin_rewards` is retired. The rebuilt Spin APIs actively remove that legacy configuration table and never read from it.
 
-The server evaluates the stored timestamps:
+### Admin contract
 
-- `starts_at > NOW()` → upcoming
-- `starts_at <= NOW() < ends_at` → live
-- `ends_at <= NOW()` → ended/settlement eligible
+Admin may edit an existing slot, but may not add a ninth slot, delete a slot or disable a slot.
 
-Players can join only while the server evaluates the event as live. Client countdowns are visual only and are never authoritative.
-
-### Progress
-
-`POST /api/events` with `action=activity` evaluates active joined entries by `mission_kind`. Progress is capped to `mission_target`; reaching the target sets `completed=TRUE` and records `completed_at`.
-
-Game/missions integrations should feed the canonical event activity path rather than writing event progress directly from React.
-
-### Expiry and settlement
-
-The expiry/settlement path is transactional and idempotent:
-
-1. Find published events whose `ends_at <= NOW()`.
-2. Lock the event transaction.
-3. Mark the event ended.
-4. Find completed player entries.
-5. Insert one `ludo_event_rewards` ledger row per `(event_id,user_id)` with conflict protection.
-6. Credit configured coins/gems only for a newly inserted ledger row.
-7. Mark the entry `reward_claimed=TRUE`.
-8. Record `settled_at`.
-
-The production event-settler worker runs independently of the player page. API reads/actions also invoke settlement defensively.
-
-### Progress-bar rendering rule
-
-The Event UI percentage fill must be a block-level element with explicit height and width. A plain inline `<span>` can leave a completed `1/1` progress bar visually empty because percentage width does not produce the intended fill on an inline element. The current implementation uses `progressFill` with `display: block`, `height: 100%`, a calculated percentage width and a width transition.
-
-See `EVENTS.md` for the complete Event developer handoff.
-
-## Shop / pricing architecture
-
-The Shop has two responsibilities: catalogue availability and purchase pricing. The **server is authoritative** for price/currency and the player Shop must consume the same server-backed pricing that Admin manages.
-
-### Player Shop categories
-
-The player Shop has:
+Each slot supports:
 
 - Coins
 - Gems
-- Items
-- Avatars
-- Boards
-- Dice
+- Extra Spin
+- Shop Item
 
-### Admin Shop rules
+and has an editable display label, icon, amount and probability/weight.
 
-Admin Shop belongs **inside the admin hamburger menu**. It must not expose a floating/global button outside the admin page.
+A Shop Item must exist in the current canonical Shop catalogue before an Admin save is accepted.
 
-Admin can change **price only**; admin must not change ownership data or item definitions from this screen.
+### Selection and payout
 
-Supported price currencies:
+`POST /api/spin` reads one complete eight-slot database snapshot and chooses one winning slot by its configured positive weights.
 
-- `coins`
-- `gems`
-- `naira`
+The server locks the user's free-spin state, verifies a spin is available, consumes one spin and applies the selected reward transactionally.
 
-The Admin Shop must include both **Coin purchase packages and Gem purchase packages**, in addition to customization items. Changing a package/item from Coins to Gems or Naira is a pricing configuration change and must flow through the same authoritative purchase path.
+Reward settlement:
 
-Naira purchases must use the existing verified payment flow; never credit a Naira purchase merely because a client says payment succeeded.
+- Coins/Gems → existing wallet-audit mutation path.
+- Extra Spin → increases `ludo_spin_state.spins` by the configured amount.
+- Shop Item → creates a pending record in `ludo_spin_item_rewards` for the existing `/spin-rewards` claim flow.
 
-Admin Shop endpoint: `app/api/admin/shop/route.ts`. Player customization ownership remains under `app/api/customization/route.ts`.
+The client never selects the reward and never directly awards wallet/inventory state.
 
-## Inventory / Award Room
+### Board/reward synchronization
 
-The home page has a split card with exactly two labels:
+Every successful spin response contains the exact configuration snapshot used for the decision, a configuration version, the winning slot index, the exact prize and the resulting spin balance.
 
-- **Friend** → `/friends`
-- **Inventory** → `/inventory`
+`/spin` animates against that same returned snapshot and winning slot index. It does not perform an independent reward lookup to decide where to land.
 
-Do not add explanatory subtitles or `OPEN` labels back to these two buttons unless explicitly requested.
+Therefore an Admin change during an in-progress animation cannot make the pointer visually land on a different reward from the reward already selected and settled by the server.
 
-Inventory is strictly the player's acquired/owned collection.
+After the animation completes, the player reloads the current wheel configuration so subsequent spins use the latest Admin settings.
 
-### My Items
+### Authentication
 
-Shows only items the authenticated player owns/acquired from the Shop/customization system. It may include boards, dice, avatars and other owned shop items. Equip actions must use the authoritative customization API.
+Spin Wheel is an authenticated registered-player feature. Guests and unauthenticated requests are rejected because Shop Item prizes require a registered account/inventory destination.
 
-### Award Room
+## Shop and pricing
 
-Award Room is a second tab **inside Inventory**. It is for earned rewards only, such as tournament medals/badges and achievement rewards.
+`/dbase/shop` is the canonical catalogue-management surface.
 
-- Store purchases do **not** belong in Award Room.
-- Tournament awards are read from the existing server-backed tournament/medal data; do not fabricate awards client-side.
-- Awards are displayed in a **responsive grid**, not a list.
-- Awards are permanent historical achievements unless a future product rule explicitly says otherwise.
-- Do not mix purchased inventory with earned awards.
+Supported purchase currencies are Coins, Gems and Naira. Naira purchase success is established by the verified server payment flow rather than client claims.
 
-## Home navigation contract
+Free Spin rewards are rewards, not purchases, and are not blocked by Shop purchase-level locks.
 
-Main home cards are ordered:
+## Missions
 
-1. Play Online
-2. Tournaments
-3. Play Solo
-4. Friends
+`/dbase/missions` has Daily and Weekly management and preserves existing mission records. Claims remain server-authoritative and idempotent.
 
-Inventory is a separate full-width card below the quick-access row. Do not duplicate Friends there.
+## Events
 
-Home bottom navigation remains:
+Events are server-authoritative and use PostgreSQL-backed schedules, entries and settled reward ledgers. Player Event UI separates Live Events and Upcoming; history remains an Admin concern.
 
-- Home
-- Missions
-- Chat
-- Profile
+## Wallet audit
 
-The quick-access row retains the existing Daily Reward, Shop, Events and Spin Wheel functions unless explicitly redesigned. Inventory is intentionally accessed through its separate full-width card rather than adding another bottom-nav item.
+Wallet mutations must remain transactional and auditable. Preserve source, reason, request/transaction identifiers, actor/player identity where available, before/after balances, IP and user agent.
 
-## Admin architecture
+Do not fabricate missing historical metadata or balances.
 
-All admin management controls belong inside the **admin hamburger menu**. Do not add floating/fixed admin trigger buttons that can be accessed outside the admin page.
+## Admin and UX boundaries
 
-Current menu structure:
+Protected Admin routes are under `/dbase`. Admin APIs use authenticated server sessions plus the configured Admin allow-list.
 
-### Dashboard
+Native `alert`, `confirm` and `prompt` are not the intended product UX. Use the project's branded modal/toast patterns.
 
-- Overview
-- Players
-- Economy
-- Visitors
-- Disputes
-- Audit
+## Documentation and rebuild discipline
 
-### Management
+When production behavior changes:
 
-- Shop
-- Missions
-- Tournament Control
-- Finance
-- Events
+1. Trace the current implementation and identify the authoritative source.
+2. Make the requested feature change without touching protected unrelated surfaces.
+3. For a requested full rebuild, replace the affected implementation cleanly rather than layering speculative patches.
+4. Reconcile `CURRENT_PROJECT_STATE.md`, `ARCHITECTURE.md`, `DEVELOPER_HANDOFF.md` and the relevant focused feature document.
+5. Build and inspect the affected deployment.
+6. Do not call the release live until Railway reports `SUCCESS`.
 
-The underlying management components may remain mounted for state continuity, but their visible triggers must be controlled by the admin hamburger. Admin authentication/authorization must remain enforced server-side.
-
-### Finance
-
-The Admin Finance page includes server money-bank top-up and wallet transfer tools. The Server Top Up form must remain responsive on mobile: currency, amount and reason controls should stack to full width rather than forcing a desktop multi-column row. Do not sacrifice server-side authorization or audit logging for UI changes.
-
-## Database / financial authority
-
-PostgreSQL is authoritative for accounts, wallets, customization ownership, tournament data, progression, events and financial records. Server transactions must validate balances, ownership and payment state. Never implement a financial mutation as client-only state.
-
-## UI / responsive rules
-
-- Mobile layouts must not depend on desktop-only fixed-width grids.
-- Game pages that are designed as viewport experiences should remain `overflow:hidden` / `100dvh` where appropriate.
-- Admin controls should not float over unrelated pages.
-- Reuse existing design language/components where practical; do not introduce competing navigation systems.
-
-## Deployment / debugging discipline
-
-1. Inspect the current implementation before editing.
-2. Trace the exact code path and identify the authoritative source of truth.
-3. Reuse canonical APIs/components instead of creating parallel systems.
-4. Make the smallest isolated change.
-5. Run/build-check the affected code.
-6. Push to `main`.
-7. Inspect Railway deployment status and logs.
-8. If deployment fails, fix the **actual reported error** before changing unrelated code.
-9. Only call a release live after Railway reports `SUCCESS`.
-
-## Known traps / lessons
-
-- Do not use screenshots as the sole source of truth for architecture.
-- Do not add a fixed admin button simply because a component needs a trigger; the trigger belongs in the admin hamburger.
-- Do not treat the Shop catalogue as equivalent to Coin/Gem purchase packages; they are distinct product types but must share authoritative pricing configuration.
-- Do not put purchased items into Award Room.
-- Do not make Award Room a list when the product contract calls for a grid.
-- Do not trust client-only XP, wallet, tournament points, ownership, payment state, free-spin balance or event rewards.
-- Do not calculate the 17:00–20:00 reward window using local device time; use Nigeria time on the server.
-- Do not expose History/Expired tabs on the player Event page unless explicitly requested.
-- Do not render an Event progress fill as an inline-only span; percentage width needs a block-level fill element.
-- Do not claim Railway deployment success until the platform reports success.
-- Do not treat a successful `getUserMedia()` call or a green Mic button as proof that remote peers received audio. WebRTC call/stream state must be considered separately.
+Dated state snapshots are historical and should be removed when superseded. Current documentation is not a substitute for code verification.
