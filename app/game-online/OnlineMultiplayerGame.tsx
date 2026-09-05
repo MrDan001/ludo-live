@@ -62,32 +62,321 @@ export default function OnlineMultiplayerGame() {
   const roomCode = String(params.get("room") || "W100NB").trim().toUpperCase();
   const roomSize = Number(params.get("size") || 2) === 4 ? 4 : 2;
   const cacheKey = `ludo-live-multiplayer:${roomCode}`;
-  const [socket, setSocket] = useState<Socket | null>(null); const [connected, setConnected] = useState(false); const [connectionMessage, setConnectionMessage] = useState("Connecting…"); const [me, setMe] = useState("");
-  const [profile, setProfile] = useState({ name: "Player", avatar: "", level: 1, coins: 0 }); const [game, setGame] = useState<GameState | null>(null); const [roster, setRoster] = useState<Player[]>([]); const [tokens, setTokens] = useState<DemoToken[]>(EMPTY_TOKENS); const [roll, setRoll] = useState<DiceValue>(6); const [pending, setPending] = useState<DiceValue | null>(null); const [remoteRolling, setRemoteRolling] = useState(false); const [animating, setAnimating] = useState(false); const [cosmetics, setCosmetics] = useState<Cosmetics>(defaultCosmetics); const [soundEnabled, setSoundEnabled] = useState(true); const [chatOpen, setChatOpen] = useState(false); const [chatUnread, setChatUnread] = useState(false); const [chatText, setChatText] = useState(""); const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]); const [playersOpen, setPlayersOpen] = useState(false); const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
-  const revisionRef = useRef(-1); const authoritativeRef = useRef<DemoToken[]>(EMPTY_TOKENS); const animationRef = useRef(false); const moveQueueRef = useRef<MoveEvent[]>([]); const actionTimerRef = useRef<number | null>(null); const requestPendingRef = useRef(false); const mountedRef = useRef(true); const chatOpenRef = useRef(false); const animateRef = useRef<(move: MoveEvent) => Promise<void>>(async () => {}); const sendingChatRef = useRef(false);
-  const clearAction = useCallback(() => { if (actionTimerRef.current !== null) window.clearTimeout(actionTimerRef.current); actionTimerRef.current = null; requestPendingRef.current = false; }, []);
+  const [socket, setSocket] = useState<Socket | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [connectionMessage, setConnectionMessage] = useState("Connecting…");
+  const [me, setMe] = useState("");
+  const [profile, setProfile] = useState({ name: "Player", avatar: "", level: 1, coins: 0 });
+  const [game, setGame] = useState<GameState | null>(null);
+  const [roster, setRoster] = useState<Player[]>([]);
+  const [tokens, setTokens] = useState<DemoToken[]>(EMPTY_TOKENS);
+  const [roll, setRoll] = useState<DiceValue>(6);
+  const [pending, setPending] = useState<DiceValue | null>(null);
+  const [remoteRolling, setRemoteRolling] = useState(false);
+  const [animating, setAnimating] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
+  const [cosmetics, setCosmetics] = useState<Cosmetics>(defaultCosmetics);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatUnread, setChatUnread] = useState(false);
+  const [chatText, setChatText] = useState("");
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [playersOpen, setPlayersOpen] = useState(false);
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+
+  const revisionRef = useRef(-1);
+  const authoritativeRef = useRef<DemoToken[]>(EMPTY_TOKENS);
+  const animationRef = useRef(false);
+  const moveQueueRef = useRef<MoveEvent[]>([]);
+  const actionTimerRef = useRef<number | null>(null);
+  const requestPendingRef = useRef(false);
+  const mountedRef = useRef(true);
+  const chatOpenRef = useRef(false);
+  const animateRef = useRef<(move: MoveEvent) => Promise<void>>(async () => {});
+  const sendingChatRef = useRef(false);
+  const hostCosmeticsRef = useRef<Cosmetics>(defaultCosmetics);
+  const isHostRef = useRef(false);
+
+  const clearAction = useCallback(() => {
+    if (actionTimerRef.current !== null) window.clearTimeout(actionTimerRef.current);
+    actionTimerRef.current = null;
+    requestPendingRef.current = false;
+    setActionBusy(false);
+  }, []);
   const saveGameCache = useCallback((next: GameState) => { try { sessionStorage.setItem(cacheKey, JSON.stringify(next)); } catch {} }, [cacheKey]);
   const recover = useCallback((s: Socket | null) => { if (!s?.connected) return; s.emit("game-recover", (result: { ok?: boolean }) => { if (result?.ok) setConnectionMessage("Connected"); }); }, []);
-  const loadProfile = useCallback(async () => { try { const [authResponse, customizationResponse] = await Promise.all([fetch("/api/auth", { cache: "no-store" }), fetch("/api/customization", { cache: "no-store" })]); const auth = await authResponse.json(); const customization: CustomizationResponse = customizationResponse.ok ? await customizationResponse.json() : {}; const name = String(auth?.user?.username || "Player"); const avatar = String(auth?.user?.avatar || auth?.user?.image || ""); const level = Math.max(1, Number(auth?.user?.level) || 1); const coins = Math.max(0, Number(auth?.user?.coins) || 0); const next: Cosmetics = { board: String(customization.equippedBoard || "classic") as BoardThemeId, dice: String(customization.equippedDice || "classic") as DiceSkinId, yard: Array.isArray(customization.equippedItems) ? String(customization.equippedItems.find(x => typeof x === "string" && x.startsWith("yard-")) || "") : "" }; setProfile({ name, avatar, level, coins }); setCosmetics(current => current.board === next.board && current.dice === next.dice && current.yard === next.yard ? current : next); return { playerId: String(auth?.user?.id || ""), name, avatar, level, coins, cosmetics: next }; } catch { return null; } }, []);
-  const loadChatHistory = useCallback(async () => { try { const response = await fetch(`/api/multiplayer-chat?roomCode=${encodeURIComponent(roomCode)}`, { cache: "no-store" }); if (!response.ok) return; const data = await response.json(); const history: ChatMessage[] = Array.isArray(data?.messages) ? data.messages.map((m: any) => ({ id: String(m.id), playerId: String(m.playerId || ""), name: String(m.name || "Player"), text: String(m.text || ""), at: Number(m.at) || Date.now() })) : []; setChatMessages(current => { const merged = [...current]; for (const message of history) { const duplicate = merged.some(existing => existing.id === message.id || (existing.playerId && message.playerId && existing.playerId === message.playerId && existing.text === message.text && Math.abs(existing.at - message.at) < 3000)); if (!duplicate) merged.push(message); } return merged.sort((a,b) => a.at-b.at).slice(-100); }); } catch {} }, [roomCode]);
-  useEffect(() => { mountedRef.current = true; try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); if (saved.sound !== undefined) setSoundEnabled(saved.sound !== false); } catch {} return () => { mountedRef.current = false; }; }, []); useEffect(() => { chatOpenRef.current = chatOpen; if (chatOpen) setChatUnread(false); }, [chatOpen]);
-  useEffect(() => { try { const raw = sessionStorage.getItem(cacheKey); if (!raw) return; const cached = JSON.parse(raw) as GameState; if (!cached || !Array.isArray(cached.players) || !cached.tokens) return; revisionRef.current = Number(cached.stateRevision ?? -1); setGame(cached); setPending(cached.pendingMove ?? null); if (cached.dice !== null) setRoll(cached.dice); const cachedTokens = normalizeTokens(cached.tokens); authoritativeRef.current = cachedTokens; setTokens(cachedTokens.map(token => ({...token}))); } catch {} }, [cacheKey]);
-  useEffect(() => { let cancelled = false; let s: Socket | null = null; const start = async () => { const p = await loadProfile(); if (cancelled || !p?.playerId) return; setMe(p.playerId); s = io(window.location.origin, { transports: ["websocket"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 300, reconnectionDelayMax: 2000 }); setSocket(s); const join = () => { setConnected(true); setConnectionMessage("Connected"); s?.emit("join-room", { roomCode, roomSize, name:p.name, avatar:p.avatar, level:p.level, coins:p.coins, board:p.cosmetics.board, dice:p.cosmetics.dice, yard:p.cosmetics.yard, playerId:p.playerId }); window.setTimeout(() => { if (mountedRef.current) void loadChatHistory(); }, 80); }; s.on("connect", join); s.on("disconnect", () => { setConnected(false); clearAction(); setAnimating(false); animationRef.current=false; setConnectionMessage("Reconnecting…"); }); s.on("connect_error", error => { setConnected(false); setConnectionMessage(`Connection error: ${error.message || "retrying"}`); }); s.on("roster", (members: Player[]) => { const next=uniquePlayers(Array.isArray(members)?members:[]); setRoster(next); const host=next.find(member=>member.host); if(host) setCosmetics({board:String(host.board||"classic") as BoardThemeId,dice:String(host.dice||"classic") as DiceSkinId,yard:String(host.yard||"")}); }); s.on("host-cosmetics", (value: Cosmetics) => setCosmetics({board:String(value?.board||"classic") as BoardThemeId,dice:String(value?.dice||"classic") as DiceSkinId,yard:String(value?.yard||"")})); s.on("game-state", (next: GameState) => { if(!mountedRef.current)return; const revision=Number(next.stateRevision??-1); if(revision>=0&&revisionRef.current>=0&&revision<revisionRef.current)return; if(revision>=0)revisionRef.current=revision; setGame(next); setPending(String(next.currentPlayerId||"")===p.playerId?next.pendingMove:null); if(next.dice!==null)setRoll(next.dice); authoritativeRef.current=normalizeTokens(next.tokens||{}); if(!animationRef.current&&moveQueueRef.current.length===0)setTokens(authoritativeRef.current.map(token=>({...token}))); saveGameCache(next); if(next.status!=="playing"){clearAction();setAnimating(false);animationRef.current=false;} }); s.on("game-dice", (event:{value:DiceValue;playerId?:string}) => { if(Number(event?.value)>=1)setRoll(event.value); setRemoteRolling(String(event?.playerId||"")!==p.playerId); window.setTimeout(()=>{if(mountedRef.current)setRemoteRolling(false);},650); }); s.on("game-moved", (move:MoveEvent) => { if(!move?.tokenId)return; clearAction(); moveQueueRef.current.push(move); if(!animationRef.current){const next=moveQueueRef.current.shift();if(next)void animateRef.current(next);} }); s.on("game-roll-error",()=>{clearAction();setAnimating(false);}); s.on("game-move-error",()=>{clearAction();setAnimating(false);animationRef.current=false;recover(s);}); s.on("chat",(message:any)=>{if(!message?.text)return;const normalized:ChatMessage={id:String(message.id||`${message.playerId||"player"}-${message.at||Date.now()}`),playerId:String(message.playerId||""),name:String(message.name||"Player"),text:String(message.text),at:Number(message.at)||Date.now()};setChatMessages(items=>{const duplicate=items.some(item=>item.id===normalized.id||(item.playerId&&normalized.playerId&&item.playerId===normalized.playerId&&item.text===normalized.text&&Math.abs(item.at-normalized.at)<3000));return duplicate?items:[...items.slice(-99),normalized];});if(!chatOpenRef.current&&String(message.playerId)!==p.playerId)setChatUnread(true);}); s.on("game-finished",(event:any)=>setConnectionMessage(event?.winnerId===p.playerId?"You won!":"Match finished")); const onOnline=()=>{if(s?.connected)recover(s);}; window.addEventListener("online",onOnline); return()=>{cancelled=true;window.removeEventListener("online",onOnline);s?.disconnect();}; }; void start(); return()=>{cancelled=true;s?.disconnect();}; }, [roomCode,roomSize,cacheKey,clearAction,loadChatHistory,loadProfile,recover,saveGameCache]);
-  const animateMove = useCallback(async (move:MoveEvent) => { if(!mountedRef.current)return; animationRef.current=true; setAnimating(true); const [color,idText]=String(move.tokenId).split(":"); const id=Number(idText); if(!COLORS.includes(color as Color)||!Number.isInteger(id)){animationRef.current=false;setAnimating(false);return;} const from=Number(move.from); const contact=Number(move.captureToCenter?(move.captureProgress??move.to??move.target):(move.to??move.target)); const finalTo=Number(move.finalTo??(move.captureToCenter?FINISH_PROGRESS:contact)); const update=(position:number)=>setTokens(prev=>prev.map(token=>token.color===color&&token.id===id?{...token,position,state:tokenState(position)}:token)); update(from); if(contact!==from){const step=contact>from?1:-1; for(let position=from+step;;position+=step){await new Promise(resolve=>window.setTimeout(resolve,95));if(!mountedRef.current)return;update(position);if(position===contact)break;}} if(move.captureToCenter&&move.captured){setTokens(prev=>prev.map(token=>token.color===move.captured?.color&&token.id===move.captured?.id?{...token,position:0,state:"yard"}:token));await new Promise(resolve=>window.setTimeout(resolve,80));} if(finalTo!==contact){await new Promise(resolve=>window.setTimeout(resolve,80));if(!mountedRef.current)return;update(finalTo);} const next=moveQueueRef.current.shift(); if(next){await animateRef.current(next);return;} animationRef.current=false;setAnimating(false);setTokens(authoritativeRef.current.map(token=>({...token}))); }, []);
-  useEffect(() => { animateRef.current=animateMove; }, [animateMove]);
-  const players=useMemo(()=>uniquePlayers(roster.length?roster:(game?.players||[])),[roster,game?.players]); const mine=players.find(player=>String(player.playerId)===String(me))||players[0]; const opponent=players.find(player=>String(player.playerId)!==String(me)); const myColors=useMemo<Color[]>(()=>mine?.colors?.length?mine.colors:playerColorsForSeats(roomSize,mine?.seat??0) as Color[],[mine,roomSize]); const myTurn=!!game&&connected&&String(game.currentPlayerId||"")===String(me); const legalTokenKeys=useMemo(()=>pending===null||!myTurn?[]:tokens.filter(token=>myColors.includes(token.color)&&canMove(tokens,token,pending)).map(token=>`${token.color}-${token.id}`),[pending,myTurn,tokens,myColors]);
-  const emitAction=useCallback((event:"game-roll"|"game-move",payload?:unknown)=>{if(!socket?.connected)return false;clearAction();requestPendingRef.current=true;actionTimerRef.current=window.setTimeout(()=>{clearAction();setAnimating(false);if(socket.connected)recover(socket);},7000);socket.emit(event,payload,(ack:{ok?:boolean})=>{if(ack?.ok){clearAction();return;}clearAction();setAnimating(false);if(socket.connected)recover(socket);});return true;},[socket,clearAction,recover]);
-  const chooseToken=(color:Color,id:number)=>{if(!socket||!game||!connected||!myTurn||pending===null||requestPendingRef.current)return;const token=tokens.find(item=>item.color===color&&item.id===id);if(!token||!myColors.includes(color)||!canMove(tokens,token,pending))return;void emitAction("game-move",{tokenId:`${color}:${id}`});};
-  const handleRoll=()=>{if(!socket||!game||!connected||!myTurn||pending!==null||remoteRolling||requestPendingRef.current)return;void emitAction("game-roll");};
-  const toggleSound=()=>{const next=!soundEnabled;setSoundEnabled(next);try{const saved=JSON.parse(localStorage.getItem("ludo-settings")||"{}");localStorage.setItem("ludo-settings",JSON.stringify({...saved,sound:next}));}catch{}};
-  const sendChat=useCallback(async(value=chatText)=>{const text=value.trim();if(!text||!socket?.connected||sendingChatRef.current)return;sendingChatRef.current=true;try{const response=await fetch("/api/multiplayer-chat",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({roomCode,text}),cache:"no-store"});const data=await response.json().catch(()=>null);if(!response.ok||!data?.message?.id)return;setChatText("");socket.emit("chat",{text,messageId:String(data.message.id)});}finally{sendingChatRef.current=false;}},[chatText,roomCode,socket]);
-  const confirmLeave=()=>{setLeaveConfirmOpen(false);socket?.emit("leave-room");window.setTimeout(()=>{window.location.href="/lobby";},400);}; const statusText=game?.status==="finished"?(game.winnerId===me?"YOU WON":"MATCH FINISHED"):myTurn?"YOUR TURN":"OPPONENT'S TURN"; const meName=mine?.name||profile.name; const opponentName=opponent?.name||"Opponent"; const commMembers=players.map(player=>({id:String(player.playerId),playerId:String(player.playerId),name:player.name,role:player.host?"host":"member",online:player.connected!==false,peerId:player.peerId}));
-  return <main className="mp-page"><div className="mp-shell"><header className="mp-header"><div className="mp-player-card"><div className="mp-avatar"><PlayerAvatar src={mine?.avatar||profile.avatar}/></div><div className="mp-player-copy"><strong>{meName} <span>YOU</span></strong><small className="mp-player-level">⭐ {mine?.level??profile.level}</small><small><i className="mp-online-dot"/> Connected</small></div></div><div className="mp-brand"><strong>♛ LUDO</strong><span>LIVE</span></div><div className="mp-player-card mp-player-card-opponent"><div className="mp-avatar"><PlayerAvatar src={opponent?.avatar}/></div><div className="mp-player-copy"><strong>{opponentName}</strong><small className="mp-player-level">⭐ {opponent?.level??"1"}</small><small><i className={`mp-online-dot ${opponent?.connected===false?"off":"busy"}`}/> {opponent?.connected===false?"Disconnected":"In match"}</small></div></div></header>
-    <section className="mp-board-section"><StakeDisplay roomCode={roomCode}/><div className="mp-board-frame"><CanonicalLudoBoard theme={cosmetics.board} yardSkin={cosmetics.yard} demoTokens={tokens} legalTokenKeys={legalTokenKeys} onTokenClick={chooseToken}/></div></section>
-    <section className="mp-control-section"><div className="mp-info-card"><div className="mp-info-name">{meName}</div><div className="mp-info-level">★ {mine?.level??profile.level}</div><div className="mp-info-coins">🪙 {(Number(mine?.coins)||profile.coins).toLocaleString()}</div></div><div className="mp-turn-card"><div className={`mp-turn-label ${myTurn?"mine":""}`}><span/>{statusText}</div><div className="mp-turn-note">{game?.status==="playing"?(myTurn?"Roll the dice to play":"Wait for the other player to move"):connectionMessage}</div><DemoDice value={roll} onRoll={handleRoll} disabled={!myTurn||pending!==null||remoteRolling||!connected||game?.status!=="playing"||requestPendingRef.current} botRolling={remoteRolling} skin={cosmetics.dice}/></div><div className="mp-tools"><button type="button" className={`mp-tool ${chatOpen||chatUnread?"active":""}`} onClick={()=>setChatOpen(true)}><span>💬</span><small>Chat{chatUnread?" •":""}</small></button><div className="mp-tool"><ChatVoice roomCode={roomCode} playerId={me} members={commMembers} socket={socket}/><small>Mic</small></div></div></section>
-    <div className="mp-bottom-bar"><button type="button" className="danger" onClick={()=>setLeaveConfirmOpen(true)}>↩ Leave Match</button><button type="button" onClick={()=>setPlayersOpen(true)}>👥 Players</button><button type="button" onClick={toggleSound}>{soundEnabled?"🔊 Sound":"🔇 Sound"}</button><div className="mp-connection">● {connected?"Connected":"Reconnecting…"}</div><div className="mp-room">🛡️ Room ID: {roomCode}</div></div></div>
-    <ChatPanel open={chatOpen} messages={chatMessages} me={me} value={chatText} setValue={setChatText} onSend={sendChat} onClose={()=>setChatOpen(false)} reactions={REACTIONS} onReaction={sendChat}/>
-    {playersOpen&&<div className="mp-modal-backdrop" onMouseDown={e=>{if(e.target===e.currentTarget)setPlayersOpen(false);}}><section className="mp-players-modal" role="dialog" aria-modal="true"><div className="mp-chat-head"><strong>Players</strong><button type="button" onClick={()=>setPlayersOpen(false)} aria-label="Close players">×</button></div>{players.map(player=><div className="mp-roster-row" key={player.playerId}><span className="mp-roster-dot"/><strong>{player.name}{String(player.playerId)===String(me)?" (You)":""}</strong><small>{player.connected===false?"Disconnected":"Connected"}</small></div>)}</section></div>}
-    <LudoConfirmModal open={leaveConfirmOpen} title="Leave match?" message="Leaving now will end your participation in this room." confirmLabel="Leave" cancelLabel="Stay" onConfirm={confirmLeave} onCancel={()=>setLeaveConfirmOpen(false)} danger/>
+
+  const loadProfile = useCallback(async () => {
+    try {
+      const [authResponse, customizationResponse] = await Promise.all([fetch("/api/auth", { cache: "no-store" }), fetch("/api/customization", { cache: "no-store" })]);
+      const auth = await authResponse.json();
+      const customization: CustomizationResponse = customizationResponse.ok ? await customizationResponse.json() : {};
+      const name = String(auth?.user?.username || "Player");
+      const avatar = String(auth?.user?.avatar || auth?.user?.image || "");
+      const level = Math.max(1, Number(auth?.user?.level) || 1);
+      const coins = Math.max(0, Number(auth?.user?.coins) || 0);
+      const next: Cosmetics = { board: String(customization.equippedBoard || "classic") as BoardThemeId, dice: String(customization.equippedDice || "classic") as DiceSkinId, yard: Array.isArray(customization.equippedItems) ? String(customization.equippedItems.find(x => typeof x === "string" && x.startsWith("yard-")) || "") : "" };
+      setProfile({ name, avatar, level, coins });
+      return { playerId: String(auth?.user?.id || ""), name, avatar, level, coins, cosmetics: next };
+    } catch { return null; }
+  }, []);
+
+  const loadChatHistory = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/multiplayer-chat?roomCode=${encodeURIComponent(roomCode)}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const data = await response.json();
+      const history: ChatMessage[] = Array.isArray(data?.messages) ? data.messages.map((m: any) => ({ id: String(m.id), playerId: String(m.playerId || ""), name: String(m.name || "Player"), text: String(m.text || ""), at: Number(m.at) || Date.now() })) : [];
+      setChatMessages(current => {
+        const merged = [...current];
+        for (const message of history) {
+          const duplicate = merged.some(existing => existing.id === message.id || (existing.playerId && message.playerId && existing.playerId === message.playerId && existing.text === message.text && Math.abs(existing.at - message.at) < 3000));
+          if (!duplicate) merged.push(message);
+        }
+        return merged.sort((a, b) => a.at - b.at).slice(-100);
+      });
+    } catch {}
+  }, [roomCode]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); if (saved.sound !== undefined) setSoundEnabled(saved.sound !== false); } catch {}
+    return () => { mountedRef.current = false; };
+  }, []);
+  useEffect(() => { chatOpenRef.current = chatOpen; if (chatOpen) setChatUnread(false); }, [chatOpen]);
+  useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(cacheKey);
+      if (!raw) return;
+      const cached = JSON.parse(raw) as GameState;
+      if (!cached || !Array.isArray(cached.players) || !cached.tokens) return;
+      revisionRef.current = Number(cached.stateRevision ?? -1);
+      setGame(cached);
+      setPending(String(cached.currentPlayerId || "") === String(me) ? cached.pendingMove : null);
+      if (cached.dice !== null) setRoll(cached.dice);
+      const cachedTokens = normalizeTokens(cached.tokens);
+      authoritativeRef.current = cachedTokens;
+      setTokens(cachedTokens.map(token => ({ ...token })));
+    } catch {}
+  }, [cacheKey, me]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let s: Socket | null = null;
+    let cosmeticsTimer: number | null = null;
+    const start = async () => {
+      const p = await loadProfile();
+      if (cancelled || !p?.playerId) return;
+      setMe(p.playerId);
+      s = io(window.location.origin, { transports: ["websocket"], reconnection: true, reconnectionAttempts: Infinity, reconnectionDelay: 300, reconnectionDelayMax: 2000 });
+      setSocket(s);
+      const join = () => {
+        setConnected(true);
+        setConnectionMessage("Connected");
+        s?.emit("join-room", { roomCode, roomSize, name: p.name, avatar: p.avatar, level: p.level, coins: p.coins, board: p.cosmetics.board, dice: p.cosmetics.dice, yard: p.cosmetics.yard, playerId: p.playerId });
+        window.setTimeout(() => { if (mountedRef.current) void loadChatHistory(); }, 80);
+      };
+      s.on("connect", join);
+      s.on("disconnect", () => { setConnected(false); clearAction(); setAnimating(false); animationRef.current = false; setConnectionMessage("Reconnecting…"); });
+      s.on("connect_error", error => { setConnected(false); setConnectionMessage(`Connection error: ${error.message || "retrying"}`); });
+      s.on("roster", (members: Player[]) => {
+        const next = uniquePlayers(Array.isArray(members) ? members : []);
+        setRoster(next);
+        const host = next.find(member => member.host);
+        const mineMember = next.find(member => String(member.playerId) === String(p.playerId));
+        isHostRef.current = !!mineMember?.host;
+        if (host) {
+          const hostCosmetics: Cosmetics = { board: String(host.board || "classic") as BoardThemeId, dice: String(host.dice || "classic") as DiceSkinId, yard: String(host.yard || "") };
+          hostCosmeticsRef.current = hostCosmetics;
+          setCosmetics(hostCosmetics);
+        }
+      });
+      s.on("host-cosmetics", (value: Cosmetics) => {
+        const next: Cosmetics = { board: String(value?.board || "classic") as BoardThemeId, dice: String(value?.dice || "classic") as DiceSkinId, yard: String(value?.yard || "") };
+        hostCosmeticsRef.current = next;
+        setCosmetics(next);
+      });
+      s.on("game-state", (next: GameState) => {
+        if (!mountedRef.current) return;
+        const revision = Number(next.stateRevision ?? -1);
+        if (revision >= 0 && revisionRef.current >= 0 && revision < revisionRef.current) return;
+        if (revision >= 0) revisionRef.current = revision;
+        setGame(next);
+        const isMyTurn = String(next.currentPlayerId || "") === String(p.playerId);
+        setPending(isMyTurn ? next.pendingMove : null);
+        if (next.dice !== null) setRoll(next.dice);
+        authoritativeRef.current = normalizeTokens(next.tokens || {});
+        if (!animationRef.current && moveQueueRef.current.length === 0) setTokens(authoritativeRef.current.map(token => ({ ...token })));
+        saveGameCache(next);
+        if (next.status !== "playing") { clearAction(); setAnimating(false); animationRef.current = false; }
+      });
+      s.on("game-dice", (event: { value: DiceValue; playerId?: string }) => {
+        if (Number(event?.value) >= 1) setRoll(event.value);
+        const remote = String(event?.playerId || "") !== String(p.playerId);
+        setRemoteRolling(remote);
+        window.setTimeout(() => { if (mountedRef.current) setRemoteRolling(false); }, remote ? 700 : 0);
+      });
+      s.on("game-moved", (move: MoveEvent) => {
+        if (!move?.tokenId) return;
+        clearAction();
+        moveQueueRef.current.push(move);
+        if (!animationRef.current) {
+          const next = moveQueueRef.current.shift();
+          if (next) void animateRef.current(next);
+        }
+      });
+      s.on("game-roll-error", () => { clearAction(); setAnimating(false); });
+      s.on("game-move-error", () => { clearAction(); setAnimating(false); animationRef.current = false; recover(s); });
+      s.on("chat", (message: any) => {
+        if (!message?.text) return;
+        const normalized: ChatMessage = { id: String(message.id || `${message.playerId || "player"}-${message.at || Date.now()}`), playerId: String(message.playerId || ""), name: String(message.name || "Player"), text: String(message.text), at: Number(message.at) || Date.now() };
+        setChatMessages(items => {
+          const duplicate = items.some(item => item.id === normalized.id || (item.playerId && normalized.playerId && item.playerId === normalized.playerId && item.text === normalized.text && Math.abs(item.at - normalized.at) < 3000));
+          return duplicate ? items : [...items.slice(-99), normalized];
+        });
+        if (!chatOpenRef.current && String(message.playerId) !== String(p.playerId)) setChatUnread(true);
+      });
+      s.on("game-finished", (event: any) => setConnectionMessage(event?.winnerId === p.playerId ? "You won!" : "Match finished"));
+      const onOnline = () => { if (s?.connected) recover(s); };
+      window.addEventListener("online", onOnline);
+      cosmeticsTimer = window.setInterval(async () => {
+        if (!mountedRef.current || !isHostRef.current) return;
+        try {
+          const response = await fetch("/api/customization", { cache: "no-store" });
+          if (!response.ok) return;
+          const customization: CustomizationResponse = await response.json();
+          const next: Cosmetics = { board: String(customization.equippedBoard || "classic") as BoardThemeId, dice: String(customization.equippedDice || "classic") as DiceSkinId, yard: Array.isArray(customization.equippedItems) ? String(customization.equippedItems.find(x => typeof x === "string" && x.startsWith("yard-")) || "") : "" };
+          if (next.board !== hostCosmeticsRef.current.board || next.dice !== hostCosmeticsRef.current.dice || next.yard !== hostCosmeticsRef.current.yard) {
+            hostCosmeticsRef.current = next;
+            setCosmetics(next);
+            s?.emit("host-cosmetics-update", next);
+          }
+        } catch {}
+      }, 1500);
+      return () => { window.removeEventListener("online", onOnline); if (cosmeticsTimer !== null) window.clearInterval(cosmeticsTimer); s?.disconnect(); };
+    };
+    void start();
+    return () => { cancelled = true; if (cosmeticsTimer !== null) window.clearInterval(cosmeticsTimer); s?.disconnect(); };
+  }, [roomCode, roomSize, clearAction, loadChatHistory, loadProfile, recover, saveGameCache]);
+
+  const animateMove = useCallback(async (move: MoveEvent) => {
+    if (!mountedRef.current) return;
+    animationRef.current = true;
+    setAnimating(true);
+    const [color, idText] = String(move.tokenId).split(":");
+    const id = Number(idText);
+    if (!COLORS.includes(color as Color) || !Number.isInteger(id)) { animationRef.current = false; setAnimating(false); return; }
+    const from = Number(move.from);
+    const contact = Number(move.captureToCenter ? (move.captureProgress ?? move.to ?? move.target) : (move.to ?? move.target));
+    const finalTo = Number(move.finalTo ?? (move.captureToCenter ? FINISH_PROGRESS : contact));
+    const update = (position: number) => setTokens(prev => prev.map(token => token.color === color && token.id === id ? { ...token, position, state: tokenState(position) } : token));
+    update(from);
+    if (Number.isFinite(contact) && contact !== from) {
+      const step = contact > from ? 1 : -1;
+      for (let position = from + step; ; position += step) {
+        await new Promise(resolve => window.setTimeout(resolve, 280));
+        if (!mountedRef.current) return;
+        update(position);
+        if (position === contact) break;
+      }
+    }
+    if (move.captureToCenter && move.captured) {
+      setTokens(prev => prev.map(token => token.color === move.captured?.color && token.id === move.captured?.id ? { ...token, position: 0, state: "yard" } : token));
+      await new Promise(resolve => window.setTimeout(resolve, 180));
+    }
+    if (finalTo !== contact && Number.isFinite(finalTo)) {
+      await new Promise(resolve => window.setTimeout(resolve, 180));
+      if (!mountedRef.current) return;
+      update(finalTo);
+    }
+    const next = moveQueueRef.current.shift();
+    if (next) { await animateRef.current(next); return; }
+    animationRef.current = false;
+    setAnimating(false);
+    setTokens(authoritativeRef.current.map(token => ({ ...token })));
+  }, []);
+  useEffect(() => { animateRef.current = animateMove; }, [animateMove]);
+
+  const players = useMemo(() => uniquePlayers(roster.length ? roster : (game?.players || [])), [roster, game?.players]);
+  const mine = players.find(player => String(player.playerId) === String(me)) || players[0];
+  const opponent = players.find(player => String(player.playerId) !== String(me));
+  const myColors = useMemo<Color[]>(() => mine?.colors?.length ? mine.colors : playerColorsForSeats(roomSize, mine?.seat ?? 0) as Color[], [mine, roomSize]);
+  const myTurn = !!game && connected && String(game.currentPlayerId || "") === String(me);
+  const legalTokenKeys = useMemo(() => pending === null || !myTurn ? [] : tokens.filter(token => myColors.includes(token.color) && canMove(tokens, token, pending)).map(token => `${token.color}-${token.id}`), [pending, myTurn, tokens, myColors]);
+
+  const emitAction = useCallback((event: "game-roll" | "game-move", payload?: unknown) => {
+    if (!socket?.connected || requestPendingRef.current) return false;
+    requestPendingRef.current = true;
+    setActionBusy(true);
+    if (actionTimerRef.current !== null) window.clearTimeout(actionTimerRef.current);
+    actionTimerRef.current = window.setTimeout(() => { clearAction(); if (socket.connected) recover(socket); }, 7000);
+    socket.emit(event, payload, (ack: { ok?: boolean }) => {
+      if (ack?.ok) return;
+      clearAction();
+      if (socket.connected) recover(socket);
+    });
+    return true;
+  }, [socket, clearAction, recover]);
+
+  const chooseToken = useCallback((color: Color, id: number) => {
+    if (!socket || !game || !connected || !myTurn || pending === null || requestPendingRef.current) return;
+    const token = tokens.find(item => item.color === color && item.id === id);
+    if (!token || !myColors.includes(color) || !canMove(tokens, token, pending)) return;
+    void emitAction("game-move", { tokenId: `${color}:${id}` });
+  }, [socket, game, connected, myTurn, pending, tokens, myColors, emitAction]);
+
+  const handleRoll = useCallback(() => {
+    if (!socket || !game || !connected || !myTurn || pending !== null || remoteRolling || actionBusy) return;
+    void emitAction("game-roll");
+  }, [socket, game, connected, myTurn, pending, remoteRolling, actionBusy, emitAction]);
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    try { const saved = JSON.parse(localStorage.getItem("ludo-settings") || "{}"); localStorage.setItem("ludo-settings", JSON.stringify({ ...saved, sound: next })); } catch {}
+  };
+
+  const sendChat = useCallback(async (value = chatText) => {
+    const text = value.trim();
+    if (!text || !socket?.connected || sendingChatRef.current) return;
+    sendingChatRef.current = true;
+    try {
+      const response = await fetch("/api/multiplayer-chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ roomCode, text }), cache: "no-store" });
+      const data = await response.json().catch(() => null);
+      if (!response.ok || !data?.message?.id) return;
+      setChatText("");
+      socket.emit("chat", { text, messageId: String(data.message.id) });
+    } finally { sendingChatRef.current = false; }
+  }, [chatText, roomCode, socket]);
+
+  const confirmLeave = () => { setLeaveConfirmOpen(false); socket?.emit("leave-room"); window.setTimeout(() => { window.location.href = "/lobby"; }, 400); };
+  const statusText = game?.status === "finished" ? (game.winnerId === me ? "YOU WON" : "MATCH FINISHED") : myTurn ? "YOUR TURN" : "OPPONENT'S TURN";
+  const meName = mine?.name || profile.name;
+  const opponentName = opponent?.name || "Opponent";
+  const commMembers = players.map(player => ({ id: String(player.playerId), playerId: String(player.playerId), name: player.name, role: player.host ? "host" : "member", online: player.connected !== false, peerId: player.peerId }));
+  const diceDisabled = !myTurn || pending !== null || remoteRolling || !connected || game?.status !== "playing" || actionBusy;
+
+  return <main className="mp-page">
+    <div className="mp-shell">
+      <header className="mp-header">
+        <div className="mp-player-card"><div className="mp-avatar"><PlayerAvatar src={mine?.avatar || profile.avatar} /></div><div className="mp-player-copy"><strong>{meName} <span>YOU</span></strong><small className="mp-player-level">⭐ {mine?.level ?? profile.level}</small><small><i className="mp-online-dot"/> Connected</small></div></div>
+        <div className="mp-brand"><strong>♛ LUDO</strong><span>LIVE</span></div>
+        <div className="mp-player-card mp-player-card-opponent"><div className="mp-avatar"><PlayerAvatar src={opponent?.avatar} /></div><div className="mp-player-copy"><strong>{opponentName}</strong><small className="mp-player-level">⭐ {opponent?.level ?? "1"}</small><small><i className={`mp-online-dot ${opponent?.connected === false ? "off" : "busy"}`}/> {opponent?.connected === false ? "Disconnected" : "In match"}</small></div></div>
+      </header>
+
+      <section className="mp-board-section"><StakeDisplay roomCode={roomCode}/><div className="mp-board-frame"><CanonicalLudoBoard theme={cosmetics.board} yardSkin={cosmetics.yard} demoTokens={tokens} legalTokenKeys={legalTokenKeys} onTokenClick={chooseToken}/></div></section>
+
+      <section className="mp-control-section">
+        <div className="mp-info-card"><div className="mp-info-name">{meName}</div><div className="mp-info-level">★ {mine?.level ?? profile.level}</div><div className="mp-info-coins">🪙 {(Number(mine?.coins) || profile.coins).toLocaleString()}</div></div>
+        <div className="mp-turn-card"><div className={`mp-turn-label ${myTurn ? "mine" : ""}`}><span/>{statusText}</div><div className="mp-turn-note">{game?.status === "playing" ? (myTurn ? "Roll the dice to play" : "Wait for the other player to move") : connectionMessage}</div><DemoDice value={roll} onRoll={handleRoll} disabled={diceDisabled} botRolling={remoteRolling} skin={cosmetics.dice}/></div>
+        <div className="mp-tools"><button type="button" className={`mp-tool ${chatOpen || chatUnread ? "active" : ""}`} onClick={() => setChatOpen(true)}><span>💬</span><small>Chat{chatUnread ? " •" : ""}</small></button><div className="mp-tool"><ChatVoice roomCode={roomCode} playerId={me} members={commMembers} socket={socket}/><small>Mic</small></div></div>
+      </section>
+
+      <div className="mp-bottom-bar"><button type="button" className="danger" onClick={() => setLeaveConfirmOpen(true)}>↩ Leave Match</button><button type="button" onClick={() => setPlayersOpen(true)}>👥 Players</button><button type="button" onClick={toggleSound}>{soundEnabled ? "🔊 Sound" : "🔇 Sound"}</button><div className="mp-connection">● {connected ? "Connected" : "Reconnecting…"}</div><div className="mp-room">🛡️ Room ID: {roomCode}</div></div>
+    </div>
+
+    <ChatPanel open={chatOpen} messages={chatMessages} me={me} value={chatText} setValue={setChatText} onSend={sendChat} onClose={() => setChatOpen(false)} reactions={REACTIONS} onReaction={sendChat}/>
+    {playersOpen && <div className="mp-modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget) setPlayersOpen(false); }}><section className="mp-players-modal" role="dialog" aria-modal="true"><div className="mp-chat-head"><strong>Players</strong><button type="button" onClick={() => setPlayersOpen(false)} aria-label="Close players">×</button></div>{players.map(player => <div className="mp-roster-row" key={player.playerId}><span className="mp-roster-dot"/><strong>{player.name}{String(player.playerId) === String(me) ? " (You)" : ""}</strong><small>{player.connected === false ? "Disconnected" : "Connected"}</small></div>)}</section></div>}
+    <LudoConfirmModal open={leaveConfirmOpen} title="Leave match?" message="Leaving now will end your participation in this room." confirmLabel="Leave" cancelLabel="Stay" onConfirm={confirmLeave} onCancel={() => setLeaveConfirmOpen(false)} danger/>
   </main>;
 }
