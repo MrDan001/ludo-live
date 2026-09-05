@@ -6,14 +6,7 @@ import { readProgress, xpRequiredForLevel } from "../../lib/playerProgress";
 import EquippedAvatar from "../_components/EquippedAvatar";
 
 type Wallet = { coins: number; gems: number };
-
-type Action = {
-  icon: string;
-  title: string;
-  sub: string;
-  href: string;
-  kind: "online" | "tournament" | "solo" | "friends";
-};
+type Action = { icon: string; title: string; sub: string; href: string; kind: "online" | "tournament" | "solo" | "friends" };
 
 const actions: Action[] = [
   { icon: "🌐", title: "PLAY ONLINE", sub: "Find open rooms and play real players", href: "/lobby", kind: "online" },
@@ -55,7 +48,7 @@ export default function HomePage() {
           });
         }
       } catch {
-        // Preserve the current wallet display if the network is temporarily unavailable.
+        // Keep the existing wallet display through temporary network failures.
       }
     };
 
@@ -84,22 +77,19 @@ export default function HomePage() {
 
   return (
     <main className="home-screen">
-      <div className="home-screen__content">
+      <div className="home-inner">
         <header className="home-header">
           <Link href="/profile" className="profile-block">
             <div className="avatar-ring">
               <div className="avatar-image"><EquippedAvatar /></div>
               <div className="level-badge">{progress.level}</div>
             </div>
-
             <div className="profile-details">
               <strong className="player-name">{name}</strong>
-              <div className="xp-track" aria-hidden="true">
-                <span style={{ width: `${xpPercent}%` }} />
-              </div>
+              <div className="xp-track"><span style={{ width: `${xpPercent}%` }} /></div>
               <div className="level-line">
                 <b>LEVEL {progress.level}</b>
-                <span className="level-track" aria-hidden="true"><i style={{ width: `${xpPercent}%` }} /></span>
+                <span className="level-progress"><i style={{ width: `${xpPercent}%` }} /></span>
                 <b>LVL {progress.level + 1}</b>
               </div>
             </div>
@@ -112,62 +102,60 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="main-actions" aria-label="Game actions">
+        <section className="main-actions">
           {actions.map((action) => (
             <Link key={action.title} href={action.href} className={`main-action main-action--${action.kind}`}>
-              <span className="main-action__icon" aria-hidden="true">{action.icon}</span>
+              <span className="main-action__icon">{action.icon}</span>
               <span className="main-action__copy">
                 <b className="main-action__title">{action.title}</b>
                 {action.sub ? <small className="main-action__sub">{action.sub}</small> : null}
               </span>
-              <span className="main-action__arrow" aria-hidden="true">›</span>
+              <span className="main-action__arrow">›</span>
             </Link>
           ))}
         </section>
 
-        <section className="quick-actions" aria-label="Quick actions">
+        <section className="quick-actions">
           {shortcuts.map(([icon, label, href]) => (
             <Link key={label} href={href} className="quick-action">
-              <span className="quick-action__icon" aria-hidden="true">{icon}</span>
+              <span className="quick-action__icon">{icon}</span>
               <b>{label}</b>
             </Link>
           ))}
         </section>
 
         <Link href="/inventory" className="inventory-button">
-          <span className="inventory-button__icon" aria-hidden="true">🎒</span>
+          <span className="inventory-button__icon">🎒</span>
           <b>Inventory</b>
         </Link>
       </div>
 
-      <nav className="bottom-navigation" aria-label="Primary navigation">
+      <nav className="bottom-navigation">
         {nav.map(([icon, label, href], index) => (
           <Link key={label} href={href} className={`bottom-navigation__item ${index === 0 ? "is-active" : ""}`}>
-            <span className="bottom-navigation__icon" aria-hidden="true">{icon}</span>
+            <span className="bottom-navigation__icon">{icon}</span>
             <b>{label}</b>
           </Link>
         ))}
       </nav>
 
       <style jsx global>{`
-        .home-screen,
-        .home-screen * {
-          box-sizing: border-box !important;
-        }
+        html, body { width: 100%; min-height: 100%; margin: 0; padding: 0; }
+        body { overflow: hidden; background: #020817; }
 
+        .home-screen, .home-screen * { box-sizing: border-box; }
         .home-screen {
-          position: fixed !important;
-          inset: 0 !important;
-          width: 100% !important;
-          height: 100dvh !important;
-          min-height: 100dvh !important;
-          overflow: hidden !important;
-          margin: 0 !important;
-          padding: 0 !important;
-          background: linear-gradient(180deg, #041733 0%, #020b1d 58%, #010611 100%) !important;
-          color: #fff !important;
-          font-family: Arial, Helvetica, sans-serif !important;
-          isolation: isolate !important;
+          position: fixed;
+          inset: 0;
+          width: 100%;
+          height: 100dvh;
+          min-height: 100dvh;
+          overflow: hidden;
+          background: linear-gradient(180deg, #041733 0%, #020b1d 58%, #010611 100%);
+          color: #fff;
+          font-family: Arial, Helvetica, sans-serif;
+          isolation: isolate;
+          -webkit-font-smoothing: antialiased;
         }
 
         .home-screen a,
@@ -176,403 +164,327 @@ export default function HomePage() {
         .home-screen strong,
         .home-screen small,
         .home-screen i {
-          opacity: 1 !important;
-          filter: none !important;
-          visibility: visible !important;
+          opacity: 1;
+          visibility: visible;
+          filter: none;
+          text-shadow: none;
         }
 
-        .home-screen__content {
-          width: min(100%, 760px) !important;
-          height: calc(100dvh - 78px - env(safe-area-inset-bottom, 0px)) !important;
-          min-height: 0 !important;
-          margin: 0 auto !important;
-          padding: max(8px, env(safe-area-inset-top, 0px)) 14px 12px !important;
-          overflow: hidden !important;
-          display: flex !important;
-          flex-direction: column !important;
+        .home-inner {
+          position: relative;
+          width: min(100%, 760px);
+          height: calc(100% - 78px - env(safe-area-inset-bottom, 0px));
+          margin: 0 auto;
+          padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 10px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
         }
 
         .home-header {
-          flex: 0 0 70px !important;
-          min-width: 0 !important;
-          display: grid !important;
-          grid-template-columns: minmax(0, 1fr) auto !important;
-          align-items: center !important;
-          gap: 8px !important;
+          flex: 0 0 68px;
+          min-width: 0;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: 8px;
         }
 
         .profile-block {
-          min-width: 0 !important;
-          height: 70px !important;
-          display: flex !important;
-          align-items: center !important;
-          gap: 9px !important;
-          text-decoration: none !important;
-          color: #fff !important;
+          min-width: 0;
+          height: 68px;
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          color: #fff;
+          text-decoration: none;
         }
 
         .avatar-ring {
-          position: relative !important;
-          flex: 0 0 58px !important;
-          width: 58px !important;
-          height: 58px !important;
-          display: grid !important;
-          place-items: center !important;
-          border-radius: 50% !important;
-          background: linear-gradient(145deg, #ffe45c, #ffb300) !important;
-          border: 3px solid #ffd43b !important;
+          position: relative;
+          flex: 0 0 58px;
+          width: 58px;
+          height: 58px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: linear-gradient(145deg, #ffe45c, #ffb300);
+          border: 3px solid #ffd43b;
         }
 
         .avatar-image {
-          width: 84% !important;
-          height: 84% !important;
-          display: grid !important;
-          place-items: center !important;
-          border-radius: 50% !important;
-          overflow: hidden !important;
-          background: #c58a54 !important;
-          border: 2px solid #8b5a32 !important;
-          font-size: 31px !important;
+          width: 84%;
+          height: 84%;
+          display: grid;
+          place-items: center;
+          overflow: hidden;
+          border-radius: 50%;
+          background: #c58a54;
+          border: 2px solid #8b5a32;
+          font-size: 31px;
         }
 
         .level-badge {
-          position: absolute !important;
-          left: 50% !important;
-          bottom: -7px !important;
-          transform: translateX(-50%) !important;
-          min-width: 31px !important;
-          height: 21px !important;
-          padding: 0 5px !important;
-          display: grid !important;
-          place-items: center !important;
-          border-radius: 7px !important;
-          background: #ffd21a !important;
-          color: #111 !important;
-          border: 2px solid #f5b900 !important;
-          font-size: 12px !important;
-          line-height: 1 !important;
-          font-weight: 950 !important;
+          position: absolute;
+          left: 50%;
+          bottom: -7px;
+          transform: translateX(-50%);
+          min-width: 31px;
+          height: 21px;
+          padding: 0 5px;
+          display: grid;
+          place-items: center;
+          border-radius: 7px;
+          background: #ffd21a;
+          color: #111;
+          border: 2px solid #f5b900;
+          font-size: 12px;
+          line-height: 1;
+          font-weight: 950;
         }
 
-        .profile-details {
-          min-width: 0 !important;
-          flex: 1 1 auto !important;
-        }
-
+        .profile-details { min-width: 0; flex: 1 1 auto; }
         .player-name {
-          display: block !important;
-          max-width: 100% !important;
-          overflow: hidden !important;
-          white-space: nowrap !important;
-          text-overflow: ellipsis !important;
-          color: #fff !important;
-          font-size: clamp(19px, 4.6vw, 25px) !important;
-          line-height: 1 !important;
+          display: block;
+          max-width: 100%;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
+          color: #fff;
+          font-size: clamp(19px, 4.4vw, 25px);
+          line-height: 1;
+          font-weight: 900;
         }
 
-        .xp-track {
-          display: block !important;
-          width: 100% !important;
-          height: 5px !important;
-          margin-top: 6px !important;
-          overflow: hidden !important;
-          border-radius: 999px !important;
-          background: #102746 !important;
+        .xp-track,
+        .level-progress {
+          display: block;
+          width: 100%;
+          overflow: hidden;
+          border-radius: 999px;
+          background: #102746;
         }
 
-        .xp-track > span {
-          display: block !important;
-          height: 100% !important;
-          border-radius: inherit !important;
-          background: linear-gradient(90deg, #37c8ff, #7df5ff) !important;
+        .xp-track { height: 5px; margin-top: 6px; }
+        .xp-track > span,
+        .level-progress > i {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
         }
+        .xp-track > span { background: linear-gradient(90deg, #37c8ff, #7df5ff); }
 
         .level-line {
-          min-width: 0 !important;
-          margin-top: 3px !important;
-          display: grid !important;
-          grid-template-columns: auto minmax(24px, 1fr) auto !important;
-          align-items: center !important;
-          gap: 5px !important;
-          color: #ffd21a !important;
-          font-size: 8px !important;
-          line-height: 1 !important;
+          min-width: 0;
+          margin-top: 3px;
+          display: grid;
+          grid-template-columns: auto minmax(24px, 1fr) auto;
+          align-items: center;
+          gap: 5px;
+          color: #ffd21a;
+          font-size: 8px;
+          line-height: 1;
         }
-
-        .level-line b {
-          color: #ffd21a !important;
-          white-space: nowrap !important;
-          font-weight: 950 !important;
-        }
-
-        .level-track {
-          display: block !important;
-          width: 100% !important;
-          height: 9px !important;
-          overflow: hidden !important;
-          border-radius: 999px !important;
-          background: #102746 !important;
-        }
-
-        .level-track i {
-          display: block !important;
-          height: 100% !important;
-          border-radius: inherit !important;
-          background: linear-gradient(90deg, #ffb51b, #ffe15a) !important;
-        }
+        .level-line b { color: #ffd21a; white-space: nowrap; font-weight: 950; }
+        .level-progress { height: 9px; }
+        .level-progress > i { background: linear-gradient(90deg, #ffb51b, #ffe15a); }
 
         .wallet {
-          min-width: 0 !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: flex-end !important;
-          gap: 5px !important;
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: 5px;
         }
-
         .wallet-pill {
-          min-width: 0 !important;
-          display: inline-flex !important;
-          align-items: center !important;
-          gap: 3px !important;
-          height: 38px !important;
-          padding: 0 8px !important;
-          border-radius: 12px !important;
-          background: #051737 !important;
-          border: 1px solid #173766 !important;
-          color: #fff !important;
-          font-size: 11px !important;
-          line-height: 1 !important;
-          white-space: nowrap !important;
+          height: 38px;
+          padding: 0 8px;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          white-space: nowrap;
+          border-radius: 12px;
+          background: #051737;
+          border: 1px solid #173766;
+          color: #fff;
+          font-size: 11px;
+          line-height: 1;
         }
-
         .plus-button {
-          flex: 0 0 46px !important;
-          width: 46px !important;
-          height: 46px !important;
-          display: grid !important;
-          place-items: center !important;
-          border-radius: 50% !important;
-          background: #39b930 !important;
-          border: 2px solid #83ec64 !important;
-          color: #fff !important;
-          text-decoration: none !important;
-          font-size: 29px !important;
-          font-weight: 950 !important;
-          line-height: 1 !important;
+          flex: 0 0 46px;
+          width: 46px;
+          height: 46px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: #39b930;
+          border: 2px solid #83ec64;
+          color: #fff;
+          text-decoration: none;
+          font-size: 29px;
+          line-height: 1;
+          font-weight: 950;
         }
 
         .main-actions {
-          flex: 0 0 auto !important;
-          display: grid !important;
-          grid-template-rows: repeat(4, clamp(76px, 10.4dvh, 92px)) !important;
-          gap: clamp(7px, 0.9dvh, 10px) !important;
-          margin-top: 7px !important;
+          flex: 0 0 auto;
+          margin-top: 8px;
+          display: grid;
+          grid-template-rows: repeat(4, 88px);
+          gap: 8px;
         }
 
         .main-action {
-          position: relative !important;
-          min-width: 0 !important;
-          min-height: 0 !important;
-          display: grid !important;
-          grid-template-columns: 72px minmax(0, 1fr) 24px !important;
-          align-items: center !important;
-          gap: 10px !important;
-          padding: 8px 13px !important;
-          overflow: hidden !important;
-          border-radius: 19px !important;
-          border: 1px solid rgba(255,255,255,.25) !important;
+          min-width: 0;
+          min-height: 88px;
+          display: grid;
+          grid-template-columns: 68px minmax(0, 1fr) 24px;
+          align-items: center;
+          gap: 10px;
+          padding: 8px 13px;
+          overflow: hidden;
+          border-radius: 19px;
+          border: 1px solid rgba(255,255,255,.25);
           color: #fff !important;
-          text-decoration: none !important;
-          box-shadow: 0 5px 14px rgba(0,0,0,.20) !important;
+          text-decoration: none;
+          box-shadow: 0 5px 14px rgba(0,0,0,.20);
         }
-
-        .main-action--online { background: linear-gradient(135deg, #159447 0%, #31c936 100%) !important; }
-        .main-action--tournament { background: linear-gradient(135deg, #6b1998 0%, #a126c8 100%) !important; }
-        .main-action--solo { background: linear-gradient(135deg, #b86b12 0%, #e39a24 100%) !important; }
-        .main-action--friends { background: linear-gradient(135deg, #087b61 0%, #16b875 100%) !important; }
+        .main-action--online { background: linear-gradient(135deg,#159447 0%,#31c936 100%); }
+        .main-action--tournament { background: linear-gradient(135deg,#6b1998 0%,#a126c8 100%); }
+        .main-action--solo { background: linear-gradient(135deg,#b86b12 0%,#e39a24 100%); }
+        .main-action--friends { background: linear-gradient(135deg,#087b61 0%,#16b875 100%); }
 
         .main-action__icon {
-          min-width: 0 !important;
-          width: 72px !important;
-          display: grid !important;
-          place-items: center !important;
+          width: 68px;
+          display: grid;
+          place-items: center;
           color: #fff !important;
           font-size: 43px !important;
           line-height: 1 !important;
         }
-
-        .main-action__copy {
-          min-width: 0 !important;
-          overflow: hidden !important;
-          color: #fff !important;
-        }
-
+        .main-action__copy { min-width: 0; overflow: hidden; color: #fff !important; }
         .main-action__title {
-          display: block !important;
-          overflow: hidden !important;
-          white-space: nowrap !important;
-          text-overflow: ellipsis !important;
+          display: block;
+          overflow: hidden;
+          white-space: nowrap;
+          text-overflow: ellipsis;
           color: #fff !important;
-          font-size: clamp(17px, 4vw, 24px) !important;
-          line-height: 1.04 !important;
+          font-size: clamp(16px, 3.2vw, 25px) !important;
+          line-height: 1.05 !important;
           font-weight: 950 !important;
         }
-
         .main-action__sub {
-          display: block !important;
-          margin-top: 4px !important;
-          overflow: hidden !important;
-          white-space: nowrap !important;
-          text-overflow: ellipsis !important;
+          display: block;
+          margin-top: 4px;
           color: #fff !important;
-          font-size: clamp(9px, 2.2vw, 13px) !important;
-          line-height: 1.1 !important;
+          font-size: clamp(9px, 2vw, 14px) !important;
+          line-height: 1.15 !important;
           font-weight: 750 !important;
         }
-
         .main-action__arrow {
-          display: grid !important;
-          place-items: center !important;
           color: #fff !important;
           font-size: 31px !important;
           line-height: 1 !important;
+          text-align: center;
           font-weight: 400 !important;
         }
 
         .quick-actions {
-          flex: 0 0 92px !important;
-          display: grid !important;
-          grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-          margin-top: 9px !important;
-          padding: 7px 4px !important;
-          border-radius: 18px !important;
-          background: #061731 !important;
-          border: 1px solid #173766 !important;
-          overflow: hidden !important;
+          flex: 0 0 112px;
+          margin-top: 9px;
+          padding: 8px 5px;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0,1fr));
+          align-items: center;
+          border-radius: 18px;
+          background: #06152f;
+          border: 1px solid #173766;
         }
 
         .quick-action {
-          min-width: 0 !important;
-          display: grid !important;
-          place-items: center !important;
-          align-content: center !important;
-          gap: 4px !important;
+          min-width: 0;
+          display: grid;
+          place-items: center;
+          align-content: center;
+          gap: 5px;
           color: #fff !important;
-          text-decoration: none !important;
-          text-align: center !important;
+          text-decoration: none;
+          text-align: center;
+          font-size: clamp(9px, 2.25vw, 13px);
+          line-height: 1.05;
         }
-
-        .quick-action__icon {
-          display: block !important;
-          color: #fff !important;
-          font-size: 35px !important;
-          line-height: 1 !important;
-        }
-
-        .quick-action b {
-          display: block !important;
-          max-width: 100% !important;
-          overflow: hidden !important;
-          white-space: nowrap !important;
-          text-overflow: ellipsis !important;
-          color: #fff !important;
-          font-size: 11px !important;
-          line-height: 1.05 !important;
-          font-weight: 800 !important;
-        }
+        .quick-action__icon { font-size: clamp(28px, 7vw, 40px) !important; line-height: 1 !important; }
+        .quick-action b { color: #fff !important; font-weight: 850 !important; }
 
         .inventory-button {
-          flex: 0 0 72px !important;
-          min-height: 72px !important;
-          margin-top: 10px !important;
-          display: flex !important;
-          align-items: center !important;
-          justify-content: center !important;
-          gap: 10px !important;
-          border-radius: 18px !important;
-          background: #0a214b !important;
-          border: 1px solid #173766 !important;
+          flex: 0 0 76px;
+          margin-top: 9px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 10px;
+          min-height: 76px;
+          border-radius: 19px;
+          background: #103574;
+          border: 1px solid #214d95;
           color: #fff !important;
-          text-decoration: none !important;
-          overflow: hidden !important;
+          text-decoration: none;
+          box-shadow: 0 5px 14px rgba(0,0,0,.18);
+          font-size: 21px;
+          line-height: 1;
         }
-
-        .inventory-button__icon {
-          display: block !important;
-          font-size: 43px !important;
-          line-height: 1 !important;
-        }
-
-        .inventory-button b {
-          color: #fff !important;
-          font-size: 20px !important;
-          line-height: 1 !important;
-          font-weight: 950 !important;
-        }
+        .inventory-button__icon { font-size: 44px !important; line-height: 1 !important; }
+        .inventory-button b { color: #fff !important; font-weight: 950 !important; }
 
         .bottom-navigation {
-          position: fixed !important;
-          left: 0 !important;
-          right: 0 !important;
-          bottom: 0 !important;
-          z-index: 100 !important;
-          height: calc(78px + env(safe-area-inset-bottom, 0px)) !important;
-          padding-bottom: env(safe-area-inset-bottom, 0px) !important;
-          display: grid !important;
-          grid-template-columns: repeat(4, 1fr) !important;
-          background: #020b1b !important;
-          border-top: 1px solid #17325b !important;
+          position: fixed;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          height: calc(78px + env(safe-area-inset-bottom, 0px));
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          background: #020b1b;
+          border-top: 1px solid #17325b;
+          z-index: 20;
         }
-
         .bottom-navigation__item {
-          min-width: 0 !important;
-          display: grid !important;
-          place-items: center !important;
-          align-content: center !important;
-          gap: 2px !important;
+          min-width: 0;
+          display: grid;
+          place-items: center;
+          align-content: center;
+          gap: 4px;
           color: #9eb3d7 !important;
-          text-decoration: none !important;
-          font-size: 11px !important;
-          line-height: 1 !important;
+          text-decoration: none;
+          font-size: 13px;
+          line-height: 1;
+          text-align: center;
         }
-
         .bottom-navigation__item.is-active {
-          background: #123a72 !important;
           color: #fff !important;
+          background: #16477f;
         }
+        .bottom-navigation__icon { font-size: 31px !important; line-height: 1 !important; }
+        .bottom-navigation__item b { color: inherit !important; font-weight: 850 !important; }
 
-        .bottom-navigation__item b {
-          color: inherit !important;
-          font-size: 11px !important;
-          font-weight: 800 !important;
-        }
-
-        .bottom-navigation__icon {
-          display: block !important;
-          color: inherit !important;
-          font-size: 29px !important;
-          line-height: 1 !important;
-        }
-
-        @media (max-width: 430px) {
-          .home-screen__content { padding-left: 12px !important; padding-right: 12px !important; }
-          .avatar-ring { flex-basis: 54px !important; width: 54px !important; height: 54px !important; }
-          .profile-block { gap: 8px !important; }
-          .wallet-pill { height: 36px !important; padding: 0 6px !important; font-size: 10px !important; }
-          .plus-button { flex-basis: 42px !important; width: 42px !important; height: 42px !important; }
-          .main-action { grid-template-columns: 60px minmax(0, 1fr) 20px !important; gap: 8px !important; padding-left: 9px !important; padding-right: 9px !important; }
-          .main-action__icon { width: 60px !important; font-size: 38px !important; }
-          .main-action__title { font-size: 18px !important; }
-          .main-action__sub { font-size: 9px !important; }
-          .quick-action__icon { font-size: 31px !important; }
-        }
-
-        @media (max-height: 700px) {
-          .main-actions { grid-template-rows: repeat(4, 70px) !important; gap: 6px !important; }
-          .quick-actions { flex-basis: 82px !important; }
-          .inventory-button { flex-basis: 62px !important; min-height: 62px !important; margin-top: 8px !important; }
-          .inventory-button__icon { font-size: 37px !important; }
-          .inventory-button b { font-size: 18px !important; }
+        @media (max-height: 700px) and (max-width: 600px) {
+          .home-inner { padding-left: 12px; padding-right: 12px; }
+          .home-header { flex-basis: 62px; }
+          .profile-block { height: 62px; }
+          .avatar-ring { flex-basis: 52px; width: 52px; height: 52px; }
+          .wallet-pill { height: 34px; padding-left: 6px; padding-right: 6px; font-size: 10px; }
+          .plus-button { flex-basis: 42px; width: 42px; height: 42px; font-size: 26px; }
+          .main-actions { margin-top: 6px; grid-template-rows: repeat(4, 72px); gap: 6px; }
+          .main-action { min-height: 72px; grid-template-columns: 54px minmax(0,1fr) 20px; gap: 7px; padding: 7px 10px; border-radius: 16px; }
+          .main-action__icon { width: 54px; font-size: 34px !important; }
+          .main-action__title { font-size: 16px !important; }
+          .main-action__sub { margin-top: 3px; font-size: 9px !important; }
+          .main-action__arrow { font-size: 27px !important; }
+          .quick-actions { flex-basis: 92px; margin-top: 7px; }
+          .quick-action__icon { font-size: 28px !important; }
+          .inventory-button { flex-basis: 62px; min-height: 62px; margin-top: 7px; font-size: 18px; }
+          .inventory-button__icon { font-size: 36px !important; }
         }
       `}</style>
     </main>
