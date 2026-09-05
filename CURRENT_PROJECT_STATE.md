@@ -1,249 +1,125 @@
 # Ludo Live — Current Project State
 
-**Last reviewed:** 2026-09-03
-**Repository:** `MrDan001/ludo-live`
-**Production backend:** Railway
-**Production branch:** `main`
-**Web frontend:** Next.js application; Vercel deployment integration is present in the repository.
+**Last reviewed:** 2026-09-05  
+**Repository:** `MrDan001/ludo-live`  
+**Production backend:** Railway  
+**Production branch:** `main`  
+**Web application:** Next.js with Vercel deployment integration
 
-This file is the authoritative current-state ledger. It records verified implementation direction and important recent changes. Do not infer production behavior from screenshots, stale branches, or old conversation context.
+This is the current-state ledger. Current code is authoritative; old dated snapshots and superseded feature notes are not.
 
-## 1. Admin catalogue — canonical location
+## 1. Protected multiplayer surface
 
-The Admin hamburger **Catalogue** section intentionally contains only:
+`/game-online` is locked and must not be modified casually.
 
-- **Shop** → `/dbase/shop`
+Canonical implementation:
 
-Do not recreate separate Boards, Dice, Avatars, or Yards catalogue pages unless explicitly requested. The Shop is the canonical catalogue-management surface.
-
-## 2. Admin missions — Daily + Weekly
-
-The Admin Missions page is:
-
-- `/dbase/missions`
-
-It now has two management tabs:
-
-- **Daily** — existing daily missions are preserved and editable.
-- **Weekly** — existing weekly missions are preserved and editable.
-
-Both tabs use the server-backed Admin Mission APIs and persist changes. The player-facing mission system remains server-authoritative; editing a mission in Admin must not silently replace or reset the existing mission catalogue.
-
-Relevant API surfaces include:
-
-- `/api/admin/missions`
-- `/api/admin/missions/weekly`
-- `/api/missions`
-- `/api/missions/weekly`
-
-Do not restore the old single-tab-only assumption or discard existing mission records when changing the Admin UI.
-
-## 3. Admin browser-dialog UX
-
-Native browser dialogs are not the intended product UX.
-
-The shared `LudoConfirmModal` is the standard branded confirmation/error surface. The Online Multiplayer leave-match confirmation and Shop/Paystack initialization errors were migrated away from native `window.confirm()` / `alert()` behavior.
-
-Future player/admin flows should use the project's branded modal/toast patterns rather than introducing `alert`, `confirm`, or `prompt`.
-
-## 4. Admin Avatar creation contract
-
-The Admin Shop Add Avatar flow supports:
-
-- **Upload** — actual image file.
-- **URL** — image URL.
-- one input mode at a time.
-- pricing in the project's supported currencies: `coins`, `gems`, and `naira`.
-- catalogue categories.
-
-The existing Shop/avatar model is the source of truth. Do not invent a second avatar schema.
-
-## 5. Level / XP progression
-
-Player progression starts at **Level 1**.
-
-Required XP from level `N` to `N + 1` remains:
-
-`10 + (N × 5)`
-
-Current product rule:
-
-> **Do not carry remaining XP forward after a level-up. Reset XP to 0 for the new level.**
-
-Level rewards remain idempotent by `(user_id, level)`. Already-owned milestone cosmetics receive their configured gem compensation rather than duplicate ownership.
-
-The XP reward system remains server-authoritative and must not be weakened by client-side changes.
-
-## 6. Admin Events
-
-Admin Events is server-authoritative. The production event model requires the compatibility field `name`; event creation/editing keeps `name` synchronized with the event title.
-
-Do not use an empty event list as proof that the API is unavailable, and do not delete/reset event data as a workaround for schema compatibility problems.
-
-## 7. Tournament funding / Admin Finance
-
-Tournament funding uses the platform's Admin Finance virtual treasury/money-bank source rather than an unrelated balance.
-
-The intended relationship is:
-
-`/dbase/finance` → platform virtual treasury → `/dbase/tournament` funding validation
-
-Tournament lifecycle is automatic:
-
-`UPCOMING → LIVE → ENDED`
-
-The server must validate entry/prize funding against the same treasury source displayed by Admin Finance. Do not bypass insufficient-funds checks, create a second treasury, or fabricate currency.
-
-## 8. Wallet audit / server-authoritative accounting
-
-Wallet changes must remain server-authoritative and transactional. The wallet-audit path supports request metadata and player identity resolution.
-
-The intended audit contract is to record, where available:
-
-- source
-- reason
-- request / transaction identifier
-- actor / resolved player identity
-- balance before
-- balance after
-- IP address
-- user agent
-
-Older records may contain `unknown` or missing metadata because they were written before the audit improvements. Do not treat those historical records as proof that new wallet paths may omit metadata.
-
-Relevant implementation surfaces include `app/api/lib/wallet-audit.ts`, wallet APIs, reward APIs, Paystack fulfillment, Spin rewards, mission claims, and Admin wallet operations.
-
-## 9. Missions / Spin rewards
-
-Mission claims and Spin rewards are server-authoritative and must be idempotent.
-
-Spin reward handling supports the project's reward/inventory flow. Shop-item rewards can unlock inventory items without requiring a normal purchase. Free rewards must not be incorrectly blocked by Shop purchase-level rules.
-
-## 10. Shop / pricing
-
-The Admin Shop is `/dbase/shop`. Supported pricing currencies include:
-
-- `coins`
-- `gems`
-- `naira`
-
-Player purchase APIs consume the effective server catalogue. Naira checkout uses verified Paystack server flows; client-side claims of payment success are not authoritative.
-
-For level-locked Shop items:
-
-- below the required level, show the lock/unlock requirement and do not expose the protected purchase price as an unlocked price;
-- at the required level, the item becomes purchasable;
-- free Spin rewards bypass purchase-level locks because they are rewards, not purchases.
-
-## 11. Multiplayer architecture
-
-The repository contains canonical multiplayer board/authority modules and the online multiplayer page:
-
-- `/game-online`
 - `app/game-online/OnlineMultiplayerGame.tsx`
-- `app/game/MultiplayerGameCanonical.tsx`
-- `app/_components/CanonicalLudoBoard.tsx`
-- `lib/onlineLudoAuthority.js`
-- `lib/multiplayerMove.js`
-- `lib/canonicalLudoBoard.ts`
-- `lib/canonicalLudoBoard.invariants.ts`
+- `app/game-online/page.tsx`
+- `app/_components/LudoBoardMultiplayer.tsx`
+- multiplayer authority modules under `lib/`
 
-Server/authority code is the source of truth for legal movement and match state. Client animation must represent authoritative state; it must not independently award currency, XP, or match outcomes.
+The completed multiplayer implementation is treated as a protected contract. Future work must not touch it unless the request explicitly reopens that surface.
 
-Known multiplayer engineering concerns include correct capture sequencing, token yard/home state, turn synchronization, room membership cleanup, and animation synchronization. These areas should be regression-tested rather than patched by adding client-only state.
+## 2. Bot vs Human and Tournament turn sequencing
 
-## 12. In-game chat, voice and avatar sync
+The local Human-vs-Bot flow is `/game` and the Tournament Bot-vs-Human flow is `/tournament/game` using their dedicated game components.
 
-The multiplayer UI contains dedicated communication components including `ChatVoice.tsx`, `InGameComms.tsx`, `MultiplayerChatOverlay.tsx`, and social overlays.
+The current turn contract is:
 
-Voice signaling uses the active room/socket roster. Chat and unread state are persisted through the existing player/social infrastructure.
+**Human roll animation → result is committed → if no legal move, the complete roll animation finishes before the turn changes → Bot preparation → Bot roll animation → Bot result → Bot move.**
 
-Player identity shown during multiplayer should use the player's current profile data. Equipped avatar rendering should remain synchronized with the player's currently equipped profile avatar rather than using a stale hard-coded avatar.
+The Tournament implementation is `app/game/TournamentBotGame.tsx`; the Bot-vs-Human implementation is `app/game/GameBoardContent.tsx`.
 
-The intended mobile presentation is portrait-first and should preserve board visibility without making the communication controls overwhelm the game surface.
+## 3. Admin Missions
 
-## 13. Notifications
+`/dbase/missions` contains Daily and Weekly management tabs. Existing mission records are preserved and edited through server-backed Admin APIs.
 
-Browser notification permission alone is not proof that registration succeeded. Notification subscription/registration remains a separate server-backed step.
+## 4. Admin Shop and catalogue
 
-Do not reintroduce global schema initialization inside request handlers. Database preparation/migration belongs in deployment/setup tooling.
+`/dbase/shop` is the canonical catalogue-management surface for boards, dice, avatars and related shop items. Do not create parallel catalogue sources without an explicit product requirement.
 
-## 14. Authentication and Admin shell
+Supported purchase currencies remain `coins`, `gems` and `naira`.
 
-Admin authentication is separate from the normal player shell. Protected Admin routes remain under `/dbase` and Admin APIs.
+## 5. Admin Events
 
-Login/register password fields use the project's show/hide password control. The Admin hamburger/navigation should not be exposed as an authenticated management surface before the Admin gate is satisfied.
+Admin Events remains server-authoritative. Event compatibility fields must stay synchronized with the current event model.
 
-## 15. Current Admin route map
+## 6. Tournament funding
 
-Core Admin surfaces include:
+Tournament funding continues to use the Admin Finance virtual treasury. Prize/entry funding must be validated against the same authoritative treasury shown by Admin Finance.
 
-- `/dbase`
-- `/dbase/players`
-- `/dbase/economy`
-- `/dbase/visitors`
-- `/dbase/audit`
-- `/dbase/shop`
+## 7. Wallet and accounting
+
+Wallet changes are server-authoritative and transactional. Wallet audit records should preserve source, reason, transaction/request metadata, actor/player identity where available, balances before/after, IP and user agent.
+
+Do not manufacture currency or treat client-side payment success as authoritative.
+
+## 8. Spin Wheel — rebuilt 2026-09-05
+
+Spin Wheel has been rebuilt from scratch around a fixed **8-slot** server configuration.
+
+Player surface:
+
+- `/spin`
+
+Admin surface:
+
 - `/dbase/spin`
-- `/dbase/missions`
-- `/dbase/events`
-- `/dbase/tournament`
-- `/dbase/finance`
-- `/dbase/support`
-- `/dbase/players-audit`
-- `/dbase/wallet-audit`
 
-The route implementation in the repository is authoritative. A design document describing a route that is not present should be treated as specification/history, not as proof that the route is currently implemented.
+Authoritative configuration table:
 
-## 16. Deployment discipline
+- `ludo_spin_wheel_slots`
 
-Railway remains the production backend deployment. The repository also contains Vercel deployment integration for the web application.
+Canonical configuration contract:
 
-After every production code change:
+- exactly 8 slots (`0` through `7` internally; displayed as Slots 1–8);
+- every slot is always active;
+- every slot has an editable label, icon, reward type, amount and probability/weight;
+- supported reward types are Coins, Gems, Extra Spin and Shop Item;
+- Shop Item slots must reference an item that exists in the live Shop catalogue;
+- total weight must remain positive;
+- the server selects the winning slot and applies the reward transactionally.
 
-1. Build/type-check the affected code.
-2. Inspect the relevant deployment.
-3. Fix the exact reported build/runtime error before touching unrelated code.
-4. Do not call a release successful until the deployment reports success.
-5. For critical behavior, perform the actual production request/action instead of relying only on compilation.
+The old `ludo_spin_rewards` configuration table is retired. The new eight-slot table is the only Spin Wheel configuration source.
 
-## 17. Documentation reconciliation — 2026-09-03
+### Spin result synchronization
 
-The Markdown set is being maintained as a documentation system rather than a collection of isolated historical notes.
+A spin response returns the exact eight-slot wheel snapshot, its configuration version, the selected slot index and the exact prize object. The player wheel animates against that returned snapshot, so the visual landing position and the rewarded item cannot drift apart because of a concurrent Admin edit.
 
-Rules:
+An Admin change affects the live configuration for subsequent spins. A spin already in progress finishes against the snapshot returned by the server for that spin.
 
-- `CURRENT_PROJECT_STATE.md` is the current-state ledger.
-- `ARCHITECTURE.md` is the technical architecture contract.
-- `DEVELOPER_HANDOFF.md` explains safe production change discipline.
-- Focused feature documents remain detailed contracts for their own systems.
-- Historical incident documents remain useful for explaining why safeguards exist, but must not be read as current implementation claims unless they explicitly say so.
-- Specifications such as `ADMIN_REBUILD_SPEC.md` preserve product/design requirements; implemented behavior must be verified against the current code.
-- When a feature changes, update both its focused document and this ledger.
+### Spin balances and reward history
 
-## 18. Do-not-regress list
+Active-play spin earning continues through `/api/spin/activity` and `ludo_spin_state`. Shop-item wins continue through the existing Spin Rewards claim flow under `/spin-rewards` and `ludo_spin_item_rewards`.
 
-Do not:
+## 9. Admin browser-dialog UX
 
-- restore native `alert`, `confirm`, or `prompt` for product UX;
-- discard existing Daily/Weekly mission records while changing Admin mission UI;
-- create a second Admin Shop/catalogue source of truth;
-- award XP, currency, or match outcomes from client-only state;
-- bypass Admin Finance treasury validation for tournaments;
-- create fake currency to solve an accounting error;
-- hide wallet-audit metadata by replacing unknown values with fabricated values;
-- treat browser payment success as authoritative;
-- reintroduce global database initialization in request handlers;
-- casually refactor unrelated multiplayer implementations while fixing a specific online-game defect.
+Use the project's branded modal/toast patterns instead of native `alert`, `confirm` or `prompt` for product UI.
 
-## 19. Future documentation updates
+## 10. Authentication and Admin access
 
-Whenever a production contract changes, update:
+Protected Admin surfaces remain under `/dbase`. Admin APIs verify the active Ludo session and configured Admin email allow-list.
 
-1. this file;
-2. `ARCHITECTURE.md`;
-3. `DEVELOPER_HANDOFF.md`;
-4. the relevant focused feature document;
-5. any incident/history document whose conclusions are no longer accurate.
+## 11. Notifications and active-time rewards
 
-Never rely on a conversation transcript as the project's only source of truth.
+Browser notification permission is not itself proof of subscription/registration. Active-play heartbeat and progression rewards remain server-authoritative.
+
+## 12. Deployment discipline
+
+For every production code change:
+
+1. Inspect the exact affected implementation before editing.
+2. Rebuild the affected feature rather than stacking speculative patches when the request calls for a rebuild.
+3. Keep changes scoped to the requested feature.
+4. Wait for Railway/Vercel deployment status before calling the release successful.
+5. Verify the actual production behavior for critical workflows.
+
+## 13. Documentation source of truth
+
+- `CURRENT_PROJECT_STATE.md` — current implementation ledger
+- `ARCHITECTURE.md` — technical architecture contract
+- `DEVELOPER_HANDOFF.md` — safe production-change rules
+- focused feature documents — current contracts for protected subsystems
+
+Dated developer snapshots and superseded implementation notes should not be used as current-state references.
