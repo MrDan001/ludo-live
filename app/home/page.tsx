@@ -436,7 +436,7 @@ export default function HomePage() {
 
         .inventory-button {
           flex: 0 0 76px;
-          margin-top: 9px;
+          margin-top: 22px;
           min-height: 76px;
           display: flex;
           align-items: center;
@@ -486,8 +486,6 @@ export default function HomePage() {
         .bottom-navigation__icon { font-size: 31px !important; line-height: 1 !important; }
         .bottom-navigation__item b { color: inherit !important; font-weight: 850 !important; }
 
-        /* Keep the layout compact on shorter phones instead of allowing the
-           bottom navigation to cover the Inventory button. */
         @media (max-height: 780px) and (max-width: 600px) {
           .home-inner { padding-left: 12px; padding-right: 12px; }
           .home-header { flex-basis: 62px; }
@@ -507,7 +505,6 @@ export default function HomePage() {
           .inventory-button__icon { font-size: 36px !important; }
         }
 
-        /* Extra-tight phones get one final compact step; still no scrolling. */
         @media (max-height: 730px) and (max-width: 600px) {
           .home-header { flex-basis: 58px; }
           .profile-block { height: 58px; }
