@@ -17,6 +17,7 @@ type ApiResponse = {
 
 const SEGMENT_COLORS = ["#e5a31b", "#2279d5", "#8d43ba", "#2b9c61", "#d9544d", "#296fbd", "#c28719", "#6b4bb5"];
 const SPIN_DURATION = 5800;
+const FULL_TURNS = 7;
 
 function segmentLayout(items: SpinWheelSlot[]) {
   const span = 360 / Math.max(1, items.length);
@@ -29,8 +30,6 @@ function formatTime(ms: number) {
 }
 
 function rewardText(reward: SpinWheelSlot) {
-  if (reward.kind === "shop_item") return `You won ${reward.icon} ${reward.label}!`;
-  if (reward.kind === "extraSpin") return `You won ${reward.icon} ${reward.label}!`;
   return `You won ${reward.icon} ${reward.label}!`;
 }
 
@@ -50,9 +49,8 @@ export default function SpinPage() {
       const response = await fetch("/api/spin", { cache: "no-store" });
       const data: ApiResponse = await response.json();
       if (!response.ok) throw new Error(data.error || "Unable to load Spin Wheel.");
-      const nextWheel = Array.isArray(data.wheel) ? data.wheel : [];
       setSpins(Number(data.spins) || 0);
-      setWheel(nextWheel);
+      setWheel(Array.isArray(data.wheel) ? data.wheel : []);
       if (data.serverTime) setServerNow(new Date(data.serverTime).getTime());
       setError("");
     } catch (err) {
@@ -86,27 +84,44 @@ export default function SpinPage() {
     setSpinning(true);
     setResult(null);
     setError("");
+
     try {
       const response = await fetch("/api/spin", { method: "POST", cache: "no-store" });
       const data: ApiResponse = await response.json();
       if (!response.ok) throw new Error(data.error || "Could not complete Spin Wheel spin.");
+
       const snapshot = Array.isArray(data.wheel) ? data.wheel : [];
       const prizeIndex = Number(data.prizeIndex);
-      if (snapshot.length !== 8 || !Number.isInteger(prizeIndex) || prizeIndex < 0 || prizeIndex >= snapshot.length || !data.prize) {
+      if (
+        snapshot.length !== 8 ||
+        !Number.isInteger(prizeIndex) ||
+        prizeIndex < 0 ||
+        prizeIndex >= snapshot.length ||
+        !data.prize ||
+        snapshot[prizeIndex]?.id !== data.prize.id
+      ) {
         throw new Error("Spin result and wheel configuration are out of sync. Please try again.");
       }
 
       setWheel(snapshot);
       setSpins(Number(data.spins) || 0);
+
       const target = segmentLayout(snapshot)[prizeIndex];
       if (!target) throw new Error("Unable to position the Spin reward.");
 
-      const landing = 360 - target.center;
-      const nextRotation = rotationRef.current + 360 * 7 + landing;
+      // The pointer is fixed at 12 o'clock. Normalize the current wheel angle
+      // before calculating the correction, so every spin lands on the exact
+      // server-selected slot rather than drifting after the first spin.
+      const current = ((rotationRef.current % 360) + 360) % 360;
+      const landing = ((360 - target.center) % 360 + 360) % 360;
+      const correction = ((landing - current) % 360 + 360) % 360;
+      const nextRotation = rotationRef.current + FULL_TURNS * 360 + correction;
+
       rotationRef.current = nextRotation;
       setRotation(nextRotation);
 
       finishTimer.current = window.setTimeout(() => {
+        finishTimer.current = null;
         setSpinning(false);
         setResult(data.prize || null);
         window.dispatchEvent(new Event("ludo-wallet-updated"));
