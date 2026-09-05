@@ -427,7 +427,7 @@ body {
 }
 
 .empty-big a {
-  display inline-block;
+  display: inline-block;
   padding: 11px 15px;
   background: #16a34a;
   color: #fff;
