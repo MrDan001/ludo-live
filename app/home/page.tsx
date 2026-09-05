@@ -7,19 +7,13 @@ import EquippedAvatar from "../_components/EquippedAvatar";
 
 type Wallet = { coins: number; gems: number };
 
-type Action = {
-  icon: string;
-  title: string;
-  sub: string;
-  href: string;
-  bg: string;
-};
+type Action = { icon: string; title: string; sub: string; href: string; className: string };
 
 const actions: Action[] = [
-  { icon: "🌐", title: "PLAY ONLINE", sub: "Find open rooms and play real players", href: "/lobby", bg: "linear-gradient(135deg,#159447 0%,#31c936 100%)" },
-  { icon: "🏆", title: "TOURNAMENTS", sub: "Enter competitions and fight for rewards", href: "/tournament", bg: "linear-gradient(135deg,#6b1998 0%,#a126c8 100%)" },
-  { icon: "🎮", title: "PLAY SOLO", sub: "Play solo and sharpen your skills", href: "/mood", bg: "linear-gradient(135deg,#b86b12 0%,#e39a24 100%)" },
-  { icon: "👥", title: "FRIENDS", sub: "", href: "/friends", bg: "linear-gradient(135deg,#087b61 0%,#16b875 100%)" },
+  { icon: "🌐", title: "PLAY ONLINE", sub: "Find open rooms and play real players", href: "/lobby", className: "online" },
+  { icon: "🏆", title: "TOURNAMENTS", sub: "Enter competitions and fight for rewards", href: "/tournament", className: "tournament" },
+  { icon: "🎮", title: "PLAY SOLO", sub: "Play solo and sharpen your skills", href: "/mood", className: "solo" },
+  { icon: "👥", title: "FRIENDS", sub: "", href: "/friends", className: "friends" },
 ];
 
 const shortcuts = [
@@ -55,7 +49,7 @@ export default function HomePage() {
           });
         }
       } catch {
-        // Keep the current wallet display during transient network failures.
+        // Keep the current wallet during transient failures.
       }
     };
 
@@ -83,162 +77,140 @@ export default function HomePage() {
   const xpPercent = Math.min(100, Math.max(0, (progress.xp / required) * 100));
 
   return (
-    <main className="ludo-home-page">
-      <div className="ludo-home-content">
-        <header className="ludo-home-header">
-          <Link href="/profile" className="ludo-profile-link">
-            <div className="ludo-avatar-wrap">
-              <div className="ludo-avatar"><EquippedAvatar /></div>
-              <div className="ludo-level-badge">{progress.level}</div>
+    <main className="home-screen">
+      <div className="home-body">
+        <header className="home-header">
+          <Link href="/profile" className="profile">
+            <div className="avatar-wrap">
+              <div className="avatar"><EquippedAvatar /></div>
+              <span className="level-badge">{progress.level}</span>
             </div>
-            <div className="ludo-profile-copy">
-              <strong className="ludo-name">{name}</strong>
-              <div className="ludo-xp-row">
-                <i className="ludo-xp-track"><em style={{ width: `${xpPercent}%` }} /></i>
-              </div>
-              <div className="ludo-level-row">
+            <div className="profile-info">
+              <strong className="player-name">{name}</strong>
+              <div className="level-line">
                 <b>LEVEL {progress.level}</b>
-                <i className="ludo-level-track"><em style={{ width: `${xpPercent}%` }} /></i>
+                <span className="xp-bar"><i style={{ width: `${xpPercent}%` }} /></span>
                 <b>LVL {progress.level + 1}</b>
               </div>
             </div>
           </Link>
 
-          <div className="ludo-wallet-row">
-            <span className="ludo-wallet-item">🪙 <b>{wallet ? wallet.coins.toLocaleString() : "…"}</b></span>
-            <span className="ludo-wallet-item">💎 <b>{wallet ? wallet.gems.toLocaleString() : "…"}</b></span>
-            <Link href="/shop" className="ludo-add-button">+</Link>
+          <div className="wallet">
+            <span>🪙 <b>{wallet ? wallet.coins.toLocaleString() : "…"}</b></span>
+            <span>💎 <b>{wallet ? wallet.gems.toLocaleString() : "…"}</b></span>
+            <Link href="/shop" className="add">+</Link>
           </div>
         </header>
 
-        <section className="ludo-actions" aria-label="Main game actions">
+        <section className="actions" aria-label="Main game actions">
           {actions.map((action) => (
-            <Link key={action.title} href={action.href} className="ludo-action-card" style={{ background: action.bg }}>
-              <span className="ludo-action-icon" aria-hidden="true">{action.icon}</span>
-              <span className="ludo-action-copy">
-                <b className="ludo-action-title">{action.title}</b>
-                {action.sub && <small className="ludo-action-sub">{action.sub}</small>}
+            <Link key={action.title} href={action.href} className={`action ${action.className}`}>
+              <span className="action-icon" aria-hidden="true">{action.icon}</span>
+              <span className="action-copy">
+                <b>{action.title}</b>
+                {action.sub && <small>{action.sub}</small>}
               </span>
-              <span className="ludo-action-arrow" aria-hidden="true">›</span>
+              <span className="arrow" aria-hidden="true">›</span>
             </Link>
           ))}
         </section>
 
-        <section className="ludo-shortcuts" aria-label="Quick links">
+        <section className="shortcuts" aria-label="Quick links">
           {shortcuts.map(([icon, label, href]) => (
-            <Link key={label} href={href} className="ludo-shortcut">
-              <span className="ludo-shortcut-icon" aria-hidden="true">{icon}</span>
+            <Link key={label} href={href} className="shortcut">
+              <span>{icon}</span>
               <b>{label}</b>
             </Link>
           ))}
         </section>
 
-        <section className="ludo-inventory-section">
-          <Link href="/inventory" className="ludo-inventory-link">
-            <span className="ludo-inventory-icon" aria-hidden="true">🎒</span>
-            <b>Inventory</b>
-          </Link>
-        </section>
+        <Link href="/inventory" className="inventory">
+          <span>🎒</span>
+          <b>Inventory</b>
+        </Link>
       </div>
 
-      <nav className="ludo-bottom-nav" aria-label="Primary navigation">
+      <nav className="bottom-nav" aria-label="Primary navigation">
         {nav.map(([icon, label, href], index) => (
-          <Link key={label} href={href} className={`ludo-nav-item ${index === 0 ? "active" : ""}`}>
-            <span className="ludo-nav-icon" aria-hidden="true">{icon}</span>
+          <Link key={label} href={href} className={index === 0 ? "active" : ""}>
+            <span>{icon}</span>
             <b>{label}</b>
           </Link>
         ))}
       </nav>
 
       <style jsx global>{`
-        html,
-        body {
-          width: 100%;
-          height: 100%;
-          margin: 0;
-          padding: 0;
-        }
+        :root { background: #020817; }
+        html, body { width: 100%; height: 100%; margin: 0; padding: 0; }
+        body { overflow: hidden; background: #020817; font-family: Arial, Helvetica, sans-serif; }
+        *, *::before, *::after { box-sizing: border-box; }
 
-        body {
-          overflow: hidden;
-          background: #020817;
-        }
-
-        .ludo-home-page,
-        .ludo-home-page * {
-          box-sizing: border-box;
-        }
-
-        .ludo-home-page {
-          --home-nav-height: 74px;
+        .home-screen {
+          --nav-h: 74px;
           position: fixed;
           inset: 0;
           width: 100%;
           height: 100dvh;
           min-height: 100dvh;
           overflow: hidden;
-          background: linear-gradient(180deg, #031536 0%, #020b1d 52%, #010611 100%);
           color: #fff;
-          font-family: Arial, Helvetica, sans-serif;
-          isolation: isolate;
+          background: linear-gradient(180deg, #061a3b 0%, #03122d 44%, #020817 100%);
         }
 
-        .ludo-home-content {
-          position: relative;
+        .home-body {
           width: min(100%, 760px);
-          height: calc(100dvh - var(--home-nav-height) - env(safe-area-inset-bottom, 0px));
+          height: calc(100dvh - var(--nav-h) - env(safe-area-inset-bottom, 0px));
           min-height: 0;
           margin: 0 auto;
-          padding: max(8px, env(safe-area-inset-top, 0px)) 14px 10px;
-          display: flex;
-          flex-direction: column;
+          padding: max(8px, env(safe-area-inset-top, 0px)) 17px 8px;
+          display: grid;
+          grid-template-rows: auto minmax(0, 1fr) auto auto;
+          gap: clamp(8px, 1.1dvh, 14px);
           overflow: hidden;
         }
 
-        .ludo-home-header {
-          flex: 0 0 auto;
+        .home-header {
           min-width: 0;
-          min-height: 66px;
           display: grid;
           grid-template-columns: minmax(0, 1fr) auto;
           align-items: center;
-          gap: clamp(6px, 1.2vw, 12px);
+          gap: 8px;
         }
 
-        .ludo-profile-link {
+        .profile {
           min-width: 0;
           display: flex;
           align-items: center;
-          gap: clamp(7px, 1.4vw, 11px);
+          gap: 10px;
           color: #fff;
           text-decoration: none;
         }
 
-        .ludo-avatar-wrap {
+        .avatar-wrap {
           position: relative;
-          flex: 0 0 clamp(52px, 9vw, 68px);
-          width: clamp(52px, 9vw, 68px);
-          height: clamp(52px, 9vw, 68px);
+          flex: 0 0 clamp(56px, 10vw, 68px);
+          width: clamp(56px, 10vw, 68px);
+          height: clamp(56px, 10vw, 68px);
           display: grid;
           place-items: center;
-          border-radius: 50%;
-          background: linear-gradient(145deg, #ffe45c, #ffb300);
           border: 3px solid #ffd43b;
+          border-radius: 50%;
+          background: linear-gradient(145deg, #ffe45c, #ffad00);
         }
 
-        .ludo-avatar {
+        .avatar {
           width: 82%;
           height: 82%;
           display: grid;
           place-items: center;
-          border-radius: 50%;
           overflow: hidden;
-          background: #c58a54;
           border: 2px solid #8b5a32;
-          font-size: clamp(27px, 5vw, 38px);
+          border-radius: 50%;
+          background: #c58a54;
+          font-size: 30px;
         }
 
-        .ludo-level-badge {
+        .level-badge {
           position: absolute;
           left: 50%;
           bottom: -7px;
@@ -248,362 +220,209 @@ export default function HomePage() {
           padding: 0 5px;
           display: grid;
           place-items: center;
+          border: 2px solid #f5b900;
           border-radius: 7px;
           background: #ffd21a;
           color: #111;
-          border: 2px solid #f5b900;
           font-size: 12px;
-          line-height: 1;
           font-weight: 950;
+          line-height: 1;
         }
 
-        .ludo-profile-copy {
-          min-width: 0;
-          flex: 1 1 auto;
-        }
-
-        .ludo-name {
+        .profile-info { min-width: 0; flex: 1; }
+        .player-name {
           display: block;
           max-width: 100%;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: clamp(17px, 4.2vw, 25px);
+          font-size: clamp(19px, 4.8vw, 27px);
           line-height: 1.05;
         }
 
-        .ludo-xp-row {
-          width: 100%;
-          margin-top: 5px;
-        }
-
-        .ludo-xp-track,
-        .ludo-level-track {
-          display: block;
-          width: 100%;
-          overflow: hidden;
-          border-radius: 999px;
-          background: #102746;
-        }
-
-        .ludo-xp-track {
-          height: 5px;
-        }
-
-        .ludo-xp-track em,
-        .ludo-level-track em {
-          display: block;
-          height: 100%;
-          border-radius: inherit;
-        }
-
-        .ludo-xp-track em {
-          background: linear-gradient(90deg, #37c8ff, #7df5ff);
-        }
-
-        .ludo-level-row {
+        .level-line {
           min-width: 0;
+          margin-top: 7px;
           display: grid;
-          grid-template-columns: auto minmax(25px, 1fr) auto;
+          grid-template-columns: auto minmax(35px, 1fr) auto;
           align-items: center;
           gap: 5px;
-          margin-top: 3px;
           color: #ffd21a;
-          font-size: clamp(7px, 1.7vw, 10px);
+          font-size: clamp(8px, 1.9vw, 11px);
           line-height: 1;
         }
+        .level-line b { white-space: nowrap; font-weight: 950; }
+        .xp-bar { height: 10px; overflow: hidden; border-radius: 999px; background: #102746; }
+        .xp-bar i { display: block; height: 100%; border-radius: inherit; background: #ffc928; }
 
-        .ludo-level-row b {
-          white-space: nowrap;
-          font-weight: 950;
-        }
-
-        .ludo-level-track {
-          height: 9px;
-        }
-
-        .ludo-level-track em {
-          background: linear-gradient(90deg, #ffb51b, #ffe15a);
-        }
-
-        .ludo-wallet-row {
-          min-width: 0;
+        .wallet {
           display: flex;
           align-items: center;
           justify-content: flex-end;
-          gap: clamp(4px, 0.9vw, 7px);
+          gap: 5px;
         }
-
-        .ludo-wallet-item {
-          min-width: 0;
-          display: inline-flex;
-          align-items: center;
-          gap: 3px;
-          padding: clamp(6px, 1.1vw, 8px) clamp(6px, 1.3vw, 10px);
-          border-radius: 11px;
-          background: #051737;
-          border: 1px solid #173766;
+        .wallet span {
+          padding: 8px 9px;
+          border: 1px solid #1b3b6d;
+          border-radius: 12px;
+          background: #061737;
+          color: #fff;
           font-size: clamp(9px, 1.9vw, 13px);
-          line-height: 1;
           white-space: nowrap;
         }
-
-        .ludo-add-button {
-          flex: 0 0 clamp(40px, 7vw, 48px);
-          width: clamp(40px, 7vw, 48px);
-          height: clamp(40px, 7vw, 48px);
+        .add {
+          width: clamp(44px, 7vw, 52px);
+          height: clamp(44px, 7vw, 52px);
           display: grid;
           place-items: center;
+          border: 2px solid #86ed67;
           border-radius: 50%;
-          background: #37b92e;
-          border: 2px solid #83ec64;
+          background: #36b92e;
           color: #fff;
           text-decoration: none;
-          font-size: clamp(25px, 4.8vw, 31px);
-          line-height: 1;
+          font-size: 31px;
           font-weight: 950;
+          line-height: 1;
         }
 
-        .ludo-actions {
-          flex: 0 0 clamp(312px, 37dvh, 550px);
+        .actions {
           min-height: 0;
-          margin-top: clamp(7px, 1dvh, 12px);
           display: grid;
           grid-template-rows: repeat(4, minmax(0, 1fr));
-          gap: clamp(6px, 0.85dvh, 12px);
+          gap: clamp(7px, 1.05dvh, 13px);
         }
-
-        .ludo-action-card {
-          min-width: 0;
+        .action {
           min-height: 0;
           display: grid;
-          grid-template-columns: clamp(48px, 9vw, 76px) minmax(0, 1fr) 22px;
+          grid-template-columns: clamp(55px, 10vw, 78px) minmax(0, 1fr) 24px;
           align-items: center;
-          gap: clamp(7px, 1.4vw, 12px);
-          padding: clamp(7px, 1.1vw, 12px) clamp(10px, 1.8vw, 16px);
-          border-radius: clamp(15px, 2.5vw, 21px);
-          border: 1px solid rgba(255, 255, 255, 0.25);
-          box-shadow: 0 5px 14px rgba(0, 0, 0, 0.2);
+          gap: clamp(8px, 1.6vw, 14px);
+          padding: 8px 14px;
+          border: 1px solid rgba(255,255,255,.28);
+          border-radius: 20px;
           color: #fff;
           text-decoration: none;
+          box-shadow: 0 5px 14px rgba(0,0,0,.2);
           overflow: hidden;
         }
-
-        .ludo-action-icon {
-          min-width: 0;
-          display: grid;
-          place-items: center;
-          font-size: clamp(34px, 7vw, 55px);
-          line-height: 1;
-        }
-
-        .ludo-action-copy {
-          min-width: 0;
-          overflow: hidden;
-        }
-
-        .ludo-action-title {
+        .action.online { background: linear-gradient(135deg, #159447, #31c936); }
+        .action.tournament { background: linear-gradient(135deg, #6b1998, #a126c8); }
+        .action.solo { background: linear-gradient(135deg, #b86b12, #e39a24); }
+        .action.friends { background: linear-gradient(135deg, #087b61, #16b875); }
+        .action-icon { display: grid; place-items: center; font-size: clamp(36px, 7vw, 58px); line-height: 1; }
+        .action-copy { min-width: 0; overflow: hidden; }
+        .action-copy b {
           display: block;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: clamp(16px, 3.2vw, 25px);
+          font-size: clamp(17px, 3.7vw, 26px);
           line-height: 1.05;
           font-weight: 950;
         }
-
-        .ludo-action-sub {
+        .action-copy small {
           display: block;
-          margin-top: 4px;
+          margin-top: 5px;
           overflow: hidden;
           text-overflow: ellipsis;
           white-space: nowrap;
-          font-size: clamp(9px, 1.8vw, 14px);
-          line-height: 1.15;
-          font-weight: 750;
+          font-size: clamp(9px, 2vw, 13px);
+          font-weight: 700;
         }
+        .arrow { font-size: 35px; font-weight: 300; line-height: 1; text-align: right; }
 
-        .ludo-action-arrow {
-          display: grid;
-          place-items: center;
-          font-size: clamp(25px, 4vw, 34px);
-          line-height: 1;
-        }
-
-        .ludo-shortcuts {
-          flex: 0 0 clamp(78px, 10dvh, 118px);
+        .shortcuts {
           min-height: 0;
-          margin-top: clamp(7px, 1dvh, 12px);
-          padding: 7px 4px;
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          align-items: stretch;
-          border-radius: clamp(15px, 2.5vw, 20px);
-          background: #06152f;
-          border: 1px solid #173766;
+          grid-template-columns: repeat(4, 1fr);
+          border: 1px solid #193866;
+          border-radius: 19px;
+          background: #061735;
+          overflow: hidden;
         }
-
-        .ludo-shortcut {
+        .shortcut {
           min-width: 0;
-          display: grid;
-          place-items: center;
-          align-content: center;
+          min-height: 0;
+          padding: 9px 3px 10px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
           gap: 4px;
-          padding: 2px 3px;
           color: #fff;
           text-decoration: none;
-          text-align: center;
-          overflow: hidden;
         }
+        .shortcut span { font-size: clamp(28px, 6vw, 42px); line-height: 1; }
+        .shortcut b { font-size: clamp(9px, 2vw, 13px); white-space: nowrap; }
 
-        .ludo-shortcut-icon {
-          display: block;
-          font-size: clamp(25px, 5.8vw, 40px);
-          line-height: 1;
-        }
-
-        .ludo-shortcut b {
-          max-width: 100%;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          font-size: clamp(9px, 1.9vw, 13px);
-          line-height: 1.1;
-        }
-
-        .ludo-inventory-section {
-          flex: 0 0 clamp(64px, 8dvh, 88px);
-          min-height: 0;
-          margin-top: auto;
-          padding-top: clamp(7px, 1dvh, 11px);
-        }
-
-        .ludo-inventory-link {
-          width: 100%;
-          height: 100%;
-          min-height: 58px;
+        .inventory {
+          min-height: clamp(58px, 8dvh, 78px);
           display: flex;
           align-items: center;
           justify-content: center;
-          gap: 9px;
-          border-radius: clamp(15px, 2.5vw, 20px);
-          background: #0a214b;
-          border: 1px solid #173766;
+          gap: 14px;
+          border: 1px solid #193866;
+          border-radius: 19px;
+          background: #0b2759;
           color: #fff;
           text-decoration: none;
-          font-size: clamp(15px, 3vw, 22px);
-          line-height: 1;
         }
+        .inventory span { font-size: clamp(34px, 7vw, 48px); line-height: 1; }
+        .inventory b { font-size: clamp(18px, 4vw, 25px); }
 
-        .ludo-inventory-icon {
-          font-size: clamp(30px, 6vw, 43px);
-          line-height: 1;
-        }
-
-        .ludo-bottom-nav {
-          position: fixed;
-          z-index: 20;
+        .bottom-nav {
+          position: absolute;
           left: 0;
           right: 0;
           bottom: 0;
-          width: 100%;
-          height: var(--home-nav-height);
+          height: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px));
           padding-bottom: env(safe-area-inset-bottom, 0px);
           display: grid;
-          grid-template-columns: repeat(4, minmax(0, 1fr));
-          background: #020b1b;
+          grid-template-columns: repeat(4, 1fr);
           border-top: 1px solid #17325b;
+          background: #020b1b;
+          z-index: 10;
         }
-
-        .ludo-nav-item {
+        .bottom-nav a {
           min-width: 0;
-          min-height: 0;
-          display: grid;
-          place-items: center;
-          align-content: center;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
           gap: 3px;
           color: #9eb3d7;
           text-decoration: none;
-          text-align: center;
-          font-size: clamp(10px, 2.3vw, 14px);
-          line-height: 1;
-          overflow: hidden;
+        }
+        .bottom-nav a span { font-size: clamp(27px, 6vw, 39px); line-height: 1; }
+        .bottom-nav a b { font-size: clamp(10px, 2.5vw, 14px); }
+        .bottom-nav a.active { color: #fff; background: #123f78; }
+
+        @media (max-height: 700px) {
+          .home-screen { --nav-h: 68px; }
+          .home-body { padding-top: 5px; padding-bottom: 5px; gap: 6px; }
+          .home-header { min-height: 55px; }
+          .avatar-wrap { flex-basis: 52px; width: 52px; height: 52px; }
+          .player-name { font-size: 18px; }
+          .level-line { margin-top: 4px; }
+          .action { padding: 5px 11px; border-radius: 16px; }
+          .action-icon { font-size: 35px; }
+          .action-copy b { font-size: 16px; }
+          .action-copy small { margin-top: 2px; font-size: 9px; }
+          .arrow { font-size: 29px; }
+          .shortcut { padding: 6px 2px; }
+          .shortcut span { font-size: 27px; }
+          .shortcut b { font-size: 9px; }
+          .inventory { min-height: 50px; }
+          .inventory span { font-size: 30px; }
+          .inventory b { font-size: 17px; }
         }
 
-        .ludo-nav-item.active {
-          color: #fff;
-          background: #123a72;
-        }
-
-        .ludo-nav-icon {
-          display: block;
-          font-size: clamp(25px, 5.8vw, 38px);
-          line-height: 1;
-        }
-
-        @media (max-width: 420px) {
-          .ludo-home-content {
-            padding-left: 10px;
-            padding-right: 10px;
-          }
-
-          .ludo-home-header {
-            gap: 5px;
-          }
-
-          .ludo-wallet-row {
-            gap: 3px;
-          }
-
-          .ludo-wallet-item {
-            padding-left: 5px;
-            padding-right: 5px;
-          }
-
-          .ludo-action-card {
-            grid-template-columns: 45px minmax(0, 1fr) 20px;
-            gap: 6px;
-            padding-left: 8px;
-            padding-right: 8px;
-          }
-
-          .ludo-action-icon {
-            font-size: 35px;
-          }
-
-          .ludo-action-title {
-            font-size: 16px;
-          }
-
-          .ludo-action-sub {
-            font-size: 9px;
-          }
-        }
-
-        @media (max-height: 720px) {
-          .ludo-home-page {
-            --home-nav-height: 68px;
-          }
-
-          .ludo-home-header {
-            min-height: 58px;
-          }
-
-          .ludo-actions {
-            flex-basis: 292px;
-          }
-
-          .ludo-shortcuts {
-            flex-basis: 70px;
-          }
-
-          .ludo-inventory-section {
-            flex-basis: 60px;
-          }
-
-          .ludo-nav-icon {
-            font-size: 25px;
-          }
+        @media (max-width: 430px) {
+          .home-body { padding-left: 12px; padding-right: 12px; }
+          .wallet span { padding: 7px 6px; }
+          .add { width: 44px; height: 44px; font-size: 27px; }
+          .action { grid-template-columns: 55px minmax(0, 1fr) 20px; padding-left: 9px; padding-right: 9px; }
+          .action-icon { font-size: 39px; }
         }
       `}</style>
     </main>
