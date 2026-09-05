@@ -1,10 +1,135 @@
 "use client";
-import {useEffect,useState} from "react";
+
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import "../dbase.css";
 
-type R=Record<string,any>;
-const fmt=(v:any)=>Number(v||0).toLocaleString();
-function Field({label,value,onChange,type="text"}:{label:string;value:any;onChange:(v:string)=>void;type?:string}){return <label className="admin-field"><span>{label}</span><input type={type} value={value??""} onChange={e=>onChange(e.target.value)}/></label>}
-function Select({label,value,options,onChange}:{label:string;value:string;options:{value:string;label:string}[];onChange:(v:string)=>void}){return <label className="admin-field"><span>{label}</span><select value={value||""} onChange={e=>onChange(e.target.value)}><option value="">Select…</option>{options.map(x=><option key={x.value} value={x.value}>{x.label}</option>)}</select></label>}
-export default function SpinAdmin(){const[rewards,setRewards]=useState<R[]>([]),[catalog,setCatalog]=useState<R[]>([]),[x,setX]=useState<R|null>(null),[loading,setLoading]=useState(true),[error,setError]=useState(""),[saving,setSaving]=useState(false),[confirmId,setConfirmId]=useState<string|null>(null),[notice,setNotice]=useState("");const load=async()=>{setLoading(true);try{const r=await fetch("/api/admin/spin",{cache:"no-store"}),d=await r.json();if(!r.ok)throw Error(d.error||"Unable to load Spin Wheel");setRewards(d.rewards||[]);setCatalog(d.catalog||[])}catch(e:any){setError(e.message)}finally{setLoading(false)}};useEffect(()=>{load()},[]);const save=async()=>{if(!x)return;setSaving(true);setError("");try{const payload={...x,amount:Number(x.amount||0),probability:Number(x.probability||0),itemType:x.kind==="shop_item"?x.itemType:null,itemId:x.kind==="shop_item"?x.itemId:null};if(x.kind==="shop_item"&&!x.itemId)throw Error("Select a shop item for this spin reward.");const r=await fetch("/api/admin/spin",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)}),d=await r.json();if(!r.ok)throw Error(d.error||"Unable to save reward");setX(null);setNotice("Spin reward saved successfully.");await load()}catch(e:any){setError(e.message)}finally{setSaving(false)}};const del=async(id:string)=>{const r=await fetch(`/api/admin/spin?id=${encodeURIComponent(id)}`,{method:"DELETE"});if(!r.ok){setError((await r.json().catch(()=>({}))).error||"Unable to delete reward");return}setConfirmId(null);setNotice("Spin reward removed.");load()};const selected=catalog.find(c=>c.type===x?.itemType&&c.id===x?.itemId);const shopOptions=catalog.map(c=>({value:`${c.type}::${c.id}`,label:`${c.name||c.title||c.id} · ${c.type}` }));const chooseShop=(v:string)=>{const [type,id]=v.split("::");const item=catalog.find(c=>c.type===type&&c.id===id);setX({...x,itemType:type,itemId:id,label:item?.name||item?.title||"Shop item",icon:item?.icon||item?.emoji||"🎁",amount:0})};return <main className="dbase-app"><aside className="dbase-sidebar"><div className="brand"><div className="brand-mark">♛</div><div><b>LUDO LIVE</b><span>ADMIN CONTROL</span></div></div><nav><div className="nav-wrap"><small>Management</small><Link href="/dbase">◈ Dashboard</Link><Link href="/dbase/shop">▣ Shop</Link><Link className="active" href="/dbase/spin">✦ Spin Wheel</Link><Link href="/dbase/missions">✓ Missions</Link><Link href="/dbase/events">◇ Events</Link><Link href="/dbase/tournament">♛ Tournament</Link><Link href="/dbase/finance">◉ Finance</Link></div></nav></aside><section className="dbase-main"><header className="dbase-header"><div className="header-title"><span>PLAYER REWARDS</span><h1>Spin Wheel</h1></div><div className="admin-user"><div className="user-avatar">A</div><div className="user-copy"><b>Administrator</b><span>Spin configuration</span></div></div></header><div className="dbase-content"><div className="page-intro"><div><span className="eyebrow">SPIN REWARD CONTROL</span><h2>Choose exactly what appears on the wheel</h2><p>Coins, gems, extra spins, or any active item from the Shop can be placed on the Spin Wheel. Shop items are selected directly from the live catalogue.</p></div><div className="live-pill"><span/> LIVE CONTROL</div></div>{notice&&<div className="panel"><div className="empty good">✓ {notice}</div></div>}{error&&<div className="panel"><div className="empty bad">{error}</div></div>}<div className="panel"><div className="panel-head"><div><span>REWARD SLOTS</span><h3>Current Spin Wheel</h3></div><button className="admin-btn primary-btn" onClick={()=>setX({kind:"coins",label:"New reward",icon:"🎁",amount:100,probability:1,active:true})}>＋ Add reward</button></div>{loading?<div className="empty">Loading Spin configuration…</div>:rewards.map(r=><div className="case-row" key={r.id}><div className="mini-avatar">{r.icon||"🎁"}</div><div><b>{r.label}</b><span>{r.kind==="shop_item"?`Shop item · ${r.itemType}:${r.itemId}`:`${r.kind} · weight ${r.probability}`}</span></div><div className="row-meta"><b>{r.kind==="shop_item"?"Shop prize":fmt(r.amount)}</b><span className={r.active?"good":"bad"}>{r.active?"Enabled":"Disabled"}</span></div><button className="admin-btn" onClick={()=>setX({...r})}>Edit</button><button className="admin-btn danger-btn" onClick={()=>setConfirmId(r.id)}>Delete</button></div>)}{!loading&&!rewards.length&&<div className="empty">No Spin rewards configured yet.</div>}</div>{x&&<div className="editor-card"><div className="editor-head"><b>{x.id?"Edit Spin Reward":"Add Spin Reward"}</b><button className="admin-btn" onClick={()=>setX(null)}>✕</button></div><Select label="Reward type" value={x.kind} options={[{value:"coins",label:"🪙 Coins"},{value:"gems",label:"💎 Gems"},{value:"extraSpin",label:"↻ Extra Spin"},{value:"shop_item",label:"▣ Shop Item"}]} onChange={v=>setX({...x,kind:v})}/>{x.kind==="shop_item"?<><Select label="Shop item to display on the wheel" value={x.itemType&&x.itemId?`${x.itemType}::${x.itemId}`:""} options={shopOptions} onChange={chooseShop}/>{selected&&<div className="selected-preview"><div className="mini-avatar">{selected.icon||selected.emoji||"▣"}</div><div><b>{selected.name||selected.title||selected.id}</b><span>{selected.type} · {selected.currency||"coins"} {fmt(selected.price||0)}</span></div><span className="status-badge live">Selected</span></div>}<Field label="Display label" value={x.label} onChange={v=>setX({...x,label:v})}/><Field label="Icon" value={x.icon} onChange={v=>setX({...x,icon:v})}/></>:<><Field label="Display label" value={x.label} onChange={v=>setX({...x,label:v})}/><Field label="Icon" value={x.icon} onChange={v=>setX({...x,icon:v})}/><Field label="Amount" type="number" value={x.amount} onChange={v=>setX({...x,amount:Number(v)})}/></>}<Field label="Probability / weight" type="number" value={x.probability} onChange={v=>setX({...x,probability:Number(v)})}/><label className="check"><input type="checkbox" checked={x.active!==false} onChange={e=>setX({...x,active:e.target.checked})}/> Enabled on player Spin Wheel</label><button className="admin-btn primary-btn full" disabled={saving} onClick={save}>{saving?"Saving…":"Save Spin Reward"}</button></div>}{confirmId&&<div style={{position:"fixed",inset:0,zIndex:100000,background:"rgba(2,6,23,.78)",backdropFilter:"blur(10px)",display:"grid",placeItems:"center",padding:20}}><div style={{width:"min(430px,100%)",background:"linear-gradient(145deg,#111827,#071225)",color:"#fff",border:"1px solid rgba(248,113,113,.28)",borderRadius:26,padding:26,boxShadow:"0 30px 90px rgba(0,0,0,.65)"}}><div style={{fontSize:34}}>🗑️</div><div style={{fontSize:11,letterSpacing:2,color:"#fca5a5",fontWeight:900,marginTop:8}}>REMOVE REWARD</div><h2 style={{margin:"7px 0"}}>Remove this Spin Wheel reward?</h2><p style={{opacity:.7,lineHeight:1.55}}>Players will no longer receive this reward from the wheel.</p><div style={{display:"flex",gap:9,marginTop:18}}><button className="admin-btn" style={{flex:1}} onClick={()=>setConfirmId(null)}>Cancel</button><button className="admin-btn danger-btn" style={{flex:1}} onClick={()=>del(confirmId)}>Remove reward</button></div></div></div>}</div></section></main>}
+type Slot = {
+  slot: number;
+  id: string;
+  kind: "coins" | "gems" | "extraSpin" | "shop_item";
+  label: string;
+  icon: string;
+  amount: number;
+  probability: number;
+  itemType?: string | null;
+  itemId?: string | null;
+};
+type CatalogItem = Record<string, any>;
+
+const EMPTY_SLOT = (slot: number): Slot => ({ slot, id: `slot-${slot + 1}`, kind: "coins", label: "Reward", icon: "🎁", amount: 100, probability: 1 });
+const fmt = (value: any) => Number(value || 0).toLocaleString();
+
+function Field({ label, value, onChange, type = "text" }: { label: string; value: any; onChange: (value: string) => void; type?: string }) {
+  return <label className="admin-field"><span>{label}</span><input type={type} value={value ?? ""} onChange={(event) => onChange(event.target.value)} /></label>;
+}
+
+export default function SpinAdmin() {
+  const [slots, setSlots] = useState<Slot[]>([]);
+  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [editing, setEditing] = useState<Slot | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+
+  const load = async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch("/api/admin/spin", { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load Spin Wheel.");
+      const incoming = Array.isArray(data.rewards) ? data.rewards : [];
+      setSlots(Array.from({ length: 8 }, (_, slot) => incoming.find((item: Slot) => Number(item.slot) === slot) || EMPTY_SLOT(slot)));
+      setCatalog(Array.isArray(data.catalog) ? data.catalog : []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to load Spin Wheel.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { void load(); }, []);
+
+  const save = async () => {
+    if (!editing) return;
+    setSaving(true);
+    setError("");
+    try {
+      if (editing.kind === "shop_item" && (!editing.itemType || !editing.itemId)) throw new Error("Select a Shop item for this slot.");
+      const payload = {
+        ...editing,
+        amount: Number(editing.amount || 0),
+        probability: Number(editing.probability || 0),
+        itemType: editing.kind === "shop_item" ? editing.itemType : null,
+        itemId: editing.kind === "shop_item" ? editing.itemId : null,
+      };
+      const response = await fetch("/api/admin/spin", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to save Spin Wheel slot.");
+      setNotice(`Slot ${editing.slot + 1} updated. The live wheel now uses this reward.`);
+      setEditing(null);
+      await load();
+      window.dispatchEvent(new Event("ludo-spin-updated"));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Unable to save Spin Wheel slot.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const shopOptions = useMemo(() => catalog.map((item) => ({ value: `${item.type}::${item.id}`, label: `${item.name || item.title || item.id} · ${item.type}` })), [catalog]);
+  const selectedShop = catalog.find((item) => item.type === editing?.itemType && item.id === editing?.itemId);
+
+  const chooseShop = (value: string) => {
+    const [type, id] = value.split("::");
+    const item = catalog.find((entry) => entry.type === type && entry.id === id);
+    setEditing((current) => current ? { ...current, itemType: type, itemId: id, label: item?.name || item?.title || current.label, icon: item?.icon || item?.emoji || current.icon, amount: 0 } : current);
+  };
+
+  return (
+    <main className="dbase-app">
+      <aside className="dbase-sidebar">
+        <div className="brand"><div className="brand-mark">♛</div><div><b>LUDO LIVE</b><span>ADMIN CONTROL</span></div></div>
+        <nav><div className="nav-wrap"><small>Management</small><Link href="/dbase">◈ Dashboard</Link><Link href="/dbase/shop">▣ Shop</Link><Link className="active" href="/dbase/spin">✦ Spin Wheel</Link><Link href="/dbase/missions">✓ Missions</Link><Link href="/dbase/events">◇ Events</Link><Link href="/dbase/tournament">♛ Tournament</Link><Link href="/dbase/finance">◉ Finance</Link></div></nav>
+      </aside>
+
+      <section className="dbase-main">
+        <header className="dbase-header"><div className="header-title"><span>PLAYER REWARDS</span><h1>Spin Wheel</h1></div><div className="admin-user"><div className="user-avatar">A</div><div className="user-copy"><b>Administrator</b><span>8-slot live configuration</span></div></div></header>
+        <div className="dbase-content">
+          <div className="page-intro"><div><span className="eyebrow">SPIN WHEEL CONTROL</span><h2>Exactly 8 live reward slots</h2><p>Every slot on the player wheel is editable. Saving a slot updates the same server-side configuration used by the player wheel and the reward payout.</p></div><div className="live-pill"><span/> LIVE CONTROL</div></div>
+          {notice && <div className="panel"><div className="empty good">✓ {notice}</div></div>}
+          {error && <div className="panel"><div className="empty bad">{error}</div></div>}
+
+          <div className="panel">
+            <div className="panel-head"><div><span>FIXED CONFIGURATION</span><h3>Current Spin Wheel</h3></div><div className="status-badge live">8 / 8 ACTIVE</div></div>
+            {loading ? <div className="empty">Loading Spin Wheel configuration…</div> : slots.map((slot) => (
+              <div className="case-row" key={slot.slot}>
+                <div className="mini-avatar">{slot.icon || "🎁"}</div>
+                <div><b>Slot {slot.slot + 1} · {slot.label}</b><span>{slot.kind === "shop_item" ? `Shop item · ${slot.itemType}:${slot.itemId}` : `${slot.kind} · ${fmt(slot.amount)} · weight ${slot.probability}`}</span></div>
+                <div className="row-meta"><b>{slot.kind === "shop_item" ? "Shop prize" : fmt(slot.amount)}</b><span className="good">LIVE</span></div>
+                <button className="admin-btn" onClick={() => setEditing({ ...slot })}>Edit</button>
+              </div>
+            ))}
+          </div>
+
+          {editing && <div className="editor-card">
+            <div className="editor-head"><b>Edit Spin Wheel Slot {editing.slot + 1}</b><button className="admin-btn" onClick={() => setEditing(null)}>✕</button></div>
+            <div className="selected-preview"><div className="mini-avatar">{editing.icon}</div><div><b>Slot {editing.slot + 1}</b><span>There are always exactly 8 slots; this editor cannot add, delete, or disable slots.</span></div></div>
+            <label className="admin-field"><span>Reward type</span><select value={editing.kind} onChange={(event) => setEditing({ ...editing, kind: event.target.value as Slot["kind"], itemType: null, itemId: null })}><option value="coins">🪙 Coins</option><option value="gems">💎 Gems</option><option value="extraSpin">🔄 Extra Spin</option><option value="shop_item">▣ Shop Item</option></select></label>
+            {editing.kind === "shop_item" && <>
+              <label className="admin-field"><span>Shop item</span><select value={editing.itemType && editing.itemId ? `${editing.itemType}::${editing.itemId}` : ""} onChange={(event) => chooseShop(event.target.value)}><option value="">Select a Shop item…</option>{shopOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></label>
+              {selectedShop && <div className="selected-preview"><div className="mini-avatar">{selectedShop.icon || selectedShop.emoji || "▣"}</div><div><b>{selectedShop.name || selectedShop.title || selectedShop.id}</b><span>{selectedShop.type} · current Shop item</span></div><span className="status-badge live">Selected</span></div>}
+            </>}
+            <Field label="Display label" value={editing.label} onChange={(value) => setEditing({ ...editing, label: value })} />
+            <Field label="Icon" value={editing.icon} onChange={(value) => setEditing({ ...editing, icon: value })} />
+            <Field label="Amount" type="number" value={editing.amount} onChange={(value) => setEditing({ ...editing, amount: Number(value) })} />
+            <Field label="Probability / weight" type="number" value={editing.probability} onChange={(value) => setEditing({ ...editing, probability: Number(value) })} />
+            <button className="admin-btn primary-btn full" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save Slot"}</button>
+          </div>}
+        </div>
+      </section>
+    </main>
+  );
+}
