@@ -102,48 +102,64 @@ export default function HomePage() {
           </div>
         </header>
 
-        <section className="main-actions">
+        <section className="main-actions" aria-label="Game actions">
           {actions.map((action) => (
             <Link key={action.title} href={action.href} className={`main-action main-action--${action.kind}`}>
-              <span className="main-action__icon">{action.icon}</span>
+              <span className="main-action__icon" aria-hidden="true">{action.icon}</span>
               <span className="main-action__copy">
                 <b className="main-action__title">{action.title}</b>
                 {action.sub ? <small className="main-action__sub">{action.sub}</small> : null}
               </span>
-              <span className="main-action__arrow">›</span>
+              <span className="main-action__arrow" aria-hidden="true">›</span>
             </Link>
           ))}
         </section>
 
-        <section className="quick-actions">
+        <section className="quick-actions" aria-label="Quick actions">
           {shortcuts.map(([icon, label, href]) => (
             <Link key={label} href={href} className="quick-action">
-              <span className="quick-action__icon">{icon}</span>
+              <span className="quick-action__icon" aria-hidden="true">{icon}</span>
               <b>{label}</b>
             </Link>
           ))}
         </section>
 
         <Link href="/inventory" className="inventory-button">
-          <span className="inventory-button__icon">🎒</span>
+          <span className="inventory-button__icon" aria-hidden="true">🎒</span>
           <b>Inventory</b>
         </Link>
       </div>
 
-      <nav className="bottom-navigation">
+      <nav className="bottom-navigation" aria-label="Primary navigation">
         {nav.map(([icon, label, href], index) => (
           <Link key={label} href={href} className={`bottom-navigation__item ${index === 0 ? "is-active" : ""}`}>
-            <span className="bottom-navigation__icon">{icon}</span>
+            <span className="bottom-navigation__icon" aria-hidden="true">{icon}</span>
             <b>{label}</b>
           </Link>
         ))}
       </nav>
 
       <style jsx global>{`
-        html, body { width: 100%; min-height: 100%; margin: 0; padding: 0; }
-        body { overflow: hidden; background: #020817; }
+        html,
+        body {
+          width: 100%;
+          min-height: 100%;
+          margin: 0;
+          padding: 0;
+          overflow-x: hidden;
+          overflow-y: auto;
+          overscroll-behavior-y: auto;
+          background: #020817;
+        }
 
-        .home-screen, .home-screen * { box-sizing: border-box; }
+        body {
+          -webkit-overflow-scrolling: touch;
+          touch-action: pan-y;
+        }
+
+        .home-screen,
+        .home-screen * { box-sizing: border-box; }
+
         .home-screen {
           position: fixed;
           inset: 0;
@@ -174,8 +190,9 @@ export default function HomePage() {
           position: relative;
           width: min(100%, 760px);
           height: calc(100% - 78px - env(safe-area-inset-bottom, 0px));
+          min-height: 0;
           margin: 0 auto;
-          padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 10px;
+          padding: calc(8px + env(safe-area-inset-top, 0px)) 14px 2px;
           display: flex;
           flex-direction: column;
           overflow: hidden;
@@ -244,6 +261,7 @@ export default function HomePage() {
         }
 
         .profile-details { min-width: 0; flex: 1 1 auto; }
+
         .player-name {
           display: block;
           max-width: 100%;
@@ -419,11 +437,11 @@ export default function HomePage() {
         .inventory-button {
           flex: 0 0 76px;
           margin-top: 9px;
+          min-height: 76px;
           display: flex;
           align-items: center;
           justify-content: center;
           gap: 10px;
-          min-height: 76px;
           border-radius: 19px;
           background: #103574;
           border: 1px solid #214d95;
@@ -468,7 +486,9 @@ export default function HomePage() {
         .bottom-navigation__icon { font-size: 31px !important; line-height: 1 !important; }
         .bottom-navigation__item b { color: inherit !important; font-weight: 850 !important; }
 
-        @media (max-height: 700px) and (max-width: 600px) {
+        /* Keep the layout compact on shorter phones instead of allowing the
+           bottom navigation to cover the Inventory button. */
+        @media (max-height: 780px) and (max-width: 600px) {
           .home-inner { padding-left: 12px; padding-right: 12px; }
           .home-header { flex-basis: 62px; }
           .profile-block { height: 62px; }
@@ -483,8 +503,19 @@ export default function HomePage() {
           .main-action__arrow { font-size: 27px !important; }
           .quick-actions { flex-basis: 92px; margin-top: 7px; }
           .quick-action__icon { font-size: 28px !important; }
-          .inventory-button { flex-basis: 62px; min-height: 62px; margin-top: 7px; font-size: 18px; }
+          .inventory-button { flex-basis: 62px; min-height: 62px; margin-top: 0; font-size: 18px; }
           .inventory-button__icon { font-size: 36px !important; }
+        }
+
+        /* Extra-tight phones get one final compact step; still no scrolling. */
+        @media (max-height: 730px) and (max-width: 600px) {
+          .home-header { flex-basis: 58px; }
+          .profile-block { height: 58px; }
+          .avatar-ring { flex-basis: 48px; width: 48px; height: 48px; }
+          .main-actions { grid-template-rows: repeat(4, 68px); gap: 5px; }
+          .main-action { min-height: 68px; }
+          .quick-actions { flex-basis: 86px; }
+          .inventory-button { flex-basis: 58px; min-height: 58px; }
         }
       `}</style>
     </main>
