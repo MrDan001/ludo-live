@@ -1,6 +1,8 @@
 html, body {
   background: #020817 !important;
   color: #fff;
+  margin: 0;
+  padding: 0;
 }
 
 body {
@@ -8,9 +10,8 @@ body {
 }
 
 .app-home, .subpage {
-  min-height: 100dvh;
   background: radial-gradient(circle at 50% -10%, #15336a 0, #06152f 35%, #020817 75%);
-  padding: 16px 16px calc(68px + env(safe-area-inset-bottom, 0px));
+  padding: 16px 16px calc(65px + env(safe-area-inset-bottom, 0px));
   box-sizing: border-box;
 }
 
@@ -19,8 +20,9 @@ body {
   margin: auto;
   display: flex;
   flex-direction: column;
-  justify-content: space-between; /* Spacing distribution */
-  min-height: calc(100dvh - 68px - env(safe-area-inset-bottom, 0px));
+  justify-content: space-between;
+  height: calc(100dvh - 60px);
+  overflow-y: auto;
 }
 
 .home-topbar {
@@ -28,6 +30,7 @@ body {
   align-items: center;
   justify-content: space-between;
   gap: 12px;
+  flex-shrink: 0;
 }
 
 .home-top-actions {
@@ -107,6 +110,7 @@ body {
   display: flex;
   justify-content: space-between;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .hero-copy small {
@@ -135,10 +139,13 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
+  margin: 10px 0;
 }
 
 .action {
-  padding: 18px;
+  flex: 1;
+  padding: 12px 20px;
   border-radius: 20px;
   text-decoration: none;
   color: #fff;
@@ -170,7 +177,8 @@ body {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 8px;
-  margin: 10px 0 0;
+  margin: 0;
+  flex-shrink: 0;
 }
 
 .quick-row a {
@@ -206,6 +214,7 @@ body {
   font-size: 18px;
   font-weight: 900;
   box-shadow: 0 5px 14px rgba(0, 0, 0, 0.18);
+  flex-shrink: 0;
 }
 
 .online-panel, .create-card {
@@ -372,6 +381,7 @@ body {
 .subpage {
   max-width: 900px;
   margin: auto;
+  min-height: 100dvh;
 }
 
 .sub-head {
@@ -553,10 +563,9 @@ body {
     flex-direction: column;
   }
   .action {
-    padding: 14px 16px;
+    padding: 10px 16px;
   }
   .quick-row {
-    margin-top: 6px;
     gap: 6px;
   }
   .quick-row a {
@@ -566,7 +575,7 @@ body {
     font-size: 10px;
   }
   .inventory-button {
-    margin-top: 6px !important;
-    padding: 14px !important;
+    margin-top: 8px !important;
+    padding: 12px !important;
   }
 }
