@@ -11,6 +11,7 @@ body {
   min-height: 100dvh;
   background: radial-gradient(circle at 50% -10%, #15336a 0, #06152f 35%, #020817 75%);
   padding: 16px 16px calc(68px + env(safe-area-inset-bottom, 0px));
+  box-sizing: border-box;
 }
 
 .app-home {
@@ -18,8 +19,8 @@ body {
   margin: auto;
   display: flex;
   flex-direction: column;
-  justify-content: flex-start;
-  gap: 0;
+  justify-content: space-between; /* Spacing distribution */
+  min-height: calc(100dvh - 68px - env(safe-area-inset-bottom, 0px));
 }
 
 .home-topbar {
@@ -98,8 +99,8 @@ body {
 }
 
 .hero-card {
-  margin: 12px 0;
-  padding: 20px;
+  margin: 10px 0;
+  padding: 18px;
   border-radius: 24px;
   background: linear-gradient(120deg, #0a2b72, #123e8f 48%, #35106d);
   border: 1px solid #2b69c9;
@@ -133,16 +134,15 @@ body {
 .primary-actions {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .action {
-  padding: 22px 20px;
+  padding: 18px;
   border-radius: 20px;
   text-decoration: none;
   color: #fff;
   box-shadow: 0 10px 22px #0005;
-  min-height: 84px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -169,25 +169,25 @@ body {
 .quick-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin: 14px 0 0;
+  gap: 8px;
+  margin: 10px 0 0;
 }
 
 .quick-row a {
-  padding: 16px 6px;
+  padding: 12px 4px;
   border-radius: 18px;
   background: #07152d;
   border: 1px solid #18335e;
   text-decoration: none;
   color: #fff;
   text-align: center;
-  font-size: 26px;
+  font-size: 24px;
 }
 
 .quick-row b {
   display: block;
   font-size: 11px;
-  margin-top: 6px;
+  margin-top: 4px;
 }
 
 /* Inventory action button layout */
@@ -195,9 +195,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 12px;
-  margin-top: 14px;
-  padding: 18px;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 16px;
   border-radius: 18px;
   background: #103574;
   border: 1px solid #214d95;
@@ -209,8 +209,8 @@ body {
 }
 
 .online-panel, .create-card {
-  margin-top: 14px;
-  padding: 16px;
+  margin-top: 10px;
+  padding: 14px;
   border-radius: 20px;
   background: #07152d;
   border: 1px solid #18335e;
@@ -529,14 +529,14 @@ body {
 
 @media (max-width: 650px) {
   .primary-actions {
-    gap: 10px;
+    gap: 8px;
   }
   .hero-card {
-    padding: 16px;
-    margin: 10px 0;
+    padding: 14px 16px;
+    margin: 6px 0;
   }
   .hero-dice {
-    font-size: 48px;
+    font-size: 44px;
   }
   .wallet {
     display: none;
@@ -553,21 +553,20 @@ body {
     flex-direction: column;
   }
   .action {
-    min-height: 80px;
-    padding: 18px;
+    padding: 14px 16px;
   }
   .quick-row {
-    margin-top: 10px;
-    gap: 8px;
+    margin-top: 6px;
+    gap: 6px;
   }
   .quick-row a {
-    padding: 14px 4px;
+    padding: 10px 4px;
   }
   .quick-row b {
-    font-size: 11px;
+    font-size: 10px;
   }
   .inventory-button {
-    margin-top: 10px !important;
-    padding: 16px !important;
+    margin-top: 6px !important;
+    padding: 14px !important;
   }
 }
