@@ -2,10 +2,20 @@
 
 import { useEffect, useRef } from "react";
 import { recordMissionEvent } from "../../lib/missionEvents";
-import { recordEventActivity } from "../../lib/eventProgress";
+import { recordEventActivity, type EventActivityKind } from "../../lib/eventProgress";
 
 const GAME_PATHS = new Set(["/game", "/game-online", "/tournament/game"]);
 type GameplayEvent = "dice" | "move" | "home" | "win";
+
+const EVENT_ACTIVITY_KINDS = new Set<EventActivityKind>([
+  "play_games",
+  "win_games",
+  "roll_dice",
+  "move_tokens",
+  "complete_games",
+  "roll_sixes",
+  "move_home",
+]);
 
 function isGamePath() {
   return typeof window !== "undefined" && GAME_PATHS.has(window.location.pathname);
@@ -13,7 +23,9 @@ function isGamePath() {
 
 function record(kind: Parameters<typeof recordMissionEvent>[0], amount = 1) {
   void recordMissionEvent(kind, amount);
-  recordEventActivity(kind);
+  if (EVENT_ACTIVITY_KINDS.has(kind as EventActivityKind)) {
+    recordEventActivity(kind as EventActivityKind, amount);
+  }
 }
 
 function botPlayerWon() {
