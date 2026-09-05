@@ -10,7 +10,8 @@ body {
 .app-home, .subpage {
   min-height: 100dvh;
   background: radial-gradient(circle at 50% -10%, #15336a 0, #06152f 35%, #020817 75%);
-  padding: 16px 16px calc(76px + env(safe-area-inset-bottom, 0px));
+  /* Reduced bottom padding so elements sit closer to the bottom nav */
+  padding: 12px 16px calc(62px + env(safe-area-inset-bottom, 0px));
 }
 
 .app-home {
@@ -98,8 +99,8 @@ body {
 }
 
 .hero-card {
-  margin: 12px 0;
-  padding: 20px;
+  margin: 10px 0;
+  padding: 18px;
   border-radius: 24px;
   background: linear-gradient(120deg, #0a2b72, #123e8f 48%, #35106d);
   border: 1px solid #2b69c9;
@@ -193,7 +194,7 @@ body {
   justify-content: center;
   gap: 10px;
   margin-top: 10px;
-  padding: 12px 16px;
+  padding: 14px 16px;
   border-radius: 16px;
   background: #103574;
   border: 1px solid #214d95;
@@ -426,7 +427,7 @@ body {
 }
 
 .empty-big a {
-  display: inline-block;
+  display inline-block;
   padding: 11px 15px;
   background: #16a34a;
   color: #fff;
@@ -529,11 +530,11 @@ body {
     gap: 8px;
   }
   .hero-card {
-    padding: 16px;
-    margin: 10px 0;
+    padding: 14px 16px;
+    margin: 8px 0;
   }
   .hero-dice {
-    font-size: 48px;
+    font-size: 44px;
   }
   .wallet {
     display: none;
@@ -551,7 +552,7 @@ body {
   }
   .action {
     min-height: 0;
-    padding: 14px;
+    padding: 12px 16px;
   }
   .quick-row {
     margin-top: 8px;
