@@ -35,6 +35,7 @@ type LocalSnapshot = {
   winnerIsHuman?: boolean;
   winner?: "human" | "bot" | string | null;
   turn?: number;
+  roll?: number;
   tokens?: Array<{ color?: string; state?: string; position?: number }>;
 };
 
@@ -113,16 +114,10 @@ export default function MissionGameplayTracker() {
       }
 
       if (detail === "dice") {
-        // Only human turns count. Bot rolls also produce the same audio event.
         if (Number(snapshot.turn) !== 0) return;
         record("roll_dice");
-        if (Number.isNaN(Number(snapshot.turn))) return;
-        window.setTimeout(() => {
-          const after = currentSnapshot();
-          if (!after || after.matchOver || Number(after.turn) !== 0) return;
-          const value = Number(document.querySelector(".dice-value")?.textContent?.trim());
-          if (value === 6) record("roll_sixes");
-        }, 950);
+        const value = Number(snapshot.roll || 0);
+        if (value === 6) record("roll_sixes");
         return;
       }
 
@@ -139,7 +134,7 @@ export default function MissionGameplayTracker() {
       if (detail === "home") {
         window.setTimeout(() => {
           const after = currentSnapshot();
-          if (!after || after.matchOver) return;
+          if (!after) return;
           const count = humanHomeCount(after);
           const delta = Math.max(0, count - homeCountRef.current);
           homeCountRef.current = count;
