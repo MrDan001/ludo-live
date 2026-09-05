@@ -4,7 +4,7 @@ import { useEffect, useRef } from "react";
 import { recordMissionEvent } from "../../lib/missionEvents";
 import { recordEventActivity, type EventActivityKind } from "../../lib/eventProgress";
 
-const GAME_PATHS = new Set(["/game", "/game-online", "/tournament/game"]);
+const LOCAL_GAME_PATHS = new Set(["/game", "/tournament/game"]);
 type GameplayEvent = "dice" | "move" | "home" | "win";
 
 const EVENT_ACTIVITY_KINDS = new Set<EventActivityKind>([
@@ -17,8 +17,52 @@ const EVENT_ACTIVITY_KINDS = new Set<EventActivityKind>([
   "move_home",
 ]);
 
-function isGamePath() {
-  return typeof window !== "undefined" && GAME_PATHS.has(window.location.pathname);
+function isLocalGamePath() {
+  return typeof window !== "undefined" && LOCAL_GAME_PATHS.has(window.location.pathname);
+}
+
+function localStorageKey() {
+  if (typeof window === "undefined") return null;
+  if (window.location.pathname === "/game") return "ludo-bot-match-v1";
+  const tournamentId = new URLSearchParams(window.location.search).get("tournament") || "";
+  return tournamentId ? `ludo-tournament-board:${tournamentId}` : null;
+}
+
+type LocalSnapshot = {
+  matchId?: string;
+  matchNumber?: number;
+  matchOver?: boolean;
+  winnerIsHuman?: boolean;
+  winner?: "human" | "bot" | string | null;
+  turn?: number;
+  tokens?: Array<{ color?: string; state?: string; position?: number }>;
+};
+
+function readLocalSnapshot(): LocalSnapshot | null {
+  try {
+    const key = localStorageKey();
+    if (!key) return null;
+    const raw = localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as LocalSnapshot) : null;
+  } catch {
+    return null;
+  }
+}
+
+function localMatchKey(snapshot: LocalSnapshot | null) {
+  if (!snapshot) return null;
+  if (window.location.pathname === "/game") return snapshot.matchId || "local-current";
+  const tournamentId = new URLSearchParams(window.location.search).get("tournament") || "tournament";
+  return `${tournamentId}:${Number(snapshot.matchNumber || 1)}`;
+}
+
+function humanHomeCount(snapshot: LocalSnapshot | null) {
+  const tokens = Array.isArray(snapshot?.tokens) ? snapshot.tokens : [];
+  return tokens.filter((t) => {
+    const humanColor = t?.color === "red" || t?.color === "yellow";
+    const home = t?.state === "finished" || Number(t?.position) >= 57;
+    return humanColor && home;
+  }).length;
 }
 
 function record(kind: Parameters<typeof recordMissionEvent>[0], amount = 1) {
@@ -28,66 +72,108 @@ function record(kind: Parameters<typeof recordMissionEvent>[0], amount = 1) {
   }
 }
 
-function botPlayerWon() {
-  try {
-    const saved = JSON.parse(localStorage.getItem("ludo-bot-match-v1") || "null");
-    return Boolean(saved?.matchOver && saved?.winnerIsHuman);
-  } catch {
-    return false;
-  }
-}
-
 export default function MissionGameplayTracker() {
-  const started = useRef(false);
-  const winRecorded = useRef(false);
+  const matchKeyRef = useRef<string | null>(null);
+  const playRecordedRef = useRef(false);
+  const finishRecordedRef = useRef(false);
+  const winRecordedRef = useRef(false);
+  const homeCountRef = useRef(0);
+  const moveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
-    const onAudio = (event: Event) => {
-      if (!isGamePath()) return;
-      const detail = String((event as CustomEvent).detail || "") as GameplayEvent;
+    const resetForMatch = (snapshot: LocalSnapshot | null) => {
+      const key = localMatchKey(snapshot);
+      if (key && key !== matchKeyRef.current) {
+        matchKeyRef.current = key;
+        playRecordedRef.current = false;
+        finishRecordedRef.current = false;
+        winRecordedRef.current = false;
+        homeCountRef.current = humanHomeCount(snapshot);
+      }
+    };
 
-      // The tracker is mounted globally. Record a game only after a real
-      // gameplay action, not when the Home page mounts.
-      if (!started.current && ["dice", "move", "home", "win"].includes(detail)) {
-        started.current = true;
+    const currentSnapshot = () => {
+      if (!isLocalGamePath()) return null;
+      const snapshot = readLocalSnapshot();
+      resetForMatch(snapshot);
+      return snapshot;
+    };
+
+    const onAudio = (event: Event) => {
+      if (!isLocalGamePath()) return;
+      const detail = String((event as CustomEvent).detail || "") as GameplayEvent;
+      if (!["dice", "move", "home", "win"].includes(detail)) return;
+
+      const snapshot = currentSnapshot();
+      if (!snapshot || snapshot.matchOver) return;
+
+      if (!playRecordedRef.current) {
+        playRecordedRef.current = true;
         record("play_games");
       }
 
       if (detail === "dice") {
+        // Only human turns count. Bot rolls also produce the same audio event.
+        if (Number(snapshot.turn) !== 0) return;
         record("roll_dice");
+        if (Number.isNaN(Number(snapshot.turn))) return;
         window.setTimeout(() => {
-          if (!isGamePath()) return;
-          const diceValue = Number(document.querySelector(".dice-value")?.textContent?.trim());
-          if (diceValue === 6) record("roll_sixes");
+          const after = currentSnapshot();
+          if (!after || after.matchOver || Number(after.turn) !== 0) return;
+          const value = Number(document.querySelector(".dice-value")?.textContent?.trim());
+          if (value === 6) record("roll_sixes");
         }, 950);
-      } else if (detail === "move") {
+        return;
+      }
+
+      if (detail === "move") {
+        if (Number(snapshot.turn) !== 0) return;
+        if (moveTimerRef.current !== null) return;
+        moveTimerRef.current = window.setTimeout(() => {
+          moveTimerRef.current = null;
+        }, 450);
         record("move_tokens");
-      } else if (detail === "home") {
-        record("move_home");
-      } else if (detail === "win" && !winRecorded.current) {
-        // /game's generic win sound is also used by the winner UI. Confirm
-        // that the saved bot match says the human won before counting it.
-        if (window.location.pathname === "/game" && !botPlayerWon()) return;
-        winRecorded.current = true;
-        record("win_games");
-        record("complete_games");
+        return;
+      }
+
+      if (detail === "home") {
+        window.setTimeout(() => {
+          const after = currentSnapshot();
+          if (!after || after.matchOver) return;
+          const count = humanHomeCount(after);
+          const delta = Math.max(0, count - homeCountRef.current);
+          homeCountRef.current = count;
+          if (delta > 0) record("move_home", delta);
+        }, 350);
       }
     };
 
-    const onWinner = (event: Event) => {
-      if (!isGamePath() || winRecorded.current) return;
-      const detail = (event as CustomEvent<{ winnerName?: string }>).detail || {};
-      if (String(detail.winnerName || "").trim().toLowerCase() !== "you") return;
-      winRecorded.current = true;
-      record("win_games");
-      record("complete_games");
+    const pollMatchState = () => {
+      if (!isLocalGamePath()) return;
+      const snapshot = currentSnapshot();
+      if (!snapshot) return;
+
+      if (snapshot.matchOver && !finishRecordedRef.current) {
+        finishRecordedRef.current = true;
+        record("complete_games");
+      }
+
+      const humanWon = window.location.pathname === "/game"
+        ? Boolean(snapshot.winnerIsHuman)
+        : String(snapshot.winner || "") === "human";
+
+      if (snapshot.matchOver && humanWon && !winRecordedRef.current) {
+        winRecordedRef.current = true;
+        record("win_games");
+      }
     };
 
+    const interval = window.setInterval(pollMatchState, 350);
     window.addEventListener("ludo-audio", onAudio);
-    window.addEventListener("ludo-winner", onWinner);
     return () => {
       window.removeEventListener("ludo-audio", onAudio);
-      window.removeEventListener("ludo-winner", onWinner);
+      window.clearInterval(interval);
+      if (moveTimerRef.current !== null) window.clearTimeout(moveTimerRef.current);
     };
   }, []);
 
