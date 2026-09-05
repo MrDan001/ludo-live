@@ -1,10 +1,120 @@
-import { NextRequest, NextResponse } from "next/server";
 import { createHash } from "crypto";
+import { NextRequest, NextResponse } from "next/server";
+import { DEFAULT_SPIN_WHEEL, SPIN_SLOT_COUNT, cleanSpinSlot, isSpinKind, type SpinWheelSlot } from "../../../../lib/spinWheel";
 import { pool, ensureAuthSchema } from "../../auth/_db";
 import { getShopCatalog } from "../../shop/catalog";
-const COOKIE="ludo_session";
-async function admin(q:NextRequest){const token=q.cookies.get(COOKIE)?.value;if(!token)return null;const hash=createHash("sha256").update(token).digest("hex"),r=await pool.query<any>(`SELECT u.* FROM ludo_users u JOIN ludo_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW() LIMIT 1`,[hash]),u=r.rows[0];if(!u||u.is_guest||u.is_banned)return null;const allowed=(process.env.ADMIN_EMAILS||process.env.ADMIN_EMAIL||"").split(",").map((x:string)=>x.trim().toLowerCase()).filter(Boolean);return u.email&&allowed.includes(u.email.toLowerCase())?u:null}
-async function ensure(){await ensureAuthSchema();await pool.query(`CREATE TABLE IF NOT EXISTS ludo_spin_rewards(id TEXT PRIMARY KEY,kind TEXT NOT NULL CHECK(kind IN ('coins','gems','extraSpin','shop_item')),label TEXT NOT NULL,icon TEXT NOT NULL,amount INTEGER NOT NULL DEFAULT 0,item_type TEXT,item_id TEXT,probability NUMERIC NOT NULL DEFAULT 1,active BOOLEAN NOT NULL DEFAULT TRUE,sort_order INTEGER NOT NULL DEFAULT 0,updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW())`)}
-export async function GET(q:NextRequest){try{const a=await admin(q);if(!a)return NextResponse.json({error:"Admin access required."},{status:403});await ensure();const catalog=await getShopCatalog(),r=await pool.query(`SELECT id,kind,label,icon,amount,item_type AS "itemType",item_id AS "itemId",probability,active,sort_order AS "sortOrder" FROM ludo_spin_rewards ORDER BY sort_order,id`);return NextResponse.json({rewards:r.rows.map((x:any)=>({...x,amount:Number(x.amount),probability:Number(x.probability)})),catalog:catalog.filter((x:any)=>["board","dice","avatar","item"].includes(x.type))},{headers:{"Cache-Control":"no-store"}})}catch(e){console.error(e);return NextResponse.json({error:"Unable to load Spin configuration."},{status:500})}}
-export async function POST(q:NextRequest){try{const a=await admin(q);if(!a)return NextResponse.json({error:"Admin access required."},{status:403});await ensure();const b=await q.json();const kind=String(b.kind||"");if(!["coins","gems","extraSpin","shop_item"].includes(kind))return NextResponse.json({error:"Invalid reward type."},{status:400});const id=String(b.id||`${kind}-${Date.now()}`),label=String(b.label||"Reward").slice(0,100),icon=String(b.icon||"🎁").slice(0,20),amount=Math.max(0,Math.trunc(Number(b.amount)||0)),probability=Math.max(0,Number(b.probability)||0),active=b.active!==false,itemType=kind==="shop_item"?String(b.itemType||""):null,itemId=kind==="shop_item"?String(b.itemId||""):null;if(kind==="shop_item"){const item=await getShopCatalog().then(c=>c.find((x:any)=>x.type===itemType&&x.id===itemId));if(!item)return NextResponse.json({error:"Shop item not found."},{status:404})}await pool.query(`INSERT INTO ludo_spin_rewards(id,kind,label,icon,amount,item_type,item_id,probability,active,sort_order,updated_at) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,COALESCE((SELECT MAX(sort_order)+1 FROM ludo_spin_rewards),0),NOW()) ON CONFLICT(id) DO UPDATE SET kind=EXCLUDED.kind,label=EXCLUDED.label,icon=EXCLUDED.icon,amount=EXCLUDED.amount,item_type=EXCLUDED.item_type,item_id=EXCLUDED.item_id,probability=EXCLUDED.probability,active=EXCLUDED.active,updated_at=NOW()`,[id,kind,label,icon,amount,itemType,itemId,probability,active]);await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'spin_reward_update',NULL,$2)`,[a.id,JSON.stringify({id,kind,label,amount,itemType,itemId,probability,active})]);return NextResponse.json({ok:true})}catch(e){console.error(e);return NextResponse.json({error:"Unable to save Spin reward."},{status:500})}}
-export async function DELETE(q:NextRequest){try{const a=await admin(q);if(!a)return NextResponse.json({error:"Admin access required."},{status:403});await ensure();const id=new URL(q.url).searchParams.get("id");if(!id)return NextResponse.json({error:"Reward id required."},{status:400});await pool.query("DELETE FROM ludo_spin_rewards WHERE id=$1",[id]);await pool.query(`INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'spin_reward_delete',NULL,$2)`,[a.id,JSON.stringify({id})]);return NextResponse.json({ok:true})}catch(e){console.error(e);return NextResponse.json({error:"Unable to delete Spin reward."},{status:500})}}
+
+const COOKIE = "ludo_session";
+
+async function getAdmin(request: NextRequest) {
+  const token = request.cookies.get(COOKIE)?.value;
+  if (!token) return null;
+  const hash = createHash("sha256").update(token).digest("hex");
+  const result = await pool.query<any>(
+    `SELECT u.* FROM ludo_users u JOIN ludo_sessions s ON s.user_id=u.id WHERE s.token_hash=$1 AND s.expires_at>NOW() LIMIT 1`,
+    [hash],
+  );
+  const user = result.rows[0];
+  if (!user || user.is_guest || user.is_banned) return null;
+  const allowed = (process.env.ADMIN_EMAILS || process.env.ADMIN_EMAIL || "")
+    .split(",").map((value) => value.trim().toLowerCase()).filter(Boolean);
+  return user.email && allowed.includes(String(user.email).toLowerCase()) ? user : null;
+}
+
+async function ensureSchema() {
+  await ensureAuthSchema();
+  await pool.query(`CREATE TABLE IF NOT EXISTS ludo_spin_wheel_slots(
+    slot INTEGER PRIMARY KEY CHECK(slot BETWEEN 0 AND 7),
+    id TEXT NOT NULL,
+    kind TEXT NOT NULL CHECK(kind IN ('coins','gems','extraSpin','shop_item')),
+    label TEXT NOT NULL,
+    icon TEXT NOT NULL,
+    amount INTEGER NOT NULL DEFAULT 0,
+    probability NUMERIC NOT NULL DEFAULT 1,
+    item_type TEXT,
+    item_id TEXT,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  )`);
+  for (const reward of DEFAULT_SPIN_WHEEL) {
+    await pool.query(
+      `INSERT INTO ludo_spin_wheel_slots(slot,id,kind,label,icon,amount,probability,item_type,item_id)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9) ON CONFLICT(slot) DO NOTHING`,
+      [reward.slot, reward.id, reward.kind, reward.label, reward.icon, reward.amount, reward.probability, reward.itemType || null, reward.itemId || null],
+    );
+  }
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getAdmin(request);
+    if (!user) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+    await ensureSchema();
+    const catalog = await getShopCatalog();
+    const result = await pool.query(
+      `SELECT slot,id,kind,label,icon,amount,probability,item_type AS "itemType",item_id AS "itemId",updated_at AS "updatedAt"
+       FROM ludo_spin_wheel_slots ORDER BY slot ASC`,
+    );
+    const rewards = result.rows.map((row: any) => ({ ...row, amount: Number(row.amount), probability: Number(row.probability) }));
+    return NextResponse.json(
+      { slotCount: SPIN_SLOT_COUNT, rewards, catalog: catalog.filter((item: any) => ["board", "dice", "avatar", "item"].includes(item.type)) },
+      { headers: { "Cache-Control": "no-store" } },
+    );
+  } catch (error) {
+    console.error(error);
+    return NextResponse.json({ error: "Unable to load Spin Wheel configuration." }, { status: 500 });
+  }
+}
+
+export async function POST(request: NextRequest) {
+  const client = await pool.connect();
+  let transaction = false;
+  try {
+    const user = await getAdmin(request);
+    if (!user) return NextResponse.json({ error: "Admin access required." }, { status: 403 });
+    await ensureSchema();
+    const body = await request.json().catch(() => ({}));
+    const slotNumber = Number(body.slot);
+    if (!Number.isInteger(slotNumber) || slotNumber < 0 || slotNumber >= SPIN_SLOT_COUNT) {
+      return NextResponse.json({ error: "Spin slot must be between 1 and 8." }, { status: 400 });
+    }
+    if (!isSpinKind(body.kind)) return NextResponse.json({ error: "Invalid Spin reward type." }, { status: 400 });
+
+    const reward = cleanSpinSlot({ ...body, id: `slot-${slotNumber + 1}` }, slotNumber);
+    if (reward.probability <= 0) return NextResponse.json({ error: "Probability / weight must be greater than 0." }, { status: 400 });
+    if ((reward.kind === "coins" || reward.kind === "gems" || reward.kind === "extraSpin") && reward.amount < 1) {
+      return NextResponse.json({ error: "Amount must be at least 1 for this reward type." }, { status: 400 });
+    }
+    if (reward.kind === "shop_item" && (!reward.itemType || !reward.itemId)) {
+      return NextResponse.json({ error: "Select a Shop item for this slot." }, { status: 400 });
+    }
+
+    if (reward.kind === "shop_item") {
+      const catalog = await getShopCatalog();
+      const item = catalog.find((entry: any) => entry.type === reward.itemType && entry.id === reward.itemId);
+      if (!item) return NextResponse.json({ error: "Selected Shop item was not found." }, { status: 404 });
+    }
+
+    await client.query("BEGIN");
+    transaction = true;
+    await client.query(
+      `UPDATE ludo_spin_wheel_slots
+       SET id=$1,kind=$2,label=$3,icon=$4,amount=$5,probability=$6,item_type=$7,item_id=$8,updated_at=NOW()
+       WHERE slot=$9`,
+      [reward.id, reward.kind, reward.label, reward.icon, reward.amount, reward.probability, reward.itemType, reward.itemId, reward.slot],
+    );
+    await client.query(
+      `INSERT INTO ludo_admin_actions(admin_user_id,action,target_user_id,details) VALUES($1,'spin_wheel_slot_update',NULL,$2)`,
+      [user.id, JSON.stringify({ slot: reward.slot + 1, reward })],
+    );
+    await client.query("COMMIT");
+    transaction = false;
+
+    return NextResponse.json({ ok: true, slot: reward.slot, reward });
+  } catch (error: any) {
+    if (transaction) await client.query("ROLLBACK").catch(() => {});
+    console.error(error);
+    return NextResponse.json({ error: error?.message || "Unable to save Spin Wheel slot." }, { status: 500 });
+  } finally {
+    client.release();
+  }
+}
