@@ -16,10 +16,10 @@ type Action = {
 };
 
 const actions: Action[] = [
-  { icon: "🌐", title: "PLAY ONLINE", sub: "Find open rooms and play real players", href: "/lobby", bg: "linear-gradient(135deg,#159447,#31c936)" },
-  { icon: "🏆", title: "TOURNAMENTS", sub: "Enter competitions and fight for rewards", href: "/tournament", bg: "linear-gradient(135deg,#6b1998,#a126c8)" },
-  { icon: "🎮", title: "PLAY SOLO", sub: "Play solo and sharpen your skills", href: "/mood", bg: "linear-gradient(135deg,#b86b12,#e39a24)" },
-  { icon: "👥", title: "FRIENDS", sub: "", href: "/friends", bg: "linear-gradient(135deg,#087b61,#16b875)" },
+  { icon: "🌐", title: "PLAY ONLINE", sub: "Find open rooms and play real players", href: "/lobby", bg: "linear-gradient(135deg,#159447 0%,#31c936 100%)" },
+  { icon: "🏆", title: "TOURNAMENTS", sub: "Enter competitions and fight for rewards", href: "/tournament", bg: "linear-gradient(135deg,#6b1998 0%,#a126c8 100%)" },
+  { icon: "🎮", title: "PLAY SOLO", sub: "Play solo and sharpen your skills", href: "/mood", bg: "linear-gradient(135deg,#b86b12 0%,#e39a24 100%)" },
+  { icon: "👥", title: "FRIENDS", sub: "", href: "/friends", bg: "linear-gradient(135deg,#087b61 0%,#16b875 100%)" },
 ];
 
 const shortcuts = [
@@ -83,408 +83,529 @@ export default function HomePage() {
   const xpPercent = Math.min(100, Math.max(0, (progress.xp / required) * 100));
 
   return (
-    <main style={page}>
-      <div style={content}>
-        <header style={header}>
-          <Link href="/profile" style={profileLink}>
-            <div style={avatarWrap}>
-              <div style={avatar}><EquippedAvatar /></div>
-              <div style={levelBadge}>{progress.level}</div>
+    <main className="ludo-home-page">
+      <div className="ludo-home-content">
+        <header className="ludo-home-header">
+          <Link href="/profile" className="ludo-profile-link">
+            <div className="ludo-avatar-wrap">
+              <div className="ludo-avatar"><EquippedAvatar /></div>
+              <div className="ludo-level-badge">{progress.level}</div>
             </div>
-            <div style={profileCopy}>
-              <strong style={nameStyle}>{name}</strong>
-              <div style={xpRow}>
-                <i style={xpTrack}><em style={{ ...xpFill, width: `${xpPercent}%` }} /></i>
+            <div className="ludo-profile-copy">
+              <strong className="ludo-name">{name}</strong>
+              <div className="ludo-xp-row">
+                <i className="ludo-xp-track"><em style={{ width: `${xpPercent}%` }} /></i>
               </div>
-              <div style={levelRow}>
-                <b style={levelLabel}>LEVEL {progress.level}</b>
-                <i style={levelTrack}><em style={{ ...levelFill, width: `${xpPercent}%` }} /></i>
-                <b style={levelNext}>LVL {progress.level + 1}</b>
+              <div className="ludo-level-row">
+                <b>LEVEL {progress.level}</b>
+                <i className="ludo-level-track"><em style={{ width: `${xpPercent}%` }} /></i>
+                <b>LVL {progress.level + 1}</b>
               </div>
             </div>
           </Link>
 
-          <div style={walletRow}>
-            <span style={walletItem}>🪙 <b>{wallet ? wallet.coins.toLocaleString() : "…"}</b></span>
-            <span style={walletItem}>💎 <b>{wallet ? wallet.gems.toLocaleString() : "…"}</b></span>
-            <Link href="/shop" style={addButton}>+</Link>
+          <div className="ludo-wallet-row">
+            <span className="ludo-wallet-item">🪙 <b>{wallet ? wallet.coins.toLocaleString() : "…"}</b></span>
+            <span className="ludo-wallet-item">💎 <b>{wallet ? wallet.gems.toLocaleString() : "…"}</b></span>
+            <Link href="/shop" className="ludo-add-button">+</Link>
           </div>
         </header>
 
-        <section style={actionsSection}>
+        <section className="ludo-actions" aria-label="Main game actions">
           {actions.map((action) => (
-            <Link key={action.title} href={action.href} style={{ ...actionCard, background: action.bg }}>
-              <span style={actionIcon}>{action.icon}</span>
-              <span style={actionCopy}>
-                <b style={actionTitle}>{action.title}</b>
-                {action.sub && <small style={actionSub}>{action.sub}</small>}
+            <Link key={action.title} href={action.href} className="ludo-action-card" style={{ background: action.bg }}>
+              <span className="ludo-action-icon" aria-hidden="true">{action.icon}</span>
+              <span className="ludo-action-copy">
+                <b className="ludo-action-title">{action.title}</b>
+                {action.sub && <small className="ludo-action-sub">{action.sub}</small>}
               </span>
-              <span style={actionArrow}>›</span>
+              <span className="ludo-action-arrow" aria-hidden="true">›</span>
             </Link>
           ))}
         </section>
 
-        <section style={shortcutSection}>
+        <section className="ludo-shortcuts" aria-label="Quick links">
           {shortcuts.map(([icon, label, href]) => (
-            <Link key={label} href={href} style={shortcut}>
-              <span style={shortcutIcon}>{icon}</span>
+            <Link key={label} href={href} className="ludo-shortcut">
+              <span className="ludo-shortcut-icon" aria-hidden="true">{icon}</span>
               <b>{label}</b>
             </Link>
           ))}
         </section>
 
-        <section style={inventorySection}>
-          <Link href="/inventory" style={inventoryLink}>
-            <span style={inventoryIcon}>🎒</span>
+        <section className="ludo-inventory-section">
+          <Link href="/inventory" className="ludo-inventory-link">
+            <span className="ludo-inventory-icon" aria-hidden="true">🎒</span>
             <b>Inventory</b>
           </Link>
         </section>
       </div>
 
-      <nav style={bottomNav}>
+      <nav className="ludo-bottom-nav" aria-label="Primary navigation">
         {nav.map(([icon, label, href], index) => (
-          <Link
-            key={label}
-            href={href}
-            style={{
-              ...navItem,
-              color: index === 0 ? "#fff" : "#9eb3d7",
-              background: index === 0 ? "#123a72" : "transparent",
-            }}
-          >
-            <span style={navIcon}>{icon}</span>
+          <Link key={label} href={href} className={`ludo-nav-item ${index === 0 ? "active" : ""}`}>
+            <span className="ludo-nav-icon" aria-hidden="true">{icon}</span>
             <b>{label}</b>
           </Link>
         ))}
       </nav>
+
+      <style jsx global>{`
+        html,
+        body {
+          width: 100%;
+          height: 100%;
+          margin: 0;
+          padding: 0;
+        }
+
+        body {
+          overflow: hidden;
+          background: #020817;
+        }
+
+        .ludo-home-page,
+        .ludo-home-page * {
+          box-sizing: border-box;
+        }
+
+        .ludo-home-page {
+          --home-nav-height: 74px;
+          position: fixed;
+          inset: 0;
+          width: 100%;
+          height: 100dvh;
+          min-height: 100dvh;
+          overflow: hidden;
+          background: linear-gradient(180deg, #031536 0%, #020b1d 52%, #010611 100%);
+          color: #fff;
+          font-family: Arial, Helvetica, sans-serif;
+          isolation: isolate;
+        }
+
+        .ludo-home-content {
+          position: relative;
+          width: min(100%, 760px);
+          height: calc(100dvh - var(--home-nav-height) - env(safe-area-inset-bottom, 0px));
+          min-height: 0;
+          margin: 0 auto;
+          padding: max(8px, env(safe-area-inset-top, 0px)) 14px 10px;
+          display: flex;
+          flex-direction: column;
+          overflow: hidden;
+        }
+
+        .ludo-home-header {
+          flex: 0 0 auto;
+          min-width: 0;
+          min-height: 66px;
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) auto;
+          align-items: center;
+          gap: clamp(6px, 1.2vw, 12px);
+        }
+
+        .ludo-profile-link {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          gap: clamp(7px, 1.4vw, 11px);
+          color: #fff;
+          text-decoration: none;
+        }
+
+        .ludo-avatar-wrap {
+          position: relative;
+          flex: 0 0 clamp(52px, 9vw, 68px);
+          width: clamp(52px, 9vw, 68px);
+          height: clamp(52px, 9vw, 68px);
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: linear-gradient(145deg, #ffe45c, #ffb300);
+          border: 3px solid #ffd43b;
+        }
+
+        .ludo-avatar {
+          width: 82%;
+          height: 82%;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          overflow: hidden;
+          background: #c58a54;
+          border: 2px solid #8b5a32;
+          font-size: clamp(27px, 5vw, 38px);
+        }
+
+        .ludo-level-badge {
+          position: absolute;
+          left: 50%;
+          bottom: -7px;
+          transform: translateX(-50%);
+          min-width: 30px;
+          height: 21px;
+          padding: 0 5px;
+          display: grid;
+          place-items: center;
+          border-radius: 7px;
+          background: #ffd21a;
+          color: #111;
+          border: 2px solid #f5b900;
+          font-size: 12px;
+          line-height: 1;
+          font-weight: 950;
+        }
+
+        .ludo-profile-copy {
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .ludo-name {
+          display: block;
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: clamp(17px, 4.2vw, 25px);
+          line-height: 1.05;
+        }
+
+        .ludo-xp-row {
+          width: 100%;
+          margin-top: 5px;
+        }
+
+        .ludo-xp-track,
+        .ludo-level-track {
+          display: block;
+          width: 100%;
+          overflow: hidden;
+          border-radius: 999px;
+          background: #102746;
+        }
+
+        .ludo-xp-track {
+          height: 5px;
+        }
+
+        .ludo-xp-track em,
+        .ludo-level-track em {
+          display: block;
+          height: 100%;
+          border-radius: inherit;
+        }
+
+        .ludo-xp-track em {
+          background: linear-gradient(90deg, #37c8ff, #7df5ff);
+        }
+
+        .ludo-level-row {
+          min-width: 0;
+          display: grid;
+          grid-template-columns: auto minmax(25px, 1fr) auto;
+          align-items: center;
+          gap: 5px;
+          margin-top: 3px;
+          color: #ffd21a;
+          font-size: clamp(7px, 1.7vw, 10px);
+          line-height: 1;
+        }
+
+        .ludo-level-row b {
+          white-space: nowrap;
+          font-weight: 950;
+        }
+
+        .ludo-level-track {
+          height: 9px;
+        }
+
+        .ludo-level-track em {
+          background: linear-gradient(90deg, #ffb51b, #ffe15a);
+        }
+
+        .ludo-wallet-row {
+          min-width: 0;
+          display: flex;
+          align-items: center;
+          justify-content: flex-end;
+          gap: clamp(4px, 0.9vw, 7px);
+        }
+
+        .ludo-wallet-item {
+          min-width: 0;
+          display: inline-flex;
+          align-items: center;
+          gap: 3px;
+          padding: clamp(6px, 1.1vw, 8px) clamp(6px, 1.3vw, 10px);
+          border-radius: 11px;
+          background: #051737;
+          border: 1px solid #173766;
+          font-size: clamp(9px, 1.9vw, 13px);
+          line-height: 1;
+          white-space: nowrap;
+        }
+
+        .ludo-add-button {
+          flex: 0 0 clamp(40px, 7vw, 48px);
+          width: clamp(40px, 7vw, 48px);
+          height: clamp(40px, 7vw, 48px);
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          background: #37b92e;
+          border: 2px solid #83ec64;
+          color: #fff;
+          text-decoration: none;
+          font-size: clamp(25px, 4.8vw, 31px);
+          line-height: 1;
+          font-weight: 950;
+        }
+
+        .ludo-actions {
+          flex: 0 0 clamp(312px, 37dvh, 550px);
+          min-height: 0;
+          margin-top: clamp(7px, 1dvh, 12px);
+          display: grid;
+          grid-template-rows: repeat(4, minmax(0, 1fr));
+          gap: clamp(6px, 0.85dvh, 12px);
+        }
+
+        .ludo-action-card {
+          min-width: 0;
+          min-height: 0;
+          display: grid;
+          grid-template-columns: clamp(48px, 9vw, 76px) minmax(0, 1fr) 22px;
+          align-items: center;
+          gap: clamp(7px, 1.4vw, 12px);
+          padding: clamp(7px, 1.1vw, 12px) clamp(10px, 1.8vw, 16px);
+          border-radius: clamp(15px, 2.5vw, 21px);
+          border: 1px solid rgba(255, 255, 255, 0.25);
+          box-shadow: 0 5px 14px rgba(0, 0, 0, 0.2);
+          color: #fff;
+          text-decoration: none;
+          overflow: hidden;
+        }
+
+        .ludo-action-icon {
+          min-width: 0;
+          display: grid;
+          place-items: center;
+          font-size: clamp(34px, 7vw, 55px);
+          line-height: 1;
+        }
+
+        .ludo-action-copy {
+          min-width: 0;
+          overflow: hidden;
+        }
+
+        .ludo-action-title {
+          display: block;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: clamp(16px, 3.2vw, 25px);
+          line-height: 1.05;
+          font-weight: 950;
+        }
+
+        .ludo-action-sub {
+          display: block;
+          margin-top: 4px;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: clamp(9px, 1.8vw, 14px);
+          line-height: 1.15;
+          font-weight: 750;
+        }
+
+        .ludo-action-arrow {
+          display: grid;
+          place-items: center;
+          font-size: clamp(25px, 4vw, 34px);
+          line-height: 1;
+        }
+
+        .ludo-shortcuts {
+          flex: 0 0 clamp(78px, 10dvh, 118px);
+          min-height: 0;
+          margin-top: clamp(7px, 1dvh, 12px);
+          padding: 7px 4px;
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          align-items: stretch;
+          border-radius: clamp(15px, 2.5vw, 20px);
+          background: #06152f;
+          border: 1px solid #173766;
+        }
+
+        .ludo-shortcut {
+          min-width: 0;
+          display: grid;
+          place-items: center;
+          align-content: center;
+          gap: 4px;
+          padding: 2px 3px;
+          color: #fff;
+          text-decoration: none;
+          text-align: center;
+          overflow: hidden;
+        }
+
+        .ludo-shortcut-icon {
+          display: block;
+          font-size: clamp(25px, 5.8vw, 40px);
+          line-height: 1;
+        }
+
+        .ludo-shortcut b {
+          max-width: 100%;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+          font-size: clamp(9px, 1.9vw, 13px);
+          line-height: 1.1;
+        }
+
+        .ludo-inventory-section {
+          flex: 0 0 clamp(64px, 8dvh, 88px);
+          min-height: 0;
+          margin-top: auto;
+          padding-top: clamp(7px, 1dvh, 11px);
+        }
+
+        .ludo-inventory-link {
+          width: 100%;
+          height: 100%;
+          min-height: 58px;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          gap: 9px;
+          border-radius: clamp(15px, 2.5vw, 20px);
+          background: #0a214b;
+          border: 1px solid #173766;
+          color: #fff;
+          text-decoration: none;
+          font-size: clamp(15px, 3vw, 22px);
+          line-height: 1;
+        }
+
+        .ludo-inventory-icon {
+          font-size: clamp(30px, 6vw, 43px);
+          line-height: 1;
+        }
+
+        .ludo-bottom-nav {
+          position: fixed;
+          z-index: 20;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          width: 100%;
+          height: var(--home-nav-height);
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+          display: grid;
+          grid-template-columns: repeat(4, minmax(0, 1fr));
+          background: #020b1b;
+          border-top: 1px solid #17325b;
+        }
+
+        .ludo-nav-item {
+          min-width: 0;
+          min-height: 0;
+          display: grid;
+          place-items: center;
+          align-content: center;
+          gap: 3px;
+          color: #9eb3d7;
+          text-decoration: none;
+          text-align: center;
+          font-size: clamp(10px, 2.3vw, 14px);
+          line-height: 1;
+          overflow: hidden;
+        }
+
+        .ludo-nav-item.active {
+          color: #fff;
+          background: #123a72;
+        }
+
+        .ludo-nav-icon {
+          display: block;
+          font-size: clamp(25px, 5.8vw, 38px);
+          line-height: 1;
+        }
+
+        @media (max-width: 420px) {
+          .ludo-home-content {
+            padding-left: 10px;
+            padding-right: 10px;
+          }
+
+          .ludo-home-header {
+            gap: 5px;
+          }
+
+          .ludo-wallet-row {
+            gap: 3px;
+          }
+
+          .ludo-wallet-item {
+            padding-left: 5px;
+            padding-right: 5px;
+          }
+
+          .ludo-action-card {
+            grid-template-columns: 45px minmax(0, 1fr) 20px;
+            gap: 6px;
+            padding-left: 8px;
+            padding-right: 8px;
+          }
+
+          .ludo-action-icon {
+            font-size: 35px;
+          }
+
+          .ludo-action-title {
+            font-size: 16px;
+          }
+
+          .ludo-action-sub {
+            font-size: 9px;
+          }
+        }
+
+        @media (max-height: 720px) {
+          .ludo-home-page {
+            --home-nav-height: 68px;
+          }
+
+          .ludo-home-header {
+            min-height: 58px;
+          }
+
+          .ludo-actions {
+            flex-basis: 292px;
+          }
+
+          .ludo-shortcuts {
+            flex-basis: 70px;
+          }
+
+          .ludo-inventory-section {
+            flex-basis: 60px;
+          }
+
+          .ludo-nav-icon {
+            font-size: 25px;
+          }
+        }
+      `}</style>
     </main>
   );
 }
-
-const page: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  width: "100%",
-  height: "100svh",
-  overflow: "hidden",
-  background: "linear-gradient(180deg,#031536 0%,#020b1d 52%,#010611 100%)",
-  color: "#fff",
-  fontFamily: "Arial,Helvetica,sans-serif",
-};
-
-const content: React.CSSProperties = {
-  width: "min(100%, 480px)",
-  height: "calc(100svh - 68px - env(safe-area-inset-bottom,0px))",
-  margin: "0 auto",
-  padding: "7px 12px",
-  boxSizing: "border-box",
-  display: "flex",
-  flexDirection: "column",
-  overflow: "hidden",
-};
-
-const header: React.CSSProperties = {
-  flex: "0 0 auto",
-  display: "grid",
-  gridTemplateColumns: "minmax(0,1fr) auto",
-  alignItems: "center",
-  gap: 7,
-  minHeight: 70,
-};
-
-const profileLink: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 9,
-  minWidth: 0,
-  color: "#fff",
-  textDecoration: "none",
-};
-
-const avatarWrap: React.CSSProperties = {
-  position: "relative",
-  flex: "0 0 clamp(52px,13vw,64px)",
-  width: "clamp(52px,13vw,64px)",
-  height: "clamp(52px,13vw,64px)",
-  borderRadius: "50%",
-  display: "grid",
-  placeItems: "center",
-  background: "linear-gradient(145deg,#ffe45c,#ffb300)",
-  border: "3px solid #ffd43b",
-};
-
-const avatar: React.CSSProperties = {
-  width: "82%",
-  height: "82%",
-  borderRadius: "50%",
-  display: "grid",
-  placeItems: "center",
-  background: "#c58a54",
-  border: "2px solid #8b5a32",
-  fontSize: "clamp(27px,7vw,36px)",
-  overflow: "hidden",
-};
-
-const levelBadge: React.CSSProperties = {
-  position: "absolute",
-  bottom: -7,
-  left: "50%",
-  transform: "translateX(-50%)",
-  minWidth: 30,
-  height: 21,
-  borderRadius: 7,
-  display: "grid",
-  placeItems: "center",
-  background: "#ffd21a",
-  color: "#111",
-  border: "2px solid #f5b900",
-  fontSize: 12,
-  fontWeight: 950,
-};
-
-const profileCopy: React.CSSProperties = {
-  minWidth: 0,
-  flex: 1,
-};
-
-const nameStyle: React.CSSProperties = {
-  display: "block",
-  fontSize: "clamp(18px,4.8vw,25px)",
-  whiteSpace: "nowrap",
-  overflow: "hidden",
-  textOverflow: "ellipsis",
-};
-
-const xpRow: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 5,
-  marginTop: 5,
-  minWidth: 0,
-};
-
-const xpTrack: React.CSSProperties = {
-  display: "block",
-  flex: 1,
-  minWidth: 30,
-  height: 5,
-  borderRadius: 99,
-  background: "#102746",
-  overflow: "hidden",
-};
-
-const xpFill: React.CSSProperties = {
-  display: "block",
-  height: "100%",
-  background: "linear-gradient(90deg,#37c8ff,#7df5ff)",
-};
-
-const levelRow: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 5,
-  marginTop: 3,
-  minWidth: 0,
-};
-
-const levelTrack: React.CSSProperties = {
-  display: "block",
-  flex: 1,
-  minWidth: 30,
-  height: 9,
-  borderRadius: 99,
-  background: "#102746",
-  overflow: "hidden",
-};
-
-const levelFill: React.CSSProperties = {
-  display: "block",
-  height: "100%",
-  background: "linear-gradient(90deg,#ffb51b,#ffe15a)",
-};
-
-const levelLabel: React.CSSProperties = {
-  color: "#ffd21a",
-  fontSize: 8,
-  fontWeight: 950,
-  whiteSpace: "nowrap",
-};
-
-const levelNext: React.CSSProperties = {
-  color: "#ffd21a",
-  fontSize: 8,
-  fontWeight: 950,
-  whiteSpace: "nowrap",
-};
-
-const walletRow: React.CSSProperties = {
-  display: "flex",
-  alignItems: "center",
-  gap: 5,
-};
-
-const walletItem: React.CSSProperties = {
-  padding: "7px 8px",
-  borderRadius: 11,
-  background: "#051737",
-  border: "1px solid #173766",
-  fontSize: 12,
-  whiteSpace: "nowrap",
-};
-
-const addButton: React.CSSProperties = {
-  width: 42,
-  height: 42,
-  borderRadius: "50%",
-  display: "grid",
-  placeItems: "center",
-  background: "#37b92e",
-  border: "2px solid #83ec64",
-  color: "#fff",
-  textDecoration: "none",
-  fontSize: 28,
-  fontWeight: 950,
-};
-
-const actionsSection: React.CSSProperties = {
-  flex: "0 0 auto",
-  display: "flex",
-  flexDirection: "column",
-  gap: 7,
-  marginTop: 9,
-};
-
-const actionCard: React.CSSProperties = {
-  display: "grid",
-  gridTemplateColumns: "clamp(52px,14vw,68px) minmax(0,1fr) 24px",
-  alignItems: "center",
-  gap: 9,
-  minHeight: "clamp(78px,18vw,96px)",
-  padding: "7px 12px",
-  boxSizing: "border-box",
-  borderRadius: 18,
-  border: "1px solid rgba(255,255,255,.25)",
-  color: "#fff",
-  textDecoration: "none",
-  boxShadow: "0 4px 12px rgba(0,0,0,.18)",
-};
-
-const actionIcon: React.CSSProperties = {
-  textAlign: "center",
-  fontSize: "clamp(34px,8vw,52px)",
-  lineHeight: 1,
-};
-
-const actionCopy: React.CSSProperties = {
-  minWidth: 0,
-};
-
-const actionTitle: React.CSSProperties = {
-  display: "block",
-  fontSize: "clamp(16px,4vw,24px)",
-  lineHeight: 1.05,
-  fontWeight: 950,
-};
-
-const actionSub: React.CSSProperties = {
-  display: "block",
-  marginTop: 4,
-  fontSize: "clamp(9px,2.15vw,14px)",
-  lineHeight: 1.15,
-  fontWeight: 750,
-};
-
-const actionArrow: React.CSSProperties = {
-  fontSize: 30,
-  lineHeight: 1,
-  textAlign: "center",
-};
-
-const shortcutSection: React.CSSProperties = {
-  flex: "0 0 auto",
-  display: "grid",
-  gridTemplateColumns: "repeat(4,minmax(0,1fr))",
-  minHeight: 88,
-  marginTop: 8,
-  padding: "8px 5px",
-  boxSizing: "border-box",
-  borderRadius: 18,
-  background: "#06152f",
-  border: "1px solid #173766",
-};
-
-const shortcut: React.CSSProperties = {
-  display: "grid",
-  placeItems: "center",
-  alignContent: "center",
-  gap: 4,
-  minWidth: 0,
-  color: "#fff",
-  textDecoration: "none",
-  fontSize: "clamp(9px,2.4vw,13px)",
-  textAlign: "center",
-};
-
-const shortcutIcon: React.CSSProperties = {
-  fontSize: "clamp(25px,7vw,38px)",
-  lineHeight: 1,
-};
-
-const inventorySection: React.CSSProperties = {
-  flex: "0 0 auto",
-  minHeight: 76,
-  marginTop: "auto",
-  paddingTop: 8,
-  boxSizing: "border-box",
-};
-
-const inventoryLink: React.CSSProperties = {
-  minHeight: 68,
-  display: "flex",
-  alignItems: "center",
-  justifyContent: "center",
-  gap: 8,
-  padding: "8px 10px",
-  boxSizing: "border-box",
-  borderRadius: 18,
-  background: "#0a214b",
-  border: "1px solid #173766",
-  color: "#fff",
-  textDecoration: "none",
-  fontSize: "clamp(14px,4vw,20px)",
-  fontWeight: 950,
-};
-
-const inventoryIcon: React.CSSProperties = {
-  fontSize: "clamp(26px,7vw,38px)",
-  lineHeight: 1,
-};
-
-const bottomNav: React.CSSProperties = {
-  position: "fixed",
-  left: 0,
-  right: 0,
-  bottom: "env(safe-area-inset-bottom,0px)",
-  width: "100%",
-  height: 68,
-  display: "grid",
-  gridTemplateColumns: "repeat(4,1fr)",
-  background: "#020b1d",
-  borderTop: "1px solid #173766",
-  zIndex: 20,
-};
-
-const navItem: React.CSSProperties = {
-  display: "grid",
-  placeItems: "center",
-  alignContent: "center",
-  gap: 1,
-  textDecoration: "none",
-  fontSize: "clamp(12px,3vw,17px)",
-  fontWeight: 950,
-};
-
-const navIcon: React.CSSProperties = {
-  fontSize: "clamp(23px,6vw,31px)",
-  lineHeight: 1,
-};
