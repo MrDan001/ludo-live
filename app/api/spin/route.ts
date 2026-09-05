@@ -2,8 +2,8 @@ import { createHash, randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_SPIN_WHEEL, SPIN_SLOT_COUNT, weightedPick, type SpinWheelSlot } from "../../../lib/spinWheel";
 import { pool, ensureAuthSchema } from "../auth/_db";
+import { ensureWalletAudit, markWalletContext } from "../lib/wallet-audit";
 import { getShopCatalog } from "../shop/catalog";
-import { adjustWallet, requestMeta } from "../lib/wallet-audit";
 
 const COOKIE = "ludo_session";
 type DbSlot = SpinWheelSlot & { updatedAt: string };
@@ -85,7 +85,14 @@ export async function POST(request: NextRequest) {
     await client.query(`UPDATE ludo_spin_state SET spins=$1,total_spins=total_spins+1 WHERE user_id=$2`, [nextSpins, user.id]);
 
     if (prize.kind === "coins" || prize.kind === "gems") {
-      await adjustWallet(client, user.id, prize.kind, prize.amount, { source: "spin_wheel", sourceRef: prize.id, reason: `Spin Wheel reward: ${prize.label}`, ...requestMeta(request) });
+      await ensureWalletAudit(client);
+      const beforeRow = await client.query<any>(`SELECT coins,gems FROM ludo_users WHERE id=$1 FOR UPDATE`, [user.id]);
+      if (!beforeRow.rows[0]) throw new Error("Account not found.");
+      const before = Number(beforeRow.rows[0][prize.kind]) || 0;
+      const after = before + prize.amount;
+      if (!Number.isSafeInteger(after) || after < 0) throw new Error("Wallet balance cannot exceed the supported limit.");
+      await markWalletContext(client, { source: "spin_wheel", sourceRef: prize.id, reason: `Spin Wheel reward: ${prize.label}`, actorType: "system", ip: request.headers.get("x-forwarded-for") || request.headers.get("x-real-ip") || "", userAgent: request.headers.get("user-agent") || "" });
+      await client.query(`UPDATE ludo_users SET ${prize.kind}=$1 WHERE id=$2`, [after, user.id]);
     } else if (prize.kind === "extraSpin") {
       nextSpins += prize.amount;
       await client.query(`UPDATE ludo_spin_state SET spins=$1 WHERE user_id=$2`, [nextSpins, user.id]);
@@ -98,16 +105,7 @@ export async function POST(request: NextRequest) {
     await client.query("COMMIT");
     transaction = false;
 
-    return NextResponse.json({
-      serverTime: new Date().toISOString(),
-      spinId: randomUUID(),
-      wheel,
-      wheelVersion: version,
-      prize,
-      prizeIndex,
-      spins: Number(finalState.rows[0]?.spins || 0),
-      totalSpins: Number(finalState.rows[0]?.total_spins || 0),
-    }, { headers: { "Cache-Control": "no-store" } });
+    return NextResponse.json({ serverTime: new Date().toISOString(), spinId: randomUUID(), wheel, wheelVersion: version, prize, prizeIndex, spins: Number(finalState.rows[0]?.spins || 0), totalSpins: Number(finalState.rows[0]?.total_spins || 0) }, { headers: { "Cache-Control": "no-store" } });
   } catch (error: any) {
     if (transaction) await client.query("ROLLBACK").catch(() => {});
     console.error(error);
