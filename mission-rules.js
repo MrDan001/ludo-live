@@ -1,6 +1,5 @@
 const { Pool } = require("pg");
 const { Server } = require("socket.io");
-const { BroadcastOperator } = require("socket.io/dist/broadcast-operator");
 
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
@@ -110,84 +109,89 @@ async function record(userId, kind, amount = 1, eventId) {
   }
 }
 
-function roomCode(operator) {
-  try {
-    const rooms = operator?.rooms;
-    if (rooms && typeof rooms.values === "function") return String(rooms.values().next().value || "");
-  } catch {}
-  return "";
+function roomCode(room) {
+  if (Array.isArray(room)) return String(room[0] || "");
+  return String(room || "");
 }
 
-if (!BroadcastOperator.prototype.__ludoMissionEmitPatched) {
-  BroadcastOperator.prototype.__ludoMissionEmitPatched = true;
-  const originalEmit = BroadcastOperator.prototype.emit;
-  BroadcastOperator.prototype.emit = function missionAwareEmit(event, ...args) {
-    try {
-      const code = roomCode(this);
-      const payload = args[0] || {};
-      const d = day();
+function observe(room, event, payload) {
+  try {
+    const code = roomCode(room);
+    const d = day();
 
-      if (event === "roster" && Array.isArray(payload)) {
-        for (const member of payload) {
-          const userId = String(member?.playerId || "").trim();
-          if (!userId) continue;
-          const kind = member?.host ? "create_rooms" : "join_rooms";
-          const key = `${d}:${code}:${kind}:${userId}`;
-          if (rosterSeen.has(key)) continue;
-          rosterSeen.add(key);
-          void record(userId, kind, 1, `room-${kind}-${d}-${code}-${userId}`);
-        }
+    if (event === "roster" && Array.isArray(payload)) {
+      for (const member of payload) {
+        const userId = String(member?.playerId || "").trim();
+        if (!userId) continue;
+        const kind = member?.host ? "create_rooms" : "join_rooms";
+        const key = `${d}:${code}:${kind}:${userId}`;
+        if (rosterSeen.has(key)) continue;
+        rosterSeen.add(key);
+        void record(userId, kind, 1, `room-${kind}-${d}-${code}-${userId}`);
       }
-
-      if (event === "start-game" && Array.isArray(payload?.members)) {
-        for (const member of payload.members) {
-          const userId = String(member?.playerId || "").trim();
-          if (userId) void record(userId, "play_games", 1, `play-${code}-${userId}`);
-        }
-      }
-
-      if (event === "game-dice") {
-        const userId = String(payload?.playerId || "").trim();
-        const revision = Number(payload?.stateRevision || Date.now());
-        const value = Number(payload?.value || 0);
-        if (userId) {
-          void record(userId, "roll_dice", 1, `roll-${code}-${userId}-${revision}`);
-          if (value === 6) void record(userId, "roll_sixes", 1, `six-${code}-${userId}-${revision}`);
-        }
-      }
-
-      if (event === "game-moved") {
-        const userId = String(payload?.playerId || "").trim();
-        const revision = Number(payload?.stateRevision || Date.now());
-        if (userId) {
-          void record(userId, "move_tokens", 1, `move-${code}-${userId}-${revision}`);
-          if (Number(payload?.target) === 57 && !payload?.captured) {
-            void record(userId, "move_home", 1, `home-${code}-${userId}-${revision}`);
-          }
-        }
-      }
-
-      if (event === "game-state") {
-        const state = payload || {};
-        const winnerId = String(state?.winnerId || "").trim();
-        if (state?.status === "finished" && winnerId) {
-          const revision = Number(state?.stateRevision || Date.now());
-          void record(winnerId, "win_games", 1, `win-${code}-${winnerId}-${revision}`);
-          void record(winnerId, "complete_games", 1, `finish-${code}-${winnerId}-${revision}`);
-        }
-      }
-    } catch (error) {
-      console.error("[missions] broadcast hook", error?.message || error);
     }
-    return originalEmit.call(this, event, ...args);
+
+    if (event === "start-game" && Array.isArray(payload?.members)) {
+      for (const member of payload.members) {
+        const userId = String(member?.playerId || "").trim();
+        if (userId) void record(userId, "play_games", 1, `play-${code}-${userId}`);
+      }
+    }
+
+    if (event === "game-dice") {
+      const userId = String(payload?.playerId || "").trim();
+      const revision = Number(payload?.stateRevision || Date.now());
+      const value = Number(payload?.value || 0);
+      if (userId) {
+        void record(userId, "roll_dice", 1, `roll-${code}-${userId}-${revision}`);
+        if (value === 6) void record(userId, "roll_sixes", 1, `six-${code}-${userId}-${revision}`);
+      }
+    }
+
+    if (event === "game-moved") {
+      const userId = String(payload?.playerId || "").trim();
+      const revision = Number(payload?.stateRevision || Date.now());
+      if (userId) {
+        void record(userId, "move_tokens", 1, `move-${code}-${userId}-${revision}`);
+        if (Number(payload?.target) === 57 && !payload?.captured) {
+          void record(userId, "move_home", 1, `home-${code}-${userId}-${revision}`);
+        }
+      }
+    }
+
+    if (event === "game-state") {
+      const state = payload || {};
+      const winnerId = String(state?.winnerId || "").trim();
+      if (state?.status === "finished" && winnerId) {
+        const revision = Number(state?.stateRevision || Date.now());
+        void record(winnerId, "win_games", 1, `win-${code}-${winnerId}-${revision}`);
+        void record(winnerId, "complete_games", 1, `finish-${code}-${winnerId}-${revision}`);
+      }
+    }
+  } catch (error) {
+    console.error("[missions] broadcast hook", error?.message || error);
+  }
+}
+
+// Hook only the public Socket.IO Server#to API. Do not import Socket.IO's
+// private dist/broadcast-operator module; that path is blocked by package
+// exports in production Node versions.
+if (!Server.prototype.__ludoMissionToPatched) {
+  Server.prototype.__ludoMissionToPatched = true;
+  const originalTo = Server.prototype.to;
+  Server.prototype.to = function missionAwareTo(room, ...rest) {
+    const operator = originalTo.call(this, room, ...rest);
+    if (operator && !operator.__ludoMissionEmitPatched) {
+      operator.__ludoMissionEmitPatched = true;
+      const originalEmit = operator.emit;
+      operator.emit = function missionAwareEmit(event, ...args) {
+        observe(room, event, args[0]);
+        return originalEmit.call(this, event, ...args);
+      };
+    }
+    return operator;
   };
 }
 
-if (!Server.prototype.__ludoMissionServerLoaded) {
-  Server.prototype.__ludoMissionServerLoaded = true;
-  // Keep this marker on the Socket.IO server prototype so the preload is
-  // deliberately single-install even if Node's module graph is revisited.
-}
-
 void setup().catch((error) => console.error("[missions] setup", error?.message || error));
-module.exports = {};
+module.exports = { record, observe };
