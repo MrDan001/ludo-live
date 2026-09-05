@@ -1,19 +1,182 @@
 "use client";
-import {useEffect,useRef,useState} from "react";import AppFrame from "../_components/AppFrame";
-type Prize={id:string;label:string;icon:string;kind:string;amount:number;probability?:number;itemType?:string;itemId?:string};
-const colors=["#efad18","#1977d5","#8a38b6","#efad18","#2aa05a","#1977d5","#efad18","#6b38d8"];
-function formatGMT1(ms:number){const d=new Date(ms+60*60*1000);return `${String(d.getUTCHours()).padStart(2,"0")}:${String(d.getUTCMinutes()).padStart(2,"0")}:${String(d.getUTCSeconds()).padStart(2,"0")}`}
-function segmentLayout(list:Prize[]){if(!list.length)return [];const unit=360/list.length;return list.map((p,i)=>{const start=i*unit;const center=start+unit/2;return{start,span:unit,center}})}
-export default function SpinPage(){const[spins,setSpins]=useState(0),[spinning,setSpinning]=useState(false),[rotation,setRotation]=useState(0),[rewards,setRewards]=useState<Prize[]>([]),[result,setResult]=useState<Prize|null>(null),[serverNow,setServerNow]=useState(Date.now()),[error,setError]=useState("");const ref=useRef(0),timer=useRef<number|null>(null);
- const load=async()=>{try{const r=await fetch("/api/spin",{cache:"no-store"}),d=await r.json();if(!r.ok)throw Error(d.error||"Unable to load Spin Wheel");setSpins(Number(d.spins)||0);setRewards(Array.isArray(d.rewards)?d.rewards:[]);if(d.serverTime)setServerNow(new Date(d.serverTime).getTime());setError("")}catch(e){setError(e instanceof Error?e.message:"Spin wheel unavailable")}};
- useEffect(()=>{void load();const i=window.setInterval(()=>setServerNow(v=>v+1000),1000),refresh=()=>void load(),poll=window.setInterval(refresh,15000);window.addEventListener("ludo-spin-updated",refresh);window.addEventListener("focus",refresh);return()=>{clearInterval(i);clearInterval(poll);window.removeEventListener("ludo-spin-updated",refresh);window.removeEventListener("focus",refresh);if(timer.current)clearTimeout(timer.current)}},[]);
- const spin=async()=>{if(spinning||spins<1)return;setError("");setSpinning(true);setResult(null);try{
-   const sync=await fetch("/api/spin",{cache:"no-store"}),syncData=await sync.json();if(!sync.ok)throw Error(syncData.error||"Unable to sync Spin Wheel");const syncedRewards:Array<Prize>=Array.isArray(syncData.rewards)?syncData.rewards:[];setSpins(Number(syncData.spins)||0);setRewards(syncedRewards);if(!syncedRewards.length)throw Error("No Spin rewards are configured.");
-   const r=await fetch("/api/spin",{method:"POST",cache:"no-store"}),d=await r.json();if(!r.ok)throw Error(d.error||"Could not spin");
-   const snapshot:Array<Prize>=Array.isArray(d.rewards)?d.rewards:syncedRewards;setRewards(snapshot);const winnerId=d.prize?.id;const winner=winnerId?snapshot.findIndex(p=>p.id===winnerId):Number(d.prizeIndex);if(winner<0||winner>=snapshot.length)throw Error("Spin reward changed before the spin completed. Please try again.");
-   const layout=segmentLayout(snapshot),target=layout[winner];if(!target)throw Error("Unable to position the selected Spin reward.");const landing=360-target.center,next=ref.current+360*7+landing;ref.current=next;setRotation(next);setSpins(Number(d.spins)||0);
-   timer.current=window.setTimeout(()=>{setSpinning(false);setResult(d.prize);window.dispatchEvent(new Event("ludo-wallet-updated"));window.dispatchEvent(new Event("ludo-spin-updated"))},5900)
- }catch(e){setSpinning(false);setError(e instanceof Error?e.message:"Could not spin")}};
- const layout=segmentLayout(rewards);const gradient=rewards.length?`conic-gradient(${layout.map((s,i)=>`${colors[i%colors.length]} ${s.start}deg ${s.start+s.span}deg`).join(",")})`:"#263b58";
- return <AppFrame back="/home"><main style={page}><header style={top}><b>Spin Wheel</b></header><div style={eyebrow}>EARN FREE SPINS BY STAYING ACTIVE</div><h1 style={title}>Spin Wheel</h1><a href="/spin-rewards" style={rewardBtn}>🎁 Spin Rewards</a><section style={wheelWrap}><div style={pointer}/><div style={{...wheel,transform:`rotate(${rotation}deg)`,transition:spinning?"transform 5.8s cubic-bezier(.08,.72,.12,1)":"none"}}><div style={{...segments,background:gradient}}>{rewards.map((p,i)=>{const s=layout[i];if(!s)return null;const a=s.center;return <div key={p.id} style={{position:"absolute",left:"50%",top:"50%",transform:`rotate(${a}deg)`,transformOrigin:"0 0"}}><div style={{position:"absolute",left:"-50px",top:"-140px",width:100,height:70,display:"flex",justifyContent:"center",alignItems:"center",transform:`rotate(${-a}deg)`,textAlign:"center",color:"#fff",fontSize:11,fontWeight:950,textShadow:"0 2px 3px #000"}}>{p.icon}<br/>{p.label}</div></div>})}</div><div style={hub}><b>SPIN</b></div></div></section><div style={timerRow}><span>Every 30 minutes of active play: <b>+1 free spin</b></span><span>17:00–20:00 server time (GMT +1): <b>+3</b></span></div><button onClick={spin} disabled={spinning||spins<1||rewards.length<1} style={{...spinBtn,opacity:spinning?0.7:1}}>{spinning?"Spinning…":spins<1?"Stay active to earn a spin":rewards.length<1?"No rewards configured":"Spin Now"}</button><div style={balance}>🎟️ <b>{spins}</b> free {spins===1?"spin":"spins"} available</div><div style={serverTime}>◷ Server time: <b>{formatGMT1(serverNow)} (GMT +1)</b></div>{error&&<div style={{marginTop:10,color:"#fca5a5"}}>{error}</div>}{result&&<div style={resultBox}>🎉 <b>{result.kind==="extraSpin"?"You won an EXTRA SPIN!":result.kind==="shop_item"?`You won ${result.icon} ${result.label}!`:`You won ${result.icon} ${result.label}${result.kind==="coins"?" COINS":" GEMS"}`}</b><small>{result.kind==="shop_item"?"Unlocked free. Open Spin Rewards to claim it to your Inventory.":result.kind==="extraSpin"?"Your extra spin is ready now.":"The prize was added to your account."}</small>{result.kind==="shop_item"&&<a href="/spin-rewards" style={claimLink}>OPEN SPIN REWARDS</a>}</div>}</main></AppFrame>}
-const page:any={maxWidth:650,margin:"0 auto",paddingBottom:45,textAlign:"center"};const top:any={display:"flex",justifyContent:"center",padding:"0 4px 14px",fontSize:18};const eyebrow:any={fontSize:12,letterSpacing:2,fontWeight:950,color:"#f5cf43"};const title:any={fontSize:32,margin:"6px 0 8px",fontWeight:950};const rewardBtn:any={display:"inline-flex",alignItems:"center",justifyContent:"center",margin:"0 auto 10px",padding:"10px 18px",borderRadius:10,background:"linear-gradient(135deg,#8b4dff,#d6a126)",color:"#fff",textDecoration:"none",fontWeight:950,fontSize:14};const balance:any={display:"inline-flex",gap:7,alignItems:"center",marginTop:12,padding:"8px 14px",borderRadius:999,background:"#102d58",border:"1px solid #31588e",color:"#fff",fontSize:14};const serverTime:any={marginTop:10,color:"#8fa5c5",fontSize:11};const wheelWrap:any={position:"relative",width:"min(86vw,430px)",aspectRatio:"1",margin:"8px auto 12px"};const pointer:any={position:"absolute",zIndex:30,left:"50%",top:-4,transform:"translateX(-50%)",width:0,height:0,borderLeft:"22px solid transparent",borderRight:"22px solid transparent",borderTop:"42px solid #ffdf55",filter:"drop-shadow(0 3px 2px #000)"};const wheel:any={position:"absolute",inset:8,borderRadius:"50%",padding:7,background:"linear-gradient(145deg,#ffea6b,#a76609 35%,#f5bf2d 58%,#7d4705)",boxShadow:"0 0 0 3px #3a2105,0 8px 28px #0008"};const segments:any={position:"relative",width:"100%",height:"100%",borderRadius:"50%",overflow:"hidden",border:"4px solid #3a2105"};const hub:any={position:"absolute",left:"50%",top:"50%",transform:"translate(-50%,-50%)",width:88,height:88,borderRadius:"50%",display:"grid",placeItems:"center",background:"radial-gradient(circle at 35% 30%,#b7ff73,#43a92b 55%,#14610d)",border:"6px solid #4a2904",color:"#fff",fontSize:20};const timerRow:any={margin:"7px auto 10px",padding:12,borderRadius:10,background:"#231244",color:"#ddd5ed",fontSize:11,display:"grid",gap:5};const spinBtn:any={width:"100%",maxWidth:420,border:0,borderRadius:7,padding:13,background:"linear-gradient(180deg,#43d923,#1e9c10)",color:"#fff",fontWeight:950,fontSize:17};const resultBox:any={marginTop:12,padding:12,borderRadius:10,background:"#082c18",border:"1px solid #2ab55d",display:"grid",gap:5};const claimLink:any={color:"#fff",fontWeight:900,fontSize:11};
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import AppFrame from "../_components/AppFrame";
+import type { SpinWheelSlot } from "../../lib/spinWheel";
+
+type ApiResponse = {
+  serverTime?: string;
+  spins?: number;
+  totalSpins?: number;
+  wheel?: SpinWheelSlot[];
+  prize?: SpinWheelSlot;
+  prizeIndex?: number;
+  wheelVersion?: string;
+  error?: string;
+};
+
+const SEGMENT_COLORS = ["#e5a31b", "#2279d5", "#8d43ba", "#2b9c61", "#d9544d", "#296fbd", "#c28719", "#6b4bb5"];
+const SPIN_DURATION = 5800;
+
+function segmentLayout(items: SpinWheelSlot[]) {
+  const span = 360 / Math.max(1, items.length);
+  return items.map((item, index) => ({ ...item, start: index * span, span, center: index * span + span / 2 }));
+}
+
+function formatTime(ms: number) {
+  const d = new Date(ms + 60 * 60 * 1000);
+  return `${String(d.getUTCHours()).padStart(2, "0")}:${String(d.getUTCMinutes()).padStart(2, "0")}:${String(d.getUTCSeconds()).padStart(2, "0")}`;
+}
+
+function rewardText(reward: SpinWheelSlot) {
+  if (reward.kind === "shop_item") return `You won ${reward.icon} ${reward.label}!`;
+  if (reward.kind === "extraSpin") return `You won ${reward.icon} ${reward.label}!`;
+  return `You won ${reward.icon} ${reward.label}!`;
+}
+
+export default function SpinPage() {
+  const [spins, setSpins] = useState(0);
+  const [wheel, setWheel] = useState<SpinWheelSlot[]>([]);
+  const [spinning, setSpinning] = useState(false);
+  const [rotation, setRotation] = useState(0);
+  const [result, setResult] = useState<SpinWheelSlot | null>(null);
+  const [serverNow, setServerNow] = useState(Date.now());
+  const [error, setError] = useState("");
+  const rotationRef = useRef(0);
+  const finishTimer = useRef<number | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const response = await fetch("/api/spin", { cache: "no-store" });
+      const data: ApiResponse = await response.json();
+      if (!response.ok) throw new Error(data.error || "Unable to load Spin Wheel.");
+      const nextWheel = Array.isArray(data.wheel) ? data.wheel : [];
+      setSpins(Number(data.spins) || 0);
+      setWheel(nextWheel);
+      if (data.serverTime) setServerNow(new Date(data.serverTime).getTime());
+      setError("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Spin Wheel unavailable.");
+    }
+  }, []);
+
+  useEffect(() => {
+    void load();
+    const clock = window.setInterval(() => setServerNow((value) => value + 1000), 1000);
+    const poll = window.setInterval(() => void load(), 15000);
+    const refresh = () => void load();
+    window.addEventListener("ludo-spin-updated", refresh);
+    window.addEventListener("focus", refresh);
+    return () => {
+      window.clearInterval(clock);
+      window.clearInterval(poll);
+      window.removeEventListener("ludo-spin-updated", refresh);
+      window.removeEventListener("focus", refresh);
+      if (finishTimer.current !== null) window.clearTimeout(finishTimer.current);
+    };
+  }, [load]);
+
+  const layout = useMemo(() => segmentLayout(wheel), [wheel]);
+  const gradient = wheel.length === 8
+    ? `conic-gradient(${layout.map((item, index) => `${SEGMENT_COLORS[index % SEGMENT_COLORS.length]} ${item.start}deg ${item.start + item.span}deg`).join(",")})`
+    : "#263b58";
+
+  const spin = async () => {
+    if (spinning || spins < 1 || wheel.length !== 8) return;
+    setSpinning(true);
+    setResult(null);
+    setError("");
+    try {
+      const response = await fetch("/api/spin", { method: "POST", cache: "no-store" });
+      const data: ApiResponse = await response.json();
+      if (!response.ok) throw new Error(data.error || "Could not complete Spin Wheel spin.");
+      const snapshot = Array.isArray(data.wheel) ? data.wheel : [];
+      const prizeIndex = Number(data.prizeIndex);
+      if (snapshot.length !== 8 || !Number.isInteger(prizeIndex) || prizeIndex < 0 || prizeIndex >= snapshot.length || !data.prize) {
+        throw new Error("Spin result and wheel configuration are out of sync. Please try again.");
+      }
+
+      setWheel(snapshot);
+      setSpins(Number(data.spins) || 0);
+      const target = segmentLayout(snapshot)[prizeIndex];
+      if (!target) throw new Error("Unable to position the Spin reward.");
+
+      const landing = 360 - target.center;
+      const nextRotation = rotationRef.current + 360 * 7 + landing;
+      rotationRef.current = nextRotation;
+      setRotation(nextRotation);
+
+      finishTimer.current = window.setTimeout(() => {
+        setSpinning(false);
+        setResult(data.prize || null);
+        window.dispatchEvent(new Event("ludo-wallet-updated"));
+        window.dispatchEvent(new Event("ludo-spin-updated"));
+        void load();
+      }, SPIN_DURATION);
+    } catch (err) {
+      setSpinning(false);
+      setError(err instanceof Error ? err.message : "Could not complete Spin Wheel spin.");
+    }
+  };
+
+  return (
+    <AppFrame back="/home">
+      <main style={page}>
+        <header style={header}><b>Spin Wheel</b></header>
+        <div style={eyebrow}>8 LIVE REWARD SLOTS</div>
+        <h1 style={title}>Spin Wheel</h1>
+        <a href="/spin-rewards" style={rewardBtn}>🎁 Spin Rewards</a>
+
+        <section style={wheelWrap} aria-label="Spin Wheel">
+          <div style={pointer} />
+          <div style={{ ...wheelShell, transform: `rotate(${rotation}deg)`, transition: spinning ? `transform ${SPIN_DURATION}ms cubic-bezier(.08,.72,.12,1)` : "none" }}>
+            <div style={{ ...segments, background: gradient }}>
+              {layout.map((item) => (
+                <div key={item.slot} style={{ position: "absolute", left: "50%", top: "50%", transform: `rotate(${item.center}deg)`, transformOrigin: "0 0" }}>
+                  <div style={{ ...label, transform: `rotate(${-item.center}deg)` }}>
+                    <span style={{ fontSize: 20 }}>{item.icon}</span>
+                    <span>{item.label}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={hub}><b>SPIN</b></div>
+          </div>
+        </section>
+
+        <div style={balance}>🎟️ <b>{spins}</b> free {spins === 1 ? "spin" : "spins"} available</div>
+        <div style={serverTime}>◷ Server time: <b>{formatTime(serverNow)} (GMT +1)</b></div>
+
+        <button onClick={spin} disabled={spinning || spins < 1 || wheel.length !== 8} style={{ ...spinBtn, opacity: spinning ? 0.7 : 1 }}>
+          {spinning ? "Spinning…" : spins < 1 ? "Stay active to earn a spin" : wheel.length !== 8 ? "Spin Wheel unavailable" : "Spin Now"}
+        </button>
+
+        {error && <div style={errorBox}>{error}</div>}
+        {result && <div style={resultBox}>
+          <span style={{ fontSize: 28 }}>🎉</span>
+          <b>{rewardText(result)}</b>
+          <small>{result.kind === "shop_item" ? "Your prize is waiting in Spin Rewards to claim to Inventory." : result.kind === "extraSpin" ? `+${result.amount} spin${result.amount === 1 ? "" : "s"} added to your balance.` : "The reward was added to your account."}</small>
+          {result.kind === "shop_item" && <a href="/spin-rewards" style={claimLink}>OPEN SPIN REWARDS</a>}
+        </div>}
+      </main>
+    </AppFrame>
+  );
+}
+
+const page: React.CSSProperties = { maxWidth: 650, margin: "0 auto", paddingBottom: 45, textAlign: "center" };
+const header: React.CSSProperties = { display: "flex", justifyContent: "center", padding: "0 4px 14px", fontSize: 18 };
+const eyebrow: React.CSSProperties = { fontSize: 12, letterSpacing: 2, fontWeight: 950, color: "#f5cf43" };
+const title: React.CSSProperties = { fontSize: 32, margin: "6px 0 8px", fontWeight: 950 };
+const rewardBtn: React.CSSProperties = { display: "inline-flex", alignItems: "center", justifyContent: "center", margin: "0 auto 10px", padding: "10px 18px", borderRadius: 10, background: "linear-gradient(135deg,#8b4dff,#d6a126)", color: "#fff", textDecoration: "none", fontWeight: 950, fontSize: 14 };
+const wheelWrap: React.CSSProperties = { position: "relative", width: "min(88vw, 455px)", aspectRatio: "1", margin: "10px auto 15px" };
+const pointer: React.CSSProperties = { position: "absolute", zIndex: 30, left: "50%", top: -3, transform: "translateX(-50%)", width: 0, height: 0, borderLeft: "23px solid transparent", borderRight: "23px solid transparent", borderTop: "44px solid #ffdf55", filter: "drop-shadow(0 3px 2px #000)" };
+const wheelShell: React.CSSProperties = { position: "absolute", inset: 6, borderRadius: "50%", padding: 8, background: "linear-gradient(145deg,#ffea6b,#a76609 35%,#f5bf2d 58%,#7d4705)", boxShadow: "0 0 0 3px #3a2105,0 8px 28px #0008" };
+const segments: React.CSSProperties = { position: "relative", width: "100%", height: "100%", borderRadius: "50%", overflow: "hidden", border: "4px solid #3a2105" };
+const label: React.CSSProperties = { position: "absolute", left: -54, top: -144, width: 108, minHeight: 80, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", gap: 4, textAlign: "center", color: "#fff", fontSize: 11, fontWeight: 950, textShadow: "0 2px 3px #000" };
+const hub: React.CSSProperties = { position: "absolute", left: "50%", top: "50%", transform: "translate(-50%,-50%)", width: 88, height: 88, borderRadius: "50%", display: "grid", placeItems: "center", background: "radial-gradient(circle at 35% 30%,#b7ff73,#43a92b 55%,#14610d)", border: "6px solid #4a2904", color: "#fff", fontSize: 20 };
+const balance: React.CSSProperties = { display: "inline-flex", gap: 7, alignItems: "center", padding: "8px 14px", borderRadius: 999, background: "#102d58", border: "1px solid #31588e", color: "#fff", fontSize: 14 };
+const serverTime: React.CSSProperties = { marginTop: 10, color: "#8fa5c5", fontSize: 11 };
+const spinBtn: React.CSSProperties = { marginTop: 12, width: "100%", maxWidth: 420, border: 0, borderRadius: 7, padding: 13, background: "linear-gradient(180deg,#43d923,#1e9c10)", color: "#fff", fontWeight: 950, fontSize: 17 };
+const errorBox: React.CSSProperties = { marginTop: 12, padding: 10, borderRadius: 10, background: "#35131a", border: "1px solid #8e3744", color: "#fecaca" };
+const resultBox: React.CSSProperties = { marginTop: 12, padding: 14, borderRadius: 10, background: "#082c18", border: "1px solid #2ab55d", display: "grid", gap: 5 };
+const claimLink: React.CSSProperties = { color: "#fff", fontWeight: 900, fontSize: 11 };
