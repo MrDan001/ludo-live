@@ -19,14 +19,14 @@ export default function ScreenOffSession(){
    if(document.visibilityState==="visible"){cancel();return}
    cancel();
    if(expiring.current)return;
-   // Confirm the hidden state before expiring the session. Normal in-app route
-   // changes do not trigger this event, so browser back remains safe.
+   // Require the screen to remain hidden for 60 seconds before expiring.
+   // Normal in-app route changes do not trigger this event, so browser back remains safe.
    timer.current=window.setTimeout(async()=>{
     timer.current=null;
     if(document.visibilityState!=="hidden"||expiring.current)return;
     expiring.current=true;
     try{await expireSessionOnScreenOff()}finally{expiring.current=false}
-   },1500);
+   },60000);
   };
 
   document.addEventListener("visibilitychange",onVisibilityChange);
