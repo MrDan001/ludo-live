@@ -7,6 +7,7 @@ import GameSocialOverlay from "./_components/GameSocialOverlay";
 import LudoAudio from "./_components/LudoAudio";
 import SessionResume from "./_components/SessionResume";
 import AuthGuard from "./_components/AuthGuard";
+import ScreenOffSession from "./_components/ScreenOffSession";
 import XPLevelCelebration from "./_components/XPLevelCelebration";
 import XPWinWatcher from "./_components/XPWinWatcher";
 import ActiveSpinRewards from "./_components/ActiveSpinRewards";
@@ -33,5 +34,5 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body><ServiceWorkerRegistration /><AuthGuard /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense><Suspense fallback={null}><LudoAudio /></Suspense><XPLevelCelebration /><XPWinWatcher /><ActiveSpinRewards /><MissionGameplayTracker /><NotificationGate /><SuspendedGate /><PlayerNotificationPopup /><AdminPlayerModeration /></body></html>;
+  return <html lang="en"><body><ServiceWorkerRegistration /><AuthGuard /><ScreenOffSession /><SessionResume /><Suspense fallback={null}><AppShell>{children}</AppShell></Suspense><Suspense fallback={null}><GameSocialOverlay /></Suspense><Suspense fallback={null}><LudoAudio /></Suspense><XPLevelCelebration /><XPWinWatcher /><ActiveSpinRewards /><MissionGameplayTracker /><NotificationGate /><SuspendedGate /><PlayerNotificationPopup /><AdminPlayerModeration /></body></html>;
 }
