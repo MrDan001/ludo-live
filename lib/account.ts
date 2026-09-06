@@ -39,7 +39,7 @@ function clearLocalSession(){
 }
 
 async function authRequest(action:string,payload:Record<string,unknown>={}){
- const response=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action,...payload})});
+ const response=await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({action,...payload})});
  const data=await response.json().catch(()=>({}));
  if(!response.ok)throw new Error(data?.error||"Authentication failed.");
  return data.user as PlayerAccount;
@@ -73,7 +73,7 @@ export async function loginAccount(usernameOrEmail:string,password:string){
 export async function restoreSession(){
  if(typeof window==="undefined")return null;
  try{
-  const response=await fetch("/api/auth",{cache:"no-store"});
+  const response=await fetch("/api/auth",{cache:"no-store",credentials:"same-origin"});
   if(!response.ok){clearLocalSession();return null;}
   const data=await response.json();
   if(!data?.user){clearLocalSession();return null;}
@@ -83,9 +83,11 @@ export async function restoreSession(){
  }
 }
 
-export async function logoutAccount(){
+export async function expireSessionOnScreenOff(){
  if(typeof window==="undefined")return;
- try{await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({action:"logout"})});}catch{}
+ try{
+  await fetch("/api/auth",{method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",body:JSON.stringify({action:"screen_off"})});
+ }catch{}
  clearLocalSession();
 }
 
