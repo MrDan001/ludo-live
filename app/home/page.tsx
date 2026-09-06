@@ -436,7 +436,7 @@ export default function HomePage() {
 
         .inventory-button {
           flex: 0 0 76px;
-          margin-top: 22px;
+          margin-top: 0;
           min-height: 76px;
           display: flex;
           align-items: center;
