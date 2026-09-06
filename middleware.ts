@@ -20,9 +20,18 @@ function securityHeaders(response: NextResponse) {
 
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
+  const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+
+  // An already-authenticated player must never be allowed to revisit the
+  // login/register entry point. This also protects the browser back stack.
+  if ((pathname === "/login" || pathname === "/register" || pathname === "/signup") && hasSession) {
+    const target = searchParams.get("next");
+    const destination = target && target.startsWith("/") && !target.startsWith("//") ? target : "/dashboard";
+    return securityHeaders(NextResponse.redirect(new URL(destination, request.url)));
+  }
 
   // /login and /register are the canonical public entry points, but they
-  // intentionally render the original account page rather than a replacement
+  // intentionally render the existing account page rather than a replacement
   // login/register implementation. The browser URL remains /login or /register.
   if (pathname === "/login" || pathname === "/register" || pathname === "/signup") {
     const url = request.nextUrl.clone();
@@ -35,7 +44,7 @@ export function middleware(request: NextRequest) {
 
   // Fast first gate. The cookie is NOT trusted as proof of authentication;
   // protected APIs/server operations must validate it with currentUser().
-  if (!request.cookies.get(SESSION_COOKIE)?.value) {
+  if (!hasSession) {
     const login = new URL("/login", request.url);
     login.searchParams.set("next", pathname + request.nextUrl.search);
     return securityHeaders(NextResponse.redirect(login));
