@@ -15,9 +15,12 @@ export default function ScreenOffSession(){
   if(typeof window==="undefined"||PUBLIC.has(pathname)||pathname.startsWith("/login/")||pathname.startsWith("/register/")||pathname.startsWith("/signup/")||pathname.startsWith("/auth/"))return;
 
   const cancel=()=>{if(timer.current!==null){window.clearTimeout(timer.current);timer.current=null}};
-  const onHidden=()=>{
+  const onVisibilityChange=()=>{
+   if(document.visibilityState==="visible"){cancel();return}
    cancel();
-   if(document.visibilityState!=="hidden"||expiring.current)return;
+   if(expiring.current)return;
+   // Confirm the hidden state before expiring the session. Normal in-app route
+   // changes do not trigger this event, so browser back remains safe.
    timer.current=window.setTimeout(async()=>{
     timer.current=null;
     if(document.visibilityState!=="hidden"||expiring.current)return;
@@ -25,17 +28,9 @@ export default function ScreenOffSession(){
     try{await expireSessionOnScreenOff()}finally{expiring.current=false}
    },1500);
   };
-  const onVisible=()=>cancel();
 
-  document.addEventListener("visibilitychange",onHidden);
-  window.addEventListener("pagehide",onHidden);
-  window.addEventListener("pageshow",onVisible);
-  return()=>{
-   cancel();
-   document.removeEventListener("visibilitychange",onHidden);
-   window.removeEventListener("pagehide",onHidden);
-   window.removeEventListener("pageshow",onVisible);
-  };
+  document.addEventListener("visibilitychange",onVisibilityChange);
+  return()=>{cancel();document.removeEventListener("visibilitychange",onVisibilityChange)};
  },[pathname]);
 
  return null;
