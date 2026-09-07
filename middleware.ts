@@ -1,14 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/open-app", "/app"]);
 const AUTH_PATHS = new Set(["/login", "/register", "/signup"]);
 const SESSION_COOKIE = "ludo_session";
-const PWA_COOKIE = "ludo_pwa";
-
-function isPublic(pathname: string) {
-  if (PUBLIC_PATHS.has(pathname)) return true;
-  return false;
-}
 
 function securityHeaders(response: NextResponse) {
   response.headers.set("X-Frame-Options", "DENY");
@@ -16,36 +9,41 @@ function securityHeaders(response: NextResponse) {
   response.headers.set("Referrer-Policy", "strict-origin-when-cross-origin");
   response.headers.set("Permissions-Policy", "camera=(), geolocation=(), payment=(self), usb=()");
   response.headers.set("X-DNS-Prefetch-Control", "off");
-  if (process.env.NODE_ENV === "production") response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  if (process.env.NODE_ENV === "production") {
+    response.headers.set("Strict-Transport-Security", "max-age=31536000; includeSubDomains");
+  }
   return response;
 }
 
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
-  const hasPwa = request.cookies.get(PWA_COOKIE)?.value === "1";
 
+  // The browser/app distinction is handled client-side because a standalone
+  // PWA does not send a reliable server-side "standalone" flag. Keeping the
+  // PWA cookie out of server auth prevents a browser-scoped cookie from
+  // accidentally becoming the authentication gate.
   if (pathname === "/open-app" || pathname === "/app") {
     return securityHeaders(NextResponse.next());
   }
 
-  // Authentication entry points must remain reachable independently of the
-  // PWA gate so a signed-out player can always reach the real login screen.
   if (AUTH_PATHS.has(pathname)) {
     if (hasSession) {
       const target = searchParams.get("next");
-      const destination = target && target.startsWith("/") && !target.startsWith("//") ? target : "/dashboard";
+      const destination =
+        target && target.startsWith("/") && !target.startsWith("//")
+          ? target
+          : "/dashboard";
       return securityHeaders(NextResponse.redirect(new URL(destination, request.url)));
     }
 
     const url = request.nextUrl.clone();
     url.pathname = "/account";
     url.searchParams.set("mode", pathname === "/login" ? "login" : "create");
+    if (searchParams.get("next")) {
+      url.searchParams.set("next", searchParams.get("next")!);
+    }
     return securityHeaders(NextResponse.rewrite(url));
-  }
-
-  if (!hasPwa) {
-    return securityHeaders(NextResponse.redirect(new URL("/open-app", request.url)));
   }
 
   if (pathname === "/") {
@@ -58,12 +56,16 @@ export function middleware(request: NextRequest) {
     return securityHeaders(NextResponse.redirect(login));
   }
 
-  if (pathname === "/home") return securityHeaders(NextResponse.redirect(new URL("/dashboard", request.url)));
+  if (pathname === "/home") {
+    return securityHeaders(NextResponse.redirect(new URL("/dashboard", request.url)));
+  }
+
   if (pathname === "/dashboard") {
     const url = request.nextUrl.clone();
     url.pathname = "/home";
     return securityHeaders(NextResponse.rewrite(url));
   }
+
   if (pathname === "/game" && (searchParams.has("room") || searchParams.has("tournament"))) {
     const url = request.nextUrl.clone();
     url.pathname = "/game-online";
@@ -73,4 +75,6 @@ export function middleware(request: NextRequest) {
   return securityHeaders(NextResponse.next());
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sounds/|images/|api/|sw.js).*)"] };
+export const config = {
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sounds/|images/|api/|sw.js).*)"]
+};
