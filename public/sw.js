@@ -1,5 +1,5 @@
-const CACHE_NAME = "ludo-live-shell-v3";
-const APP_SHELL = ["/", "/manifest.webmanifest"];
+const CACHE_NAME = "ludo-live-shell-v4";
+const APP_SHELL = ["/open-app", "/manifest.webmanifest"];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(APP_SHELL)).then(() => self.skipWaiting()));
