@@ -6,17 +6,14 @@ on:
     paths:
       - 'capacitor.config.ts'
       - 'package.json'
-      - 'middleware.ts'
-      - 'app/open-app/page.tsx'
       - '.github/workflows/android-apk.yml'
-
-permissions:
-  contents: write
-  actions: write
 
 jobs:
   build-android:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
 
     steps:
       - name: Checkout
@@ -26,69 +23,23 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-          cache: npm
 
       - name: Install dependencies
         run: npm install
 
-      - name: Recreate Android project from Capacitor configuration
-        run: |
-          rm -rf android
-          npx cap add android
+      - name: Create Android project
+        run: npx cap add android
 
       - name: Sync Capacitor
         run: npx cap sync android
-
-      - name: Add Ludo Live deep-link intent
-        shell: python
-        run: |
-          from pathlib import Path
-          import re
-
-          manifest = Path("android/app/src/main/AndroidManifest.xml")
-          text = manifest.read_text(encoding="utf-8")
-
-          intent = '''
-              <intent-filter>
-                  <action android:name="android.intent.action.VIEW" />
-                  <category android:name="android.intent.category.DEFAULT" />
-                  <category android:name="android.intent.category.BROWSABLE" />
-                  <data android:scheme="ludolive" android:host="open" />
-              </intent-filter>'''
-
-          match = re.search(r'(<activity[^>]+android:name="[^"]*MainActivity"[^>]*>)(.*?)(</activity>)', text, re.S)
-          if not match:
-              raise SystemExit("Capacitor MainActivity was not found in AndroidManifest.xml")
-
-          activity_body = match.group(2)
-          if 'android:scheme="ludolive"' not in activity_body:
-              activity_body = activity_body.rstrip() + intent + "\n        "
-
-          text = text[:match.start(2)] + activity_body + text[match.end(2):]
-          manifest.write_text(text, encoding="utf-8")
-          print(f"Updated {manifest}")
 
       - name: Build debug APK
         working-directory: android
         run: ./gradlew assembleDebug
 
-      - name: Upload APK artifact
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: ludo-live-android-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
-
-      - name: Publish latest Android APK release
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: android-${{ github.sha }}
-          name: Ludo Live Android ${{ github.sha }}
-          body: |
-            Ludo Live Android build for commit ${{ github.sha }}.
-
-            Install the APK on Android to use the app-first experience.
-          files: android/app/build/outputs/apk/debug/app-debug.apk
-          generate_release_notes: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
