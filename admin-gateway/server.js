@@ -47,12 +47,17 @@ function proxy(req,res,path){
       let body=Buffer.concat(chunks);
       if(String(r.headers["content-type"]||"").includes("text/html")){
         let html=body.toString("utf8");
-        html=html.replaceAll("https://ludo-live.up.railway.app","");
+        // The gateway has its own PWA identity. Remove any player manifest and
+        // inject the dedicated admin manifest so Chrome does not treat the admin
+        // as the already-installed player app.
+        html=html.replaceAll(PLAYER,"");
         html=html.replace(/<link[^>]+rel=["']manifest["'][^>]*>/gi,"");
-        const manifestTag='<link rel="manifest" href="/manifest.webmanifest">';
+        const manifestTag='<link rel="manifest" href="/admin-manifest.json">';
         const swScript='<script>(function(){if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js",{scope:"/dbase/",updateViaCache:"none"}).catch(function(){});});}})();</script>';
-        html=html.replace(/<head[^>]*>/i,function(m){return m+manifestTag;});
-        html=html.replace(/<\/head>/i,swScript+"</head>");
+        if(/<head[^>]*>/i.test(html)){
+          html=html.replace(/<head[^>]*>/i,function(m){return m+manifestTag;});
+          html=html.replace(/<\/head>/i,swScript+"</head>");
+        }
         body=Buffer.from(html);
         delete out["content-length"]; out["content-length"]=String(body.length);
       }
