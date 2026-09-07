@@ -3,7 +3,7 @@
 import {useEffect,useRef} from "react";
 import {usePathname,useRouter} from "next/navigation";
 
-const PUBLIC=new Set(["/","/login","/register","/signup","/auth","/privacy","/terms"]);
+const PUBLIC=new Set(["/open-app","/app"]);
 
 export default function AuthGuard(){
   const pathname=usePathname();
@@ -11,7 +11,7 @@ export default function AuthGuard(){
   const checking=useRef(false);
 
   useEffect(()=>{
-    if(PUBLIC.has(pathname)||pathname.startsWith("/login/")||pathname.startsWith("/register/")||pathname.startsWith("/signup/")||pathname.startsWith("/auth/"))return;
+    if(PUBLIC.has(pathname))return;
     let cancelled=false;
     const check=async()=>{
       if(checking.current)return;
@@ -26,7 +26,7 @@ export default function AuthGuard(){
     };
     check();
     const timer=window.setInterval(check,60_000);
-    return()=>{cancelled=true;window.clearInterval(timer)};
+    return()=>{cancelled=true;window.clearInterval(timer)}
   },[pathname,router]);
 
   return null;
