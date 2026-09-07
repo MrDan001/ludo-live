@@ -1,11 +1,9 @@
 import type { Metadata } from "next";
-import DbasePwaGate from "./DbasePwaGate";
 import "./dbase.css";
 
 export const metadata: Metadata = {
   title: "DBASE Admin — Ludo Live",
-  applicationName: "Ludo Live DBASE Admin",
-  manifest: "/dbase/manifest.json",
+  applicationName: "Ludo Live Admin Console",
   appleWebApp: {
     capable: true,
     title: "DBASE Admin",
@@ -18,5 +16,5 @@ export const metadata: Metadata = {
 };
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
-  return <DbasePwaGate>{children}</DbasePwaGate>;
+  return <>{children}</>;
 }
