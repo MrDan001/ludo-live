@@ -1,1 +1,0 @@
-{"name":"ludo-live-admin","private":true,"version":"1.0.0","description":"Dedicated Ludo Live administrator application gateway","scripts":{"start":"node server.js"}}
