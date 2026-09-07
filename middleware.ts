@@ -25,6 +25,9 @@ export function middleware(request: NextRequest) {
   // accidentally becoming the authentication gate.
   const adminApp = process.env.ADMIN_APP_URL?.replace(/\/$/, "");
   if (pathname === "/dbase" || pathname.startsWith("/dbase/")) {
+    const gatewayToken = process.env.ADMIN_GATEWAY_TOKEN || "";
+    const gatewayHeader = request.headers.get("x-ludo-admin-gateway") || "";
+    if (gatewayToken && gatewayHeader === gatewayToken) return securityHeaders(NextResponse.next());
     if (adminApp) return securityHeaders(NextResponse.redirect(new URL(adminApp + pathname + (request.nextUrl.search || ""), request.url), 307));
     return securityHeaders(NextResponse.json({ error: "Admin application is not configured." }, { status: 404 }));
   }
