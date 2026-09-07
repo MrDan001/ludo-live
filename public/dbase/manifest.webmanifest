@@ -9,12 +9,5 @@
   "background_color": "#020817",
   "theme_color": "#07152d",
   "orientation": "portrait-primary",
-  "icons": [
-    {
-      "src": "/icons/icon.svg",
-      "sizes": "any",
-      "type": "image/svg+xml",
-      "purpose": "any maskable"
-    }
-  ]
+  "icons": [{"src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable"}]
 }
