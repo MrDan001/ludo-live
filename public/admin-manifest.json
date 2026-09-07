@@ -1,0 +1,20 @@
+{
+  "id": "/ludo-live-admin",
+  "name": "Ludo Live Admin",
+  "short_name": "Ludo Admin",
+  "description": "Administrative management app for Ludo Live.",
+  "start_url": "/dbase/login",
+  "scope": "/dbase/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#020817",
+  "theme_color": "#07152d",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
