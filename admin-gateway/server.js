@@ -48,10 +48,11 @@ function proxy(req,res,path){
       if(String(r.headers["content-type"]||"").includes("text/html")){
         let html=body.toString("utf8");
         html=html.replaceAll("https://ludo-live.up.railway.app","");
+        html=html.replace(/<link[^>]+rel=["']manifest["'][^>]*>/gi,"");
         const manifestTag='<link rel="manifest" href="/manifest.webmanifest">';
         const swScript='<script>(function(){if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("/sw.js",{scope:"/dbase/",updateViaCache:"none"}).catch(function(){});});}})();</script>';
-        if(!/rel=["']manifest["']/i.test(html)) html=html.replace(/<head[^>]*>/i,function(m){return m+manifestTag;});
-        if(!/navigator\.serviceWorker\.register\(["']\/sw\.js/i.test(html)) html=html.replace(/<\/head>/i,manifestTag+swScript+"</head>");
+        html=html.replace(/<head[^>]*>/i,function(m){return m+manifestTag;});
+        html=html.replace(/<\/head>/i,swScript+"</head>");
         body=Buffer.from(html);
         delete out["content-length"]; out["content-length"]=String(body.length);
       }
