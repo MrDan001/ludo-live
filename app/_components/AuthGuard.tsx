@@ -11,7 +11,7 @@ export default function AuthGuard(){
   const checking=useRef(false);
 
   useEffect(()=>{
-    if(PUBLIC.has(pathname))return;
+    if(PUBLIC.has(pathname) || pathname === "/dbase" || pathname.startsWith("/dbase/"))return;
     let cancelled=false;
     const check=async()=>{
       if(checking.current)return;
