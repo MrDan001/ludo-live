@@ -19,6 +19,15 @@ export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
 
+  // Admin is a separate same-origin application namespace, wired like eHealthCare:
+  // its login/manifest/worker are public and its data access remains protected by /api/admin.
+  if (pathname === "/admin-manifest.json" || pathname === "/dbase/sw.js") {
+    return securityHeaders(NextResponse.next());
+  }
+  if (pathname === "/dbase" || pathname.startsWith("/dbase/")) {
+    return securityHeaders(NextResponse.next());
+  }
+
   // The browser/app distinction is handled client-side because a standalone
   // PWA does not send a reliable server-side "standalone" flag. Keeping the
   // PWA cookie out of server auth prevents a browser-scoped cookie from
@@ -76,5 +85,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sounds/|images/|api/|sw.js).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|admin-manifest.json|dbase/sw.js|icons/|sounds/|images/|api/|sw.js).*)"]
 };
