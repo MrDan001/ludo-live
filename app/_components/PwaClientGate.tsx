@@ -20,6 +20,7 @@ export default function PwaClientGate() {
   const pathname = usePathname();
 
   useEffect(() => {
+    if (pathname === "/dbase" || pathname.startsWith("/dbase/")) return;
     if (PUBLIC_APP_PATHS.has(pathname) || PUBLIC_CONTENT_PATHS.has(pathname)) return;
     if (!isStandalonePwa()) {
       window.location.replace("/open-app");
