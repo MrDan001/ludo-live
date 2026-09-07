@@ -27,12 +27,16 @@ export default function OpenAppPage() {
       return;
     }
 
+    const alreadyInstalled = window.localStorage.getItem("ludo_pwa_installed") === "1";
+    if (alreadyInstalled) setInstalled(true);
+
     const onBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
       setDeferredPrompt(event as BeforeInstallPromptEvent);
     };
 
     const onAppInstalled = () => {
+      window.localStorage.setItem("ludo_pwa_installed", "1");
       setInstalled(true);
       setDeferredPrompt(null);
       setShowHelp(false);
@@ -62,6 +66,10 @@ export default function OpenAppPage() {
     if (choice.outcome === "dismissed") setShowHelp(true);
   }
 
+  function openApp() {
+    window.location.assign("/app");
+  }
+
   return (
     <main className="gate">
       <div className="glow glowOne" />
@@ -71,32 +79,44 @@ export default function OpenAppPage() {
       <section className="card" aria-labelledby="title">
         <div className="logo" aria-hidden="true">◆</div>
         <div className="eyebrow">LUDO LIVE</div>
-        <h1 id="title">Play Ludo Live.<br /><span>Install the app.</span></h1>
+        <h1 id="title">Play Ludo Live.<br /><span>{installed ? "Open the app." : "Install the app."}</span></h1>
         <p className="lead">
-          Ludo Live is now app-first. Install it from Chrome, then open Ludo Live from your Home screen or app launcher. The browser is only for installation.
+          {installed
+            ? "Ludo Live is already installed on this device. Open the app from your Home screen or use the button below to enter Ludo Live."
+            : "Ludo Live is now app-first. Install it from Chrome, then open Ludo Live from your Home screen or app launcher. The browser is only for installation."}
         </p>
 
         <div className="actions">
           {installed ? (
-            <div className="installedState" role="status">
-              <span className="check">✓</span>
-              <div><small>INSTALLATION COMPLETE</small><b>Open Ludo Live from your Home screen</b></div>
-            </div>
+            <>
+              <button type="button" className="primary" onClick={openApp}>
+                <span className="buttonIcon">▶</span>
+                <span className="buttonCopy">
+                  <small>ALREADY INSTALLED</small>
+                  <b>Open Ludo Live</b>
+                </span>
+                <span className="arrow">→</span>
+              </button>
+              <div className="installedState" role="status">
+                <span className="check">✓</span>
+                <div><small>INSTALLATION COMPLETE</small><b>Home-screen icon is the direct app launcher</b></div>
+              </div>
+            </>
           ) : (
-            <button type="button" className="primary" onClick={installApp} disabled={installing}>
-              <span className="buttonIcon">↥</span>
-              <span className="buttonCopy">
-                <small>{installing ? "INSTALLING…" : "CHROME APP"}</small>
-                <b>{installing ? "Adding Ludo Live" : "Install Ludo Live"}</b>
-              </span>
-              <span className="arrow">→</span>
-            </button>
-          )}
+            <>
+              <button type="button" className="primary" onClick={installApp} disabled={installing}>
+                <span className="buttonIcon">↥</span>
+                <span className="buttonCopy">
+                  <small>{installing ? "INSTALLING…" : "CHROME APP"}</small>
+                  <b>{installing ? "Adding Ludo Live" : "Install Ludo Live"}</b>
+                </span>
+                <span className="arrow">→</span>
+              </button>
 
-          {!installed && (
-            <button type="button" className="help" onClick={() => setShowHelp((value) => !value)}>
-              How to install from Chrome <span>{showHelp ? "↑" : "↓"}</span>
-            </button>
+              <button type="button" className="help" onClick={() => setShowHelp((value) => !value)}>
+                How to install from Chrome <span>{showHelp ? "↑" : "↓"}</span>
+              </button>
+            </>
           )}
         </div>
 
@@ -122,7 +142,7 @@ export default function OpenAppPage() {
         .card{width:min(520px,100%);position:relative;z-index:2;padding:42px 28px 26px;border:1px solid rgba(104,143,220,.25);border-radius:26px;background:linear-gradient(160deg,rgba(9,19,43,.97),rgba(3,9,23,.99));box-shadow:0 30px 100px rgba(0,0,0,.55),inset 0 1px rgba(255,255,255,.05);text-align:center}
         .logo{width:62px;height:62px;margin:0 auto 17px;display:grid;place-items:center;border-radius:18px;color:#6dc6ff;font-size:27px;background:linear-gradient(145deg,#102c62,#22104b);box-shadow:0 0 40px rgba(47,143,255,.22)}
         .eyebrow{font-size:9px;letter-spacing:3px;font-weight:950;color:#68baff}.card h1{font-size:clamp(38px,9vw,58px);line-height:.94;letter-spacing:-3px;margin:15px 0 18px;font-weight:950}.card h1 span{background:linear-gradient(90deg,#21a7ff,#8d3dff);-webkit-background-clip:text;color:transparent}.lead{max-width:420px;margin:0 auto;color:#91a0b8;font-size:13px;line-height:1.8}
-        .actions{display:grid;gap:11px;margin-top:29px}.primary,.installedState{width:100%;display:flex;align-items:center;gap:12px;border-radius:15px;padding:12px 14px}.primary{border:1px solid rgba(119,169,255,.35);color:#fff;background:linear-gradient(100deg,#087fff,#7a20ff);box-shadow:0 18px 42px rgba(46,74,255,.25);cursor:pointer;text-align:left}.primary:disabled{opacity:.8;cursor:wait}.buttonIcon{width:43px;height:43px;display:grid;place-items:center;border-radius:11px;background:rgba(255,255,255,.13);font-size:23px}.buttonCopy{display:grid;gap:3px}.buttonCopy small,.installedState small{font-size:8px;letter-spacing:1.5px;color:#cde8ff}.buttonCopy b,.installedState b{font-size:13px}.arrow{margin-left:auto;font-size:22px;color:#d8dfff}.installedState{border:1px solid rgba(41,211,157,.32);background:rgba(7,31,30,.8);text-align:left}.check{width:43px;height:43px;display:grid;place-items:center;border-radius:11px;background:rgba(41,211,157,.13);color:#35e99b;font-size:23px}.installedState div{display:grid;gap:3px}.installedState small{color:#6ee8bc}.help{border:1px solid #26395b;border-radius:13px;padding:13px 15px;background:rgba(4,11,26,.7);color:#dbe4f3;font-size:11px;font-weight:850;cursor:pointer}.help span{color:#68baff;margin-left:7px}
+        .actions{display:grid;gap:11px;margin-top:29px}.primary,.installedState{width:100%;display:flex;align-items:center;gap:12px;border-radius:15px;padding:12px 14px}.primary{border:1px solid rgba(119,169,255,.35);color:#fff;background:linear-gradient(100deg,#087fff,#7a20ff);box-shadow:0 18px 42px rgba(46,74,255,.25);cursor:pointer;text-align:left}.primary:disabled{opacity:.8;cursor:wait}.buttonIcon{width:43px;height:43px;display:grid;place-items:center;border-radius:11px;background:rgba(255,255,255,.13);font-size:21px}.buttonCopy{display:grid;gap:3px}.buttonCopy small,.installedState small{font-size:8px;letter-spacing:1.5px;color:#cde8ff}.buttonCopy b,.installedState b{font-size:13px}.arrow{margin-left:auto;font-size:22px;color:#d8dfff}.installedState{border:1px solid rgba(41,211,157,.32);background:rgba(7,31,30,.8);text-align:left}.check{width:43px;height:43px;display:grid;place-items:center;border-radius:11px;background:rgba(41,211,157,.13);color:#35e99b;font-size:23px}.installedState div{display:grid;gap:3px}.installedState small{color:#6ee8bc}.help{border:1px solid #26395b;border-radius:13px;padding:13px 15px;background:rgba(4,11,26,.7);color:#dbe4f3;font-size:11px;font-weight:850;cursor:pointer}.help span{color:#68baff;margin-left:7px}
         .installNotice{display:grid;gap:5px;max-height:0;opacity:0;overflow:hidden;margin-top:0;padding:0 15px;text-align:left;border:1px solid transparent;border-radius:12px;background:rgba(10,20,42,.8);transition:max-height .3s ease,opacity .3s ease,margin-top .3s ease,padding .3s ease}.installNotice.visible{max-height:180px;opacity:1;margin-top:14px;padding:13px 15px;border-color:#27436c}.installNotice strong{font-size:10px;color:#f4c92f}.installNotice span{font-size:10px;line-height:1.5;color:#8fa0bb}.installNotice b{color:#dbe4f3}
         .footerLine{margin-top:26px;display:flex;align-items:center;justify-content:center;gap:9px;color:#52637f;font-size:7px;font-weight:950;letter-spacing:1.5px}.footerLine i{width:3px;height:3px;border-radius:50%;background:#314561}
         @media(max-width:460px){.gate{padding:12px}.card{padding:35px 18px 22px;border-radius:22px}.card h1{letter-spacing:-2px}.lead{font-size:12px}.primary,.installedState{padding:11px}.help{padding:12px}}
