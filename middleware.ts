@@ -1,16 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/signup", "/auth", "/privacy", "/terms"]);
+const PUBLIC_PATHS = new Set(["/open-app", "/app"]);
 const SESSION_COOKIE = "ludo_session";
-const APP_UA_TOKEN = "LudoLiveApp/1";
+const PWA_COOKIE = "ludo_pwa";
 
 function isPublic(pathname: string) {
   if (PUBLIC_PATHS.has(pathname)) return true;
-  return pathname.startsWith("/login/") || pathname.startsWith("/register/") || pathname.startsWith("/signup/") || pathname.startsWith("/auth/");
-}
-
-function isNativeApp(request: NextRequest) {
-  return request.headers.get("user-agent")?.includes(APP_UA_TOKEN) ?? false;
+  return false;
 }
 
 function securityHeaders(response: NextResponse) {
@@ -26,27 +22,31 @@ function securityHeaders(response: NextResponse) {
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
-  const nativeApp = isNativeApp(request);
+  const hasPwa = request.cookies.get(PWA_COOKIE)?.value === "1";
 
-  // Browser access is intentionally app-only. The browser gets one gateway
-  // screen and cannot enter the game, account, dashboard, or other pages.
-  // Capacitor marks its WebView with the explicit app user-agent token above.
-  if (!nativeApp && pathname !== "/open-app") {
+  // The public website is now an installation gateway. The actual product
+  // routes are available only to the installed standalone PWA.
+  if (pathname === "/open-app" || pathname === "/app") {
+    return securityHeaders(NextResponse.next());
+  }
+
+  if (!hasPwa) {
     return securityHeaders(NextResponse.redirect(new URL("/open-app", request.url)));
   }
 
+  // Keep the installed-PWA entry point as the application's root experience.
+  if (pathname === "/") {
+    return securityHeaders(NextResponse.redirect(new URL("/app", request.url)));
+  }
+
   // An already-authenticated player must never be allowed to revisit the
-  // login/register entry point. This also protects the browser back stack.
+  // login/register entry point.
   if ((pathname === "/login" || pathname === "/register" || pathname === "/signup") && hasSession) {
     const target = searchParams.get("next");
     const destination = target && target.startsWith("/") && !target.startsWith("//") ? target : "/dashboard";
     return securityHeaders(NextResponse.redirect(new URL(destination, request.url)));
   }
 
-  // /login and /register are the canonical public entry points, but they
-  // intentionally render the existing account page rather than a replacement
-  // login/register implementation. The browser is redirected before it can
-  // reach these routes; the native app keeps the existing behavior.
   if (pathname === "/login" || pathname === "/register" || pathname === "/signup") {
     const url = request.nextUrl.clone();
     url.pathname = "/account";
@@ -54,18 +54,14 @@ export function middleware(request: NextRequest) {
     return securityHeaders(NextResponse.rewrite(url));
   }
 
-  if (isPublic(pathname)) return securityHeaders(NextResponse.next());
-
-  // Fast first gate. The cookie is NOT trusted as proof of authentication;
-  // protected APIs/server operations must validate it with currentUser().
+  // Fast first gate for authentication. The PWA cookie is only the app-entry
+  // gate; protected APIs/server operations still validate the real session.
   if (!hasSession) {
     const login = new URL("/login", request.url);
     login.searchParams.set("next", pathname + request.nextUrl.search);
     return securityHeaders(NextResponse.redirect(login));
   }
 
-  // Preserve the existing canonical game/dashboard rewrites only after the
-  // request has passed the authentication gate.
   if (pathname === "/home") return securityHeaders(NextResponse.redirect(new URL("/dashboard", request.url)));
   if (pathname === "/dashboard") {
     const url = request.nextUrl.clone();
@@ -81,4 +77,4 @@ export function middleware(request: NextRequest) {
   return securityHeaders(NextResponse.next());
 }
 
-export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sounds/|images/|api/).*)"] };
+export const config = { matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sounds/|images/|api/|sw.js).*)"] };
