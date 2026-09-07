@@ -18,6 +18,20 @@ function securityHeaders(response: NextResponse) {
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const adminApp = process.env.ADMIN_APP_URL || "";
+  const gatewayToken = process.env.ADMIN_GATEWAY_TOKEN || "";
+  const gatewayHeader = request.headers.get("x-ludo-admin-gateway") || "";
+
+  // Admin runs on its own origin. Direct visits from the player origin are handed off.
+  if (pathname === "/dbase" || pathname.startsWith("/dbase/")) {
+    if (gatewayToken && gatewayHeader === gatewayToken) {
+      return securityHeaders(NextResponse.next());
+    }
+    if (adminApp) {
+      return securityHeaders(NextResponse.redirect(new URL(adminApp + pathname + (request.nextUrl.search || ""), request.url), 307));
+    }
+    return securityHeaders(NextResponse.json({ error: "Admin application is not configured." }, { status: 503 }));
+  }
 
   // Admin is a separate same-origin application namespace, wired like eHealthCare:
   // its login/manifest/worker are public and its data access remains protected by /api/admin.
