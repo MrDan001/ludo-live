@@ -18,29 +18,6 @@ function securityHeaders(response: NextResponse) {
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
-  const adminApp = process.env.ADMIN_APP_URL || "";
-  const gatewayToken = process.env.ADMIN_GATEWAY_TOKEN || "";
-  const gatewayHeader = request.headers.get("x-ludo-admin-gateway") || "";
-
-  // Admin runs on its own origin. Direct visits from the player origin are handed off.
-  if (pathname === "/dbase" || pathname.startsWith("/dbase/")) {
-    if (gatewayToken && gatewayHeader === gatewayToken) {
-      return securityHeaders(NextResponse.next());
-    }
-    if (adminApp) {
-      return securityHeaders(NextResponse.redirect(new URL(adminApp + pathname + (request.nextUrl.search || ""), request.url), 307));
-    }
-    return securityHeaders(NextResponse.json({ error: "Admin application is not configured." }, { status: 503 }));
-  }
-
-  // Admin is a separate same-origin application namespace, wired like eHealthCare:
-  // its login/manifest/worker are public and its data access remains protected by /api/admin.
-  if (pathname === "/admin-manifest.json" || pathname === "/dbase/sw.js") {
-    return securityHeaders(NextResponse.next());
-  }
-  if (pathname === "/dbase" || pathname.startsWith("/dbase/")) {
-    return securityHeaders(NextResponse.next());
-  }
 
   // The browser/app distinction is handled client-side because a standalone
   // PWA does not send a reliable server-side "standalone" flag. Keeping the
@@ -99,5 +76,5 @@ export function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|admin-manifest.json|dbase/sw.js|icons/|sounds/|images/|api/|sw.js).*)"]
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|manifest.webmanifest|icons/|sounds/|images/|api/|sw.js).*)"]
 };
