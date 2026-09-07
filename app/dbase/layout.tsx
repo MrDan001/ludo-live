@@ -3,12 +3,13 @@ import DbasePwaGate from "./DbasePwaGate";
 import "./dbase.css";
 
 export const metadata: Metadata = {
-  title: "DBASE Admin — Ludo Live",
-  applicationName: "Ludo Live DBASE Admin",
-  manifest: "/dbase/manifest.json",
+  title: "Ludo Live Admin",
+  description: "Ludo Live administrative management console.",
+  applicationName: "Ludo Live Admin",
+  manifest: "/admin-manifest.json",
   appleWebApp: {
     capable: true,
-    title: "DBASE Admin",
+    title: "Ludo Live Admin",
     statusBarStyle: "black-translucent",
   },
   icons: {
