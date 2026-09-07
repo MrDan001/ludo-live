@@ -2,10 +2,15 @@ import { NextRequest, NextResponse } from "next/server";
 
 const PUBLIC_PATHS = new Set(["/", "/login", "/register", "/signup", "/auth", "/privacy", "/terms"]);
 const SESSION_COOKIE = "ludo_session";
+const APP_UA_TOKEN = "LudoLiveApp/1";
 
 function isPublic(pathname: string) {
   if (PUBLIC_PATHS.has(pathname)) return true;
   return pathname.startsWith("/login/") || pathname.startsWith("/register/") || pathname.startsWith("/signup/") || pathname.startsWith("/auth/");
+}
+
+function isNativeApp(request: NextRequest) {
+  return request.headers.get("user-agent")?.includes(APP_UA_TOKEN) ?? false;
 }
 
 function securityHeaders(response: NextResponse) {
@@ -21,6 +26,14 @@ function securityHeaders(response: NextResponse) {
 export function middleware(request: NextRequest) {
   const { pathname, searchParams } = request.nextUrl;
   const hasSession = Boolean(request.cookies.get(SESSION_COOKIE)?.value);
+  const nativeApp = isNativeApp(request);
+
+  // Browser access is intentionally app-only. The browser gets one gateway
+  // screen and cannot enter the game, account, dashboard, or other pages.
+  // Capacitor marks its WebView with the explicit app user-agent token above.
+  if (!nativeApp && pathname !== "/open-app") {
+    return securityHeaders(NextResponse.redirect(new URL("/open-app", request.url)));
+  }
 
   // An already-authenticated player must never be allowed to revisit the
   // login/register entry point. This also protects the browser back stack.
@@ -32,7 +45,8 @@ export function middleware(request: NextRequest) {
 
   // /login and /register are the canonical public entry points, but they
   // intentionally render the existing account page rather than a replacement
-  // login/register implementation. The browser URL remains /login or /register.
+  // login/register implementation. The browser is redirected before it can
+  // reach these routes; the native app keeps the existing behavior.
   if (pathname === "/login" || pathname === "/register" || pathname === "/signup") {
     const url = request.nextUrl.clone();
     url.pathname = "/account";
