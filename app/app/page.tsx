@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AccountPage from "../account/page";
 
@@ -14,6 +14,7 @@ function isStandalonePwa() {
 
 export default function AppEntryPage() {
   const router = useRouter();
+  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     if (!isStandalonePwa()) {
@@ -22,9 +23,10 @@ export default function AppEntryPage() {
     }
 
     document.cookie = "ludo_pwa=1; Path=/; Max-Age=31536000; SameSite=Lax";
+    setReady(true);
   }, [router]);
 
-  if (!isStandalonePwa()) return null;
+  if (!ready) return null;
 
   return <AccountPage />;
 }
