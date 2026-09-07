@@ -9,6 +9,16 @@
   "orientation": "portrait-primary",
   "background_color": "#020817",
   "theme_color": "#07152d",
+  "related_applications": [
+    {
+      "platform": "webapp",
+      "url": "/manifest.webmanifest",
+      "id": "/app"
+    }
+  ],
+  "launch_handler": {
+    "client_mode": "navigate-existing"
+  },
   "icons": [
     { "src": "/icons/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
   ],
