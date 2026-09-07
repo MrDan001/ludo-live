@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 
 const INSTALL_URL = "https://github.com/MrDan001/ludo-live/releases/latest/download/ludo-live.apk";
-const ANDROID_INTENT = "intent://open#Intent;scheme=ludolive;package=live.ludo.app;end";
+const ANDROID_INTENT = `intent://open#Intent;scheme=ludolive;package=live.ludo.app;S.browser_fallback_url=${encodeURIComponent(INSTALL_URL)};end`;
 
 export default function OpenAppPage() {
   const [showInstall, setShowInstall] = useState(false);
@@ -64,7 +64,7 @@ export default function OpenAppPage() {
             <span className="arrow">→</span>
           </button>
 
-          <a className="install" href={INSTALL_URL} download>
+          <a className="install" href={INSTALL_URL}>
             <span>Install Ludo Live</span>
             <b>↓</b>
           </a>
