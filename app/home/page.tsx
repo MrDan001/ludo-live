@@ -345,16 +345,17 @@ export default function HomePage() {
         }
 
         .main-actions {
-          flex: 0 0 auto;
+          flex: 1 1 auto;
+          min-height: 0;
           margin-top: 8px;
           display: grid;
-          grid-template-rows: repeat(4, 88px);
+          grid-template-rows: repeat(4, minmax(0, 1fr));
           gap: 8px;
         }
 
         .main-action {
           min-width: 0;
-          min-height: 88px;
+          min-height: 0;
           display: grid;
           grid-template-columns: 68px minmax(0, 1fr) 24px;
           align-items: center;
@@ -493,8 +494,8 @@ export default function HomePage() {
           .avatar-ring { flex-basis: 52px; width: 52px; height: 52px; }
           .wallet-pill { height: 34px; padding-left: 6px; padding-right: 6px; font-size: 10px; }
           .plus-button { flex-basis: 42px; width: 42px; height: 42px; font-size: 26px; }
-          .main-actions { margin-top: 6px; grid-template-rows: repeat(4, 72px); gap: 6px; }
-          .main-action { min-height: 72px; grid-template-columns: 54px minmax(0,1fr) 20px; gap: 7px; padding: 7px 10px; border-radius: 16px; }
+          .main-actions { flex: 1 1 auto; min-height: 0; margin-top: 6px; grid-template-rows: repeat(4, minmax(0,1fr)); gap: 6px; }
+          .main-action { min-height: 0; grid-template-columns: 54px minmax(0,1fr) 20px; gap: 7px; padding: 7px 10px; border-radius: 16px; }
           .main-action__icon { width: 54px; font-size: 34px !important; }
           .main-action__title { font-size: 16px !important; }
           .main-action__sub { margin-top: 3px; font-size: 9px !important; }
@@ -509,8 +510,8 @@ export default function HomePage() {
           .home-header { flex-basis: 58px; }
           .profile-block { height: 58px; }
           .avatar-ring { flex-basis: 48px; width: 48px; height: 48px; }
-          .main-actions { grid-template-rows: repeat(4, 68px); gap: 5px; }
-          .main-action { min-height: 68px; }
+          .main-actions { grid-template-rows: repeat(4, minmax(0,1fr)); gap: 5px; }
+           .main-action { min-height: 0; }
           .quick-actions { flex-basis: 86px; }
           .inventory-button { flex-basis: 58px; min-height: 58px; }
         }
