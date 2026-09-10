@@ -7,15 +7,15 @@ import ForfeitControl from "./ForfeitControl";
 export default function AppFrame({ children, back = "/home", backLabel = "← Back", hideBack = false }: { children: React.ReactNode; back?: string; backLabel?: string; hideBack?: boolean }) {
   useEffect(() => {
     const handlePopState = () => {
-      window.location.href = "/home";
+      window.location.href = back;
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, []);
+  }, [back]);
 
   const goBack = () => {
-    window.location.href = "/home";
+    window.location.href = back;
   };
 
   return (
