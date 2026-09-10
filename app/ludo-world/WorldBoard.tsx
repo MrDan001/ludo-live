@@ -9,10 +9,7 @@ const BOT_COLORS = ["green", "blue"] as const;
 type WorldColor = DemoToken["color"];
 type Turn = "human" | "bot";
 
-type Props = {
-  boardTheme?: BoardThemeId;
-  onCompleted?: () => void;
-};
+type Props = { boardTheme?: BoardThemeId; onCompleted?: () => void };
 
 function makeTokens(): DemoToken[] {
   return ([...HUMAN_COLORS, ...BOT_COLORS] as WorldColor[]).flatMap((color) =>
@@ -31,7 +28,6 @@ export default function WorldBoard({ boardTheme = "classic", onCompleted }: Prop
 
   const humanTokens = useMemo(() => tokens.filter((t) => HUMAN_COLORS.includes(t.color as (typeof HUMAN_COLORS)[number])), [tokens]);
   const botTokens = useMemo(() => tokens.filter((t) => BOT_COLORS.includes(t.color as (typeof BOT_COLORS)[number])), [tokens]);
-
   const legalTokenKeys = useMemo(() => {
     if (dice == null || turn !== "human" || gameOver) return [];
     return humanTokens.filter((token) => rules.canMove(tokens, token, dice)).map((token) => `${token.color}:${token.id}`);
@@ -39,24 +35,13 @@ export default function WorldBoard({ boardTheme = "classic", onCompleted }: Prop
 
   function reset() {
     if (aiTimer.current) window.clearTimeout(aiTimer.current);
-    setTokens(makeTokens());
-    setTurn("human");
-    setDice(null);
-    setRolling(false);
-    setGameOver(false);
-    setMessage("Roll the dice to begin.");
+    setTokens(makeTokens()); setTurn("human"); setDice(null); setRolling(false); setGameOver(false); setMessage("Roll the dice to begin.");
   }
 
-  function finishTurn(nextTurn: Turn, rolled: number) {
-    if (rolled === 6) {
-      setTurn(nextTurn);
-      setDice(null);
-      setMessage(nextTurn === "human" ? "You rolled a 6 — roll again." : "The World AI rolled a 6 and keeps the turn.");
-      return;
-    }
-    setTurn(nextTurn);
-    setDice(null);
-    setMessage(nextTurn === "human" ? "Your turn. Roll the dice." : "World AI is thinking…");
+  function finishTurn(rolled: number) {
+    const next: Turn = rolled === 6 ? turn : turn === "human" ? "bot" : "human";
+    setTurn(next); setDice(null);
+    setMessage(rolled === 6 ? (turn === "human" ? "You rolled a 6 — roll again." : "The World AI rolled a 6 — it rolls again.") : next === "human" ? "Your turn. Roll the dice." : "World AI is thinking…");
   }
 
   function rollForHuman() {
@@ -64,15 +49,10 @@ export default function WorldBoard({ boardTheme = "classic", onCompleted }: Prop
     setRolling(true);
     const rolled = Math.floor(Math.random() * 6) + 1;
     window.setTimeout(() => {
-      setRolling(false);
-      setDice(rolled);
+      setRolling(false); setDice(rolled);
       const legal = humanTokens.filter((token) => rules.canMove(tokens, token, rolled));
-      if (!legal.length) {
-        setMessage(`You rolled ${rolled}. No legal move.`);
-        finishTurn("bot", rolled);
-      } else {
-        setMessage(`You rolled ${rolled}. Choose a glowing token.`);
-      }
+      if (!legal.length) { setMessage(`You rolled ${rolled}. No legal move.`); finishTurn(rolled); }
+      else setMessage(`You rolled ${rolled}. Choose a glowing token.`);
     }, 420);
   }
 
@@ -80,19 +60,13 @@ export default function WorldBoard({ boardTheme = "classic", onCompleted }: Prop
     if (turn !== "human" || dice == null || gameOver) return;
     const token = tokens.find((t) => t.color === color && t.id === id);
     if (!token || !rules.canMove(tokens, token, dice)) return;
-    const result = rules.applyMove(tokens, token, dice);
+    const rolled = dice;
+    const result = rules.applyMove(tokens, token, rolled);
     if (!result) return;
     setTokens(result.tokens as DemoToken[]);
-    const won = rules.hasWon(result.tokens as any, HUMAN_COLORS as any);
-    if (won) {
-      setGameOver(true);
-      setDice(null);
-      setMessage("🏆 You won the World Arena match!");
-      onCompleted?.();
-      return;
-    }
+    if (rules.hasWon(result.tokens as any, HUMAN_COLORS as any)) { setGameOver(true); setDice(null); setMessage("🏆 You won the World Arena match!"); onCompleted?.(); return; }
     setMessage(result.captured ? "💥 Capture! Your token gets the World kill bonus." : "Move completed.");
-    finishTurn("bot", dice);
+    finishTurn(rolled);
   }
 
   useEffect(() => {
@@ -101,11 +75,7 @@ export default function WorldBoard({ boardTheme = "classic", onCompleted }: Prop
       const rolled = Math.floor(Math.random() * 6) + 1;
       setDice(rolled);
       const legal = botTokens.filter((token) => rules.canMove(tokens, token, rolled));
-      if (!legal.length) {
-        setMessage(`World AI rolled ${rolled}. No legal move.`);
-        finishTurn("human", rolled);
-        return;
-      }
+      if (!legal.length) { setMessage(`World AI rolled ${rolled}. No legal move.`); finishTurn(rolled); return; }
       const choice = legal[Math.floor(Math.random() * legal.length)];
       window.setTimeout(() => {
         const current = tokens.find((t) => t.color === choice.color && t.id === choice.id);
@@ -113,15 +83,9 @@ export default function WorldBoard({ boardTheme = "classic", onCompleted }: Prop
         const result = rules.applyMove(tokens, current, rolled);
         if (!result) return;
         setTokens(result.tokens as DemoToken[]);
-        const won = rules.hasWon(result.tokens as any, BOT_COLORS as any);
-        if (won) {
-          setGameOver(true);
-          setDice(null);
-          setMessage("The World AI won this round. Try again.");
-          return;
-        }
+        if (rules.hasWon(result.tokens as any, BOT_COLORS as any)) { setGameOver(true); setDice(null); setMessage("The World AI won this round. Try again."); return; }
         setMessage(result.captured ? "The World AI made a capture." : `World AI moved ${rolled} spaces.`);
-        finishTurn("human", rolled);
+        finishTurn(rolled);
       }, 520);
     }, 700);
     aiTimer.current = timer;
@@ -133,22 +97,11 @@ export default function WorldBoard({ boardTheme = "classic", onCompleted }: Prop
   return (
     <section className="lw-board-panel">
       <div className="lw-board-head">
-        <div>
-          <div className="lw-kicker">WORLD ARENA</div>
-          <h2>Playable Battle Board</h2>
-          <p>Standalone World rules with the same Ludo board geometry. Your existing Online rooms remain untouched.</p>
-        </div>
+        <div><div className="lw-kicker">WORLD ARENA</div><h2>Playable Battle Board</h2><p>Standalone World rules use the existing canonical board geometry. The existing Online rooms remain isolated.</p></div>
         <div className="lw-board-status"><b>{turn === "human" ? "YOUR TURN" : "WORLD AI"}</b><span>{dice == null ? "Dice ready" : `Rolled ${dice}`}</span></div>
       </div>
-
       <div className="lw-board-stage">
-        <LudoBoardMultiplayer
-          theme={boardTheme}
-          demoTokens={tokens}
-          legalTokenKeys={legalTokenKeys}
-          onTokenClick={moveHuman}
-          animateUpdates
-        />
+        <LudoBoardMultiplayer theme={boardTheme} demoTokens={tokens} legalTokenKeys={legalTokenKeys} onTokenClick={moveHuman} animateUpdates />
         <div className="lw-board-controls">
           <button className="lw-dice-button" type="button" onClick={rollForHuman} disabled={rolling || turn !== "human" || gameOver}>{rolling ? "🎲 Rolling…" : dice == null ? "🎲 Roll Dice" : `🎲 ${dice}`}</button>
           <button className="lw-reset-button" type="button" onClick={reset}>{gameOver ? "Play Again" : "Reset Match"}</button>
