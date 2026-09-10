@@ -1,4 +1,4 @@
-import type { WorldEngine, SimulatedMove } from "./types";
+import type { WorldEngine } from "./types";
 
 function bestBossMove(legal: Parameters<WorldEngine["chooseBotToken"]>[0], context: Parameters<WorldEngine["chooseBotToken"]>[1]) {
   const scored = legal.map((token) => {
