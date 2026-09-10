@@ -1,3 +1,3 @@
 "use client";
 
-export { default } from "./WorldGamePageV2";
+export { default } from "./WorldGamePageMobile";
