@@ -29,19 +29,99 @@ function Dice({value,rolling,disabled,onRoll}:{value:Face;rolling:boolean;disabl
 function WorldBoard({theme,tokens,legal,onToken}:{theme:BoardThemeId;tokens:DemoToken[];legal:string[];onToken:(color:DemoToken["color"],id:number)=>void}){
   const palette=BOARD_PALETTES[theme]||BOARD_PALETTES.classic;
   const legalSet=useMemo(function(){return new Set(legal);},[legal]);
-  const finishSlots:Array<[string,string]>=[["44%","44%"],["48%","44%"],["44%","48%"],["48%","48%"],["52%","44%"],["56%","44%"],["52%","48%"],["56%","48%"],["44%","52%"],["48%","52%"],["44%","56%"],["48%","56%"],["52%","52%"],["56%","52%"],["52%","56%"],["56%","56%"]];
+
+  const finishSlots:Array<[string,string]>=[
+    ["44%","44%"],["48%","44%"],["44%","48%"],["48%","48%"],
+    ["52%","44%"],["56%","44%"],["52%","48%"],["56%","48%"],
+    ["44%","52%"],["48%","52%"],["44%","56%"],["48%","56%"],
+    ["52%","52%"],["56%","52%"],["52%","56%"],["56%","56%"]
+  ];
   const finishOrder:any={red:0,yellow:1,green:2,blue:3};
+
+  const yardCenters:any={
+    green:[[13.5,13.5],[13.5,26.5],[26.5,13.5],[26.5,26.5]],
+    yellow:[[13.5,73.5],[13.5,86.5],[26.5,73.5],[26.5,86.5]],
+    red:[[73.5,13.5],[73.5,26.5],[86.5,13.5],[86.5,26.5]],
+    blue:[[73.5,73.5],[73.5,86.5],[86.5,73.5],[86.5,86.5]]
+  };
+
   const placed=useMemo(function(){
-    const centers:any={green:[[13.5,13.5],[13.5,26.5],[26.5,13.5],[26.5,26.5]],yellow:[[13.5,73.5],[13.5,86.5],[26.5,73.5],[26.5,86.5]],red:[[73.5,13.5],[73.5,26.5],[86.5,13.5],[86.5,26.5]],blue:[[73.5,73.5],[73.5,86.5],[86.5,73.5],[86.5,86.5]]};
-    const raw=tokens.map(function(token){const p=Number(token.position)||0;if(p===FINISH_PROGRESS)return null;let left="",top="";if(tokenState(p)==="yard"){const c=centers[token.color][token.id];left=c[1]+"%";top=c[0]+"%";}else{const cell=getTokenCell(token.color,p);if(!cell)return null;left=((cell[1]+.5)*100/15)+"%";top=((cell[0]+.5)*100/15)+"%";}return {token,left,top,key:left+"|"+top};}).filter(Boolean) as Array<{token:DemoToken;left:string;top:string;key:string}>;
-    const counts:Record<string,number>={};const totals:Record<string,number>={};raw.forEach(function(item){totals[item.key]=(totals[item.key]||0)+1;});return raw.map(function(item){const index=counts[item.key]||0;counts[item.key]=index+1;return {...item,index,count:totals[item.key]};});
+    const raw=tokens.map(function(token){
+      const p=Number(token.position)||0;
+      if(p===FINISH_PROGRESS)return null;
+      const state=tokenState(p);
+      if(state==="yard"){
+        const c=yardCenters[token.color][token.id];
+        return {token,left:c[1]+"%",top:c[0]+"%",key:"yard:"+token.color};
+      }
+      const cell=getTokenCell(token.color,p);
+      if(!cell)return null;
+      return {
+        token,
+        left:((cell[1]+.5)*100/15)+"%",
+        top:((cell[0]+.5)*100/15)+"%",
+        key:cell[0]+"|"+cell[1]
+      };
+    }).filter(Boolean) as Array<{token:DemoToken;left:string;top:string;key:string}>;
+
+    const counts:Record<string,number>={};
+    const totals:Record<string,number>={};
+    raw.forEach(function(item){totals[item.key]=(totals[item.key]||0)+1;});
+    return raw.map(function(item){
+      const index=counts[item.key]||0;
+      counts[item.key]=index+1;
+      return {...item,index,count:totals[item.key],state:tokenState(Number(item.token.position)||0)};
+    });
   },[tokens]);
-  const stackOffset=function(index:number,count:number){if(count<=1)return [0,0];const patterns:{[key:string]:number[][]}={2:[[-1.2,0],[1.2,0]],3:[[-1.2,-1],[1.2,-1],[0,1]],4:[[-1.2,-1],[1.2,-1],[-1.2,1],[1.2,1]]};const p=patterns[String(count)]||patterns["4"];return p[index%p.length];};
+
+  const stackOffset=function(index:number,count:number){
+    if(count<=1)return [0,0];
+    // Keep every stack inside a standard 15x15 cell even with the larger track tokens.
+    const patterns:{[key:string]:number[][]}={
+      2:[[-0.92,0],[0.92,0]],
+      3:[[-0.9,-0.82],[0.9,-0.82],[0,0.82]],
+      4:[[-0.9,-0.82],[0.9,-0.82],[-0.9,0.82],[0.9,0.82]]
+    };
+    const p=patterns[String(count)]||patterns["4"];
+    return p[index%p.length];
+  };
+
   const finished=tokens.filter(function(t){return Number(t.position)===FINISH_PROGRESS;});
-  return <div className="world-board" style={{"--world-accent":palette.accent} as React.CSSProperties}><LudoBoard theme={theme} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={function(){}}/><div className="world-token-layer">
-    {placed.map(function(item){const token=item.token;const isLegal=legalSet.has(token.color+":"+token.id);const o=stackOffset(item.index,item.count);return <button key={token.color+":"+token.id} className={"world-token "+(isLegal?"legal":"")} style={{left:"calc("+item.left+" + "+o[0]+"%)",top:"calc("+item.top+" + "+o[1]+"%)",background:(palette as any)[token.color],color:(palette as any)[token.color],transform:"translate(-50%,-50%)"}} onClick={function(){onToken(token.color,token.id);}} aria-label={isLegal?token.color+" token — move":token.color+" token"}>{isLegal&&<span className="world-token-ring"/>}</button>;})}
-    {finished.map(function(token){const slotIndex=(finishOrder[token.color]||0)*4+token.id;const slot=finishSlots[slotIndex]||finishSlots[0];return <div key={"finished:"+token.color+":"+token.id} className="world-finished-token" style={{left:slot[0],top:slot[1],background:(palette as any)[token.color]}}/>;})}
-  </div></div>;
+
+  return <div className="world-board" style={{"--world-accent":palette.accent} as React.CSSProperties}>
+    <LudoBoard theme={theme} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={function(){}}/>
+    <div className="world-token-layer">
+      {placed.map(function(item){
+        const token=item.token;
+        const isLegal=legalSet.has(token.color+":"+token.id);
+        const o=stackOffset(item.index,item.count);
+        const sizeClass=item.state==="yard"?"yard":"track";
+        return <button
+          key={token.color+":"+token.id}
+          type="button"
+          className={"world-token "+sizeClass+(isLegal?" legal":"")}
+          style={{
+            left:"calc("+item.left+" + "+o[0]+"%)",
+            top:"calc("+item.top+" + "+o[1]+"%)",
+            background:(palette as any)[token.color],
+            color:(palette as any)[token.color]
+          }}
+          onClick={function(){onToken(token.color,token.id);}}
+          aria-label={isLegal?token.color+" token — move":token.color+" token"}
+        >{isLegal&&<span className="world-token-ring"/>}</button>;
+      })}
+      {finished.map(function(token){
+        const slotIndex=(finishOrder[token.color]||0)*4+token.id;
+        const slot=finishSlots[slotIndex]||finishSlots[0];
+        return <div
+          key={"finished:"+token.color+":"+token.id}
+          className="world-finished-token"
+          style={{left:slot[0],top:slot[1],background:(palette as any)[token.color]}}
+          aria-hidden="true"
+        />;
+      })}
+    </div>
+  </div>;
 }
 
 export default function WorldMatch({mode}:{mode:WorldMode}){
