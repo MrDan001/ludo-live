@@ -133,7 +133,7 @@ export default function WorldMatch({mode}:{mode:WorldMode}){
   const animateMove=async function(token:DemoToken,rolled:Face,actor:"human"|"bot"){
     const target=nextProgress(Number(token.position) as any,rolled as any);
     if(target===null)return false;
-    setPendingDice(null);setRolling(true);
+    setPendingDice(null);
     let step=Number(token.position)||0;
     while(step<target){
       await new Promise(function(resolve){window.setTimeout(resolve,170);});
