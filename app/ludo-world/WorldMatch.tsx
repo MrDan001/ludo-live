@@ -50,9 +50,9 @@ function WorldBoard({theme,tokens,legal,onToken}:{theme:BoardThemeId;tokens:Demo
     const p=patterns[String(count)]||patterns["4"];
     return p[index%p.length];
   };
-  return <div className="world-board" style={{"--world-accent":palette.accent} as React.CSSProperties}><LudoBoard theme={theme} style={{width:"100%",height:"100%"}} demoTokens={[]}/><div className="world-token-layer">
+  return <div className="world-board" style={{"--world-accent":palette.accent} as React.CSSProperties}><LudoBoard theme={theme} style={{width:"100%",height:"100%"}} demoTokens={[]} onTokenClick={function(){}}/><div className="world-token-layer">
     {placed.map(function(item){const token=item.token;const isLegal=legalSet.has(token.color+":"+token.id);const o=stackOffsets(item.index,item.count);return <button key={token.color+":"+token.id} className={"world-token "+(isLegal?"legal":"")} style={{left:item.left,top:item.top,background:(palette as any)[token.color],transform:"translate(-50%,-50%) translate("+o[0]*100+"%,"+o[1]*100+"%)"}} onClick={function(){onToken(token.color,token.id);}} aria-label={isLegal?token.color+" token — move":token.color+" token"}>{isLegal&&<span className="world-token-ring"/>}</button>;})}
-  </div><div className="world-board-tip">{legal.length?"Tap a glowing token":"Roll the dice to choose a move"}</div></div>;
+  </div></div>;
 }
 
 export default function WorldMatch({mode}:{mode:WorldMode}){
