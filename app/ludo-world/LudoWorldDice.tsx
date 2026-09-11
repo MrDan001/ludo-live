@@ -4,12 +4,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { DICE_STYLES } from "../_components/LudoDice";
 
 type DiceFace = 1 | 2 | 3 | 4 | 5 | 6;
-type Props = {
-  value: DiceFace | null;
-  onRoll: (value: DiceFace) => void;
-  rolling?: boolean;
-  disabled?: boolean;
-};
+type Props = { value: DiceFace | null; onRoll: (value: DiceFace) => void; rolling?: boolean; disabled?: boolean };
 
 const PIPS: Record<DiceFace, number[]> = {
   1: [4],
@@ -19,7 +14,6 @@ const PIPS: Record<DiceFace, number[]> = {
   5: [0, 2, 4, 6, 8],
   6: [0, 2, 3, 5, 6, 8],
 };
-
 const randomFace = (): DiceFace => (Math.floor(Math.random() * 6) + 1) as DiceFace;
 
 function Face({ value, className }: { value: DiceFace; className: string }) {
@@ -33,8 +27,8 @@ function Face({ value, className }: { value: DiceFace; className: string }) {
 export default function LudoWorldDice({ value, onRoll, rolling = false, disabled = false }: Props) {
   const [display, setDisplay] = useState<DiceFace>(value ?? 1);
   const [humanRolling, setHumanRolling] = useState(false);
-  const timerRef = useRef<number | null>(null);
-  const endRef = useRef<number | null>(null);
+  const intervalRef = useRef<number | null>(null);
+  const timeoutRef = useRef<number | null>(null);
   const lockedRef = useRef(false);
 
   useEffect(() => {
@@ -43,17 +37,17 @@ export default function LudoWorldDice({ value, onRoll, rolling = false, disabled
 
   useEffect(() => {
     if (!rolling) return;
-    if (timerRef.current !== null) window.clearInterval(timerRef.current);
-    timerRef.current = window.setInterval(() => setDisplay(randomFace()), 85);
+    if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
+    intervalRef.current = window.setInterval(() => setDisplay(randomFace()), 85);
     return () => {
-      if (timerRef.current !== null) window.clearInterval(timerRef.current);
-      timerRef.current = null;
+      if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
     };
   }, [rolling]);
 
   useEffect(() => () => {
-    if (timerRef.current !== null) window.clearInterval(timerRef.current);
-    if (endRef.current !== null) window.clearTimeout(endRef.current);
+    if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
+    if (timeoutRef.current !== null) window.clearTimeout(timeoutRef.current);
   }, []);
 
   const roll = () => {
@@ -62,11 +56,11 @@ export default function LudoWorldDice({ value, onRoll, rolling = false, disabled
     setHumanRolling(true);
     const final = randomFace();
     setDisplay(final);
-    if (timerRef.current !== null) window.clearInterval(timerRef.current);
-    timerRef.current = window.setInterval(() => setDisplay(randomFace()), 85);
-    endRef.current = window.setTimeout(() => {
-      if (timerRef.current !== null) window.clearInterval(timerRef.current);
-      timerRef.current = null;
+    if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
+    intervalRef.current = window.setInterval(() => setDisplay(randomFace()), 85);
+    timeoutRef.current = window.setTimeout(() => {
+      if (intervalRef.current !== null) window.clearInterval(intervalRef.current);
+      intervalRef.current = null;
       setDisplay(final);
       setHumanRolling(false);
       lockedRef.current = false;
@@ -75,14 +69,14 @@ export default function LudoWorldDice({ value, onRoll, rolling = false, disabled
   };
 
   const isRolling = rolling || humanRolling;
-  const diceSkin = DICE_STYLES.classic;
+  const skin = DICE_STYLES.classic;
 
   return (
     <section className="lw7-dice" aria-label="Ludo World dice">
       <button type="button" className={`lw7-dice-button ${isRolling ? "is-rolling" : ""}`} onClick={roll} disabled={disabled || isRolling} aria-label="Roll dice">
         <span className="lw7-dice-shadow" />
         <span className="lw7-dice-cube-wrap">
-          <span className="lw7-dice-cube" style={{ "--dice-skin": diceSkin } as React.CSSProperties}>
+          <span className="lw7-dice-cube" style={{ "--dice-skin": skin } as React.CSSProperties}>
             <Face value={display} className="front" />
             <Face value={6} className="back" />
             <Face value={3} className="right" />
