@@ -1,3 +1,3 @@
 "use client";
 
-export { default } from "./LudoWorldHubV2";
+export { default } from "./WorldHub";

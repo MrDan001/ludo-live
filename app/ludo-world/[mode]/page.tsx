@@ -1,9 +1,9 @@
 import { notFound } from "next/navigation";
-import WorldGamePage from "../WorldGamePage";
-import { WORLD_ENGINES, type WorldMode } from "../engines";
+import WorldMatch from "../WorldMatch";
+import { WORLD_MODES, type WorldMode } from "../world-data";
 
 export default function LudoWorldModePage({ params }: { params: { mode: string } }) {
   const mode = params.mode as WorldMode;
-  if (!(mode in WORLD_ENGINES)) notFound();
-  return <WorldGamePage mode={mode} />;
+  if (!WORLD_MODES.some(function (item) { return item.id === mode; })) notFound();
+  return <WorldMatch mode={mode} />;
 }
